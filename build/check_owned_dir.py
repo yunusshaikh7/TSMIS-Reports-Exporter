@@ -253,10 +253,8 @@ def reset_replacement_race():
 
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_owned_reset_race_"))
     output = tmp / "output"
-    input_root = tmp / "input"
     store = tmp / "store"
     output.mkdir()
-    input_root.mkdir()
     store.mkdir()
     live = owned_dir.ensure_owned_dir(store / "ssor-prod", kind="store")
     (live / "app-report.xlsx").write_text("app", encoding="utf-8")
@@ -264,8 +262,7 @@ def reset_replacement_race():
     sentinel = live / "personal-budget.xlsx"
 
     saved = (gui_worker_maint.OUTPUT_ROOT, gui_worker_maint.FAILURES_DIR,
-             gui_worker_maint.INPUT_ROOT, gui_worker_maint.measure_targets,
-             settings.get_batch_dest)
+             gui_worker_maint.measure_targets, settings.get_batch_dest)
     calls = 0
 
     def _replace_during_measure(targets):
@@ -275,12 +272,11 @@ def reset_replacement_race():
             live.rename(moved)
             live.mkdir()
             sentinel.write_text("user-owned", encoding="utf-8")
-        return saved[3](targets)
+        return saved[2](targets)          # the real measure_targets (index shifted after INPUT_ROOT removal)
 
     try:
         gui_worker_maint.OUTPUT_ROOT = output
         gui_worker_maint.FAILURES_DIR = tmp / "failures"
-        gui_worker_maint.INPUT_ROOT = input_root
         gui_worker_maint.measure_targets = _replace_during_measure
         settings.get_batch_dest = lambda: str(store)
         q = _Q()
@@ -296,8 +292,7 @@ def reset_replacement_race():
               (moved / "app-report.xlsx").read_text(encoding="utf-8") == "app")
     finally:
         (gui_worker_maint.OUTPUT_ROOT, gui_worker_maint.FAILURES_DIR,
-         gui_worker_maint.INPUT_ROOT, gui_worker_maint.measure_targets,
-         settings.get_batch_dest) = saved
+         gui_worker_maint.measure_targets, settings.get_batch_dest) = saved
         shutil.rmtree(tmp, ignore_errors=True)
 
 
@@ -308,19 +303,16 @@ def reset_quarantine_positive():
 
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_owned_reset_positive_"))
     output = tmp / "output"
-    input_root = tmp / "input"
     store = tmp / "store"
     output.mkdir()
-    input_root.mkdir()
     store.mkdir()
     live = owned_dir.ensure_owned_dir(store / "ars-prod", kind="store")
     (live / "report.xlsx").write_text("app", encoding="utf-8")
     saved = (gui_worker_maint.OUTPUT_ROOT, gui_worker_maint.FAILURES_DIR,
-             gui_worker_maint.INPUT_ROOT, settings.get_batch_dest)
+             settings.get_batch_dest)
     try:
         gui_worker_maint.OUTPUT_ROOT = output
         gui_worker_maint.FAILURES_DIR = tmp / "failures"
-        gui_worker_maint.INPUT_ROOT = input_root
         settings.get_batch_dest = lambda: str(store)
         previewed = gui_worker_maint.reset_targets()
         q = _Q()
@@ -335,7 +327,7 @@ def reset_quarantine_positive():
               not list(store.glob(".*.tsmis-reset-*")))
     finally:
         (gui_worker_maint.OUTPUT_ROOT, gui_worker_maint.FAILURES_DIR,
-         gui_worker_maint.INPUT_ROOT, settings.get_batch_dest) = saved
+         settings.get_batch_dest) = saved
         shutil.rmtree(tmp, ignore_errors=True)
 
 
@@ -346,16 +338,13 @@ def reset_quarantine_failure_restores():
 
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_owned_reset_restore_"))
     output = tmp / "output"
-    input_root = tmp / "input"
     store = tmp / "store"
     output.mkdir()
-    input_root.mkdir()
     store.mkdir()
     live = owned_dir.ensure_owned_dir(store / "ssor-dev", kind="store")
     report = live / "locked.xlsx"
     report.write_text("app", encoding="utf-8")
     saved = (gui_worker_maint.OUTPUT_ROOT, gui_worker_maint.FAILURES_DIR,
-             gui_worker_maint.INPUT_ROOT,
              gui_worker_maint.safe_delete.scoped_rmtree,
              settings.get_batch_dest)
 
@@ -366,7 +355,6 @@ def reset_quarantine_failure_restores():
     try:
         gui_worker_maint.OUTPUT_ROOT = output
         gui_worker_maint.FAILURES_DIR = tmp / "failures"
-        gui_worker_maint.INPUT_ROOT = input_root
         gui_worker_maint.safe_delete.scoped_rmtree = _leave_locked
         settings.get_batch_dest = lambda: str(store)
         previewed = gui_worker_maint.reset_targets()
@@ -385,7 +373,6 @@ def reset_quarantine_failure_restores():
               not list(store.glob(".*.tsmis-reset-*")))
     finally:
         (gui_worker_maint.OUTPUT_ROOT, gui_worker_maint.FAILURES_DIR,
-         gui_worker_maint.INPUT_ROOT,
          gui_worker_maint.safe_delete.scoped_rmtree,
          settings.get_batch_dest) = saved
         shutil.rmtree(tmp, ignore_errors=True)

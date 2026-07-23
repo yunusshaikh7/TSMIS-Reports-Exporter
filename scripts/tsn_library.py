@@ -518,9 +518,11 @@ def ensure_layout():
 
 
 # --------------------------------------------------------------------------- #
-# Legacy fallbacks (Highway Log only) — honored read-only until the user imports
-# the raw into the library, so existing installs never break. Computed lazily from
-# paths.* at call time (so a test that redirects OUTPUT_ROOT/INPUT_ROOT is honored).
+# Legacy fallback (Highway Log only) — the pre-library COMBINE output workbook
+# (output/tsn_highway_log_consolidated.xlsx), honored read-only so existing
+# installs never break. Computed lazily from paths.* at call time (so a test that
+# redirects OUTPUT_ROOT is honored). The old input/ raw-drop fallback was retired
+# in v0.30.0 — district PDFs now live only in tsn_library/<report>/raw/.
 # --------------------------------------------------------------------------- #
 def _legacy_consolidated(report):
     if report == "highway_log":
@@ -528,24 +530,13 @@ def _legacy_consolidated(report):
     return None
 
 
-def _legacy_raw_dir(report):
-    if report == "highway_log":
-        return paths.INPUT_ROOT / "tsn_highway_log"
-    return None
-
-
 def _resolve_legacy_global(report):
-    """The pre-library global locations for `report` (consolidated workbook, then
-    raw drop folder). Returns the tsn_source-shaped dict, or {kind:none}."""
+    """The pre-library global consolidated workbook for `report`, if present.
+    Returns the tsn_source-shaped dict, or {kind:none}."""
     cons = _legacy_consolidated(report)
     if cons and cons.is_file():
         return {"kind": "consolidated", "path": str(cons),
                 "mtime": _safe_mtime(cons), "legacy": True}
-    raw = _legacy_raw_dir(report)
-    if raw:
-        n = sum(1 for p in raw.glob("*.pdf")) if raw.is_dir() else 0
-        if n:
-            return {"kind": "pdfs", "pdf_count": n, "legacy": True}
     return {"kind": "none"}
 
 

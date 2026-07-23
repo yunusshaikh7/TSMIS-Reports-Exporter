@@ -83,10 +83,9 @@ def manual_comparisons_dir():
     wherever the user last browsed. The free 'Save elsewhere…' path stays."""
     return comparisons_root() / "manual"
 
-# User-supplied input files (currently: TSN district Highway Log PDFs). The
-# TSMIS reports never read from here -- this exists for the report types whose
-# source data is NOT produced by this app's exports.
-INPUT_ROOT = DATA_ROOT / "input"
+# (v0.30.0 retired INPUT_ROOT / the input/ folder — user-supplied TSN district
+# PDFs now live in the canonical TSN library below, the SAME place the vs-TSN
+# comparison + evidence read them, so there is one drop location.)
 
 # Canonical TSN library: the ONE fixed home for each report's TSN source data.
 # The six TSN reports essentially never change, so rather than scatter them

@@ -155,10 +155,9 @@ def _cell_events(items):
 
 def main() -> None:
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_lastcomplete_"))
-    saved = (paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT)
+    saved = (paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT)
     paths.TSN_LIBRARY_ROOT = tmp / "_lib"
     paths.OUTPUT_ROOT = tmp / "_out"
-    paths.INPUT_ROOT = tmp / "_in"
     # The comparison adapter is NOT under test — stub it at the sanctioned
     # matrix-facade seam (matrix_build resolves _m.tsn_comparator_for at call
     # time), keeping the store, consolidator, worker, leases, publication and
@@ -175,7 +174,7 @@ def main() -> None:
     try:
         _main_body(tmp, stub)
     finally:
-        (paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT) = saved
+        (paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT) = saved
         matrix.tsn_comparator_for = saved_cmp
 
 

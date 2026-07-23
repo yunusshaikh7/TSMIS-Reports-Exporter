@@ -195,10 +195,9 @@ def test_producers():
 def test_library_and_matrix_end_to_end():
     print("tsn_library build -> persist -> resolve(completion) -> matrix/by-day reduce:")
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_tsnlib_"))
-    saved = (paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT)
+    saved = (paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT)
     paths.TSN_LIBRARY_ROOT = tmp / "_lib"
     paths.OUTPUT_ROOT = tmp / "_out"
-    paths.INPUT_ROOT = tmp / "_in"
     try:
         import compare_ramp_summary_tsn as rstsn
         # land a raw .pdf in the library and build a PARTIAL consolidated (one category
@@ -299,7 +298,7 @@ def test_library_and_matrix_end_to_end():
               and captured.get("completion") == oc.COMPLETE
               and tsn_library.status("ramp_summary")["current"] is True)
     finally:
-        paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT = saved
+        paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT = saved
         shutil.rmtree(tmp, ignore_errors=True)
 
 

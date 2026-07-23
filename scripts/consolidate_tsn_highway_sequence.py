@@ -72,20 +72,21 @@ from pdf_table_lib import cluster_by_top, norm_route
 import outcome
 import artifact_store
 import tsn_district_contract as tdc
-from paths import INPUT_ROOT, OUTPUT_ROOT
+from paths import OUTPUT_ROOT, tsn_library_raw_dir
 
-# Standalone / console (.bat) default locations — see the matching note in
-# consolidate_tsn_highway_log.py. The GUI/matrices build through the canonical
-# git-ignored tsn_library/ tree (tsn_library.build_into); this OUT_PATH holds
+# Standalone default locations — see the matching note in
+# consolidate_tsn_highway_log.py. Reads the district PDFs from the canonical TSN
+# library raw folder (v0.30.0 retired the separate input/ folder); the
+# GUI/matrices build through the same tsn_library/ tree. This OUT_PATH holds
 # Caltrans-internal TSN data and is git-ignored (output/* + the explicit
 # output/tsn_* rule in .gitignore) — never add an "!output/tsn_*" allowlist entry.
-INPUT_DIR = INPUT_ROOT / "tsn_highway_sequence"
+INPUT_DIR = tsn_library_raw_dir("highway_sequence")
 OUT_PATH = OUTPUT_ROOT / "tsn_highway_sequence_consolidated.xlsx"
 
 REPORT_NAME = "TSN Highway Sequence"
 INPUT_GLOB = "*.pdf"
 INPUT_FMT = "PDF"
-INPUT_NOTE = "Drop the TSN district Highway Sequence (HSL) PDFs into the input folder first."
+INPUT_NOTE = "Drop the TSN district Highway Sequence (HSL) PDFs into the TSN library folder first."
 
 # The normalized workbook the comparison reads: a leading Route column + the
 # shared comparison fields, in this exact order (compare_highway_sequence_tsn

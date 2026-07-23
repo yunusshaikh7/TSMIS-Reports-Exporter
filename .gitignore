@@ -47,14 +47,9 @@ output/tsn_highway_sequence/
 output/tsn_*_consolidated.xlsx
 output/tsn_*_normalized.xlsx
 
-# input/ holds user-supplied source files (TSN district PDFs — these come from
-# outside the app). Keep the folder structure via .gitkeep, ignore the files
-# themselves. (The TSMIS Highway Log PDFs are this app's OWN export now, read from
-# output/<run>/highway_log_pdf/, so there is no input folder for them.)
-input/*
-!input/tsn_highway_log/
-input/tsn_highway_log/*
-!input/tsn_highway_log/.gitkeep
+# (v0.30.0 retired the input/ folder — user-supplied TSN district PDFs now live
+# in the git-ignored tsn_library/<report>/raw/ tree, ignored below.)
+input/
 
 __pycache__/
 *.pyc
@@ -89,6 +84,10 @@ spike/
 # Persisted user settings (timeouts, URL overrides — local state, never committed)
 /config.json
 /data/config.json
+
+# Per-comparison durations for the live ETA (M1-B; local state, never committed)
+/compare_timings.json
+/data/compare_timings.json
 
 # Export-Everything batch manifest (B3; paths.DATA_ROOT/batch_job.json — dev:
 # repo root, packaged app: data\batch_job.json). Local run state, never committed.

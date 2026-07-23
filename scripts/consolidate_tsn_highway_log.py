@@ -4,13 +4,15 @@ Ported from the TSMIS-Report-Consolidator sibling project (the PDF parsing
 core is verbatim — it is calibrated against real district PDFs); only the
 consolidate() interface is adapted to this app's registry contract.
 
-Reads every district PDF in  input/tsn_highway_log/   (e.g. D01_Highway_Log_TSN.pdf)
+Reads every district PDF in  tsn_library/highway_log/raw/  (e.g. D01_Highway_Log_TSN.pdf)
 Writes per-route workbooks in output/tsn_highway_log/  (tsn_highway_log_d01_route_001.xlsx)
 and one combined workbook   output/tsn_highway_log_consolidated.xlsx
 
 Unlike the TSMIS consolidators, the inputs are NOT this app's dated exports:
-TSN PDFs are vendor snapshots the user drops into the input folder, so the
-"Export day" concept doesn't apply (the `day` parameter is accepted for
+TSN PDFs are vendor snapshots the user drops into the TSN library — the SAME
+raw folder the vs-TSN comparison + evidence read from, so there is ONE drop
+location (v0.30.0 retired the separate input/ folder). The "Export day" concept
+doesn't apply (the `day` parameter is accepted for
 interface compatibility and ignored). The per-route conversions this run
 writes are exactly what the Highway Log comparison takes as its TSN file.
 
@@ -70,22 +72,26 @@ import owned_dir
 from pdf_table_lib import char_lines, norm_route, write_route_workbook
 import tsn_district_contract as tdc
 from events import ConsolidateResult, Events
-from paths import INPUT_ROOT, OUTPUT_ROOT
+from paths import DATA_ROOT, OUTPUT_ROOT, tsn_library_raw_dir
 
-# Standalone / console (.bat) default locations. The GUI + matrices build through
-# the canonical TSN library instead — tsn_library.build_into() passes its own
-# raw/consolidated paths under the git-ignored tsn_library/<report>/ tree, and
-# tsn_library._legacy_{raw_dir,consolidated}() keep these legacy paths readable as
-# a back-compat fallback. These output paths hold Caltrans-internal TSN data; they
-# are git-ignored (output/* + an explicit output/tsn_* belt-and-suspenders rule in
-# .gitignore) — never add an "!output/tsn_*" allowlist entry.
-INPUT_DIR = INPUT_ROOT / "tsn_highway_log"
+# The combine feature reads the district PDFs straight from the canonical TSN
+# library's raw folder — the SAME place tsn_library.build_into() + the vs-TSN
+# comparison + the evidence generator read them, so there is ONE drop location
+# (v0.30.0 retired the separate input/ folder). The GUI + matrices still pass
+# their own raw/consolidated paths explicitly. These output paths hold
+# Caltrans-internal TSN data; they are git-ignored (output/* + an explicit
+# output/tsn_* belt-and-suspenders rule) — never add an "!output/tsn_*" entry.
+INPUT_DIR = tsn_library_raw_dir("highway_log")
 CONVERTED_DIR = OUTPUT_ROOT / "tsn_highway_log"   # per-route TSMIS-format workbooks
 OUT_PATH = OUTPUT_ROOT / "tsn_highway_log_consolidated.xlsx"
 
+# The pre-v0.30 drop folder — referenced ONLY to hint an upgrading user whose
+# PDFs still sit there (never read as a fallback).
+_LEGACY_INPUT = DATA_ROOT / "input" / "tsn_highway_log"
+
 # Shown in the GUI's Consolidate pane so users know where the PDFs go (this is
 # the one report whose input is NOT produced by this app's exports).
-INPUT_NOTE = "Drop the TSN district Highway Log PDFs into the input folder first."
+INPUT_NOTE = "Drop the TSN district Highway Log PDFs into the TSN library folder first."
 
 
 def input_dir_for(day):                  # noqa: ARG001 (interface compatibility)
@@ -924,10 +930,10 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     workbooks, then combine them all into one workbook (Route column added).
 
     `day` is accepted for interface compatibility with the other consolidators
-    and ignored — TSN PDFs are vendor snapshots in one fixed input folder, not
-    dated exports. `input_dir`/`out_path` override the fixed legacy locations
-    (the canonical TSN library passes its own raw/consolidated paths here);
-    when omitted they default to the legacy INPUT_DIR / OUT_PATH. Every call uses
+    and ignored — TSN PDFs are vendor snapshots in one fixed library folder, not
+    dated exports. `input_dir`/`out_path` override the default locations (the
+    canonical TSN library passes its own raw/consolidated paths here); when
+    omitted they default to INPUT_DIR (the library raw) / OUT_PATH. Every call uses
     a private temporary conversion directory under ``scratch_root`` or, by
     default, the requested output's parent. The temporary directory is never the
     process-global ``CONVERTED_DIR`` and is removed after every terminal path.
@@ -955,11 +961,20 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
 
     pdfs = sorted(p for p in in_dir.glob("*.pdf") if p.is_file())
     if not pdfs:
+        # Upgrade hint: if PDFs still sit in the retired input/ folder, tell the
+        # user to move them (we never read there — one drop location now).
+        moved = ""
+        try:
+            if in_dir != _LEGACY_INPUT and any(_LEGACY_INPUT.glob("*.pdf")):
+                moved = (f"\n\n(Found district PDFs in the old folder\n{_LEGACY_INPUT}"
+                         f"\n— move them into the folder above; input/ is retired.)")
+        except OSError:  # silent-ok: the legacy-folder hint is best-effort — a probe failure just omits the hint
+            pass
         return ConsolidateResult(
             status="error",
             message=(f"No {REPORT_NAME} files were found in:\n{in_dir}\n\n"
                      f"Put the district Highway Log PDFs (e.g. "
-                     f"D01_Highway_Log_TSN.pdf) there, then run again."),
+                     f"D01_Highway_Log_TSN.pdf) there, then run again.{moved}"),
         )
 
     # Confirm overwrite *before* spending time parsing PDFs.

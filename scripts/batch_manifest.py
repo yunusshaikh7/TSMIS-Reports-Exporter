@@ -3,7 +3,7 @@
 A batch can span many report types x environments and take a long time, so its
 progress is recorded on disk and survives an app restart (pause/resume across
 days). The manifest lives under DATA_ROOT — NOT output/ — so "Delete all reports"
-(which only clears output/ and input/) never removes it. Writes are atomic
+(which only clears app-generated output/) never removes it. Writes are atomic
 (temp file + os.replace) so a crash mid-write can't leave a corrupt manifest.
 
 Console-free and dependency-light (stdlib json only): importing it never touches

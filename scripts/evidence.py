@@ -37,8 +37,8 @@ It NEVER collects (RM05): the saved login (`paths.AUTH` / tsmis_auth.json), the 
 sign-in profile (`paths.EDGE_LOGIN_PROFILE_DIR`), failure dumps (`paths.FAILURES_DIR`
 — screenshots / page HTML may carry report content), the exported report data
 (`output/<run>/…`), the compressed comparison payloads (they carry compared ROWS —
-their names and sizes appear in the inventory, their bytes never do), the TSN input
-PDFs (`input/`), or the TSN library workbooks. The state sweep walks the same folders
+their names and sizes appear in the inventory, their bytes never do), or the TSN
+library workbooks/prints (`tsn_library/`). The state sweep walks the same folders
 those artifacts live in, so it matches by EXACT sidecar suffix/name — a data workbook,
 a source PDF, or a payload chunk can never match — and a user-placed evidence file
 that happens to BE one of the sensitive paths is skipped anyway (belt-and-suspenders).
@@ -109,7 +109,7 @@ def _sensitive_roots():
     allowlist below, so they can only enter via `extra_dir` — which this guards."""
     out = []
     for p in (paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR, paths.FAILURES_DIR,
-              paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+              paths.OUTPUT_ROOT, paths.TSN_LIBRARY_ROOT,
               paths.ARCGIS_LAYERS_ROOT):
         try:
             out.append(Path(p).resolve())
@@ -223,7 +223,7 @@ def _inventory_text():
     """
     lines = ["File inventory — names, sizes and timestamps only. No file content.",
              ""]
-    for root in (paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+    for root in (paths.OUTPUT_ROOT, paths.TSN_LIBRARY_ROOT,
                  paths.ARCGIS_LAYERS_ROOT, paths.LOG_DIR):
         root = Path(root)
         lines.append(f"[{root}]")
@@ -417,7 +417,7 @@ def _manifest(contents, unreadable, skipped_user, roots, session=None):
         "DELIBERATELY EXCLUDED (never collected — RM05):",
         "  - saved login (tsmis_auth.json)        - Edge sign-in profile",
         "  - failure dumps (failures/)            - exported report data (output/<run>/…)",
-        "  - TSN input PDFs (input/)              - TSN library workbooks/prints",
+        "  - TSN library workbooks/prints (tsn_library/)",
         "  - the compressed comparison payloads (.comparison-payload.zlib — they carry",
         "    compared ROWS; their names and sizes are in inventory.txt, their bytes are not)",
     ]

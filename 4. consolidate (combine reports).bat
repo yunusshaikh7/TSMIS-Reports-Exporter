@@ -23,7 +23,7 @@ echo     7.  Intersection Detail       (XLSX -^> XLSX)
 echo     8.  TSMIS Intersection Detail (PDF) (PDF export from output\...\intersection_detail_pdf -^> XLSX)
 echo     9.  TSMIS Highway Log (Excel) (Excel export from output\...\highway_log -^> XLSX)
 echo     10. TSMIS Highway Log (PDF)   (PDF export from output\...\highway_log_pdf -^> XLSX)
-echo     11. TSN Highway Log (PDF)     (district PDFs from input\tsn_highway_log -^> XLSX)
+echo     11. TSN Highway Log (PDF)     (district PDFs from tsn_library\highway_log\raw -^> XLSX)
 echo     12. Highway Detail            (XLSX -^> XLSX)
 echo     13. TSMIS Highway Detail (PDF) (PDF export from output\...\highway_detail_pdf -^> XLSX)
 echo.

@@ -49,7 +49,7 @@ COMBINE FILES
   The "Export day" picker chooses which day's exports to combine.
 
   TSN Highway Log: drop the TSN district PDFs (e.g. D01_Highway_Log_TSN.pdf)
-  into the "input\tsn_highway_log" folder first (the pane has an "Input
+  into the "tsn_library\highway_log\raw" folder first (the pane has an "Input
   folder" button). It converts them to per-route Excel files in
   "output\tsn_highway_log" and one combined workbook.
 

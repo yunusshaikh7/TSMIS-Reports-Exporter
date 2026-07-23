@@ -18,7 +18,7 @@ import owned_dir
 import safe_delete
 from common import BROWSER_CHANNELS, CHANNEL_LABELS, check_browsers
 from events import Events
-from paths import (DOWNLOADED_BROWSERS_DIR, FAILURES_DIR, INPUT_ROOT,
+from paths import (DOWNLOADED_BROWSERS_DIR, FAILURES_DIR,
                    OUTPUT_ROOT, parse_run_folder)
 
 log = logging.getLogger("tsmis.gui")
@@ -226,10 +226,8 @@ def reset_targets(include_input=False, warnings=None):
         _append_target(targets, "failure screenshots", FAILURES_DIR,
                        scope_root=FAILURES_DIR.parent, warnings=warnings)
     if include_input:
-        p = INPUT_ROOT / "tsn_highway_log"
-        if p.is_dir():
-            _append_target(targets, "TSN input PDFs", p,
-                           scope_root=INPUT_ROOT, warnings=warnings)
+        # (v0.30.0 retired the input/ folder; district TSN PDFs now live in the
+        # TSN library, which has its own management and is NOT cleared here.)
         # The Export-Everything store's TSN drops (user-placed TSN datasets) are
         # inputs too, so they only clear with include_input (the generated TSN
         # comparison sheets under comparisons/tsn are covered by "comparisons").

@@ -97,7 +97,6 @@ def _plant(root):
 def _point_paths_at(root, saved):
     paths.DATA_ROOT = root
     paths.OUTPUT_ROOT = root / "output"
-    paths.INPUT_ROOT = root / "input"
     paths.TSN_LIBRARY_ROOT = root / "tsn_library"
     paths.LOG_DIR = root / "logs"
     paths.FAILURES_DIR = root / "failures"
@@ -114,7 +113,7 @@ def _zip_text(zf):
 
 def test_credential_exclusion_and_manifest():
     print("RM05: credential-safe bundle + full manifest listing:")
-    saved = (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+    saved = (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.TSN_LIBRARY_ROOT,
              paths.LOG_DIR, paths.FAILURES_DIR, paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR)
     root = Path(tempfile.mkdtemp(prefix="tsmis_ev_"))
     user = Path(tempfile.mkdtemp(prefix="tsmis_ev_user_"))
@@ -258,7 +257,7 @@ def test_credential_exclusion_and_manifest():
         check("manifest lists the live-verify set (incl. the PDF editions)",
               "Intersection Detail (PDF)" in manifest and "Highway Log (PDF)" in manifest)
     finally:
-        (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+        (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.TSN_LIBRARY_ROOT,
          paths.LOG_DIR, paths.FAILURES_DIR, paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR) = saved
         import shutil
         shutil.rmtree(root, ignore_errors=True)
@@ -267,7 +266,7 @@ def test_credential_exclusion_and_manifest():
 
 def test_self_test_capture_and_crash():
     print("self-test output (and a CRASH) is captured into the bundle, never fatal:")
-    saved = (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+    saved = (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.TSN_LIBRARY_ROOT,
              paths.LOG_DIR, paths.FAILURES_DIR, paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR)
     saved_mod = sys.modules.get("self_test")
     root = Path(tempfile.mkdtemp(prefix="tsmis_ev_st_"))
@@ -301,7 +300,7 @@ def test_self_test_capture_and_crash():
             sys.modules["self_test"] = saved_mod
         else:
             sys.modules.pop("self_test", None)
-        (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+        (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.TSN_LIBRARY_ROOT,
          paths.LOG_DIR, paths.FAILURES_DIR, paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR) = saved
         import shutil
         shutil.rmtree(root, ignore_errors=True)
@@ -314,7 +313,7 @@ def test_unreadable_not_listed_as_bundled():
     the log only (logs are redacted through ``writestr`` before final scanning)."""
     print("P13-A01: an unreadable allowlisted file is NOT claimed as bundled:")
     import shutil
-    saved = (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+    saved = (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.TSN_LIBRARY_ROOT,
              paths.LOG_DIR, paths.FAILURES_DIR, paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR)
     real_write = evidence._write_allowlisted_entry
     root = Path(tempfile.mkdtemp(prefix="tsmis_ev_unr_"))
@@ -342,7 +341,7 @@ def test_unreadable_not_listed_as_bundled():
               "SKIPPED — unreadable" in manifest and "logs/tsmis.log" in manifest)
     finally:
         evidence._write_allowlisted_entry = real_write
-        (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+        (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.TSN_LIBRARY_ROOT,
          paths.LOG_DIR, paths.FAILURES_DIR, paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR) = saved
         shutil.rmtree(root, ignore_errors=True)
 
@@ -356,7 +355,7 @@ def test_final_member_credential_scan():
     """
     print("CMP-AUD-117: final ZIP member credential scan is fail-closed:")
     import shutil
-    saved = (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+    saved = (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.TSN_LIBRARY_ROOT,
              paths.LOG_DIR, paths.FAILURES_DIR, paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR)
     root = Path(tempfile.mkdtemp(prefix="tsmis_ev_scan_"))
     user = Path(tempfile.mkdtemp(prefix="tsmis_ev_scan_user_"))
@@ -457,7 +456,7 @@ def test_final_member_credential_scan():
         check("a UTF-16 credential inside an opaque member aborts publication",
               utf16_res.get("ok") is False and not utf16_out.exists())
     finally:
-        (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+        (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.TSN_LIBRARY_ROOT,
          paths.LOG_DIR, paths.FAILURES_DIR, paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR) = saved
         shutil.rmtree(root, ignore_errors=True)
         shutil.rmtree(user, ignore_errors=True)
@@ -503,7 +502,7 @@ def test_every_trigger_uses_the_one_collector():
 
 def test_session_facts_reach_the_manifest():
     print("caller-supplied session facts land in the manifest:")
-    saved = (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+    saved = (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.TSN_LIBRARY_ROOT,
              paths.LOG_DIR, paths.FAILURES_DIR, paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR)
     root = Path(tempfile.mkdtemp(prefix="tsmis_ev_sess_"))
     try:
@@ -520,7 +519,7 @@ def test_session_facts_reach_the_manifest():
               "src=ssor env=prod" in manifest)
         check("...and how it signed in", "device sign-in" in manifest)
     finally:
-        (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+        (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.TSN_LIBRARY_ROOT,
          paths.LOG_DIR, paths.FAILURES_DIR, paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR) = saved
         shutil.rmtree(root, ignore_errors=True)
 

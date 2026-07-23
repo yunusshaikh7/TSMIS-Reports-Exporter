@@ -140,10 +140,9 @@ def test_source_detection():
     # the dest-scoped _tsn_input drop is one fallback among the library home + the
     # global legacy locations. Isolate ALL of those roots to temp dirs so the unit
     # test exercises only the dest drop it plants (no real dev-repo TSN leaks in).
-    saved_roots = (paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT)
+    saved_roots = (paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT)
     paths.TSN_LIBRARY_ROOT = dest / "_lib"
     paths.OUTPUT_ROOT = dest / "_out"
-    paths.INPUT_ROOT = dest / "_in"
     try:
         sub = "highway_log"
         check("empty folder -> none", matrix.tsn_source(dest, sub)["kind"] == "none")
@@ -211,7 +210,7 @@ def test_source_detection():
         check("library consolidated preferred over the legacy dest drop",
               r["kind"] == "consolidated" and Path(r["path"]) == lib_cons)
     finally:
-        paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT = saved_roots
+        paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT = saved_roots
         shutil.rmtree(dest, ignore_errors=True)
 
 
@@ -227,10 +226,9 @@ def test_stale_app_owned_selection_heals():
     assertions red; weakening fail-closed turns the closed assertions red."""
     print("stale app-owned selection heals to the canonical library (field fix):")
     dest = Path(tempfile.mkdtemp(prefix="tsmis_tsn_stale_"))
-    saved_roots = (paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT)
+    saved_roots = (paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT)
     paths.TSN_LIBRARY_ROOT = dest / "_lib"
     paths.OUTPUT_ROOT = dest / "_out"
-    paths.INPUT_ROOT = dest / "_in"
     try:
         sub = "highway_log"
         name = "tsn_highway_log_consolidated.xlsx"
@@ -287,7 +285,7 @@ def test_stale_app_owned_selection_heals():
               r["kind"] == "missing_explicit"
               and r.get("selection_reason") == "legacy_identity")
     finally:
-        paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT, paths.INPUT_ROOT = saved_roots
+        paths.TSN_LIBRARY_ROOT, paths.OUTPUT_ROOT = saved_roots
         shutil.rmtree(dest, ignore_errors=True)
 
 
