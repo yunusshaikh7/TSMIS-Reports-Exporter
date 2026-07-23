@@ -918,16 +918,21 @@ sides honest (the CMP-AUD-066 pattern): the ArcGIS side REQUIRES the very
 `ArcGIS Build` marker sheet the consolidator writes; the TSN side REJECTS it.
 
 `_SCHEMA`: `side_a="ArcGIS"`, `side_b="TSN"`, `key_field=14`, date fields
-ISO-normalized, amount columns decimal-canonical, and **28 CONTEXT columns** — the
+ISO-normalized, amount columns decimal-canonical, and **24 CONTEXT columns** — the
 TSN bookkeeping (id/element/lifecycle/create/update), the TASAS change-tracking
 flags, the no-TSMIS-source columns (maintenance level, federal-aid trio, national
-lands, scenic freeway, city code), `THY_EXTRACT_DATE`, the two SYNTHESIZED offset
-columns (our PM-continued cumulative diverges from TSN's own line at every
-segmentation sliver — the sliver already shows once on END PM/LENGTH), and the ADT
-profile trio (right layer, but TSN's per-row interpolation model — cross-county
-profile continuations, the overlap vintage rule — is not yet pinned; a tracked
-follow-up upgrades them to compared) — all PRESENT with both sides' values shown
-and never counted (owner decision 2026-07-22). 46 columns are compared and counted.
+lands, scenic freeway), `THY_EXTRACT_DATE`, and the two SYNTHESIZED offset columns
+(each side's offsets are its own derived cumulative; ours diverges from TSN's line
+at every segmentation sliver — the sliver already shows once on END PM/LENGTH) —
+all PRESENT with both sides' values shown and never counted. **50 columns are
+compared and counted** (v0.29.1, owner decisions): the ADT profile trio counts
+like any other column (the Notes name the two known model-fit classes inside that
+count — cross-county profile continuations, the non-latest-year overlap vintage
+rule; Change-per-mile compares at 3 decimals so the extract's own 4th-decimal
+arithmetic wobble never counts), and THY_CITY_CODE compares through
+`city_codes.norm_city` (the 395-entry name→TASAS-code table derived from
+statewide co-location at 99.92% agreement; an unmapped name passes through
+verbatim so it surfaces).
 The Notes sheet lists the full 74-line column→layer audit
 (`clean_highway_columns.PROVENANCE`); the built workbook's `Provenance` sheet adds
 each layer's FeatureServer `Data Source` from the library's `00_INDEX.xlsx`.

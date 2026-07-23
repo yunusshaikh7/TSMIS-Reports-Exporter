@@ -260,7 +260,12 @@ five probe rounds — these supersede the open items above):**
   **AADT_AHEAD** count (AADT itself is the station's midpoint — anchoring on
   it shifted every row by a constant); slope = (BACK − AHEAD)/length; P marks
   a station row only on a CONTIGUOUS stretch (a span re-entering across a PM
-  gap is S — ORA 17.461).
+  gap is S — ORA 17.461). **Compared and COUNTED since v0.29.1** (owner:
+  wholesale column differences are the signal, not noise to hide); the two
+  known model-fit classes inside the count — TSN's profiles continue ACROSS
+  county lines (THY's LA-0.0 line fits endpoints at ORA 32.953 → LA 1.2035)
+  and its overlap vintage pick isn't always latest-year — are named in the
+  comparison Notes; fitting them exactly is a tracked refinement.
 - **No X rows are fabricated.** The HG layer never says X, and TSN skips the
   unconstructed PM ranges entirely (ORA 001 14.057–17.461 has NO row). TSN's
   340 statewide HG=X inventory rows have no layer counterpart and surface
@@ -268,10 +273,13 @@ five probe rounds — these supersede the open items above):**
 - **Offsets are PM-continued per county**: BEGIN_OFFSET = the row's own begin
   PM plus the prior counties' cumulative largest end PMs (measured: every
   first-county offset IS the begin PM, gaps and prefix handoffs included).
-- **City cuts, never values**: the City layer (SHS rows only) contributes row
-  BREAKS at city limits; its City_Code carries city NAMES, not TASAS city
-  letter codes, so THY_CITY_CODE stays a noted no-source column (ask the
-  owner for a TASAS city-code table to upgrade it).
+- **City cuts AND paints (since v0.29.1)**: the City layer (SHS rows only)
+  breaks rows at city limits, and its NAME values translate to the TASAS
+  letter codes via `scripts/city_codes.py` — a 395-entry table DERIVED from
+  statewide co-location with the extract (21,906 rows voted, 99.92%
+  agreement; the one sub-90% vote, ALHAMBRA, resolved to its majority ALH —
+  its boundary rows bleed into SPAS/PAS/LA). An unmapped name passes through
+  verbatim so it surfaces. THY_CITY_CODE is compared.
 - **Point layers may carry no lifecycle** (Equation Points ships blank
   LRSFromDates) — an undated point is always live; equate points cut rows and
   flag THY_EQUATE_CODE=E; a break/resume point that coincides with an equate

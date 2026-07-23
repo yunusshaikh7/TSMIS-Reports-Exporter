@@ -39,6 +39,7 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
+import city_codes
 import clean_highway_columns as chc
 import clean_road_layers as crl
 import consolidation_meta
@@ -91,9 +92,12 @@ SPAN_LAYERS = {
     "DSP": ("SHS Design Speed", ["Design_Speed"], "whole"),
     "POP": ("SHS Population", ["Population_Code"], "whole"),
     "NON": ("SHS Non Add Mileage", ["Non_Add_Mileage"], "whole"),
-    # City paints nothing (names, not TASAS city codes) but its SHS-route
-    # boundaries CUT rows — TSN breaks a segment at every city limit.
-    "CITY": ("City", ["City_Code"], "cuts"),
+    # City cuts rows at every SHS city limit AND paints THY_CITY_CODE — the
+    # layer carries city NAMES; city_codes.norm_city translates them to the
+    # TASAS letter codes (the table was derived from statewide co-location
+    # with the extract; an unmapped name passes through verbatim so it
+    # surfaces in the comparison instead of vanishing).
+    "CITY": ("City", ["City_Code"], "whole"),
     "TOLL": ("SHS Tolls", ["Toll_Type"], "whole"),
     "FOR": ("SHS Forest HWY", ["Forest_Hwy"], "whole"),
     "NET": ("SHS Inv Network Date", ["Network_Start_Date", "SegOrderId"],
@@ -459,6 +463,9 @@ def _paint_row(route, county, prefix, b, e, seg, kind, pts, asof_date):
     put("THY_TERRAIN_CODE", _seg_code(seg, "TER"))
     put("THY_DESIGN_SPEED_AMT", _seg_num(seg, "DSP"))
     put("THY_POPULATION_CODE", _seg_code(seg, "POP"))
+    city = seg.get("CITY")
+    if city is not None:
+        put("THY_CITY_CODE", city_codes.norm_city(city.vals[0]) or None)
     non = _seg_code(seg, "NON")
     put("THY_NON_ADD_CODE", non if non in ("N", "A") else "A")
     put("THY_TOLL_FOREST_CODE",

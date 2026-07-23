@@ -138,11 +138,12 @@ PROVENANCE = {
     "THY_RT_O_SHD_TRT_WIDTH_AMT": (_S, "SHS O Shld Width R",
                                    "Shld_Width_Treated_Out_R", ""),
     "THY_RT_SIG_CHG_IND": (_N, "", "", "TASAS change tracking — no layer"),
-    "THY_CITY_CODE": (_N, "City", "City_Code",
-                      "the layer carries city NAMES; TSN carries TASAS city "
-                      "letter codes — no code table exists in the library, so "
-                      "this stays empty (noted) rather than ~23k fabricated "
-                      "differences"),
+    "THY_CITY_CODE": (_S, "City", "City_Code",
+                      "the layer carries city NAMES; city_codes.norm_city "
+                      "translates them to the TASAS letter codes (the table "
+                      "was derived 2026-07-22 from statewide co-location — "
+                      "21,906 rows voted, 99.92% agreement); an unmapped "
+                      "name passes through verbatim so it surfaces"),
     "THY_HIGHWAY_GROUP_CODE": (_S, "SHS Highway Group", "Highway_Group", ""),
     "THY_HIGHWAY_ACCESS_CODE": (_S, "SHS Access Control", "SHS_Access_Control",
                                 ""),
@@ -155,18 +156,20 @@ PROVENANCE = {
                          "flag span → N; default A"),
     "THY_PROFILE_CODE": (_S, "Traffic Volume Segments", "(span anchors)",
                          "P where a row starts a contiguous TVS profile span; "
-                         "shown, not counted until the profile rule is pinned"),
+                         "compared and counted (owner decision 2026-07-22)"),
     "THY_ADT_AMT": (_S, "Traffic Volume Segments",
                     "AADT/AADT_AHEAD/AADT_BACK",
-                    "interpolated along the winning profile — TSN's exact "
-                    "per-row model (cross-county profile continuations, "
-                    "vintage choice at overlaps) is NOT yet pinned, so the "
-                    "value is shown for reference, never counted (counting "
-                    "it would tally model noise, not data differences)"),
+                    "interpolated along the winning profile; compared and "
+                    "counted (owner decision 2026-07-22 — a wholesale column "
+                    "difference is exactly the signal to surface). Known "
+                    "model-fit classes feeding the count: TSN's profiles "
+                    "continue ACROSS county lines and its overlap vintage "
+                    "rule isn't latest-year — the Notes say so"),
     "THY_CHANGE_PER_MILE_AMT": (_S, "Traffic Volume Segments",
                                 "(AADT_BACK−AADT_AHEAD)/length",
-                                "the winning span's slope — shown, not "
-                                "counted (see THY_ADT_AMT)"),
+                                "the winning span's slope, compared at 3 "
+                                "decimals (the extract's own 4th-decimal "
+                                "arithmetic wobble never counts)"),
     "THY_LANDMARK_SHORT_DESC": (_S, "SHS Landmark", "Landmarks_Short", ""),
     "THY_POPULATION_CODE": (_S, "SHS Population", "Population_Code", ""),
     "THY_POPULATION_GROUP_CODE": (_N, "", "",
@@ -201,21 +204,19 @@ PROVENANCE = {
 
 # The columns the comparison SHOWS but never counts (CompareSchema
 # context_fields): everything with no TSMIS source or TSN-internal,
-# THY_EXTRACT_DATE (ours is the as-of date by definition), the two
-# SYNTHESIZED offset columns (our cumulative diverges from TSN's own line
-# wherever segmentation differs — the sliver already shows once on END
-# PM/LENGTH), and the ADT profile trio (sourced from the right layer, but
-# TSN's exact per-row interpolation model is not yet pinned — counting it
-# would tally model noise). Owner decision 2026-07-22: all of these stay
-# PRESENT in the sheet — the Notes name why each isn't compared; upgrading
-# the offset/ADT columns to compared is a tracked follow-up.
-_MODEL_PENDING = ("THY_BEGIN_OFFSET_AMT", "THY_END_OFFSET_AMT",
-                  "THY_PROFILE_CODE", "THY_ADT_AMT",
-                  "THY_CHANGE_PER_MILE_AMT")
+# THY_EXTRACT_DATE (ours is the as-of date by definition), and the two
+# SYNTHESIZED offset columns (both sides' offsets are their OWN derived
+# cumulatives; ours diverges from TSN's line at every segmentation sliver,
+# and the sliver already shows once on END PM/LENGTH). The ADT profile trio
+# IS compared and counted (owner decision 2026-07-22: a wholesale column
+# difference is exactly the signal to surface; the Notes name the known
+# model-fit classes inside that count). All context columns stay PRESENT in
+# the sheet with both sides' values visible.
+_SYNTHESIZED_CONTEXT = ("THY_BEGIN_OFFSET_AMT", "THY_END_OFFSET_AMT")
 CONTEXT_COLUMNS = tuple(
     name for name in HEADER
     if PROVENANCE[name][0] in (_N, _T) or name == "THY_EXTRACT_DATE"
-    or name in _MODEL_PENDING)
+    or name in _SYNTHESIZED_CONTEXT)
 
 
 def provenance_line(name):

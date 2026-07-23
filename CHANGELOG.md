@@ -3,6 +3,33 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.29.1 — 2026-07-22
+
+Two same-evening corrections to the new clean-road comparison, both at the
+owner's direction.
+
+### Changed
+- **The ADT profile family is now compared and counted.** Profile, ADT and
+  Change-per-mile were shown but left out of the difference counts while
+  TSN's own per-row arithmetic remained partially unpinned. That was the
+  wrong call: a column that disagrees wholesale is exactly the signal this
+  comparison exists to surface — columns have been wrong before and were
+  corrected because a report showed it. All three now count like any other
+  column; the Notes name the two known model-fit classes a reader should
+  keep in mind inside those counts (TSN's profiles continue across county
+  lines where our build re-anchors, and where several count vintages are
+  live TSN's pick isn't always the latest year). Change-per-mile compares at
+  3 decimals so the extract's own 4th-decimal arithmetic wobble never counts.
+- **City codes are now translated and compared.** The City layer carries
+  city names where TSN carries the TASAS letter codes — so the app now ships
+  a translation table DERIVED from the data itself: 21,906 statewide rows
+  where a city span and the extract's coded rows co-locate voted name→code,
+  with 99.92% agreement (the one sub-90% vote, Alhambra — whose boundary
+  rows bleed into its neighbors — resolved to its clear majority). A name
+  the table doesn't know passes through verbatim, so it surfaces as a
+  visible difference instead of vanishing. The built workbook's Provenance
+  sheet and the comparison Notes record the rule.
+
 ## v0.29.0 — 2026-07-22
 
 ### Added

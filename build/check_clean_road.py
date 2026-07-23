@@ -29,6 +29,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
+import city_codes                       # noqa: E402
 import clean_highway_columns as chc     # noqa: E402
 import clean_road_layers as crl         # noqa: E402
 import compare_clean_highway_tsn as cht  # noqa: E402
@@ -225,7 +226,8 @@ def _build_library(lib, *, drop_layer=None, lie_rows=None):
         [c for c in span_cols if c != "InventoryItemStartDate"]
         + ["Network_Start_Date", "Network_End_Date", "SegOrderId"])
     add("City",
-        [_span(ora, 0.2, 0.4, 0.2, {"City_Code": "SOME CITY"}),
+        [_span(ora, 0.2, 0.4, 0.2, {"City_Code": "Los Angeles"}),
+         _span(ora, 0.9, 0.95, 0.9, {"City_Code": "Unincorporated Ville"}),
          _span(ora, 90.0, 91.0, 90.0, {"City_Code": "NOT SHS"})
          | {"RouteID": "ORA_X_SIDE ST_P"}],
         span_cols + ["City_Code"])
@@ -285,6 +287,10 @@ def test_dialects_and_algebra():
     check("coded numeric", crl.code_of("7- No Curbs or Shrubs") == "7")
     check("dot none", crl.dot_none(".") == "")
     check("route pad", crl.norm_route("1") == "001")
+    check("city name -> TASAS code", city_codes.norm_city("Los Angeles") == "LA")
+    check("city code passthrough", city_codes.norm_city("SJS") == "SJS")
+    check("unmapped city surfaces upper",
+          city_codes.norm_city("No Such Town") == "NO SUCH TOWN")
     d = crl.to_serial(datetime(2025, 9, 8))
     check("serial of datetime", d == 45908.0)
     check("serial of iso text", crl.to_serial("2025-09-08") == 45908.0)
@@ -408,8 +414,20 @@ def test_consolidator_end_to_end():
               any(r[col["THY_BEGIN_PM_AMT"]] == 4.5
                   and r[col["THY_HIGHWAY_ACCESS_CODE"]] == "F" for r in ora))
         check("no-source columns stay empty",
-              all(r[col["THY_MAINT_SVC_LVL_CODE"]] is None for r in rows)
-              and all(r[col["THY_CITY_CODE"]] is None for r in rows))
+              all(r[col["THY_MAINT_SVC_LVL_CODE"]] is None for r in rows))
+        in_city = [r for r in ora
+                   if 0.2 <= r[col["THY_BEGIN_PM_AMT"]] < 0.4]
+        check("city names normalize to TASAS codes",
+              in_city and all(r[col["THY_CITY_CODE"]] == "LA"
+                              for r in in_city))
+        unmapped = [r for r in ora
+                    if 0.9 <= r[col["THY_BEGIN_PM_AMT"]] < 0.95]
+        check("an unmapped city name passes through visibly (upper-cased)",
+              unmapped and all(r[col["THY_CITY_CODE"]]
+                               == "UNINCORPORATED VILLE" for r in unmapped))
+        check("no city outside the spans",
+              all(r[col["THY_CITY_CODE"]] is None for r in ora
+                  if r[col["THY_BEGIN_PM_AMT"]] >= 1.0))
         check("extract date = the as-of date",
               str(rows[0][col["THY_EXTRACT_DATE"]]).startswith(ASOF))
         offs = [r[col["THY_BEGIN_OFFSET_AMT"]] for r in ora]

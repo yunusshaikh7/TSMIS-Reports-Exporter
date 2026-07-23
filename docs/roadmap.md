@@ -513,17 +513,21 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
   `build/check_clean_road.py`. **Follow-ups (small, tracked):**
   - [ ] a **sliver policy** for the 0.001-mi boundary-calibration class (rows keyed 9.256 vs
     9.257 pair one-sided today; ~a few hundred statewide);
-  - [ ] **upgrade the ADT profile trio + the offset pair from context to compared**: TSN's exact
-    per-row ADT model is not yet pinned (measured on 001: profiles CONTINUE ACROSS county lines —
-    THY's LA-0.0 line fits endpoints at ORA 32.953 → LA 1.2035 — and the winning-vintage rule at
-    overlaps isn't latest-year), and the synthesized PM-continued offsets diverge from TSN's own
-    line at every segmentation sliver. Both families are painted and SHOWN as context with Notes;
-    fitting the profile-continuation + vintage rule statewide (and choosing an offset policy)
-    upgrades them to counted;
+  - [x] ~~upgrade the ADT profile trio to compared~~ — **DONE v0.29.1** (owner decision: a
+    wholesale column difference is exactly the signal to surface; the Notes name the two known
+    model-fit classes inside the count). Fitting TSN's cross-county profile-continuation +
+    overlap-vintage arithmetic exactly remains a nice-to-have REFINEMENT (it would shrink the
+    ADT-family counts to pure data differences; measured on 001: THY's LA-0.0 line fits
+    endpoints at ORA 32.953 → LA 1.2035);
+  - [x] ~~a TASAS city-code table~~ — **DONE v0.29.1**: `scripts/city_codes.py`, DERIVED from
+    statewide co-location (21,906 rows voted, 99.92%; ALHAMBRA resolved to its majority ALH);
+    THY_CITY_CODE is compared, unmapped names pass through visibly. If Caltrans ever supplies an
+    official table, swap it in and re-verify;
+  - [ ] the **offset pair stays context** (each side's offsets are its own derived cumulative;
+    ours diverges at every segmentation sliver — the sliver already counts once on END
+    PM/LENGTH); a policy decision could upgrade them later;
   - [ ] the exact TSN **block effective-date composite** rule (oldest-member ≈ 70%; the residual
     shows honestly in the comparison);
-  - [ ] a **TASAS city-code table** from the owner would upgrade THY_CITY_CODE from
-    noted-no-source to compared (the City layer carries names, not codes);
   - [ ] attribute holes on multi-county spans whose ODOMETERS are blank (the chain walk needs
     them) — re-export or accept;
   - [ ] **CA INTERSECTIONS / CA RAMPS builds** on the same pattern (mappings censused in the

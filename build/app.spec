@@ -86,6 +86,7 @@ APP_MODULES = [
     "arcgis_layers",                     # the manually-stocked ArcGIS layer drop-zone
     "clean_road_layers",                 # the per-layer library substrate (v0.29.0)
     "clean_highway_columns",             # the 74-col THY contract + provenance tiers
+    "city_codes",                        # the derived TASAS city-code table (v0.29.1)
     "consolidate_clean_highway",         # the ArcGIS CA HIGHWAYS overlay build
     "compare_clean_highway_tsn",         # the ArcGIS-vs-TSN clean-road comparison
     "gui_arcgis_api",                    # the ArcGIS tab endpoints
