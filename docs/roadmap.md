@@ -53,9 +53,12 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > 5/6/7/8/12) has a design spec:
 > **[docs/planning/output-model-unification.md](planning/output-model-unification.md)** (its
 > current-state map is verify-first too). **Priority: this list is now the FRONT of the queue —
-> comparison-perfection closed in v0.28.0.** Items 1 (comparison logging) + 5 (unique names) are
-> the natural first pair; the rest are design-first (Claude) then a future sol-002 for the export
-> mechanics.
+> comparison-perfection closed in v0.28.0.** ➡ **UPDATE 2026-07-22:** the owner expanded the list
+> to 20 comments; every item has been Step-0 code-verified (some were already implemented — e.g.
+> export-tab exports ALREADY write dated run folders — and some refuted-as-described) and the
+> whole set is sequenced into **[the two-marathon plan](planning/v0.30-owner-backlog-plan.md)**
+> (owner directive 2026-07-22: TWO MARATHON RUNS — M1 → v0.30.0 the surfaces/diagnosis run,
+> M2 → v0.31.0 the structural run; sol-002 absorbed — the verified export-side residue is small).
 
 > **v0.18.1 — field-validated close-out (SHIPPED 2026-06-26).** The work-PC sign-off release on top of
 > the v0.18.0 candidate, bundled in ONE commit (`e2bfade`; tag `v0.18.1` pushed → `release.yml` published

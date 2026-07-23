@@ -4,6 +4,12 @@ Owner-supplied feature/hardening notes for *after* (or alongside) the comparison
 project. Captured verbatim-in-intent + triaged by **lane**, **risk**, and **sequencing**.
 This is the backlog; detail/decisions land in the owning docs as each is picked up.
 
+> **➡ EXECUTION PLAN (2026-07-22): [v0.30-owner-backlog-plan.md](v0.30-owner-backlog-plan.md)** —
+> the owner expanded this list to 20 comments; every item is Step-0 code-verified there
+> (several were already implemented or refuted) and sequenced into TWO MARATHON RUNS
+> (M1 → v0.30.0, M2 → v0.31.0; owner directive 2026-07-22). That plan supersedes this
+> file for execution; this file remains the capture/triage record.
+
 > **⚠ These are OWNER OBSERVATIONS, not verified defects. Step 0 for every item is a
 > code-verification pass — confirm what the app ACTUALLY does today before scoping any fix.**
 > The owner flagged (2026-07-17) that these were noticed in use, not traced in code, and some may
