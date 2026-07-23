@@ -976,9 +976,10 @@ button, input, select { font-family: inherit; }
   display: none; flex-direction: column; gap: 12px; flex-shrink: 0;
   padding: 12px 14px; max-height: 46%; overflow-y: auto;
 }
-body.matrix-wide:not(.mw-day):not(.mw-bl) #matrixConfig { display: flex; }
+body.matrix-wide:not(.mw-day):not(.mw-bl):not(.mw-pve) #matrixConfig { display: flex; }
 body.matrix-wide.mw-day #dayMatrixConfig { display: flex; }
 body.matrix-wide.mw-bl #baselineMatrixConfig { display: flex; }
+body.matrix-wide.mw-pve #pveMatrixConfig { display: flex; }
 .matrix-config .mc-head {
   display: flex; align-items: center; gap: 7px;
   font-size: 12px; font-weight: 600; color: var(--muted-foreground);

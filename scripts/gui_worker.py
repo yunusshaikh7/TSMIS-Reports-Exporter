@@ -71,6 +71,7 @@ from gui_worker_matrix import (BaselineMatrixCompareWorker,                    #
                                DayMatrixCompareWorker, MatrixBatchExportWorker,
                                MatrixCompareWorker, MatrixEvidenceWorker,
                                MatrixTsnConsolidateWorker,
+                               PdfExcelMatrixCompareWorker,
                                _run_matrix_export_step)
 
 # Collaborators historically reachable AS gui_worker attributes (the checks and

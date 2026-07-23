@@ -656,7 +656,51 @@
               <svg class="ic"><use href="#i-x"/></svg>Cancel
             </button>
           </div>
-        </div>
+        </div><!-- /baselineMatrixSection -->
+
+        <!-- PDF vs Excel Matrix (M2-B): a manual day-picking matrix (rows = the 5
+             dual-edition families, columns = exported days; each cell = that day's
+             PDF export self-compared vs its Excel export). Shown only on the
+             "PDF vs Excel Matrix" sub-tab. Same run folder on both sides by
+             construction; no TSN, no cross-environment, no live re-export. -->
+        <div id="pveMatrixSection" class="hidden mx-pane">
+          <div class="card-section mx-gridsection">
+            <div class="section-head">
+              <span class="section-label">PDF vs Excel — by export day</span>
+              <span class="section-meta">
+                Source
+                <span class="tb-select select-light"><select id="pveMatrixSource"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+                <span class="hint" id="pveMatrixProgress" hidden></span>
+              </span>
+            </div>
+            <div class="matrix-legend">
+              <span class="mx-key mx-match">identical</span>
+              <span class="mx-key mx-diff-lo">few diffs</span>
+              <span class="mx-key mx-diff-hi">many diffs</span>
+              <span class="mx-key mx-partial">partial inputs</span>
+              <span class="mx-key mx-stale">stale</span>
+              <span class="mx-key mx-missing">needs export</span>
+              <span class="mx-key mx-na">not available</span>
+            </div>
+            <div class="matrix-wrap"><div class="matrix-grid" id="pveMatrixGrid"></div></div>
+          </div>
+
+          <div class="card-section actions-row">
+            <button class="btn btn-subtle btn-small" id="btnPveBuildAll">
+              <svg class="ic"><use href="#i-layers"/></svg>Build all
+            </button>
+            <button class="btn btn-subtle btn-small" id="btnPveRebuildAll">
+              <svg class="ic"><use href="#i-refresh"/></svg>Rebuild stale
+            </button>
+            <button class="btn btn-subtle btn-small" id="btnOpenPveComparisons">
+              <svg class="ic"><use href="#i-folder-open"/></svg>Open comparisons folder
+            </button>
+            <span class="spacer"></span>
+            <button class="btn btn-subtle btn-small hidden" id="btnPveCancel">
+              <svg class="ic"><use href="#i-x"/></svg>Cancel
+            </button>
+          </div>
+        </div><!-- /pveMatrixSection -->
       </div>
 
       <!-- ArcGIS clean-road pane: the manually-stocked layer library, the
@@ -1211,6 +1255,56 @@
         <div class="mc-group">
           <div class="mc-label">Reports</div>
           <div class="mx-toggles" id="baselineMatrixReportToggles"></div>
+        </div>
+      </div>
+
+      <!-- PDF-vs-Excel matrix config zone: same corner pattern, shown on the
+           "PDF vs Excel Matrix" sub-tab (body.matrix-wide.mw-pve). Compare-only —
+           just the shared job queue, day columns, the live-formulas option, and
+           the family show/hide toggles. -->
+      <div class="card matrix-config" id="pveMatrixConfig">
+        <div class="mc-head"><svg class="ic"><use href="#i-grid"/></svg>Matrix options</div>
+
+        <div class="mc-group mx-queue-group" id="pveQueueGroup" hidden>
+          <div class="mc-label">Queue <span class="mx-queue-count" id="pveQueueCount"></span></div>
+          <div class="mx-queue" id="pveQueue"></div>
+          <div class="mx-queue-actions">
+            <button class="btn btn-subtle btn-small" id="btnPveQueueClear">
+              <svg class="ic"><use href="#i-trash"/></svg>Clear queued
+            </button>
+            <button class="btn btn-subtle btn-small" id="btnPveQueueStopAll">
+              <svg class="ic"><use href="#i-x"/></svg>Stop all
+            </button>
+          </div>
+        </div>
+
+        <div class="mc-group">
+          <div class="mc-label">Day columns</div>
+          <div class="dm-toolbar">
+            <span class="tb-select select-light"><select id="pveMatrixAddDay"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+            <button class="btn btn-standard btn-small" id="btnPveAddDay">
+              <svg class="ic"><use href="#i-check"/></svg>Add day
+            </button>
+          </div>
+          <p class="hint" style="margin:6px 0 0">Add exported days as columns. Each cell
+            self-checks that day's <b>PDF</b> export against its <b>Excel</b> export
+            (both consolidated from the same run folder). A day needs BOTH editions
+            exported to compare.</p>
+        </div>
+
+        <div class="mc-group">
+          <div class="mc-label">Comparison output</div>
+          <label class="mc-fast" title="Also write a live-formulas (recalculating, auditable) copy beside each values comparison">
+            <input type="checkbox" id="pveMatrixFormulas">
+            <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+            <svg class="ic"><use href="#i-file-text"/></svg>
+            <span>Also write a live-formulas copy</span>
+          </label>
+        </div>
+
+        <div class="mc-group">
+          <div class="mc-label">Reports</div>
+          <div class="mx-toggles" id="pveMatrixReportToggles"></div>
         </div>
       </div>
     </section>

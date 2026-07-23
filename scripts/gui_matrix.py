@@ -15,13 +15,14 @@ import webview
 import baseline_matrix
 import day_matrix
 import matrix
+import pdf_excel_matrix
 import settings
 from exporter_parallel import MAX_WORKERS, default_worker_count
 from gui_endpoint import _api_method, pick_path, pick_paths
 from gui_worker import (BaselineMatrixCompareWorker, ConsolidateWorker,
                         DayMatrixCompareWorker, MatrixBatchExportWorker,
                         MatrixCompareWorker, MatrixEvidenceWorker,
-                        MatrixTsnConsolidateWorker)
+                        MatrixTsnConsolidateWorker, PdfExcelMatrixCompareWorker)
 from paths import TSN_LIBRARY_ROOT
 from reports import EXPORT_REPORTS, matrix_rows
 
@@ -350,6 +351,8 @@ class GuiMatrixMixin:
             return self._dispatch_day_compare_job(job)
         if job.get("which") == "baseline":
             return self._dispatch_baseline_compare_job(job)
+        if job.get("which") == "pdf_vs_excel":
+            return self._dispatch_pve_compare_job(job)
         base = self._current_baseline()
         dest = settings.get_batch_dest()
         cells = self._resolve_compare_cells(job, base)
@@ -388,6 +391,42 @@ class GuiMatrixMixin:
                                force_consolidate=job.get("force", False),
                                also_formulas=settings.get_day_matrix_formulas(),
                                evidence=self._evidence_request()).start()
+        return True
+
+    def _resolve_pve_cells(self, job):
+        """[(date, row)] for a PDF-vs-Excel compare job. 'cell' = the one explicit
+        cell; row/column/all/stale defer to pdf_excel_matrix's staleness-aware list."""
+        snap = self._pve_matrix_snapshot()
+        scope = job["scope"]
+        if scope == "cell":
+            row, date = job["row"], job["env"]
+            if row not in snap["rows"] or date not in snap["days"]:
+                return []
+            cmp = snap["cells"].get(row, {}).get(date, {}).get("cmp")   # CMP-AUD-103
+            if not matrix.cell_buildable(cmp):
+                return []
+            return [(date, row)]
+        rebuild_scope = "stale" if scope == "stale" else "all"
+        return pdf_excel_matrix.cells_to_rebuild(snap, scope=rebuild_scope,
+                                                 row=job.get("row"), date=job.get("env"))
+
+    def _dispatch_pve_compare_job(self, job):
+        source = settings.get_pve_matrix_source()
+        dest = settings.get_batch_dest()
+        cells = self._resolve_pve_cells(job)
+        if not cells:
+            return False
+        with self._lock:
+            self._matrix = {"phase": "comparing", "row": job.get("row"),
+                            "cell": job.get("env"), "done": 0, "total": len(cells)}
+        self._emit_log(f"{job['label']} — {len(cells)} PDF-vs-Excel comparison(s)…")
+        self._set_dot("busy", "Comparing…")
+        self._emit({"t": "run_started", "mode": "consolidate", "label": "Comparing…",
+                    "workers": 1})
+        PdfExcelMatrixCompareWorker(
+            source, cells, dest, self._gated_queue(), self.cancel_event,
+            force_consolidate=job.get("force", False),
+            also_formulas=settings.get_pve_matrix_formulas()).start()
         return True
 
     @staticmethod
@@ -1545,6 +1584,183 @@ class GuiMatrixMixin:
     def open_day_comparisons_folder(self):
         """Open the by-day comparison store (output/comparisons/tsn-by-day/)."""
         self._open_folder(day_matrix.byday_root())
+        return {"ok": True}
+
+    # ------------------------------------------------------------------ #
+    # The PDF-vs-Excel by-day matrix (M2-B): rows = the 5 dual-edition
+    # families, columns = days, each cell = that day's PDF export self-
+    # compared vs its Excel export. COMPARE-ONLY (no export, no TSN, no
+    # evidence) — the editions come from the normal export/by-day flow.
+    # ------------------------------------------------------------------ #
+    def _pve_matrix_snapshot(self):
+        """The PDF-vs-Excel matrix snapshot with the user's source / day columns /
+        hidden rows / drag order applied. `dest` = the Everything matrix's batch_dest
+        for source/store context only (the self check has no TSN dataset)."""
+        return pdf_excel_matrix.pve_matrix_snapshot(
+            settings.get_pve_matrix_source(), settings.get_pve_matrix_days(),
+            hidden=settings.get_pve_matrix_hidden(),
+            dest=settings.get_batch_dest(),
+            row_order=settings.get_pve_matrix_row_order())
+
+    def _pve_job_label(self, scope, row=None, date=None):
+        rl = self._matrix_row_label(row) if row else None
+        if scope == "cell":
+            return f"Rebuild {rl} — {date} PDF vs Excel"
+        if scope == "row":
+            return f"Rebuild {rl} — all days PDF vs Excel"
+        if scope == "column":
+            return f"Rebuild all reports — {date} PDF vs Excel"
+        if scope == "stale":
+            return "Refresh stale PDF-vs-Excel comparisons"
+        return "Rebuild all PDF-vs-Excel comparisons"
+
+    @_api_method
+    def pve_matrix_info(self):
+        """The PDF-vs-Excel matrix snapshot + the add-day picker's available days."""
+        snap = self._pve_matrix_snapshot()
+        snap["available_days"] = pdf_excel_matrix.available_days(snap["source"])
+        self._push_state()
+        return snap
+
+    @_api_method
+    def set_pve_matrix_source(self, source):
+        """Set the PDF-vs-Excel matrix data source (day columns are dates within it)."""
+        if source not in pdf_excel_matrix.sources():
+            return {"error": "Unknown data source."}
+        settings.set_pve_matrix_source(source)
+        avail = set(pdf_excel_matrix.available_days(source))
+        kept = [d for d in settings.get_pve_matrix_days() if d in avail]
+        if kept != settings.get_pve_matrix_days():
+            settings.set_pve_matrix_days(kept)
+        self._emit_log("PDF-vs-Excel matrix source set to "
+                       f"{matrix.default_env_label(source)}.")
+        self._push_state()
+        return {"ok": True, "source": source, "days": kept}
+
+    @_api_method
+    def add_pve_matrix_day(self, date):
+        """Add a day COLUMN (a date with an export for the source, or today)."""
+        if date not in pdf_excel_matrix.available_days(settings.get_pve_matrix_source()):
+            return {"error": "That day has no export for this source (only exported "
+                             "days — or today — can be added)."}
+        days = settings.get_pve_matrix_days()
+        if date not in days:
+            settings.set_pve_matrix_days(days + [date])
+        self._push_state()
+        return {"ok": True, "days": settings.get_pve_matrix_days()}
+
+    @_api_method
+    def remove_pve_matrix_day(self, date):
+        """Remove a day column from the PDF-vs-Excel matrix."""
+        settings.set_pve_matrix_days(
+            [d for d in settings.get_pve_matrix_days() if d != date])
+        self._push_state()
+        return {"ok": True, "days": settings.get_pve_matrix_days()}
+
+    @_api_method
+    def set_pve_matrix_report(self, row_key, visible):
+        """Show/hide a family ROW on the PDF-vs-Excel matrix. At least one stays on."""
+        keys = {r["key"] for r in self._pve_matrix_snapshot()["all_rows"]}
+        if row_key not in keys:
+            return {"error": "Unknown report for the matrix."}
+        hidden = set(settings.get_pve_matrix_hidden())
+        if visible:
+            hidden.discard(row_key)
+        else:
+            hidden.add(row_key)
+        if len(hidden & keys) >= len(keys):
+            return {"error": "Keep at least one report on the matrix."}
+        settings.set_pve_matrix_hidden(sorted(hidden))
+        self._push_state()
+        return {"ok": True, "hidden": sorted(hidden)}
+
+    @_api_method
+    def set_pve_matrix_row_order(self, keys):
+        """Persist the drag-to-reorder ROW order for the PDF-vs-Excel matrix."""
+        valid = {r["key"] for r in self._pve_matrix_snapshot()["all_rows"]}
+        clean = [k for k in (keys or []) if isinstance(k, str) and k in valid]
+        settings.set_pve_matrix_row_order(clean)
+        self._push_state()
+        return {"ok": True, "order": clean}
+
+    @_api_method
+    def set_pve_matrix_day_order(self, days):
+        """Persist the drag-to-reorder DAY-column order. Any current day the client
+        omitted is appended in its existing order (a reorder never drops a column)."""
+        current = settings.get_pve_matrix_days()
+        clean = [d for d in (days or []) if isinstance(d, str) and d in current]
+        clean += [d for d in current if d not in clean]
+        settings.set_pve_matrix_days(clean)
+        self._push_state()
+        return {"ok": True, "days": clean}
+
+    @_api_method
+    def set_pve_matrix_formulas(self, on):
+        """Toggle the live-formulas twin for the PDF-vs-Excel matrix comparisons."""
+        settings.set_pve_matrix_formulas(bool(on))
+        self._push_state()
+        return {"ok": True, "on": bool(on)}
+
+    @_api_method
+    def build_pve_cell(self, row_key, date):
+        """Queue a (re)build of ONE (family, day) PDF-vs-Excel self comparison."""
+        snap = self._pve_matrix_snapshot()
+        if row_key not in {r["key"] for r in snap["all_rows"]}:
+            return {"error": "Unknown report for the matrix."}
+        if date not in snap["days"]:
+            return {"error": "Add that day first."}
+        cmp = snap["cells"].get(row_key, {}).get(date, {}).get("cmp")
+        reason = matrix.cell_unbuildable_reason(cmp)   # CMP-AUD-103
+        if reason:
+            return {"error": reason}
+        job = self._make_job("compare", "cell",
+                             self._pve_job_label("cell", row_key, date),
+                             row=row_key, env=date, which="pdf_vs_excel")
+        return self._enqueue_matrix_job(job)
+
+    @_api_method
+    def rebuild_pve_matrix(self, scope="stale", row=None, date=None, force=False):
+        """Queue a PDF-vs-Excel rebuild in scope ('stale'/'all'), optionally scoped
+        to one family row or one day column. `force` also rebuilds the day's
+        persistent consolidated editions. {nothing:True} when idle with nothing to do."""
+        snap = self._pve_matrix_snapshot()
+        scope = scope if scope in ("stale", "all") else "stale"
+        if row and row not in {r["key"] for r in snap["all_rows"]}:
+            return {"error": "Unknown report row for the rebuild."}
+        if date and date not in snap["days"]:
+            return {"error": "Unknown day for the rebuild."}
+        row = row or None
+        date = date or None
+        job_scope = "row" if row else "column" if date else scope
+        with self._lock:
+            idle = not self._task and not self._queue
+        if idle:
+            probe_scope = "all" if force else scope
+            cells = pdf_excel_matrix.cells_to_rebuild(snap, scope=probe_scope,
+                                                      row=row, date=date)
+            if not cells:
+                return {"ok": True, "nothing": True}
+        job = self._make_job("compare", job_scope,
+                             self._pve_job_label(job_scope, row, date),
+                             row=row, env=date, which="pdf_vs_excel", force=force)
+        return self._enqueue_matrix_job(job)
+
+    @_api_method
+    def open_pve_cell_comparison(self, row_key, date):
+        """Open ONE PDF-vs-Excel comparison VALUES workbook."""
+        snap = self._pve_matrix_snapshot()
+        if date not in snap["days"] or row_key not in snap["rows"]:
+            return {"error": "Unknown cell."}
+        path = pdf_excel_matrix.day_out_path(date, snap["source"], row_key)
+        if not path.exists():
+            return {"error": "No comparison built yet — use “⟳ rebuild” first."}
+        self._open_file(path)
+        return {"ok": True}
+
+    @_api_method
+    def open_pve_comparisons_folder(self):
+        """Open the PDF-vs-Excel comparison store (comparisons/pdf-vs-excel-by-day/)."""
+        self._open_folder(pdf_excel_matrix.pve_root())
         return {"ok": True}
 
     @_api_method

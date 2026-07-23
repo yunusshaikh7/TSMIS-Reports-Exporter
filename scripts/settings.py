@@ -827,6 +827,86 @@ def set_day_matrix_hidden(keys):
     return _set_str_list("day_matrix_hidden", keys)
 
 
+# ---- Compare-tab "PDF vs Excel" matrix (M2-B) ------------------------------
+# Same shape as the by-day matrix (a source, ordered day-columns, hidden family
+# rows, a drag row order, a formulas toggle) but no TSN dataset — the cell self-
+# compares two exported editions from one run folder.
+
+_DEFAULT_PVE_MATRIX_SOURCE = "ssor-prod"
+
+
+def get_pve_matrix_source():
+    raw = _read_file().get("pve_matrix_source")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return _DEFAULT_PVE_MATRIX_SOURCE
+
+
+def set_pve_matrix_source(key):
+    """Save (or, empty, reset) the PDF-vs-Excel matrix source. Returns the new value."""
+    data = dict(_read_file())
+    key = (key or "").strip()
+    if key:
+        data["pve_matrix_source"] = key
+    else:
+        data.pop("pve_matrix_source", None)
+    _atomic_write(data)
+    log.info("settings: pve_matrix_source -> %s", key or "(default)")
+    return get_pve_matrix_source()
+
+
+def get_pve_matrix_days():
+    """The ordered day-column date strings the user added (default: none)."""
+    raw = _read_file().get("pve_matrix_days")
+    if isinstance(raw, list):
+        return [d for d in raw if isinstance(d, str) and d]
+    return []
+
+
+def set_pve_matrix_days(days):
+    """Persist the ordered PDF-vs-Excel day-column list. Empty -> cleared."""
+    data = dict(_read_file())
+    days = [d for d in (days or []) if isinstance(d, str) and d]
+    if days:
+        data["pve_matrix_days"] = days
+    else:
+        data.pop("pve_matrix_days", None)
+    _atomic_write(data)
+    log.info("settings: pve_matrix_days -> %s", days or "(none)")
+    return get_pve_matrix_days()
+
+
+def get_pve_matrix_hidden():
+    """Hidden family-row keys on the PDF-vs-Excel matrix (default: none)."""
+    return _get_str_list("pve_matrix_hidden")
+
+
+def set_pve_matrix_hidden(keys):
+    """Persist the hidden PDF-vs-Excel family rows. Empty -> cleared."""
+    return _set_str_list("pve_matrix_hidden", keys)
+
+
+def get_pve_matrix_row_order():
+    """The user's drag-to-reorder family-row order (default: none = registry order)."""
+    return _get_str_list("pve_matrix_row_order")
+
+
+def set_pve_matrix_row_order(keys):
+    """Persist the PDF-vs-Excel family-row drag order. Empty -> cleared."""
+    return _set_str_list("pve_matrix_row_order", keys)
+
+
+def get_pve_matrix_formulas():
+    """Whether the PDF-vs-Excel matrix ALSO writes a live-formulas workbook
+    (its own toggle; default off)."""
+    return _get_flag("pve_matrix_formulas")
+
+
+def set_pve_matrix_formulas(on):
+    """Persist the PDF-vs-Excel matrix formulas-workbook toggle (cleared when off)."""
+    return _set_flag("pve_matrix_formulas", on)
+
+
 # ---- Compare-tab "vs Baseline" matrix ---------------------------------------
 # Same shape as the by-day matrix: a source, picked day-columns, hidden rows, a
 # row order, and its own formulas toggle — plus the picked BASELINE id

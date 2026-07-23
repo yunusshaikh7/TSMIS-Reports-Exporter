@@ -92,6 +92,11 @@ FROZEN_API = {
     # v0.29.0 — the ArcGIS clean-road tab (gui_arcgis_api).
     "arcgis_status", "open_arcgis_layers_folder", "open_arcgis_output_folder",
     "start_arcgis_build", "start_arcgis_compare",
+    # v0.31.0 (M2-B) — the PDF-vs-Excel by-day matrix (gui_matrix).
+    "pve_matrix_info", "set_pve_matrix_source", "add_pve_matrix_day",
+    "remove_pve_matrix_day", "set_pve_matrix_report", "set_pve_matrix_row_order",
+    "set_pve_matrix_day_order", "set_pve_matrix_formulas", "build_pve_cell",
+    "rebuild_pve_matrix", "open_pve_cell_comparison", "open_pve_comparisons_folder",
 }
 
 

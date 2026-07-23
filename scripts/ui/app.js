@@ -209,6 +209,12 @@ function buildStatic() {
   blTab.textContent = "vs Baseline Matrix";
   blTab.addEventListener("click", () => selectCompareGroup(BASELINE_MATRIX_GROUP));
   subStrip.appendChild(blTab);
+  const pveTab = document.createElement("button");
+  pveTab.className = "subtab"; pveTab.dataset.group = PVE_MATRIX_GROUP;
+  pveTab.setAttribute("role", "tab"); pveTab.setAttribute("aria-selected", "false");
+  pveTab.textContent = "PDF vs Excel Matrix";
+  pveTab.addEventListener("click", () => selectCompareGroup(PVE_MATRIX_GROUP));
+  subStrip.appendChild(pveTab);
 
   const cl2 = $("compareList");
   // W2: family headers inside each comparison-type sub-tab; tracked PER SUB-TAB
@@ -1053,12 +1059,14 @@ function dispatch(events) {
           if (S.tab === "everything") { renderBatchLibrary(); if (S.everySub === "matrix") renderMatrix(); }
           if (S.tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP) renderDayMatrix();
           if (S.tab === "compare" && S.compareGroup === BASELINE_MATRIX_GROUP) renderBaselineMatrix();
+          if (S.tab === "compare" && S.compareGroup === PVE_MATRIX_GROUP) renderPveMatrix();
           if (S.tab === "arcgis") renderArcgis();
           break;
         case "matrix_refresh":
           if (S.tab === "everything" && S.everySub === "matrix") renderMatrix();
           if (S.tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP) renderDayMatrix();
           if (S.tab === "compare" && S.compareGroup === BASELINE_MATRIX_GROUP) renderBaselineMatrix();
+          if (S.tab === "compare" && S.compareGroup === PVE_MATRIX_GROUP) renderPveMatrix();
           break;
         case "modal": showMessage(ev.kind, ev.title, ev.message); break;
         default:
@@ -1135,6 +1143,7 @@ function bindEvents() {
       // Compare re-enters its last sub-tab; a matrix one re-applies full-width.
       if (tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP) renderDayMatrix();
       if (tab === "compare" && S.compareGroup === BASELINE_MATRIX_GROUP) renderBaselineMatrix();
+      if (tab === "compare" && S.compareGroup === PVE_MATRIX_GROUP) renderPveMatrix();
       applyMatrixWide();   // clears matrix-wide unless a day matrix is active
     }
     updateActivityCards();
@@ -1178,6 +1187,11 @@ function bindEvents() {
     const r = await api.set_baseline_matrix_formulas(e.target.checked);
     if (r && r.error) showMessage("error", "Can't set formulas option", r.error);
     syncBaselineMatrixFormulas();
+  });
+  $("pveMatrixFormulas")?.addEventListener("change", async (e) => {
+    const r = await api.set_pve_matrix_formulas(e.target.checked);
+    if (r && r.error) showMessage("error", "Can't set formulas option", r.error);
+    syncPveMatrixFormulas();
   });
   // Evidence images — ONE shared persisted setting, surfaced on both matrix
   // pages (the checkboxes/counts are mirrors, resynced from each state push).
@@ -1230,6 +1244,8 @@ function bindEvents() {
   $("btnDayQueueStopAll")?.addEventListener("click", () => api.matrix_stop_all());
   $("btnBaselineQueueClear")?.addEventListener("click", () => api.matrix_queue_clear());
   $("btnBaselineQueueStopAll")?.addEventListener("click", () => api.matrix_stop_all());
+  $("btnPveQueueClear")?.addEventListener("click", () => api.matrix_queue_clear());
+  $("btnPveQueueStopAll")?.addEventListener("click", () => api.matrix_stop_all());
 
   renderThemeButton();
   $("btnTheme").onclick = () => {

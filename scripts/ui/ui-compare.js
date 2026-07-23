@@ -18,6 +18,7 @@ function compareKind() {
 // renderCompareKind then swaps in the matching files/folders inputs.
 const DAY_MATRIX_GROUP = "tsn_by_day";
 const BASELINE_MATRIX_GROUP = "baseline_by_day";
+const PVE_MATRIX_GROUP = "pdf_vs_excel_by_day";   // M2-B
 
 // Full-width "matrix" layout is shared by the Everything comparison matrix and the
 // Compare-tab day matrices. Compute it from the active tab/sub-tab in ONE place so
@@ -28,9 +29,11 @@ function applyMatrixWide() {
   const every = S.tab === "everything" && S.everySub === "matrix";
   const day = S.tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP;
   const bl = S.tab === "compare" && S.compareGroup === BASELINE_MATRIX_GROUP;
-  document.body.classList.toggle("matrix-wide", every || day || bl);
+  const pve = S.tab === "compare" && S.compareGroup === PVE_MATRIX_GROUP;
+  document.body.classList.toggle("matrix-wide", every || day || bl || pve);
   document.body.classList.toggle("mw-day", day);
   document.body.classList.toggle("mw-bl", bl);
+  document.body.classList.toggle("mw-pve", pve);
 }
 
 // CMP-AUD-079: true when a COMPARE-TAB comparison is live, so the sub-tab strip
@@ -45,7 +48,8 @@ function compareSubtabsShouldLock(st) {
   if (!st) return false;
   if (st.task === "compare") return true;
   const cur = st.matrix_current;
-  return st.task === "matrix" && !!cur && (cur.which === "day" || cur.which === "baseline");
+  return st.task === "matrix" && !!cur
+    && (cur.which === "day" || cur.which === "baseline" || cur.which === "pdf_vs_excel");
 }
 
 function selectCompareGroup(groupId) {
@@ -59,12 +63,15 @@ function selectCompareGroup(groupId) {
   // full-width (same treatment as the Everything matrix).
   const dayMode = groupId === DAY_MATRIX_GROUP;
   const blMode = groupId === BASELINE_MATRIX_GROUP;
-  $("compareClassic")?.classList.toggle("hidden", dayMode || blMode);
+  const pveMode = groupId === PVE_MATRIX_GROUP;
+  $("compareClassic")?.classList.toggle("hidden", dayMode || blMode || pveMode);
   $("dayMatrixSection")?.classList.toggle("hidden", !dayMode);
   $("baselineMatrixSection")?.classList.toggle("hidden", !blMode);
+  $("pveMatrixSection")?.classList.toggle("hidden", !pveMode);
   applyMatrixWide();
   if (dayMode) { renderDayMatrix(); return; }
   if (blMode) { renderBaselineMatrix(); return; }
+  if (pveMode) { renderPveMatrix(); return; }
   // family headers (W2) filter with their sub-tab, like the rows
   $("compareList").querySelectorAll(".option-group").forEach((h) => {
     h.classList.toggle("hidden", h.dataset.group !== groupId);

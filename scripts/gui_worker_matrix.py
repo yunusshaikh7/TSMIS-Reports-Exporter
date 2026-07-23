@@ -16,6 +16,7 @@ import compare_timings
 import day_matrix
 import matrix
 import outcome
+import pdf_excel_matrix
 from common import AuthError, BrowserNotFoundError, get_site, set_site
 from events import Events
 from gui_worker_export import ExportWorker
@@ -547,6 +548,80 @@ class BaselineMatrixCompareWorker(threading.Thread):
                 _record_attempt(attempts_root,
                                 f"{row_key}|{self.source}|{self.baseline_id}",
                                 date, attempt, why, error_type=error_type)
+                tally.done += 1
+                self.q.put(("matrix_cell", {"row": row_key, "cell": date,
+                                            "status": status,
+                                            "done": tally.done, "total": total,
+                                            **clock.progress_extra()}))
+        finally:
+            self.q.put(("matrix_done", {**tally.payload(self.cancel.is_set()),
+                                        "elapsed_s": round(clock.elapsed, 1)}))
+
+
+class PdfExcelMatrixCompareWorker(threading.Thread):
+    """(Re)build Compare-tab "PDF vs Excel Matrix" cells — each a (day, family) self
+    check of that day's PDF export vs its Excel export.
+
+    `cells` is a list of (date, row_key). No browser, no TSN dataset — pure
+    orchestration via pdf_excel_matrix.build_pve_cell over the SAME shared self
+    primitives the Everything matrix's self mode uses. Honors cancel BETWEEN cells
+    (each finished cell is saved). Posts the same ('matrix_cell', …) / ('matrix_done',
+    …) events as the other compare workers so the bridge lifecycle is identical."""
+
+    def __init__(self, source, cells, dest, queue, cancel_event,
+                 force_consolidate=False, also_formulas=False):
+        super().__init__(daemon=True, name="pdf-excel-matrix-compare")
+        self.source = source
+        self.cells = [(c[0], c[1]) for c in cells]   # (date, row_key)
+        self.dest = dest
+        self.q = queue
+        self.cancel = cancel_event
+        self.force_consolidate = force_consolidate
+        self.also_formulas = also_formulas
+
+    def run(self):
+        events = Events(is_cancelled=self.cancel.is_set,
+                        on_log=lambda m: self.q.put(("log", m)))
+        tally = _AttemptTally(len(self.cells))
+        total = tally.total
+        clock = _RunClock([f"{row}|pdf_vs_excel" for _date, row in self.cells])
+        attempts_root = pdf_excel_matrix.pve_root()
+        try:
+            for date, row_key in self.cells:
+                if self.cancel.is_set():
+                    break
+                self.q.put(("matrix_cell", {"row": row_key, "cell": date,
+                                            "status": "running",
+                                            "done": tally.done, "total": total,
+                                            **clock.progress_extra()}))
+                self.q.put(("log", f"  ▸ comparing {row_key} · {date} PDF vs Excel…"))
+                error_type = None
+                started = clock.start()
+                try:
+                    res = pdf_excel_matrix.build_pve_cell(
+                        self.source, date, row_key, self.dest, events,
+                        force_consolidate=self.force_consolidate,
+                        also_formulas=self.also_formulas)
+                    attempt, why = _attempt_state(res)
+                    status = res.status
+                    if status != "ok":
+                        tally.errors += 1
+                except Exception as e:                   # noqa: BLE001
+                    log.exception("pdf-excel matrix compare %s/%s crashed",
+                                  date, row_key)
+                    cancelled_cell = self.cancel.is_set()
+                    status = "cancelled" if cancelled_cell else "error"
+                    tally.errors += 1
+                    attempt, why = _attempt_state(None, cancelled=cancelled_cell)
+                    if not cancelled_cell:
+                        why = f"{type(e).__name__}: {e}"
+                        error_type = type(e).__name__
+                dur = clock.finish(f"{row_key}|pdf_vs_excel", started)
+                self.q.put(("log", _cell_done_line(row_key, date, "pdf_vs_excel",
+                                                   attempt, why, dur)))
+                tally.count(attempt)
+                _record_attempt(attempts_root, f"{row_key}|{self.source}", date,
+                                attempt, why, error_type=error_type)
                 tally.done += 1
                 self.q.put(("matrix_cell", {"row": row_key, "cell": date,
                                             "status": status,

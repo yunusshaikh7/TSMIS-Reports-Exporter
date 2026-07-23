@@ -1561,3 +1561,240 @@ function updateBaselineMatrixProgress() {
   renderQueuePanel("baselineQueueGroup", "baselineQueue", "baselineQueueCount");
   syncBaselineMatrixFormulas();
 }
+
+// ---- PDF-vs-Excel by-day matrix (M2-B) ----------------------------------- //
+// Rows = the 5 dual-edition families, columns = exported days; each cell = that
+// day's PDF export self-compared vs its Excel export. Compare-only (no TSN, no
+// export, no evidence) — the near-twin of the vs-Baseline matrix, without a
+// baseline picker (any day with BOTH editions present is buildable).
+let _pveRenderSeq = 0;
+
+function syncPveMatrixFormulas() {
+  syncFormulasToggle("pveMatrixFormulas", "pve_matrix_formulas");
+}
+
+async function renderPveMatrix() {
+  const grid = $("pveMatrixGrid");
+  if (!grid) return;
+  const seq = ++_pveRenderSeq;
+  let snap;
+  try { snap = await api.pve_matrix_info(); } catch (e) { return; }
+  if (seq !== _pveRenderSeq) return;      // a newer render started; drop this one
+  if (!snap) return;
+  const days = snap.days || [], locked = !!(S.st && S.st.task);
+
+  const srcSel = $("pveMatrixSource");
+  if (srcSel) {
+    srcSel.textContent = "";
+    (snap.sources || []).forEach((s) => {
+      const o = document.createElement("option");
+      o.value = s.key; o.textContent = s.label;
+      if (s.key === snap.source) o.selected = true;
+      srcSel.appendChild(o);
+    });
+    srcSel.disabled = locked;
+    srcSel.onchange = async () => {
+      const r = await api.set_pve_matrix_source(srcSel.value);
+      if (r && r.error) showMessage("error", "Can't set source", r.error);
+      await renderPveMatrix();
+    };
+  }
+
+  const addSel = $("pveMatrixAddDay"), addBtn = $("btnPveAddDay");
+  const avail = (snap.available_days || []).filter((d) => !days.includes(d));
+  if (addSel) {
+    addSel.textContent = "";
+    if (!avail.length) {
+      const o = document.createElement("option");
+      o.value = ""; o.textContent = days.length ? "— no more exported days —" : "— no exported days —";
+      addSel.appendChild(o);
+    } else {
+      avail.forEach((d) => {
+        const o = document.createElement("option"); o.value = d; o.textContent = d;
+        addSel.appendChild(o);
+      });
+    }
+    addSel.disabled = locked || !avail.length;
+  }
+  if (addBtn) {
+    addBtn.disabled = locked || !avail.length;
+    addBtn.onclick = async () => {
+      const d = $("pveMatrixAddDay").value;
+      if (!d) return;
+      const r = await api.add_pve_matrix_day(d);
+      if (r && r.error) showMessage("error", "Can't add day", r.error);
+      await renderPveMatrix();
+    };
+  }
+
+  const rtog = $("pveMatrixReportToggles");
+  if (rtog) {
+    rtog.textContent = "";
+    const hidden = new Set(snap.hidden || []);
+    (snap.all_rows || []).forEach((r) => {
+      const isOn = !hidden.has(r.key);
+      const b = document.createElement("button");
+      b.className = "mx-toggle" + (isOn ? " on" : "");
+      b.textContent = r.label;
+      b.disabled = locked;
+      b.title = (isOn ? "Hide " : "Show ") + r.label;
+      b.onclick = async () => {
+        const res = await api.set_pve_matrix_report(r.key, !isOn);
+        if (res && res.error) { showMessage("error", "Can't toggle", res.error); return; }
+        await renderPveMatrix();
+      };
+      rtog.appendChild(b);
+    });
+  }
+
+  grid.textContent = "";
+  if (!days.length) {
+    grid.style.gridTemplateColumns = ""; grid.style.gridTemplateRows = "";
+    const empty = document.createElement("div");
+    empty.className = "dm-empty";
+    empty.textContent = "Add an export day from Matrix options to self-check its PDF "
+      + "export against its Excel export.";
+    grid.appendChild(empty);
+    wirePveMatrixFooter();
+    updatePveMatrixProgress();
+    return;
+  }
+  grid.style.gridTemplateColumns = `minmax(190px,1.1fr) repeat(${days.length}, minmax(120px,1fr))`;
+  grid.style.gridTemplateRows = `auto repeat(${snap.rows.length}, minmax(50px,1fr))`;
+
+  const corner = document.createElement("div");
+  corner.className = "mx-cell mx-corner mx-colhead";
+  corner.textContent = "Report \\ Day";
+  grid.appendChild(corner);
+  days.forEach((d) => {
+    const h = document.createElement("div");
+    h.className = "mx-cell mx-colhead";
+    const lab = document.createElement("div"); lab.textContent = d;
+    h.appendChild(lab);
+    const btns = document.createElement("span"); btns.className = "mxch-btns";
+    btns.append(
+      mxHeadBtn("i-compare", `Rebuild every report for ${d} (PDF vs Excel)`, "mxch-rebuild",
+        async () => {
+          const r = await api.rebuild_pve_matrix("all", null, d);
+          if (r && r.nothing) showMessage("info", "Nothing to rebuild", "No comparable cells in this day.");
+          else if (r && r.error) showMessage("error", "Can't rebuild", r.error);
+        }),
+      mxHeadBtn("i-trash", `Remove the ${d} column`, "mxch-rm", async () => {
+        await api.remove_pve_matrix_day(d); await renderPveMatrix();
+      }));
+    h.appendChild(btns);
+    dndAttach(h, h, d, "pve-day", "x", () => days.slice(), async (order) => {
+      const r = await api.set_pve_matrix_day_order(order);
+      if (r && r.error) showMessage("error", "Can't reorder", r.error);
+    });
+    grid.appendChild(h);
+  });
+
+  snap.rows.forEach((rk) => {
+    const rlabel = snap.row_labels[rk] || rk;
+    const rh = document.createElement("div"); rh.className = "mx-cell mx-rowhead";
+    rh.dataset.rk = rk; rh.dataset.label = rlabel;
+    const top = document.createElement("div"); top.className = "mxrh-top";
+    const lbl = document.createElement("span"); lbl.className = "mxrh-label";
+    lbl.textContent = rlabel;
+    top.appendChild(lbl);
+    top.appendChild(mxHeadBtn("i-compare", `Rebuild ${rlabel} for every day (PDF vs Excel)`,
+      "mxch-rebuild", async () => {
+        const r = await api.rebuild_pve_matrix("all", rk, null);
+        if (r && r.nothing) showMessage("info", "Nothing to rebuild", "No comparable cells in this row.");
+        else if (r && r.error) showMessage("error", "Can't rebuild", r.error);
+      }));
+    rh.appendChild(top);
+    dndAttach(rh, top, rk, "pve-row", "y", () => snap.rows.slice(), async (order) => {
+      const r = await api.set_pve_matrix_row_order(order);
+      if (r && r.error) showMessage("error", "Can't reorder", r.error);
+      else await renderPveMatrix();
+    });
+    grid.appendChild(rh);
+    days.forEach((d) => {
+      const c = snap.cells[rk][d], cmp = c.cmp;
+      const cell = document.createElement("div"); cell.className = "mx-cell";
+      const main = document.createElement("div"); main.className = "mx-num";
+      const sub = document.createElement("div"); sub.className = "mx-sub";
+      const v = mxCellContent(cmp);
+      cell.classList.add(v.cls); main.textContent = v.main; sub.textContent = v.sub;
+      if (v.warn) cell.classList.add(v.warn);
+      // "needs export" here means one or both editions weren't exported that day.
+      const ed = c.export || {};
+      const edWhen = ed.present ? fmtAge(ed.age_seconds)
+        : ed.pdf_present ? "Excel edition not exported"
+          : ed.excel_present ? "PDF edition not exported" : "neither edition exported";
+      cell.title = `${rlabel} — ${d} (PDF vs Excel)\nEditions: ${edWhen}`
+        + (v.title ? `\n⚠ ${v.title}` : "");
+      cell.append(main, sub);
+      const acts = document.createElement("div"); acts.className = "mx-actions";
+      if (cmp && !cmp.missing_side) {
+        acts.appendChild(mxActBtn("i-compare", "Build / rebuild this PDF-vs-Excel comparison",
+          false, async () => {
+            const r = await api.build_pve_cell(rk, d);
+            if (r && r.error) showMessage("error", "Can't build", r.error);
+          }));
+      }
+      if (cmp && cmp.built) {
+        const ob = mxActBtn("i-external", "Open this comparison workbook (values copy)",
+          false, async () => {
+            const r = await api.open_pve_cell_comparison(rk, d);
+            if (r && r.error) showMessage("error", "Can't open", r.error);
+          });
+        ob.classList.add("mx-open"); acts.appendChild(ob);
+      }
+      cell.appendChild(acts);
+      grid.appendChild(cell);
+    });
+  });
+
+  wirePveMatrixFooter();
+  updatePveMatrixProgress();
+}
+
+function wirePveMatrixFooter() {
+  const ba = $("btnPveBuildAll");
+  if (ba) ba.onclick = async () => {
+    const r = await api.rebuild_pve_matrix("all");
+    if (r && r.nothing) showMessage("info", "Nothing to build", "Add days with both editions exported first.");
+    else if (r && r.error) showMessage("error", "Can't build", r.error);
+  };
+  const rb = $("btnPveRebuildAll");
+  if (rb) rb.onclick = async () => {
+    const r = await api.rebuild_pve_matrix("stale");
+    if (r && r.nothing) showMessage("info", "Up to date", "Every PDF-vs-Excel comparison is current.");
+    else if (r && r.error) showMessage("error", "Can't rebuild", r.error);
+  };
+  const of = $("btnOpenPveComparisons");
+  if (of) of.onclick = async () => {
+    const r = await api.open_pve_comparisons_folder();
+    if (r && r.error) showMessage("error", "Can't open", r.error);
+  };
+  const cb = $("btnPveCancel");
+  if (cb) cb.onclick = () => api.cancel_run();
+}
+
+function updatePveMatrixProgress() {
+  const el = $("pveMatrixProgress");
+  if (el) {
+    const m = S.st && S.st.matrix;
+    if (m && m.total) { el.hidden = false; el.textContent = mxProgressText(m); }
+    else el.hidden = true;
+  }
+  const locked = !!(S.st && S.st.task);
+  document.querySelectorAll(
+    "#pveMatrixSource, #pveMatrixReportToggles .mx-toggle")
+    .forEach((c) => { c.disabled = locked; });
+  const addSel = $("pveMatrixAddDay"), addBtn = $("btnPveAddDay");
+  const noAvail = !addSel || !addSel.querySelector('option[value]:not([value=""])');
+  if (addSel) addSel.disabled = locked || noAvail;
+  if (addBtn) addBtn.disabled = locked || noAvail;
+  const cancel = $("btnPveCancel");
+  if (cancel) {
+    const running = !!(S.st && S.st.task === "matrix");
+    cancel.classList.toggle("hidden", !running);
+    cancel.disabled = !running;
+  }
+  renderQueuePanel("pveQueueGroup", "pveQueue", "pveQueueCount");
+  syncPveMatrixFormulas();
+}

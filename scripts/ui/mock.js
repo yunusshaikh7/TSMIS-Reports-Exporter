@@ -578,6 +578,52 @@ function makeMockApi() {
              available_days: MOCK_DAY_AVAIL[source] || [],
              baseline_options: mockBaselineOptions(source) };
   }
+
+  // M2-B "PDF vs Excel" matrix mock — 5 dual-edition families × day columns; each
+  // cell self-checks the day's PDF export vs its Excel export (both from one run
+  // folder). Every cell with BOTH editions present is buildable (no baseline).
+  const MOCK_PVE_ROWS = [
+    { key: "highway_log_pdf", label: "Highway Log", supported: true },
+    { key: "intersection_detail_pdf", label: "Intersection Detail", supported: true },
+    { key: "highway_detail_pdf", label: "Highway Detail", supported: true },
+    { key: "highway_sequence_pdf", label: "Highway Sequence Listing", supported: true },
+    { key: "ramp_detail_pdf", label: "TSAR: Ramp Detail", supported: true },
+  ];
+
+  function mockPveMatrixSnapshot() {
+    const source = st.pve_matrix_source || "ssor-prod";
+    const days = st.pve_matrix_days || [];
+    const hidden = st.pve_matrix_hidden || [];
+    const _visible = MOCK_PVE_ROWS.filter((r) => hidden.indexOf(r.key) < 0);
+    const _byKey = {}; _visible.forEach((r) => { _byKey[r.key] = r; });
+    const shown = mockApplyOrder(_visible.map((r) => r.key), st.pve_matrix_row_order)
+      .map((k) => _byKey[k]);
+    const rowLabels = {}, rowSupported = {};
+    MOCK_PVE_ROWS.forEach((r) => { rowLabels[r.key] = r.label; rowSupported[r.key] = true; });
+    const cells = {};
+    shown.forEach((r, ri) => {
+      cells[r.key] = {};
+      days.forEach((d, i) => {
+        // exercise a "needs export" cell: the oldest day is missing one family's
+        // Excel edition, so its PDF-vs-Excel cell can't build.
+        const excelMissing = (d === "2026-06-11" && ri % 3 === 1);
+        const both = !excelMissing;
+        const cmp = both ? mockCmp(i === 0 ? (ri % 2 === 0 ? [4, 1] : [0, 0]) : "notbuilt")
+          : { supported: true, built: false, stale: false, missing_side: "excel" };
+        cells[r.key][d] = { export: { present: both, mtime: 0,
+          age_seconds: both ? (i + 1) * 86400 : null,
+          pdf_present: true, excel_present: both }, cmp };
+      });
+    });
+    return { source,
+             sources: ["ssor-prod", "ssor-test", "ssor-dev", "ars-prod", "ars-test", "ars-dev"]
+               .map((k) => { const [s, v] = k.split("-");
+                 return { key: k, label: `${s.toUpperCase()} / ${v[0].toUpperCase()}${v.slice(1)}` }; }),
+             days,
+             rows: shown.map((r) => r.key), row_labels: rowLabels,
+             row_supported: rowSupported, all_rows: MOCK_PVE_ROWS, hidden, cells,
+             available_days: MOCK_DAY_AVAIL[source] || [] };
+  }
   // v0.16.0 mock job queue — mirrors gui_api: enqueue, run one at a time, auto-
   // advance. `kind` drives the run-mode/icon; `total` feeds the compare progress.
   let mockJobSeq = 0;
@@ -1543,6 +1589,65 @@ function makeMockApi() {
     },
     open_baseline_comparisons_folder: async () => {
       push({ t: "log", text: "(mock) open vs-baseline comparisons folder" });
+      return { ok: true };
+    },
+    // M2-B — the PDF-vs-Excel matrix.
+    pve_matrix_info: async () => mockPveMatrixSnapshot(),
+    set_pve_matrix_source: async (s) => {
+      st.pve_matrix_source = s; st.pve_matrix_days = [];
+      pushState(); return { ok: true, source: s };
+    },
+    add_pve_matrix_day: async (d) => {
+      const avail = MOCK_DAY_AVAIL[st.pve_matrix_source || "ssor-prod"] || [];
+      if (avail.indexOf(d) < 0) return { error: "That day has no export for this source." };
+      if ((st.pve_matrix_days || []).indexOf(d) < 0)
+        st.pve_matrix_days = [...(st.pve_matrix_days || []), d];
+      pushState(); return { ok: true, days: st.pve_matrix_days };
+    },
+    remove_pve_matrix_day: async (d) => {
+      st.pve_matrix_days = (st.pve_matrix_days || []).filter((x) => x !== d);
+      pushState(); return { ok: true, days: st.pve_matrix_days };
+    },
+    set_pve_matrix_report: async (rk, visible) => {
+      const hidden = new Set(st.pve_matrix_hidden || []);
+      if (visible) hidden.delete(rk); else hidden.add(rk);
+      st.pve_matrix_hidden = [...hidden];
+      return { ok: true, hidden: st.pve_matrix_hidden };
+    },
+    set_pve_matrix_row_order: async (keys) => {
+      st.pve_matrix_row_order = keys || [];
+      pushState(); return { ok: true, order: st.pve_matrix_row_order };
+    },
+    set_pve_matrix_day_order: async (days) => {
+      const cur = st.pve_matrix_days || [];
+      const clean = (days || []).filter((d) => cur.includes(d));
+      st.pve_matrix_days = [...clean, ...cur.filter((d) => !clean.includes(d))];
+      pushState(); return { ok: true, days: st.pve_matrix_days };
+    },
+    set_pve_matrix_formulas: async (on) => {
+      st.pve_matrix_formulas = !!on;
+      push({ t: "log", text: `PDF-vs-Excel live-formulas workbook ${on ? "on" : "off"}.` });
+      pushState(); return { ok: true, on: !!on };
+    },
+    build_pve_cell: async (rk, d) =>
+      mockEnqueue("compare", "cell", `Rebuild ${rk} — ${d} PDF vs Excel`,
+                  { which: "pdf_vs_excel", total: 1 }),
+    rebuild_pve_matrix: async (scope, row, date) => {
+      if (!(st.pve_matrix_days || []).length) return { ok: true, nothing: true };
+      const n = row ? (st.pve_matrix_days || []).length : date ? 2 : 4;
+      const label = row ? `Rebuild ${row} — all days PDF vs Excel`
+        : date ? `Rebuild all reports — ${date} PDF vs Excel`
+        : scope === "all" ? "Rebuild all PDF-vs-Excel comparisons"
+          : "Refresh stale PDF-vs-Excel comparisons";
+      return mockEnqueue("compare", row ? "row" : date ? "column" : scope, label,
+                         { which: "pdf_vs_excel", total: n });
+    },
+    open_pve_cell_comparison: async (rk, d) => {
+      push({ t: "log", text: `(mock) open PDF-vs-Excel comparison: ${d} ${rk}.xlsx` });
+      return { ok: true };
+    },
+    open_pve_comparisons_folder: async () => {
+      push({ t: "log", text: "(mock) open PDF-vs-Excel comparisons folder" });
       return { ok: true };
     },
     pick_batch_dest: async () => {
