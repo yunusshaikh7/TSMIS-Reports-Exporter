@@ -1,0 +1,447 @@
+{
+ "EVERYTHING-tsn": {
+  "n": 18,
+  "warned": 12,
+  "temp_path": 18,
+  "rows": [
+   {
+    "file": "ssor-prod_highway_log_pdf_tsn (formulas).xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "ssor-prod_highway_log_pdf_tsn.xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "ssor-prod_highway_log_tsn (formulas).xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "ssor-prod_highway_log_tsn.xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "ssor-prod_highway_sequence_pdf_tsn (formulas).xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "ssor-prod_highway_sequence_pdf_tsn.xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "ssor-prod_highway_sequence_tsn (formulas).xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "ssor-prod_highway_sequence_tsn.xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "ssor-prod_intersection_detail_pdf_tsn (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": true
+   },
+   {
+    "file": "ssor-prod_intersection_detail_pdf_tsn.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": true
+   },
+   {
+    "file": "ssor-prod_intersection_detail_tsn (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": true
+   },
+   {
+    "file": "ssor-prod_intersection_detail_tsn.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": true
+   },
+   {
+    "file": "ssor-prod_intersection_summary_tsn (formulas).xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "ssor-prod_intersection_summary_tsn.xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "ssor-prod_ramp_detail_pdf_tsn (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": true
+   },
+   {
+    "file": "ssor-prod_ramp_detail_pdf_tsn.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": true
+   },
+   {
+    "file": "ssor-prod_ramp_summary_tsn (formulas).xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "ssor-prod_ramp_summary_tsn.xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   }
+  ]
+ },
+ "EVERYTHING-self": {
+  "n": 8,
+  "warned": 0,
+  "temp_path": 0,
+  "rows": [
+   {
+    "file": "ssor-prod_highway_log_pdf_vs_excel (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-prod_highway_log_pdf_vs_excel.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-prod_highway_log_vs_pdf (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-prod_highway_log_vs_pdf.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-prod_highway_sequence_pdf_vs_excel (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-prod_highway_sequence_pdf_vs_excel.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-prod_intersection_detail_pdf_vs_excel (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-prod_intersection_detail_pdf_vs_excel.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   }
+  ]
+ },
+ "EVERYTHING-env": {
+  "n": 20,
+  "warned": 0,
+  "temp_path": 0,
+  "rows": [
+   {
+    "file": "ars-prod_intersection_detail (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ars-prod_intersection_detail.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ars-prod_intersection_detail_pdf (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ars-prod_intersection_detail_pdf.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ars-prod_intersection_summary (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ars-prod_intersection_summary.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-test_highway_log (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-test_highway_log.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-test_highway_log_pdf (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-test_highway_log_pdf.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-test_highway_sequence (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-test_highway_sequence.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-test_highway_sequence_pdf (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-test_highway_sequence_pdf.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-test_intersection_summary (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-test_intersection_summary.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-test_ramp_detail_pdf (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-test_ramp_detail_pdf.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-test_ramp_summary (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ssor-test_ramp_summary.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   }
+  ]
+ },
+ "DIRECT-tsn": {
+  "n": 18,
+  "warned": 0,
+  "temp_path": 0,
+  "rows": [
+   {
+    "file": "highway_log vs tsn (values).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "highway_log vs tsn.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "highway_log_pdf vs tsn (values).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "highway_log_pdf vs tsn.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "highway_sequence vs tsn (values).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "highway_sequence vs tsn.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "highway_sequence_pdf vs tsn (values).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "highway_sequence_pdf vs tsn.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "intersection_detail vs tsn (values).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "intersection_detail vs tsn.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "intersection_detail_pdf vs tsn (values).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "intersection_detail_pdf vs tsn.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "intersection_summary vs tsn (values).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "intersection_summary vs tsn.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ramp_detail_pdf vs tsn (values).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ramp_detail_pdf vs tsn.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ramp_summary vs tsn (values).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   },
+   {
+    "file": "ramp_summary vs tsn.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": false
+   }
+  ]
+ },
+ "BYDAY-tsn": {
+  "n": 18,
+  "warned": 12,
+  "temp_path": 18,
+  "rows": [
+   {
+    "file": "highway_log_pdf_vs_tsn 2026-07-23 ssor-prod (formulas).xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "highway_log_pdf_vs_tsn 2026-07-23 ssor-prod.xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "highway_log_vs_tsn 2026-07-23 ssor-prod (formulas).xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "highway_log_vs_tsn 2026-07-23 ssor-prod.xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "highway_sequence_pdf_vs_tsn 2026-07-23 ssor-prod (formulas).xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "highway_sequence_pdf_vs_tsn 2026-07-23 ssor-prod.xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "highway_sequence_vs_tsn 2026-07-23 ssor-prod (formulas).xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "highway_sequence_vs_tsn 2026-07-23 ssor-prod.xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "intersection_detail_pdf_vs_tsn 2026-07-23 ssor-prod (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": true
+   },
+   {
+    "file": "intersection_detail_pdf_vs_tsn 2026-07-23 ssor-prod.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": true
+   },
+   {
+    "file": "intersection_detail_vs_tsn 2026-07-23 ssor-prod (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": true
+   },
+   {
+    "file": "intersection_detail_vs_tsn 2026-07-23 ssor-prod.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": true
+   },
+   {
+    "file": "intersection_summary_vs_tsn 2026-07-23 ssor-prod (formulas).xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "intersection_summary_vs_tsn 2026-07-23 ssor-prod.xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "ramp_detail_pdf_vs_tsn 2026-07-23 ssor-prod (formulas).xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": true
+   },
+   {
+    "file": "ramp_detail_pdf_vs_tsn 2026-07-23 ssor-prod.xlsx",
+    "false_rebuild_warning": false,
+    "temp_path": true
+   },
+   {
+    "file": "ramp_summary_vs_tsn 2026-07-23 ssor-prod (formulas).xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   },
+   {
+    "file": "ramp_summary_vs_tsn 2026-07-23 ssor-prod.xlsx",
+    "false_rebuild_warning": true,
+    "temp_path": true
+   }
+  ]
+ }
+}
