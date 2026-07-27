@@ -14,9 +14,9 @@ sign [IMPLEMENTATION-PLAN.md](../../IMPLEMENTATION-PLAN.md))
 | Branch | `hotfix/hf-01-clean-road-source-truth` |
 | Base `main` commit | PENDING (the `main` head at branch time; plan drafted against `a29bdb6`) |
 | Canonical finding IDs | **PCOA-FINAL-010** (P1) |
-| Implementer | Claude |
+| Implementer | **Claude** (owner decision 2026-07-26: Claude implements every bundle) |
 | First reviewer | **Codex** — non-implementer; holds `source-audit/CLEAN-ROAD-HIGHWAY-RAW-SOURCE-TRUTH-FINAL.md`, `clean-road-highway-raw-source-truth.json`, `CLEAN-ROAD-COMPARISON-UNLOCATABLE-IMPACT.md`, `clean-road-comparison-unlocatable-impact.json` |
-| Second reviewer | Claude — challenge pass; must re-derive from source, not ratify review 1 |
+| Second reviewer | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it. Claude never approves this bundle |
 
 ## In scope
 

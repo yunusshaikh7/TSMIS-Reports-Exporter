@@ -48,6 +48,9 @@ Canonical finding count carried into planning: **22 records — 20 actionable
 - Every canonical finding maps to exactly one **primary** bundle. A finding may
   appear in other bundles only as *regression surface* — never as a second
   implementation scope.
+- **Roles are fixed for the whole program (owner decision, 2026-07-26): Claude
+  implements every bundle; Codex performs both adversarial reviews on every
+  bundle.** Claude never approves its own work.
 - Every bundle starts from the then-current `main`, uses its own
   `hotfix/<bundle-id>-<slug>` branch and worktree, and merges to `main` only
   after two adversarial reviews approve it with at least one non-implementer
@@ -231,13 +234,27 @@ SHA, implementer and reviewer names. The BUNDLE.md must not diverge from this
 section; where they disagree, this file wins. (`HF-01/BUNDLE.md` is already
 created because it is the first `READY` bundle.)
 
-Reviewer rule, from Prompt 05 ("at least one reviewer must not be the bundle's
-implementer"): **review 1 is always the non-implementer** — deliberately the
-agent that holds the finding's durable witness — and review 2 is the implementer,
-whose mandate is to *challenge* review 1 and re-derive from source, never to
-ratify it. A bundle is mergeable only when both reviews approve. Substituting a
-second non-implementer pass in a fresh chat for review 2 is also compliant and
-preferred when that agent has capacity.
+**Role assignment (owner decision, 2026-07-26): Claude implements every bundle;
+Codex performs every review.** Both Stage 5 passes are Codex, in two separate
+fresh chats: review 1 is the primary adversarial gate, and review 2 must
+*challenge* review 1 and re-derive from source rather than copy it. This
+satisfies Prompt 05's hard rule — "at least one reviewer must not be the bundle's
+implementer" — on every bundle, since Codex is never the implementer, and it is
+strictly stronger than the minimum (Claude never approves its own work).
+
+Two consequences the reviewer must plan for:
+
+- **Codex must bind to Claude-authored witnesses on the Claude-unique findings**
+  (PCOA-FINAL-003, -006, -014, -015, -017, -018, -019, -022 and the RC-2/RC-3
+  rechecks). The independence firewall ended on 2026-07-26, so Claude's retained
+  Stage 1B root and the Stage 2 neutral root are both readable; the small
+  `stage2-*.json` witnesses are committed in-repo. Binding to a witness is not
+  accepting it — Prompt 05 item 5 still requires an independent recount.
+- **Review 2 is the same agent as review 1.** Its challenge value comes from
+  re-deriving, not re-reading: it must re-run the acceptance generation itself,
+  recount from raw, and explicitly list what review 1 did not check. A review 2
+  that only restates review 1 is a failed review, and the second planner should
+  say so if it happens.
 
 ---
 
@@ -252,7 +269,7 @@ preferred when that agent has capacity.
 | Findings | **PCOA-FINAL-010** (P1) |
 | Implementer | Claude |
 | Review 1 | **Codex** (holds `clean-road-comparison-unlocatable-impact.json` and `CLEAN-ROAD-HIGHWAY-RAW-SOURCE-TRUTH-FINAL.md`) |
-| Review 2 | Claude (challenge pass) |
+| Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
 | Status | BLOCKED → `READY` on joint planner sign-off |
 
 **Exact scope.** Clean Road Highway only: the ArcGIS build
@@ -385,9 +402,9 @@ join, the recount totals) →
 | Priority / order | 2 |
 | Depends on | Nothing (sequenced after HF-01 so its Clean Road witness covers the merged state) |
 | Findings | **PCOA-FINAL-008** (P1), **-009** (P2), **-014** (P2), **-019** (P3) |
-| Implementer | Codex |
-| Review 1 | **Claude** (ran Stage 2 RC-1; owns `stage2-measure-clipping.py` and `stage2-clipping-recheck.json`) |
-| Review 2 | Codex (challenge pass) |
+| Implementer | Claude |
+| Review 1 | **Codex** — non-implementer; binds to its own `statewide-summary-visible-text-clipping.json`, `large-detail-no-render-visual-adjudication.json` and native-Excel renders, plus the committed `stage2-measure-clipping.py` / `stage2-clipping-recheck.json` |
+| Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
 | Status | BLOCKED |
 
 **Exact scope.** Stored presentation and self-description of the generated
@@ -507,9 +524,9 @@ and the per-family count-invariance table.
 | Priority / order | 3 |
 | Depends on | Nothing |
 | Findings | **PCOA-FINAL-002** (P1), **-003** (P2), **-016** (P3) |
-| Implementer | Codex |
-| Review 1 | **Claude** (ran RC-3; owns `stage2-tsn-provenance-scope.json` and `witness\temp_captures.txt`) |
-| Review 2 | Codex (challenge pass) |
+| Implementer | Claude |
+| Review 1 | **Codex** — non-implementer; binds to `run-ledgers/tsn-library-rebuild.json`, `source-audit/all-completed-workflow-note-audit.json`, the committed `stage2-tsn-provenance-scope.json`, and Claude's `witness\temp_captures.txt` (readable since the firewall ended) |
+| Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
 | Status | BLOCKED |
 
 **Exact scope.** The matrix lanes' private TSN capture step and what the
@@ -624,7 +641,7 @@ classification and the temp-directory lifecycle log.
 | Findings | **PCOA-FINAL-001** (P1), **-012** (P2, latent) |
 | Implementer | Claude |
 | Review 1 | **Codex** (holds `ramp-detail-pdf-excel-sibling-parity.json` and the header-census run ledgers) |
-| Review 2 | Claude (challenge pass) |
+| Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
 | Status | BLOCKED |
 
 **Exact scope.** Ramp Detail, both editions: the 8 topology decisions the Excel
@@ -743,9 +760,9 @@ row-2 field trace and the self-check zero proof.
 | Priority / order | 5 |
 | Depends on | Nothing (blocks HF-10) |
 | Findings | **PCOA-FINAL-004** (P1), **-005** (P1), **-006** (P1) |
-| Implementer | Codex |
-| Review 1 | **Claude** (found 006's root cause and the wrong-record crop; RC-2 reproduced the wrong-target defect) |
-| Review 2 | Codex (challenge pass) |
+| Implementer | Claude |
+| Review 1 | **Codex** — non-implementer; binds to its five `source-audit/*evidence*` review ledgers and `visual-review/evidence-review/`, plus Claude's `visual_evidence.py:1270` census and the RC-2 `FT_3_stacked.png` reproduction |
+| Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
 | Status | BLOCKED |
 
 **Exact scope.** The visual-evidence renderer's eligibility rule, per-side source
@@ -878,7 +895,7 @@ truncation census and the target-geometry measurements.
 | Findings | **PCOA-FINAL-011** (P1) |
 | Implementer | Claude |
 | Review 1 | **Codex** (owns the 60,254-row equation witness and the route-001 raw adjudication) |
-| Review 2 | Claude (challenge pass) |
+| Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
 | Status | BLOCKED |
 
 **Exact scope.** The Highway Sequence PDF-vs-Excel **self** check only, on all
@@ -979,9 +996,9 @@ before/after count table.
 | Priority / order | 7 |
 | Depends on | HF-04 (`compare_env.py` ownership) |
 | Findings | **PCOA-FINAL-015** (P2), **-018** (P2) |
-| Implementer | Codex |
-| Review 1 | **Claude** (both findings are Claude-unique; owns `witness\export_coverage.txt` and the three timing witnesses) |
-| Review 2 | Codex (challenge pass) |
+| Implementer | Claude |
+| Review 1 | **Codex** — non-implementer. Both findings are Claude-unique, so Codex must bind to Claude's `witness\export_coverage.txt`, the committed `claude-round1-export-coverage.txt`, and the three timing witnesses, then re-measure independently |
+| Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
 | Status | BLOCKED |
 
 **Exact scope.** 015: the folder-comparison preflight on every statewide PDF
@@ -1082,9 +1099,9 @@ and the re-derived coverage census.
 | Priority / order | 8 |
 | Depends on | HF-03 (the capture step must already be identity-complete) |
 | Findings | **PCOA-FINAL-017** (P2) |
-| Implementer | Codex |
-| Review 1 | **Claude** (Claude-unique; owns `witness\tsn_rebuild_all.json`) |
-| Review 2 | Codex (challenge pass) |
+| Implementer | Claude |
+| Review 1 | **Codex** — non-implementer. Claude-unique finding, so Codex must bind to Claude's `witness\tsn_rebuild_all.json` and re-run the double rebuild itself; the root cause is an unverified hypothesis and the reviewer's first job is to confirm the implementer actually established it |
+| Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
 | Status | BLOCKED |
 
 **Exact scope.** The TSN library's normalized-workbook build and identity for all
@@ -1179,7 +1196,7 @@ eight datasets and the content-invariance proof.
 | Findings | **PCOA-FINAL-013** (P2) |
 | Implementer | Claude |
 | Review 1 | **Codex** (owns the four semantic-classification witnesses) |
-| Review 2 | Claude (challenge pass) |
+| Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
 | Status | BLOCKED |
 
 **Exact scope.** The measured representation-only Description/landmark class in
@@ -1287,7 +1304,7 @@ the disclosure/count table.
 | Findings | **PCOA-FINAL-007** (P2) |
 | Implementer | Claude |
 | Review 1 | **Codex** (found the five absent-but-required cells) |
-| Review 2 | Claude (challenge pass) |
+| Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
 | Status | BLOCKED |
 
 **Exact scope.** Evidence for the five Everything ENV cells that compare PDF
@@ -1377,9 +1394,9 @@ table and the count-invariance proof.
 | Priority / order | 11 — program closeout |
 | Depends on | HF-06, HF-09 (the guards must lock the final parser/comparator state) |
 | Findings | **PCOA-FINAL-020** (P1, source-side), **-021** (NO FIX), **-022** (NO FIX) |
-| Implementer | Codex |
-| Review 1 | **Claude** (found 020 and 022 independently) |
-| Review 2 | Codex (challenge pass) |
+| Implementer | Claude |
+| Review 1 | **Codex** — non-implementer; binds to `source-audit/prior-7.9-highway-log-sibling-raw-source-audit.json` (its own 021 witness) and to Claude's `witness\pdf_head_census.txt` for 022 |
+| Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
 | Status | BLOCKED |
 
 **Exact scope.** Turn two prose regression guards into executable checks, and
@@ -1500,8 +1517,9 @@ blocked by this program.
 
 ## Definition of done — whole program
 
-1. All eleven bundles read `MERGED`, each with two adversarial approvals and at
-   least one approver who was not its implementer.
+1. All eleven bundles read `MERGED`, each implemented by Claude and approved by
+   two Codex reviews — so every bundle has two adversarial approvals and no
+   approver was its implementer.
 2. Every canonical finding's acceptance oracle is demonstrated on the frozen
    archive, with its committed witness under `hotfix-bundles/<ID>/witness/`.
 3. The 88-decision topology is re-adjudicated: every decision denied in Stage 2
@@ -1540,7 +1558,8 @@ blocked by this program.
 | 001 and 012 in one bundle? | **Yes, mandatory.** 012 is unobservable until 001 lands and the finding states that fixing 001 alone creates a new defect (108 false discrepancies on a same-source check) | PENDING | PENDING |
 | 015 and 018 together — unrelated fixes? | **Accepted as one bundle.** Two disjoint files, no workbook/count/image effect, one coherent theme (tell the user immediately, and tell them at all). If the second planner disagrees, split into HF-07a/HF-07b without changing any other boundary | PENDING | PENDING |
 | Per-bundle `BUNDLE.md` at Stage 3 or Stage 4? | **This plan's section is the frozen contract**; `BUNDLE.md` is transcribed from it at the start of each Stage 4 with only base SHA/implementer/reviewer filled. Writing eleven near-duplicate contracts now would create a second authority that drifts — the failure mode the predecessor project logged repeatedly. `HF-01/BUNDLE.md` exists because it is the first `READY` bundle | PENDING | PENDING |
-| Review 2 performed by the implementer? | **Compliant and, with two agents, the only assignment that always seats a non-implementer first.** Prompt 05 requires only that *at least one* approver not be the implementer, and mandates that review 2 challenge review 1. A second non-implementer pass may be substituted whenever that agent has capacity | PENDING | PENDING |
+| Who implements and who reviews? | **Settled by owner decision (2026-07-26): Claude implements all eleven bundles; Codex performs both reviews on every bundle.** Codex is therefore never the implementer, so Prompt 05's "at least one non-implementer approver" holds everywhere and Claude never approves its own work. The cost is that both reviews come from one agent — review 2 must re-derive independently and name what review 1 missed, not restate it | PENDING | PENDING |
+| Does Codex-only review weaken the Claude-unique findings? | **It is a scheduling constraint, not a soundness one.** For PCOA-FINAL-003, -006, -014, -015, -017, -018, -019 and -022 the durable witness is Claude's, but the firewall has ended, the key witnesses are committed in-repo, and Prompt 05 item 5 independently requires the reviewer to recount from raw rather than trust any prior parser. Each affected bundle names the exact witness Codex must bind to | PENDING | PENDING |
 | Are eleven bundles too many? | **No.** Each is one implementation pass with one complete adversarial output review, and the map shows only five same-file overlaps, all on disjoint functions in merge order. Fewer bundles would mix normalization behaviour, evidence policy, visual cleanup and source-row correctness — which the prompt forbids | PENDING | PENDING |
 | Does any bundle leave `main` unreleasable? | **No.** HF-04 is the only one that changes an input contract, and it must accept both censused layouts rather than swapping one pinned layout for another; HF-08 forces exactly one disclosed re-comparison; every other bundle is additive or presentation-only | PENDING | PENDING |
 
