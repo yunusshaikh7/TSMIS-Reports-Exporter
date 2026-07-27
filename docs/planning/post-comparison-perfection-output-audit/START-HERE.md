@@ -1,9 +1,9 @@
 # Post-Comparison Output Program — Start Here
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
-RB-1 / Clean Road is READY for Stage 4**
+RB-1 / Clean Road is IMPLEMENTED — AWAITING ADVERSARIAL REVIEW (Stage 5)**
 
-Last updated: 2026-07-26
+Last updated: 2026-07-27
 
 This is the entry point for every new Codex or Claude chat. Read this file
 before opening the other audit documents. The project deliberately separates
@@ -14,17 +14,22 @@ first pass.
 ## Next action
 
 Run
-[`prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
-in a new **Claude** chat with:
+[`prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md)
+in a new **Codex** chat (review 1 of 2) with:
 
 ```text
 <BUNDLE_ID> = RB-1
-<IMPLEMENTER> = Claude
+<REVIEWER> = Codex
 ```
 
-RB-1 carries work item HF-01 only and uses the exact branch
-`hotfix/rb-1-clean-road-source-truth`. Its frozen contract is
-[`hotfix-bundles/RB-1/BUNDLE.md`](hotfix-bundles/RB-1/BUNDLE.md).
+RB-1 (work item HF-01, branch `hotfix/rb-1-clean-road-source-truth`) is
+implemented: the record is
+[`hotfix-bundles/RB-1/IMPLEMENTATION.md`](hotfix-bundles/RB-1/IMPLEMENTATION.md),
+the frozen contract
+[`hotfix-bundles/RB-1/BUNDLE.md`](hotfix-bundles/RB-1/BUNDLE.md), and the
+committed witnesses `hotfix-bundles/HF-01/witness/`. Bulk acceptance output is
+retained at `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\`.
+The branch is NOT merged.
 
 Claude drafted the plan as first planner (both sign-off rows read `NOT STARTED`
 when Prompt 03 was invoked, so the prompt's own first-planner rule applied — the

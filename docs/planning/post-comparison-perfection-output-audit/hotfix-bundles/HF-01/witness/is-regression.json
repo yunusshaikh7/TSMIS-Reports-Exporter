@@ -1,0 +1,57 @@
+{
+ "a": "C:\\Users\\Yunus\\AppData\\Local\\Temp\\claude\\C--Users-Yunus-Projects-TSMIS-Reports-Exporter\\661f21e3-b5fb-4afb-bdbc-28d5cd7132c0\\scratchpad\\is_reg\\is_base (values).xlsx",
+ "b": "C:\\Users\\Yunus\\AppData\\Local\\Temp\\claude\\C--Users-Yunus-Projects-TSMIS-Reports-Exporter\\661f21e3-b5fb-4afb-bdbc-28d5cd7132c0\\scratchpad\\is_reg\\is_fix (values).xlsx",
+ "sheets": {
+  "Summary": {
+   "diff_cells": 0,
+   "row_count_delta": 0,
+   "sample": []
+  },
+  "Spot Check": {
+   "diff_cells": 0,
+   "row_count_delta": 0,
+   "sample": []
+  },
+  "Comparison": {
+   "diff_cells": 0,
+   "row_count_delta": 0,
+   "sample": []
+  },
+  "Only in TSMIS": {
+   "diff_cells": 0,
+   "row_count_delta": 0,
+   "sample": []
+  },
+  "Only in TSN": {
+   "diff_cells": 0,
+   "row_count_delta": 0,
+   "sample": []
+  },
+  "TSMIS": {
+   "diff_cells": 0,
+   "row_count_delta": 0,
+   "sample": []
+  },
+  "TSN": {
+   "diff_cells": 0,
+   "row_count_delta": 0,
+   "sample": []
+  },
+  "Summary by Category": {
+   "diff_cells": 0,
+   "row_count_delta": 0,
+   "sample": []
+  },
+  "__CMP_E2_SNAPSHOT_A": {
+   "diff_cells": 0,
+   "row_count_delta": 0,
+   "sample": []
+  },
+  "__CMP_E2_SNAPSHOT_B": {
+   "diff_cells": 0,
+   "row_count_delta": 0,
+   "sample": []
+  },
+  "Provenance": "excluded (run-identity cells)"
+ }
+}

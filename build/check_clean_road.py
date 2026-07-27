@@ -21,6 +21,7 @@ Covers:
 Run from the repo root:
     build\\.venv\\Scripts\\python.exe build\\check_clean_road.py
 """
+import json
 import sys
 import tempfile
 from datetime import datetime
@@ -94,15 +95,18 @@ def _write_layer(lib, nn, layer, rows, columns):
     return len(rows)
 
 
-def _build_library(lib, *, drop_layer=None, lie_rows=None):
+def _build_library(lib, *, drop_layer=None, lie_rows=None, extra=None):
     """A minimal consistent library covering every required highway layer for
-    route 001 across Orange + Los Angeles. Returns the INDEX entry list."""
+    route 001 across Orange + Los Angeles. Returns the INDEX entry list.
+    `extra` appends rows to one layer ({layer name: [row dicts]}) — the HF-01
+    skipped-span fixtures ride the same consistent library."""
     lib.mkdir(parents=True, exist_ok=True)
     span_cols = ["OBJECTID", "District", "RouteNum", "RouteSuffix", "Alignment",
                  "BeginCounty", "EndCounty", "BeginPMPrefix", "BeginPMMeasure",
                  "BeginPMSuffix", "EndPMPrefix", "EndPMMeasure", "EndPMSuffix",
                  "BeginODMeasure", "EndODMeasure", "InventoryItemStartDate",
-                 "InventoryItemEndDate", "RouteID", "LRSFromDate", "LRSToDate"]
+                 "InventoryItemEndDate", "RouteID", "LRSFromDate", "LRSToDate",
+                 "LocError"]
     point_cols = ["OBJECTID", "RouteNum", "RouteSuffix", "Alignment", "County",
                   "PMPrefix", "PMMeasure", "PMSuffix", "ODMeasure",
                   "LRSFromDate", "LRSToDate"]
@@ -181,6 +185,8 @@ def _build_library(lib, *, drop_layer=None, lie_rows=None):
         nn += 1
         if layer == drop_layer:
             return
+        if extra and layer in extra:
+            rows = list(rows) + list(extra[layer])
         n = _write_layer(lib, nn, layer, rows, columns)
         claimed = lie_rows.get(layer, n) if lie_rows else n
         entries.append((f"{nn:02d}_{layer}.xlsx", layer, claimed,
@@ -616,11 +622,191 @@ def test_normalizer_and_comparator():
             vwb.close()
 
 
+def test_skipped_span_source_truth():
+    """HF-01 / PCOA-FINAL-010 red->green: an as-of span with one unreadable
+    postmile endpoint must be RECORDED (sidecar + marker + PARTIAL), its
+    known-endpoint anchor cells MARKED with the reserved unavailable token
+    (never guessed, never blank), and the marked anchors must never count as
+    differences in a real mode="both" comparison — while a genuinely
+    differing, correctly placed control cell still counts."""
+    print("== skipped-source spans: recorded, PARTIAL, marked, never counted"
+          " (HF-01)")
+    # getattr + literal so the check DEGRADES TO RED (not a crash) on the
+    # pre-fix code, which has no token at all — the red->green property.
+    tok = getattr(cch, "UNAVAILABLE_TOKEN", "(unavailable: source span skipped)")
+    ora = "Orange"
+    osr = {"Shld_Width_Total_Out_R": 8, "Shld_Width_Treated_Out_R": 8}
+    # Three OSR spans the postmile contract cannot place (LocError=NO ERROR,
+    # usable odometers — exactly the witnessed raw shape):
+    #  - begin known @0.7, Total differs from the painted 8 -> ONE marked cell
+    #    (Treated equals the painted value -> corroborated, NOT marked);
+    #  - begin known @1.5, both values equal the painted ones -> recorded,
+    #    nothing marked;
+    #  - end known @2.2 (begin unreadable) inside the R-window -> marks the
+    #    R row's Total (kind eligibility: base/R rows carry the RT block).
+    skip_mark = _span(ora, 0.7, None, 0.7,
+                      {"Shld_Width_Total_Out_R": 4, "Shld_Width_Treated_Out_R": 8,
+                       "LocError": "NO ERROR"}, od_end=0.9)
+    skip_match = _span(ora, 1.5, None, 1.5,
+                       dict(osr, LocError="NO ERROR"), od_end=1.7)
+    skip_end = _span(ora, None, 2.2, None,
+                     {"Shld_Width_Total_Out_R": 4, "Shld_Width_Treated_Out_R": 8,
+                      "LocError": "NO ERROR"}, od_end=2.4)
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        lib = td / "lib"
+        _build_library(lib, extra={"SHS O Shld Width R":
+                                   [skip_mark, skip_match, skip_end]})
+        out = td / "built.xlsx"
+        res = cch.consolidate(events=Events(), asof=ASOF, lib_root=lib,
+                              out_path=out)
+        check("build still ok", res.status == "ok")
+        check("build reports PARTIAL (a skipped span is incomplete coverage)",
+              res.completion == "partial")
+        check("skipped_inputs counts the three spans", res.skipped_inputs == 3)
+        check("result message names the marked anchors",
+              "anchor cell(s)" in (res.message or ""))
+
+        # (c) marker sheet + sidecar carry the record.
+        _mh, mrows = _rows_of(out, chc.ARC_MARKER_SHEET)
+        marker = {}
+        for r in mrows:
+            if r and r[0] is not None:
+                marker.setdefault(str(r[0]), []).append(r[1])
+        check("marker: skipped source spans = 3",
+              marker.get("Skipped source spans") == [3])
+        check("marker: marked anchor cells = 2",
+              marker.get("Marked anchor cells") == [2])
+        check("marker: names the unavailable token",
+              marker.get("Unavailable marker") == [tok])
+        check("marker: one warning per skipped span",
+              sum("O Shld Width R" in str(w) for w in
+                  marker.get("Warning", [])) == 3)
+        sidecar = json.loads(
+            (out.parent / (out.name + ".outcome.json")).read_text("utf-8"))
+        rec = (sidecar.get("clean_road_build") or {}).get(
+            "skipped_source_spans") or {}
+        check("sidecar: count/marked/reason recorded",
+              rec.get("count") == 3 and rec.get("marked_anchor_cells") == 2
+              and "postmile" in str(rec.get("reason")))
+        spans = rec.get("spans") or []
+        check("sidecar: spans carry layer/route/county/anchor/measures",
+              len(spans) == 3
+              and all(s.get("layer") == "SHS O Shld Width R"
+                      and s.get("route") == "001" and s.get("county") == "ORA"
+                      and s.get("loc_error") == "NO ERROR"
+                      and s.get("station_pm") for s in spans))
+        check("sidecar: per-span marked-cell counts are exact",
+              sorted(s.get("marked_cells") for s in spans) == [0, 1, 1])
+
+        # (d) the anchors themselves: marked where information was omitted,
+        # untouched where the placeable coverage corroborates the span.
+        _h, rows = _rows_of(out, chc.ARC_SHEET)
+        col = {n: i for i, n in enumerate(chc.HEADER)}
+        tot, trt = col["THY_RT_O_SHD_TOT_WIDTH_AMT"], col["THY_RT_O_SHD_TRT_WIDTH_AMT"]
+        token_cells = [(i, j) for i, r in enumerate(rows)
+                       for j, v in enumerate(r) if v == tok]
+        check("exactly the two omitted anchors are marked",
+              len(token_cells) == 2
+              and all(j == tot for _i, j in token_cells))
+        anchor_a = [r for r in rows
+                    if r[col["THY_BEGIN_PM_AMT"]] is not None
+                    and r[col["THY_BEGIN_PM_AMT"]] <= 0.7
+                    and (r[col["THY_END_PM_AMT"]] or 0) > 0.7
+                    and r[col["THY_PM_SUFFIX_CODE"]] is None]
+        check("begin anchor: containing base row Total is the token, the "
+              "corroborated Treated keeps its value",
+              anchor_a and anchor_a[0][tot] == tok and anchor_a[0][trt] == 8)
+        anchor_b = [r for r in rows if r[col["THY_PM_SUFFIX_CODE"]] == "R"
+                    and r[tot] == tok]
+        check("end anchor: the R row inside the window is the marked one",
+              len(anchor_b) == 1)
+        check("the matches-raw span marked nothing at 1.5",
+              all(r[tot] != tok for r in rows
+                  if r[col["THY_BEGIN_PM_AMT"]] is not None
+                  and 1.0 <= r[col["THY_BEGIN_PM_AMT"]] < 2.0))
+
+        # The comparison: token vs the SAME value the span carried (the
+        # false-positive class, TSN=4 at the begin anchor) and token vs a
+        # DIFFERENT value (the misrepresented class, TSN=5 at the end anchor)
+        # are both explicit N — never counted; the correctly placed control
+        # difference still counts. The TSN edits key on the ANCHOR POSITION,
+        # not on the token, so on the pre-fix code (blank anchors) the same
+        # fixture reproduces the counted false positives — the red.
+        header, arows = _rows_of(out, chc.ARC_SHEET)
+        tsn_rows = []
+        for i, r in enumerate(arows):
+            rr = list(r)
+            begin = rr[col["THY_BEGIN_PM_AMT"]]
+            end = rr[col["THY_END_PM_AMT"]] or 0
+            suffix = rr[col["THY_PM_SUFFIX_CODE"]]
+            if begin is not None and rr[col["THY_COUNTY_CODE"]] == "ORA":
+                if suffix is None and begin <= 0.7 < end:
+                    rr[tot] = 4                      # == the skipped span's raw
+                elif suffix == "R" and begin < 2.2 <= end:
+                    rr[tot] = 5                      # != the skipped span's raw
+            if i == 1:
+                rr[col["THY_HIGHWAY_GROUP_CODE"]] = "Q"    # the control diff
+            tsn_rows.append(rr)
+        raw_dir = td / "raw"
+        raw_dir.mkdir()
+        _tsn_raw(raw_dir / "CA HIGHWAYS test.xlsx", tsn_rows)
+        cmp_out = td / "cmp.xlsx"
+        cres = cht.compare(out, raw_dir / "CA HIGHWAYS test.xlsx", cmp_out,
+                           events=Events(), mode="both")
+        check("comparison ok", cres.status == "ok")
+        counts = getattr(cres.comparison_outcome, "counts", None)
+        diffs = getattr(counts, "differing_cells", None)
+        check("unavailable anchors are never counted — only the control "
+              f"difference is (got {diffs})", diffs == 1)
+
+        values_twin = cmp_out.with_name(cmp_out.stem + " (values)"
+                                        + cmp_out.suffix)
+        vwb = load_workbook(values_twin, data_only=True)
+        try:
+            cmp_texts = [str(c.value) for row in vwb["Comparison"].iter_rows()
+                         for c in row if c.value is not None]
+            shown = [t for t in cmp_texts if tok in t]
+            check("both token anchors display the token on the Comparison "
+                  "sheet", len(shown) == 2)
+            check("no token anchor is displayed as a difference",
+                  not any("≠" in t for t in shown))
+            summary = [str(c.value) for row in vwb["Summary"].iter_rows()
+                       for c in row if c.value is not None]
+            check("Summary disclosure: skipped-span count + marked anchors",
+                  any("SOURCE COVERAGE" in t and "3 source span(s)" in t
+                      and "2 anchor cell(s)" in t for t in summary))
+            check("Summary carries the producer's PARTIAL input note",
+                  any("producer outcome is 'partial'" in t for t in summary))
+            notes = [str(c.value) for row in vwb["Notes"].iter_rows()
+                     for c in row if c.value is not None]
+            check("Notes disclosure: reason + non-asserting rule",
+                  any("SOURCE COVERAGE" in t and "postmile" in t
+                      for t in notes)
+                  and any("NON-ASSERTING" in t for t in notes))
+        finally:
+            vwb.close()
+
+        # An older build without the marker record still compares (the plain
+        # schema), and a skip-free build still reports COMPLETE.
+        clean_lib = td / "clean_lib"
+        _build_library(clean_lib)
+        clean_out = td / "clean_built.xlsx"
+        res2 = cch.consolidate(events=Events(), asof=ASOF, lib_root=clean_lib,
+                               out_path=clean_out)
+        check("a skip-free build stays COMPLETE",
+              res2.status == "ok" and res2.completion == "complete")
+        check("a skip-free marker records zeroes",
+              getattr(cht, "_build_skip_facts",
+                      lambda _p: None)(clean_out) == (0, 0))
+
+
 def main():
     test_dialects_and_algebra()
     test_stream_and_index()
     test_consolidator_end_to_end()
     test_normalizer_and_comparator()
+    test_skipped_span_source_truth()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

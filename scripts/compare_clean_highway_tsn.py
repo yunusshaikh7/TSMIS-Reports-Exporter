@@ -28,7 +28,9 @@ decimals, landmark edge trim) are format-only and documented in the Notes.
 Console-free; engine in compare_core via compare_tsn_common.run_files_compare
 (mode="both" writes the live-formulas workbook plus its values twin).
 """
+import logging
 import re
+from dataclasses import replace
 from datetime import date, datetime
 from pathlib import Path
 
@@ -42,7 +44,10 @@ import clean_highway_columns as chc
 import compare_tsn_common as ctc
 import comparison_contract as cc
 from compare_core import CompareSchema
+from consolidate_clean_highway import UNAVAILABLE_TOKEN
 from paths import today_str
+
+log = logging.getLogger(__name__)
 
 REPORT_NAME = "Clean Road Highway"
 ARC_SHEET = chc.ARC_SHEET
@@ -102,9 +107,8 @@ def _provenance_table_lines():
     return tuple(out)
 
 
-_write_notes_sheet = ctc.make_notes_writer(
-    "Clean Road Highway — ArcGIS build vs TSN: comparison notes",
-    (
+_NOTES_TITLE = "Clean Road Highway — ArcGIS build vs TSN: comparison notes"
+_NOTES_LINES = (
         "Side A is OUR CA HIGHWAYS table, built from the owner's ArcGIS "
         "per-layer exports (arcgis_layers/) by the county+PM overlay "
         "consolidator; side B is the vendor's TSN CA HIGHWAYS extract. Both "
@@ -153,7 +157,9 @@ _write_notes_sheet = ctc.make_notes_writer(
         "whether it is COUNTED or shown as CONTEXT. The built workbook's "
         "Provenance sheet adds each layer's FeatureServer source + the per-column "
         "note:",
-    ) + _provenance_table_lines())
+    ) + _provenance_table_lines()
+
+_write_notes_sheet = ctc.make_notes_writer(_NOTES_TITLE, _NOTES_LINES)
 
 _SCHEMA = CompareSchema(
     report_name=REPORT_NAME,
@@ -381,13 +387,87 @@ def _load_pair(arc_path, tsn_path):
     return rows_a, rows_b, None
 
 
+def _build_skip_facts(path):
+    """The built workbook's own skipped-source record from its marker sheet
+    (HF-01): (skipped span count, marked anchor cell count). (0, 0) when the
+    marker predates the record — an older build carries no tokens, so the
+    plain schema is exactly right for it — or when nothing was skipped."""
+    try:
+        wb = load_workbook(path, read_only=True, data_only=True)
+    except Exception as e:      # silent-ok: the loader's role gate re-opens the file and surfaces the real failure with the actionable message
+        log.info("clean-road skip facts unreadable (%s: %s)",
+                 type(e).__name__, str(e).splitlines()[0] if str(e) else "")
+        return 0, 0
+    try:
+        if chc.ARC_MARKER_SHEET not in wb.sheetnames:
+            return 0, 0
+        facts = {}
+        for r in wb[chc.ARC_MARKER_SHEET].iter_rows(values_only=True):
+            if r and r[0] is not None:
+                facts[str(r[0]).strip()] = r[1] if len(r) > 1 else None
+
+        def _count(key):
+            try:
+                n = int(facts.get(key))
+            except (TypeError, ValueError):  # silent-ok: an absent/malformed marker count means an older or skip-free build — the plain schema is exactly right for it
+                return 0
+            return max(n, 0)
+
+        return (_count("Skipped source spans"), _count("Marked anchor cells"))
+    finally:
+        wb.close()
+
+
+def _disclosure_lines(skipped, marked):
+    """The Notes-sheet disclosure block (HF-01): the skipped-source-span
+    count, the marked-anchor count, and the reason, ahead of the standard
+    notes so it cannot be buried under the 74-line column table."""
+    return (
+        f"⚠ SOURCE COVERAGE — {skipped} ArcGIS source span(s) could not be "
+        f"placed: rows whose begin or end postmile is unreadable (the raw "
+        f"rows carry LocError=NO ERROR and usable AR/odometer measures, but "
+        f"the county+postmile contract never guesses a position from those "
+        f"calibrations). Each span's values are withheld at its one known "
+        f"endpoint instead: {marked} anchor cell(s) show "
+        f"'{UNAVAILABLE_TOKEN}'.",
+        f"Cells showing '{UNAVAILABLE_TOKEN}' are NON-ASSERTING (state N): "
+        "the ArcGIS side HAS a source row there whose exact placement is "
+        "unknowable, so the cell is neither '(blank)' (empty in the system) "
+        "nor a countable difference — it is excluded from every difference "
+        "count. The built workbook's '" + chc.ARC_MARKER_SHEET + "' sheet "
+        "lists every skipped span with the measures it did have.",
+    )
+
+
+def _schema_for(arc_path):
+    """The per-run schema: when the built workbook records skipped source
+    spans, opt into the non-asserting unavailable token and carry the exact
+    counts into the Summary note and the Notes sheet. An older or skip-free
+    build gets the plain module schema — byte-identical behavior."""
+    skipped, marked = _build_skip_facts(arc_path)
+    if not skipped and not marked:
+        return _SCHEMA
+    note = (f"SOURCE COVERAGE — the ArcGIS build could not place {skipped} "
+            f"source span(s) whose begin or end postmile is unreadable "
+            f"(LocError=NO ERROR rows with a missing PM endpoint); "
+            f"{marked} anchor cell(s) show '{UNAVAILABLE_TOKEN}' and are "
+            f"never asserted or counted as differences. The built workbook's "
+            f"'{chc.ARC_MARKER_SHEET}' sheet lists every skipped span; the "
+            "Notes sheet explains the rule.")
+    return replace(
+        _SCHEMA,
+        unavailable_rule=(UNAVAILABLE_TOKEN, note),
+        legend_writer=ctc.make_notes_writer(
+            _NOTES_TITLE, _disclosure_lines(skipped, marked) + _NOTES_LINES))
+
+
 def compare(arc_path, tsn_path, out_path, events=None, confirm_overwrite=None,
             mode="formulas", commit_guard=None):
     """Build the Clean Road Highway ArcGIS-vs-TSN comparison workbook(s).
     `arc_path` is the ArcGIS-built workbook; `tsn_path` the TSN extract (raw
     or normalized). Returns a ConsolidateResult."""
     return ctc.run_files_compare(
-        _SCHEMA, arc_path, tsn_path, out_path,
+        _schema_for(arc_path), arc_path, tsn_path, out_path,
         banner="Clean Road Highway Comparison — ArcGIS build vs TSN",
         has_route=True, loader=_load_pair, deps_ok=_DEPS_OK,
         deps_msg="Required components are missing (openpyxl).",

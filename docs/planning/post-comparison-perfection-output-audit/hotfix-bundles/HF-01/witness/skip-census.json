@@ -1,0 +1,1947 @@
+{
+ "source": "clean_road_build.skipped_source_spans sidecar of the RB-1 acceptance build (2026-07-27, as-of 2025-09-08)",
+ "count": 102,
+ "marked_anchor_cells": 174,
+ "unavailable_marker": "(unavailable: source span skipped)",
+ "reason": "as-of spans whose begin or end postmile is unreadable cannot be placed by the county+postmile rule; their known-endpoint anchors are marked instead of guessed",
+ "spans": [
+  {
+   "layer": "SHS O Shld Width R",
+   "route": "016",
+   "county": "YOL",
+   "prefix": "",
+   "alignment": "R",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 26.179,
+   "end_od": null,
+   "from_ar": 26.1922651,
+   "to_ar": 26.3166832,
+   "values": [
+    5,
+    2
+   ],
+   "marked_cells": 2,
+   "station_pm": "18.926"
+  },
+  {
+   "layer": "SHS O Shld Width R",
+   "route": "016",
+   "county": "YOL",
+   "prefix": "",
+   "alignment": "R",
+   "known_endpoint": "end",
+   "loc_error": "NO ERROR",
+   "begin_od": null,
+   "end_od": 27.393,
+   "from_ar": 26.3166832,
+   "to_ar": 27.4179771,
+   "values": [
+    8,
+    0
+   ],
+   "marked_cells": 1,
+   "station_pm": "20.14"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 20.498,
+   "end_od": 23.785,
+   "from_ar": 20.5048782,
+   "to_ar": 23.7885673,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "20.422"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 23.785,
+   "end_od": 24.182,
+   "from_ar": 23.7885673,
+   "to_ar": 24.1840458,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "23.709"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 24.182,
+   "end_od": 25.24,
+   "from_ar": 24.1840458,
+   "to_ar": 25.2450578,
+   "values": [
+    11,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "24.21"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 25.24,
+   "end_od": 25.273,
+   "from_ar": 25.2450578,
+   "to_ar": 25.2781517,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "25.268"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 25.273,
+   "end_od": 25.737,
+   "from_ar": 25.2781517,
+   "to_ar": 25.7385413,
+   "values": [
+    11,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "25.301"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 25.737,
+   "end_od": 27.027,
+   "from_ar": 25.7385413,
+   "to_ar": 27.0145431,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "25.765"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 27.027,
+   "end_od": 27.407,
+   "from_ar": 27.0145431,
+   "to_ar": 27.3904196,
+   "values": [
+    11,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "27.055"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 27.407,
+   "end_od": 28.515,
+   "from_ar": 27.3904196,
+   "to_ar": 28.5076588,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "27.435"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 28.515,
+   "end_od": 30.772,
+   "from_ar": 28.5076588,
+   "to_ar": 30.7546831,
+   "values": [
+    11,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "28.543"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 30.772,
+   "end_od": 31.053,
+   "from_ar": 30.7546831,
+   "to_ar": 31.0358465,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "30.8"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 31.053,
+   "end_od": 31.972,
+   "from_ar": 31.0358465,
+   "to_ar": 31.9553807,
+   "values": [
+    11,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "31.081"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 31.972,
+   "end_od": 32.387,
+   "from_ar": 31.9553807,
+   "to_ar": 32.3703813,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "32"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 32.387,
+   "end_od": 32.762,
+   "from_ar": 32.3703813,
+   "to_ar": 32.7453819,
+   "values": [
+    11,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "32.415"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 32.762,
+   "end_od": 33.933,
+   "from_ar": 32.7453819,
+   "to_ar": 33.918329,
+   "values": [
+    10,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "32.79"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 33.933,
+   "end_od": 34.548,
+   "from_ar": 33.918329,
+   "to_ar": 34.5547189,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "33.961"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 34.548,
+   "end_od": 35.809,
+   "from_ar": 34.5547189,
+   "to_ar": 35.8041654,
+   "values": [
+    11,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "34.576"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 35.809,
+   "end_od": 36.042,
+   "from_ar": 35.8041654,
+   "to_ar": 36.0430224,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "35.837"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 36.042,
+   "end_od": 39.896,
+   "from_ar": 36.0430224,
+   "to_ar": 39.8963492,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "36.07"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 39.896,
+   "end_od": 40.033,
+   "from_ar": 39.8963492,
+   "to_ar": 40.0345495,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "40.442"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 40.033,
+   "end_od": 41.709,
+   "from_ar": 40.034724,
+   "to_ar": 41.7145499,
+   "values": [
+    11,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "40.579"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 41.709,
+   "end_od": 42.204,
+   "from_ar": 41.7145499,
+   "to_ar": 42.2105934,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "42.255"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 42.204,
+   "end_od": 42.342,
+   "from_ar": 42.2105934,
+   "to_ar": 42.3489525,
+   "values": [
+    11,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "42.75"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "HUM",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 42.342,
+   "end_od": 45.135,
+   "from_ar": 42.3489525,
+   "to_ar": 45.1655283,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "42.888"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TRI",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 45.135,
+   "end_od": 45.682,
+   "from_ar": 45.1655283,
+   "to_ar": 45.6894686,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "0"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TRI",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 45.682,
+   "end_od": 54.431,
+   "from_ar": 45.6895582,
+   "to_ar": 54.4180583,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "0.547"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TRI",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 54.431,
+   "end_od": 59.646,
+   "from_ar": 54.4180583,
+   "to_ar": 59.6757998,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "10.08"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TRI",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 59.646,
+   "end_od": 61.232,
+   "from_ar": 59.6757998,
+   "to_ar": 61.2786658,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "15.295"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TRI",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 61.232,
+   "end_od": 70.018,
+   "from_ar": 61.2786658,
+   "to_ar": 70.0506738,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "16.881"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TRI",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 70.018,
+   "end_od": 70.169,
+   "from_ar": 70.0506738,
+   "to_ar": 70.1998438,
+   "values": [
+    24,
+    2
+   ],
+   "marked_cells": 2,
+   "station_pm": "25.667"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TRI",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 70.169,
+   "end_od": 71.105,
+   "from_ar": 70.1998438,
+   "to_ar": 71.137421,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "25.818"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TRI",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 71.105,
+   "end_od": 71.293,
+   "from_ar": 71.137421,
+   "to_ar": 71.3232559,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "26.754"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TRI",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 71.293,
+   "end_od": 71.477,
+   "from_ar": 71.3232559,
+   "to_ar": 71.5033459,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "27.048"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TRI",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 71.477,
+   "end_od": 77.636,
+   "from_ar": 71.5033459,
+   "to_ar": 77.6640388,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "28.65"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TRI",
+   "prefix": "M",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 77.636,
+   "end_od": 77.964,
+   "from_ar": 77.6640388,
+   "to_ar": 78.0041601,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "34.809"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TRI",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 77.964,
+   "end_od": 79.354,
+   "from_ar": 78.0041601,
+   "to_ar": 79.3442791,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "35.31"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TRI",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 79.354,
+   "end_od": 79.754,
+   "from_ar": 79.3442791,
+   "to_ar": 79.7334714,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "36.7"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TRI",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 79.754,
+   "end_od": 81.024,
+   "from_ar": 79.7334714,
+   "to_ar": 80.9983423,
+   "values": [
+    13,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "37.1"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TRI",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 81.024,
+   "end_od": 81.069,
+   "from_ar": 80.9983423,
+   "to_ar": 81.0423388,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "38.37"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TRI",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 81.069,
+   "end_od": 83.745,
+   "from_ar": 81.0423388,
+   "to_ar": 83.6803201,
+   "values": [
+    13,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "38.415"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TRI",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 83.745,
+   "end_od": 83.793,
+   "from_ar": 83.6803201,
+   "to_ar": 83.7881438,
+   "values": [
+    14,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "41.091"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "SHA",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 83.793,
+   "end_od": 88.213,
+   "from_ar": 83.7881438,
+   "to_ar": 88.1776352,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "0"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "SHA",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 88.213,
+   "end_od": 88.778,
+   "from_ar": 88.1776352,
+   "to_ar": 88.7364688,
+   "values": [
+    14,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "4.42"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "SHA",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 88.778,
+   "end_od": 91.253,
+   "from_ar": 88.7364688,
+   "to_ar": 91.2264267,
+   "values": [
+    13,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "4.985"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "SHA",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 91.253,
+   "end_od": 91.513,
+   "from_ar": 91.2264267,
+   "to_ar": 91.4867258,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "7.46"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "SHA",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 91.513,
+   "end_od": 95.705,
+   "from_ar": 91.4867258,
+   "to_ar": 95.6786801,
+   "values": [
+    13,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "7.72"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "SHA",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 95.705,
+   "end_od": 95.738,
+   "from_ar": 95.6786801,
+   "to_ar": 95.7204335,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "11.912"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "L",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 95.738,
+   "end_od": 97.844,
+   "from_ar": 95.7204335,
+   "to_ar": 97.7989923,
+   "values": [
+    13,
+    1
+   ],
+   "marked_cells": 0,
+   "station_pm": "0.017"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 97.844,
+   "end_od": 107.212,
+   "from_ar": 97.7989923,
+   "to_ar": 107.1350119,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "2.105"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 107.212,
+   "end_od": 107.561,
+   "from_ar": 107.1350119,
+   "to_ar": 107.4751173,
+   "values": [
+    10,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "11.473"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 107.561,
+   "end_od": 107.874,
+   "from_ar": 107.4751173,
+   "to_ar": 107.7801624,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "11.822"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 107.874,
+   "end_od": 108.426,
+   "from_ar": 107.7801624,
+   "to_ar": 108.3180808,
+   "values": [
+    10,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "12.148"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 108.426,
+   "end_od": 108.6,
+   "from_ar": 108.3180808,
+   "to_ar": 108.487642,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "12.7"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 108.6,
+   "end_od": 109.226,
+   "from_ar": 108.487642,
+   "to_ar": 109.0976726,
+   "values": [
+    10,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "12.874"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 109.226,
+   "end_od": 109.526,
+   "from_ar": 109.0976726,
+   "to_ar": 109.3900195,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "13.5"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 109.526,
+   "end_od": 110.996,
+   "from_ar": 109.3900195,
+   "to_ar": 110.8225195,
+   "values": [
+    10,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "13.8"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 110.996,
+   "end_od": 111.562,
+   "from_ar": 110.8225195,
+   "to_ar": 111.3740589,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 0,
+   "station_pm": "15.27"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 111.562,
+   "end_od": 112.104,
+   "from_ar": 111.3740589,
+   "to_ar": 111.9022553,
+   "values": [
+    10,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "15.858"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 112.104,
+   "end_od": 112.604,
+   "from_ar": 111.9022553,
+   "to_ar": 112.3909139,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 0,
+   "station_pm": "16.4"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 112.604,
+   "end_od": 113.049,
+   "from_ar": 112.3909139,
+   "to_ar": 112.8312377,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "17"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 113.049,
+   "end_od": 113.807,
+   "from_ar": 112.8312377,
+   "to_ar": 113.5812635,
+   "values": [
+    10,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "17.5"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 113.807,
+   "end_od": 114.655,
+   "from_ar": 113.5812635,
+   "to_ar": 114.4203424,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "18.258"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 114.655,
+   "end_od": 114.691,
+   "from_ar": 114.4203424,
+   "to_ar": 114.4559637,
+   "values": [
+    14,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "19.106"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 114.691,
+   "end_od": 115.104,
+   "from_ar": 114.4559637,
+   "to_ar": 114.8618695,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "19.142"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 115.104,
+   "end_od": 118.616,
+   "from_ar": 114.8618695,
+   "to_ar": 118.3023687,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "19.555"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 118.616,
+   "end_od": 118.7,
+   "from_ar": 118.3023687,
+   "to_ar": 118.385056,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "23.121"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 118.7,
+   "end_od": 119.107,
+   "from_ar": 118.385056,
+   "to_ar": 118.7911531,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 0,
+   "station_pm": "23.205"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 119.108,
+   "end_od": 120.505,
+   "from_ar": 118.7917498,
+   "to_ar": 120.186084,
+   "values": [
+    11,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "23.645"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 120.505,
+   "end_od": 121.253,
+   "from_ar": 120.186084,
+   "to_ar": 120.9453146,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 0,
+   "station_pm": "25.157"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 121.262,
+   "end_od": 121.783,
+   "from_ar": 120.946293,
+   "to_ar": 121.4574516,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 0,
+   "station_pm": "25.914"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 121.783,
+   "end_od": 121.935,
+   "from_ar": 121.4574516,
+   "to_ar": 121.5893524,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "26.487"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 121.935,
+   "end_od": 122.806,
+   "from_ar": 121.5893524,
+   "to_ar": 122.46199,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 0,
+   "station_pm": "26.639"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 122.806,
+   "end_od": 124.171,
+   "from_ar": 122.46199,
+   "to_ar": 123.8428762,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "27.53"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 124.171,
+   "end_od": 125.14,
+   "from_ar": 123.8428762,
+   "to_ar": 124.8116938,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 0,
+   "station_pm": "28.895"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "T",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 125.14,
+   "end_od": 125.193,
+   "from_ar": 124.8116938,
+   "to_ar": 124.8646785,
+   "values": [
+    10,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "28.813"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "T",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 125.193,
+   "end_od": 125.409,
+   "from_ar": 124.8646785,
+   "to_ar": 125.0806161,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "28.866"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "T",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 125.409,
+   "end_od": 131.065,
+   "from_ar": 125.0806161,
+   "to_ar": 130.7341005,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "29.082"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 131.065,
+   "end_od": 131.718,
+   "from_ar": 130.7341005,
+   "to_ar": 131.3848508,
+   "values": [
+    9,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "36.157"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 131.718,
+   "end_od": 132.658,
+   "from_ar": 131.3848508,
+   "to_ar": 132.3218343,
+   "values": [
+    10,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "36.81"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 132.658,
+   "end_od": 133.023,
+   "from_ar": 132.3218343,
+   "to_ar": 132.685663,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "37.75"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 133.023,
+   "end_od": 133.04,
+   "from_ar": 132.685663,
+   "to_ar": 132.7026068,
+   "values": [
+    11,
+    1
+   ],
+   "marked_cells": 1,
+   "station_pm": "38.115"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 133.04,
+   "end_od": 134.129,
+   "from_ar": 132.7026068,
+   "to_ar": 133.7881852,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 0,
+   "station_pm": "38.132"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "R",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 134.129,
+   "end_od": 134.26,
+   "from_ar": 133.7881852,
+   "to_ar": 133.9207346,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 0,
+   "station_pm": "39.288"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 134.26,
+   "end_od": 134.561,
+   "from_ar": 133.9207346,
+   "to_ar": 134.2267205,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "39.419"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 134.561,
+   "end_od": 134.946,
+   "from_ar": 134.2267205,
+   "to_ar": 134.6176475,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "39.72"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 134.946,
+   "end_od": 135.021,
+   "from_ar": 134.6176475,
+   "to_ar": 134.693802,
+   "values": [
+    24,
+    2
+   ],
+   "marked_cells": 2,
+   "station_pm": "40.105"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 135.021,
+   "end_od": 135.139,
+   "from_ar": 134.693802,
+   "to_ar": 134.8136186,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "40.18"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 135.139,
+   "end_od": 135.232,
+   "from_ar": 134.8136186,
+   "to_ar": 134.9080503,
+   "values": [
+    24,
+    2
+   ],
+   "marked_cells": 2,
+   "station_pm": "40.298"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 135.232,
+   "end_od": 135.568,
+   "from_ar": 134.9080503,
+   "to_ar": 135.2489271,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "40.391"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 135.568,
+   "end_od": 135.617,
+   "from_ar": 135.2489271,
+   "to_ar": 135.2989772,
+   "values": [
+    24,
+    2
+   ],
+   "marked_cells": 2,
+   "station_pm": "40.727"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 135.617,
+   "end_od": 135.934,
+   "from_ar": 135.2989772,
+   "to_ar": 135.5852453,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "40.776"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 135.934,
+   "end_od": 136.588,
+   "from_ar": 135.5852453,
+   "to_ar": 136.2181607,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "41.093"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "L",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 136.588,
+   "end_od": 136.676,
+   "from_ar": 136.2181607,
+   "to_ar": 136.3093544,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "40.227"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "L",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 136.676,
+   "end_od": 137.231,
+   "from_ar": 136.3093544,
+   "to_ar": 136.8727113,
+   "values": [
+    24,
+    2
+   ],
+   "marked_cells": 2,
+   "station_pm": "40.315"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "L",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 137.231,
+   "end_od": 137.652,
+   "from_ar": 136.8727113,
+   "to_ar": 137.3156976,
+   "values": [
+    26,
+    2
+   ],
+   "marked_cells": 2,
+   "station_pm": "40.87"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 137.652,
+   "end_od": 137.689,
+   "from_ar": 137.3156976,
+   "to_ar": 137.3602441,
+   "values": [
+    32,
+    2
+   ],
+   "marked_cells": 2,
+   "station_pm": "41.291"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 137.689,
+   "end_od": 140.306,
+   "from_ar": 137.3602441,
+   "to_ar": 139.9856631,
+   "values": [
+    24,
+    2
+   ],
+   "marked_cells": 2,
+   "station_pm": "41.328"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 140.306,
+   "end_od": 140.315,
+   "from_ar": 139.9856631,
+   "to_ar": 139.9947364,
+   "values": [
+    24,
+    2
+   ],
+   "marked_cells": 2,
+   "station_pm": "43.945"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 140.315,
+   "end_od": 140.409,
+   "from_ar": 139.9947364,
+   "to_ar": 140.092503,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "43.954"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 140.409,
+   "end_od": 141.481,
+   "from_ar": 140.092503,
+   "to_ar": 141.1793358,
+   "values": [
+    14,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "44.048"
+  },
+  {
+   "layer": "SHS Travel Way L",
+   "route": "036",
+   "county": "TEH",
+   "prefix": "",
+   "alignment": "L",
+   "known_endpoint": "begin",
+   "loc_error": "NO ERROR",
+   "begin_od": 141.481,
+   "end_od": 155.857,
+   "from_ar": 141.1793358,
+   "to_ar": 155.5574723,
+   "values": [
+    12,
+    1
+   ],
+   "marked_cells": 2,
+   "station_pm": "45.12"
+  }
+ ]
+}

@@ -57,6 +57,13 @@ FILENAME = "clean_highway_built.xlsx"
 OUT_DIR = paths.OUTPUT_ROOT / "arcgis_cleanroad"
 OUT_PATH = OUT_DIR / FILENAME
 
+# HF-01 (PCOA-FINAL-010): the reserved marker written into an anchor cell
+# whose source span exists but cannot be placed (an unreadable begin or end
+# postmile). The comparison schema declares this token NON-ASSERTING, so the
+# anchor is never counted as a difference and never reads as "empty in the
+# system". compare_clean_highway_tsn imports it; never reuse the text as data.
+UNAVAILABLE_TOKEN = "(unavailable: source span skipped)"
+
 # The 74-column THY header (clean_highway_columns is the shared contract).
 THY_HEADER = list(chc.HEADER)
 _COL = {name: i for i, name in enumerate(THY_HEADER)}
@@ -72,6 +79,10 @@ _SPAN_ID = ["District", "RouteNum", "RouteSuffix", "Alignment", "BeginCounty",
             "InventoryItemStartDate", "LRSFromDate", "LRSToDate", "RouteID"]
 _POINT_ID = ["RouteNum", "RouteSuffix", "Alignment", "County", "PMPrefix",
              "PMMeasure", "LRSFromDate", "LRSToDate"]
+# Read (as optional columns) only to enrich a skipped-span record (HF-01) —
+# the AR measures and LocError document what the unplaceable row DID have;
+# they are never used to place anything.
+_SKIP_DETAIL_COLS = ["FromARMeasure", "ToARMeasure", "LocError"]
 
 # tag -> (layer name, attribute columns, family). Families: "whole" paints base
 # rows AND its own alignment's independent rows; "right"/"left" paint that
@@ -164,15 +175,21 @@ def _cancelled():
 # --------------------------------------------------------------------------- #
 # reading
 # --------------------------------------------------------------------------- #
-def _read_span_layer(lib, index, tag, *, asof, events, buckets, parked):
+def _read_span_layer(lib, index, tag, *, asof, events, buckets, parked, skips):
     """Stream one span layer's as-of slices into `buckets[(route, align,
-    county, prefix)][tag]`; cross-county/prefix spans park for the split pass."""
+    county, prefix)][tag]`; cross-county/prefix spans park for the split pass.
+    An as-of span with an unreadable begin or end postmile cannot be placed
+    (the contract keys on county + PM prefix + postmile and never guesses from
+    AR/odometer calibration) — it is RECORDED into `skips` (HF-01), never
+    silently dropped."""
     layer, attrs, family = SPAN_LAYERS[tag]
     entry = index.get(layer) or {}
-    n_asof = n_cross = 0
-    for r in crl.stream_layer(lib["present"][layer], _SPAN_ID + attrs,
+    n_asof = n_cross = n_skip = 0
+    for r in crl.stream_layer(lib["present"][layer],
+                              _SPAN_ID + attrs + _SKIP_DETAIL_COLS,
                               layer_name=layer, expected_rows=entry.get("rows"),
-                              optional=("InventoryItemStartDate",)):
+                              optional=("InventoryItemStartDate",
+                                        *_SKIP_DETAIL_COLS)):
         rid = r["RouteID"]
         if isinstance(rid, str) and rid and not rid.startswith("SHS_"):
             continue                     # all-roads layers: SHS routes only
@@ -181,6 +198,8 @@ def _read_span_layer(lib, index, tag, *, asof, events, buckets, parked):
             continue
         b, e = crl.pm_units(r["BeginPMMeasure"]), crl.pm_units(r["EndPMMeasure"])
         if b is None or e is None:
+            n_skip += 1
+            skips.append(_skipped_span_record(tag, r, b, e))
             continue
         n_asof += 1
         route = _route_token(r["RouteNum"], r["RouteSuffix"])
@@ -209,7 +228,73 @@ def _read_span_layer(lib, index, tag, *, asof, events, buckets, parked):
             n_cross += 1
             parked.append((tag, route, align, c1, p1, c2, p2, span))
     events.on_log(f"  {layer}: {n_asof:,} as-of spans"
-                  + (f" ({n_cross} cross-county)" if n_cross else ""))
+                  + (f" ({n_cross} cross-county)" if n_cross else "")
+                  + (f" ({n_skip} skipped: unreadable postmile)"
+                     if n_skip else ""))
+
+
+def _skipped_span_record(tag, r, b, e):
+    """One structured record for an as-of span the postmile-only contract
+    cannot place (HF-01 / PCOA-FINAL-010): the layer, route, county, prefix,
+    the one known PM endpoint (the anchor the unavailable marker lands on),
+    and every measure the row DID have — the AR/odometer measures stay
+    recorded but are never used to guess a position."""
+    layer, attrs, _family = SPAN_LAYERS[tag]
+    if b is not None:
+        known, station = "begin", b
+        county = crl.norm_county(r["BeginCounty"])
+        prefix = crl.dot_none(r["BeginPMPrefix"]).strip().upper()
+    elif e is not None:
+        known, station = "end", e
+        county = crl.norm_county(r["EndCounty"])
+        prefix = crl.dot_none(r["EndPMPrefix"]).strip().upper()
+    else:
+        known, station, county, prefix = None, None, "", ""
+    loc_error = r.get("LocError")
+    return {
+        "tag": tag, "layer": layer,
+        "route": _route_token(r["RouteNum"], r["RouteSuffix"]),
+        "alignment": crl.norm_alignment(r["Alignment"]) or "R",
+        "known_endpoint": known, "station": station,
+        "county": county, "prefix": prefix,
+        "begin_od": _num(r["BeginODMeasure"]),
+        "end_od": _num(r["EndODMeasure"]),
+        "from_ar": _num(r["FromARMeasure"]),
+        "to_ar": _num(r["ToARMeasure"]),
+        "loc_error": "" if loc_error is None else str(loc_error).strip(),
+        "values": [v if v is None or isinstance(v, (str, int, float, bool))
+                   else str(v) for v in (r[a] for a in attrs)],
+        "marked_cells": 0,
+    }
+
+
+def _skip_warning(s):
+    """The human-readable line one skipped span contributes to `warnings`
+    (the marker sheet, the sidecar, and the result message ride on it) —
+    itemizing the span's own attribute values, so the record states the
+    unassertable source facts in full."""
+    where = f"{s['route']} {s['county'] or '?'}/{s['prefix'] or '-'}"
+    if s["known_endpoint"] == "begin":
+        span_txt = f"begin {crl.pm_text(s['station'])} → end unreadable"
+    elif s["known_endpoint"] == "end":
+        span_txt = f"begin unreadable → end {crl.pm_text(s['station'])}"
+    else:
+        span_txt = "both postmiles unreadable"
+    loc = f", LocError={s['loc_error']}" if s["loc_error"] else ""
+    attrs = SPAN_LAYERS[s["tag"]][1]
+    vals = ", ".join(f"{a}={'' if v is None else v}"
+                     for a, v in zip(attrs, s["values"]))
+    if s["marked_cells"]:
+        tail = (f" — its {s['marked_cells']} anchor cell(s) are marked "
+                f"'{UNAVAILABLE_TOKEN}'.")
+    elif s["known_endpoint"] is None:
+        tail = " — it has no usable anchor."
+    else:
+        tail = (" — no marked anchor cell (no built row covers its known "
+                "endpoint, or the built value already equals the span's own).")
+    return (f"{s['layer']}: an as-of span ({where} {span_txt}{loc}; {vals}) "
+            f"could not be placed by the county+postmile rule; its values are "
+            f"not asserted{tail}")
 
 
 def _read_point_layer(lib, index, tag, *, asof, events, points):
@@ -768,6 +853,168 @@ def _build_route(route, buckets, points, asof_date):
 
 
 # --------------------------------------------------------------------------- #
+# unavailable-anchor marking (HF-01 / PCOA-FINAL-010)
+# --------------------------------------------------------------------------- #
+# The THY columns each span layer paints DIRECTLY from its covering span (the
+# _paint_row _seg_code/_seg_num/city projections), with each column's
+# projection kind. A skipped span of one of these layers marks its anchor
+# cells with UNAVAILABLE_TOKEN. Layers whose output is structural (HG),
+# interpolated (TVS), presence-muxed (TOLL/FOR), defaulted (NON) or
+# date-derived (NET) stay record-only — their skips are still counted, warned
+# and disclosed, but no single output cell IS their value, so there is no
+# honest cell to mark. No such skip exists in the real corpus (the 102 are
+# all SHS Travel Way L / SHS O Shld Width R).
+_TAG_MARK_COLUMNS = {
+    "MED": (("THY_MEDIAN_TYPE_CODE", "code", 0),
+            ("THY_MEDIAN_WIDTH_AMT", "num", 1),
+            ("THY_MEDIAN_WIDTH_VAR_CODE", "code", 2)),
+    "BAR": (("THY_MEDIAN_BARRIER_CODE", "code", 0),),
+    "CURB": (("THY_CURB_LANDSCAPE_CODE", "code", 0),),
+    "ACC": (("THY_HIGHWAY_ACCESS_CODE", "code", 0),),
+    "TER": (("THY_TERRAIN_CODE", "code", 0),),
+    "DSP": (("THY_DESIGN_SPEED_AMT", "num", 0),),
+    "POP": (("THY_POPULATION_CODE", "code", 0),),
+    "CITY": (("THY_CITY_CODE", "city", 0),),
+    "TWR": (("THY_RT_TRAV_WAY_WIDTH_AMT", "num", 0),
+            ("THY_RT_LANES_AMT", "num", 1)),
+    "SUR": (("THY_RT_SURF_TYPE_CODE", "code", 0),),
+    "SPR": (("THY_RT_SPEC_FEATURES_CODE", "code", 0),),
+    "OSR": (("THY_RT_O_SHD_TOT_WIDTH_AMT", "num", 0),
+            ("THY_RT_O_SHD_TRT_WIDTH_AMT", "num", 1)),
+    "ISR": (("THY_RT_I_SHD_TOT_WIDTH_AMT", "num", 0),
+            ("THY_RT_I_SHD_TRT_WIDTH_AMT", "num", 1)),
+    "TWL": (("THY_LT_TRAV_WAY_WIDTH_AMT", "num", 0),
+            ("THY_LT_LANES_AMT", "num", 1)),
+    "SUL": (("THY_LT_SURF_TYPE_CODE", "code", 0),),
+    "SPL": (("THY_LT_SPEC_FEATURES_CODE", "code", 0),),
+    "OSL": (("THY_LT_O_SHD_TOT_WIDTH_AMT", "num", 0),
+            ("THY_LT_O_SHD_TRT_WIDTH_AMT", "num", 1)),
+    "ISL": (("THY_LT_I_SHD_TOT_WIDTH_AMT", "num", 0),
+            ("THY_LT_I_SHD_TRT_WIDTH_AMT", "num", 1)),
+}
+
+
+def _skip_kinds(family, alignment):
+    """The THY_PM_SUFFIX_CODE values of rows that would carry the skipped
+    span's columns — mirrors _paint_row's kind gating (left block on base/L,
+    right block on base/R, whole-road by the span's own alignment)."""
+    if family == "left":
+        return (None, "L")
+    if family == "right":
+        return (None, "R")
+    if family == "whole":
+        return ("L",) if alignment == "L" else (None, "R")
+    return ()
+
+
+def _skip_value(kind, v):
+    """The skipped span's own value projected the way _paint_row would have
+    painted it (_seg_code / _seg_num / the City translation), so painted-vs-raw
+    equality compares like with like."""
+    if kind == "code":
+        return crl.code_of(v)
+    if kind == "city":
+        return city_codes.norm_city(v)
+    if v is None or (isinstance(v, str) and not v.strip()):
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return str(v).strip()
+    return int(f) if f == int(f) else f
+
+
+def _blankish(v):
+    """Painted/raw comparison canon: None and blank text are the same absent
+    value (an empty string round-trips as an empty cell)."""
+    if v is None or (isinstance(v, str) and not v.strip()):
+        return None
+    return v
+
+
+def _mark_unavailable_anchors(rows, skips):
+    """Write UNAVAILABLE_TOKEN into each skipped span's anchor cells: the
+    built row(s) whose postmile range contains the span's one known endpoint
+    (begin anchors: b <= s < e; end anchors: b < s <= e), on the roadbed
+    kinds that layer paints, in its direct value columns — and only where the
+    painted value is NOT already the span's own value (a value corroborated
+    by a placeable span is source truth, not an omission). Positions are
+    never inferred from AR/odometer measures. Mutates the freshly built rows
+    in place (they are this builder's own pre-write buffer) and returns the
+    number of cells marked. Each skip's `marked_cells` counts the anchor
+    cells whose value IT could not assert — a cell shared by co-anchored
+    spans credits each of them, so the per-span numbers can sum above the
+    returned global cell count."""
+    by_cp = defaultdict(list)
+    for s in skips:
+        if s["known_endpoint"] is None or not s["county"]:
+            continue
+        if s["tag"] not in _TAG_MARK_COLUMNS:
+            continue
+        by_cp[(s["route"], s["county"], s["prefix"])].append(s)
+    if not by_cp:
+        return 0
+    marked = 0
+    for row in rows:
+        route = ((row[_COL["THY_ROUTE_NAME"]] or "")
+                 + (row[_COL["THY_ROUTE_SUFFIX_CODE"]] or ""))
+        county = row[_COL["THY_COUNTY_CODE"]] or ""
+        prefix = (row[_COL["THY_PM_PREFIX_CODE"]] or "").strip().upper()
+        cands = by_cp.get((route, county, prefix))
+        if not cands:
+            continue
+        rb = crl.pm_units(row[_COL["THY_BEGIN_PM_AMT"]])
+        re_units = crl.pm_units(row[_COL["THY_END_PM_AMT"]])
+        if rb is None or re_units is None:
+            continue
+        kind = row[_COL["THY_PM_SUFFIX_CODE"]]
+        # Cell-first: several spans can anchor into the SAME row (a chain of
+        # unreadable-end spans whose begins all land in one built stretch).
+        # Evaluate every anchoring span against the ORIGINAL painted value,
+        # write the token once, and credit EVERY span whose value it withheld
+        # — so no co-anchored span falsely reports "no marked anchor cell".
+        per_cell = defaultdict(list)         # col index -> [span, ...]
+        for s in cands:
+            if kind not in _skip_kinds(SPAN_LAYERS[s["tag"]][2],
+                                       s["alignment"]):
+                continue
+            station = s["station"]
+            if s["known_endpoint"] == "begin":
+                if not rb <= station < re_units:
+                    continue
+            elif not rb < station <= re_units:
+                continue
+            for name, proj, pos in _TAG_MARK_COLUMNS[s["tag"]]:
+                raw = (_skip_value(proj, s["values"][pos])
+                       if pos < len(s["values"]) else None)
+                per_cell[_COL[name]].append((s, raw))
+        for i, anchored in per_cell.items():
+            painted = _blankish(row[i])
+            withheld = [s for s, raw in anchored
+                        if painted != _blankish(raw)]
+            if not withheld:
+                continue                 # corroborated — nothing was omitted
+            row[i] = UNAVAILABLE_TOKEN
+            marked += 1
+            for s in withheld:
+                s["marked_cells"] += 1
+    return marked
+
+
+def _skip_sidecar_entries(skips):
+    """The sidecar's JSON-safe span records (postmiles as canonical text)."""
+    out = []
+    for s in skips:
+        entry = {k: s[k] for k in ("layer", "route", "county", "prefix",
+                                   "alignment", "known_endpoint", "loc_error",
+                                   "begin_od", "end_od", "from_ar", "to_ar",
+                                   "values", "marked_cells")}
+        entry["station_pm"] = crl.pm_text(s["station"])
+        out.append(entry)
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # provenance + workbook
 # --------------------------------------------------------------------------- #
 def _provenance_rows(index):
@@ -799,7 +1046,8 @@ _PROV_TIER_FILL = {
 }
 
 
-def _write_workbook(out_path, rows, index, asof_date, lib_root, warnings):
+def _write_workbook(out_path, rows, index, asof_date, lib_root, warnings,
+                    n_skipped=0, n_marked=0):
     from openpyxl import Workbook
     from openpyxl.cell import WriteOnlyCell
     from openpyxl.styles import PatternFill
@@ -829,6 +1077,11 @@ def _write_workbook(out_path, rows, index, asof_date, lib_root, warnings):
     marker.append(["Build version", BUILD_VERSION])
     marker.append(["As-of date", asof_date.isoformat()])
     marker.append(["Layer library", str(lib_root)])
+    # HF-01: the build's own skipped-source record — the comparator reads
+    # these keys to disclose the condition in the comparison's Summary/Notes.
+    marker.append(["Skipped source spans", n_skipped])
+    marker.append(["Marked anchor cells", n_marked])
+    marker.append(["Unavailable marker", UNAVAILABLE_TOKEN])
     for w in warnings:
         marker.append(["Warning", w])
     tmp = out_path.with_name(out_path.name + ".tmp")
@@ -938,12 +1191,12 @@ def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes)
 
     buckets = defaultdict(lambda: defaultdict(list))
     points = defaultdict(dict)
-    parked, warnings = [], []
+    parked, warnings, skips = [], [], []
     for tag in SPAN_LAYERS:
         if events.is_cancelled():
             return _cancelled(events)
         _read_span_layer(lib, index, tag, asof=asof_serial, events=events,
-                         buckets=buckets, parked=parked)
+                         buckets=buckets, parked=parked, skips=skips)
     for tag in POINT_LAYERS:
         if events.is_cancelled():
             return _cancelled(events)
@@ -971,13 +1224,30 @@ def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes)
             events.on_log(f"  built {i}/{len(all_routes)} routes "
                           f"({len(rows):,} rows)")
 
-    _write_workbook(out_path, rows, index, asof_date, lib_root, warnings)
+    # HF-01: mark each skipped span's anchor cells, then surface every skip
+    # through the same warnings channel the split pass already uses (marker
+    # sheet, PARTIAL completion, skipped_inputs, sidecar, result message).
+    marked = _mark_unavailable_anchors(rows, skips)
+    if skips:
+        events.on_log(f"  {len(skips)} source span(s) have an unreadable "
+                      f"postmile endpoint — {marked} anchor cell(s) marked "
+                      f"'{UNAVAILABLE_TOKEN}'")
+    for s in skips:
+        w = _skip_warning(s)
+        warnings.append(w)
+        events.on_log(f"  note: {w}")
+
+    _write_workbook(out_path, rows, index, asof_date, lib_root, warnings,
+                    n_skipped=len(skips), n_marked=marked)
     result = ConsolidateResult(
         status="ok",
         message=(f"Built {len(rows):,} clean-road highway rows "
                  f"({len(all_routes)} routes) as of {asof_date.isoformat()}."
                  + (f" {len(warnings)} span(s) could not be placed — see the "
-                    f"{MARKER_SHEET} sheet." if warnings else "")),
+                    f"{MARKER_SHEET} sheet." if warnings else "")
+                 + (f" {marked} anchor cell(s) are marked "
+                    f"'{UNAVAILABLE_TOKEN}' (a source span exists there but "
+                    "its placement is unknowable)." if marked else "")),
         output_path=str(out_path),
         summary_lines=[f"Clean Road Highway (ArcGIS): {len(rows):,} rows, "
                        f"{len(all_routes)} routes -> {out_path.name}"],
@@ -991,6 +1261,16 @@ def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes)
                 "routes": len(all_routes),
                 "rows": len(rows),
                 "warnings": warnings,
+                "skipped_source_spans": {
+                    "count": len(skips),
+                    "marked_anchor_cells": marked,
+                    "unavailable_marker": UNAVAILABLE_TOKEN,
+                    "reason": ("as-of spans whose begin or end postmile is "
+                               "unreadable cannot be placed by the "
+                               "county+postmile rule; their known-endpoint "
+                               "anchors are marked instead of guessed"),
+                    "spans": _skip_sidecar_entries(skips),
+                },
             }}):
         return ConsolidateResult(
             status="error",

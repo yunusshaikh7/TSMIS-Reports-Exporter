@@ -1715,3 +1715,57 @@ exactly (291,292 / 50,012 / 52,647·5,081·7,436); the values workbook's own
 cells sum to the same; the real-Excel COM full rebuild of the formulas
 edition equals the values twin cell-for-cell across all 65,164 rows. Oracle
 JSON beside `audit_v0290.py`. Gate 153/153 + ruff clean at the tag.
+
+### CRH-SW-E3 — the RB-1 / HF-01 re-bless (supersedes CRH-SW-E2's expected counts)
+
+Same recipe and the same raw inputs (the ArcGIS layer library and the
+`CA HIGHWAYS 09.08.2025` extract are byte-identical to E2's), one owner-ruled
+truth change (2026-07-26, PCOA-FINAL-010): the build RECORDS the 102 as-of
+source spans whose begin or end postmile is unreadable (`LocError=NO ERROR`,
+usable AR/odometer measures — the county+postmile contract never guesses from
+those calibrations), reports **PARTIAL** completion with `skipped_inputs=102`,
+itemizes every span on the `ArcGIS Build` sheet and in the
+`clean_road_build.skipped_source_spans` sidecar, and emits the reserved
+non-asserting marker `(unavailable: source span skipped)` into the **174**
+anchor cells whose painted value was not the skipped span's own (162 formerly
+blank + 3 formerly stale + 9 on rows that do not pair). The comparison schema
+declares the token non-asserting via the one opt-in
+`CompareSchema.unavailable_rule` field: those cells render state `N`, display
+the marker, and are excluded from every difference count; Summary and Notes
+state the span count, the marked-anchor count and the reason.
+
+Expected approved result: **52,647 paired / 5,081 ArcGIS-only / 7,436 TSN-only
+(UNCHANGED) / 50,012 differing rows (UNCHANGED — every affected row keeps at
+least one real difference) / 291,127 differing cells (was 291,292; −165 =
+exactly the Codex-witnessed skipped-anchor `D` cells, now explicit `N`) /
+2,635 fully identical (UNCHANGED)**. Per-field deltas, all four from the
+witness: `THY_LT_TRAV_WAY_WIDTH_AMT` −82 · `THY_LT_LANES_AMT` −81 ·
+`THY_RT_O_SHD_TOT_WIDTH_AMT` −1 · `THY_RT_O_SHD_TRT_WIDTH_AMT` −1. Typed
+outcome: asserted_cells 2,579,538 / context_cells 1,263,693 (the same 165-cell
+shift; 52,647 × 73 exactly). The comparison itself reports PARTIAL — the
+producer's truthful partial coverage propagated by `_merge_input_outcomes` —
+and can no longer read green while source rows are unplaceable.
+
+| Role | Exact file | Length | SHA-256 |
+|---|---|---:|---|
+| ArcGIS (built, RB-1) | `output\arcgis_cleanroad\clean_highway_built.xlsx` | 10,828,144 | `8BDD9247771CF2580775F4F0A1DD87706E75F3533C33EC9DB25D41A9AB4B305E` |
+| TSN (normalized, rebuilt from the same raw — sha differs per PCOA-FINAL-017; projected content proved identical cell-for-cell) | `tsn_library\clean_highway\consolidated\tsn_clean_highway_normalized.xlsx` | 14,864,394 | `7F1086FEAFE061531B682B12D0DDA161F5256DF50FCC89A954DF8B87A4656AAB` |
+
+Acceptance evidence (RB-1, 2026-07-27): (A) a build-level cell diff of the new
+built workbook against the frozen audit-approved E2-era build (SHA
+`8F9766AC…`) shows the SAME 57,728-row universe and ZERO cell changes outside
+exactly the 174 witnessed anchors; (B) an app-free lockstep recount of the old
+vs new values twins verifies the 165 witnessed `D`→`N` flips cell-for-cell
+(masks + displays), the 20 matched-at-anchor cells untouched, the 9 one-sided
+anchor displays carrying the marker at state `U`, totals 291,292 → 291,127
+with no other mask/display/status/key change anywhere, and the TSN data sheet
+identical (the rebuilt normalized input's projected content equals the old);
+(C) the real-Excel COM full rebuild of the formulas twin recomputes the same
+truth live (SELF-CHECK all OK, verdict 291,127, the witnessed positions
+live-`N` with the marker, no error cells). Witnesses:
+`hotfix-bundles/HF-01/witness/` (this repo) and
+`Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\`. The Phase-3
+decision gates are honored: the equality change is opt-in per-report schema
+(`unavailable_rule`), proved inert for every other family (Intersection
+Summary vs TSN regenerated identically, zero cells, on both code states), and
+the count move is exactly the owner-ruled 165-cell witness — nothing else.

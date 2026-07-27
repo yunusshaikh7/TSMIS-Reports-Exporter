@@ -1,6 +1,6 @@
 # `RB-1` — Bundle Contract
 
-Status: **READY**
+Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW**
 
 > This RB-level contract carries work item **HF-01** and is transcribed from the
 > HF-01 section of
@@ -15,7 +15,7 @@ Status: **READY**
 | Queue order | **1 — first implementation bundle** |
 | Rush ship | **Eligible, not planned.** The default path applies unless the owner explicitly invokes a [rush ship](../../IMPLEMENTATION-PLAN.md#expedited-release-rush-ship) for this batch. If invoked: full release on the next minor, tagged on this branch so the in-app updater offers it, status `RUSH-SHIPPED — AWAITING ADVERSARIAL REVIEW`, branch unmerged until Codex approves, and every condition in that section applies. Note the output-regeneration caveat — this batch changes what the Clean Road deliverable says about differences |
 | Branch | `hotfix/rb-1-clean-road-source-truth` |
-| Base `main` commit | PENDING (the `main` head at branch time; plan drafted against `a29bdb6`) |
+| Base `main` commit | `9c774d4edacf6ae3b6e86d15b62e5d876a690a48` (the `main` head at branch time; plan drafted against `a29bdb6` — the delta is the Stage 3 planning docs only) |
 | Canonical finding IDs | **PCOA-FINAL-010** (P1) |
 | Implementer | **Claude** (owner decision 2026-07-26: Claude implements every bundle) |
 | First reviewer | **Codex** — non-implementer; holds `source-audit/CLEAN-ROAD-HIGHWAY-RAW-SOURCE-TRUTH-FINAL.md`, `clean-road-highway-raw-source-truth.json`, `CLEAN-ROAD-COMPARISON-UNLOCATABLE-IMPACT.md`, `clean-road-comparison-unlocatable-impact.json` |

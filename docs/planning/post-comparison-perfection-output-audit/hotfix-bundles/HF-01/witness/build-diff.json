@@ -1,0 +1,20 @@
+{
+ "old": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-perfection-output-audit-2026-07-23\\generated-comparisons\\clean-road\\clean_highway_built.xlsx",
+ "new": "C:\\Users\\Yunus\\Projects\\TSMIS-rb1-worktree\\output\\arcgis_cleanroad\\clean_highway_built.xlsx",
+ "rows_old_extra": 0,
+ "rows_new_extra": 0,
+ "expected_marked": 174,
+ "tokens_found_at_expected": 174,
+ "expected_but_unmarked": [],
+ "unexpected_cell_changes": [],
+ "unexpected_count": 0,
+ "marker_old_rows": 3,
+ "marker_new_rows": 108,
+ "marker_old_is_prefix_of_new_keys": true,
+ "marker_new_keys": [
+  "Marked anchor cells",
+  "Skipped source spans",
+  "Unavailable marker",
+  "Warning"
+ ]
+}

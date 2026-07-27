@@ -1,0 +1,14 @@
+{
+ "file": "C:\\Users\\Yunus\\Projects\\TSMIS-rb1-worktree\\output\\comparisons\\arcgis\\ArcGIS_vs_TSN_CleanRoadHighway_Comparison 2026-07-27.xlsx",
+ "summary_errors": 0,
+ "verdict": "✗ DIFFERENCES FOUND — 291,127 differing cell(s), 12,517 one-sided row(s) — details below.",
+ "self_check_not_ok": 0,
+ "disclosure_present": true,
+ "partial_note_present": true,
+ "spot_errors": 0,
+ "spot_agree_bad": 0,
+ "comparison_errors": 0,
+ "diffs_sum": 291127,
+ "live_165_mask_N": 165,
+ "live_165_display_token": 165
+}
