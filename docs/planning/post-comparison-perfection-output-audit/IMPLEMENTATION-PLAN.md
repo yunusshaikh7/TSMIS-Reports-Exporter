@@ -88,7 +88,7 @@ this commit and are anchors, not contracts).
 | **002, 003, 016** | One function: `matrix_build.captured_tsn_workbook:227` — `tempfile.mkdtemp(prefix="tsmis-tsn-consumer-")` at `:237` (016), the reduced sidecar it publishes (002), and the captured path that reaches `compare_tsn_common.capture_input_provenance:604` → `"selection": str(path.resolve(...))` at `:625` (003). Used at `matrix_build.py:1045` and `:1191`; re-exported by `matrix.py:52`. The four `claims_notes` fallbacks (`compare_highway_log.py:228`, `compare_highway_sequence_tsn.py:346`, `compare_intersection_summary_tsn.py:290`, `compare_ramp_summary_tsn.py:150`) need **no change** if the sidecar is complete | All vs-TSN families, By Day + Everything lanes | None inbound | **One bundle.** All three are the same capture step; 003's scope (36 workbooks) is strictly wider than 002's (24), and fixing 002 alone leaves 003 standing — the finding says so explicitly |
 | **001, 012** | `compare_ramp_detail_tsn._TSMIS_HEADER` + the misdiagnosing `bad_header_msg` in `_load_tsmis`; `compare_env._ramp_detail_canonical_header` (+ `_ramp_detail_env_keys:1294`); the unconditional success in `consolidate_ramp_detail.consolidate`; the self leg's asymmetry in `compare_ramp_detail_pdf.py` — `_NULL_DESC`/`_NULL_MARK:52-53`, `_null_blank:76` applied on the PDF path but not by `_load_excel_collapsed:155` | Ramp Detail, both editions | **012 is hard-coupled to 001**: it is unobservable until the header gate is fixed and the finding states "fixing 001 without this creates a new defect" | **One bundle.** Shipping 001 alone would publish 108 known-false discrepancies on a same-source check |
 | **004, 005, 006** | `visual_evidence.generate:547` (roles at `:580-581`, PDF-set gates at `:599-603`), `tsmis_source_role:173`, `_TSN_PDFS_IN_RAW:118`, the two flavors at `:159-161`, the Excel panel at `_excel_strip:1238` → `label[:24]` `:1266` and `text[:26]` `:1270`; per-family targeting in `evidence_highway_log.py` / `evidence_highway_sequence.py` / `evidence_intersection_detail.py` / `evidence_ramp_detail.py`; call sites `matrix_build.run_evidence_only:1016`, `evidence_for_cell:1113` (`generate` at `:1096`… `:1284`), `_run_self_evidence:1304` (`:1327`), plus `day_matrix.py:454`, `gui_matrix.py:711/789/946/1510/1576`, `gui_api.py:372` | HL, HSL, ID (both), RD-PDF | 006's symptom may be retired by 004's gate; the finding forbids assuming either fixes the other. **Blocks HF-10** | **One bundle.** Eligibility, binding and panel fidelity are one renderer contract and one review of the same image sets. Carries an **owner policy gate** (see below) |
-| **011** | `compare_highway_sequence_pdf.py` — `_SS_SCHEMA:156`, `_tsmis_row_same_source:118`, `_load_tsmis_same_source:147`, and `_NOTES_PDF_VS_EXCEL:78-107`, which *already* describes the equate class in prose while the totals stay unqualified | Highway Sequence self only | Count-affecting → Phase-3 decision gates. Establishes the disclosed-class pattern HF-09 reuses | **Own bundle.** Family-local file, but equality/count semantics — it must not travel with presentation work |
+| **011** | `compare_highway_sequence_pdf.py` — `_SS_SCHEMA:156`, `_tsmis_row_same_source:118`, `_load_tsmis_same_source:147`, and `_NOTES_PDF_VS_EXCEL:78-107`, which *already* describes the equate class in prose while the totals stay unqualified | Highway Sequence self only | **Owner ruling 2026-07-26: normalize to zero.** Count-affecting (3,714 → 0) and pair-aware → the `compare_core` lock + Phase-3 gates apply, opt-in only | **Own bundle.** Family-local file, but equality/count semantics — it must not travel with presentation work, and it must not touch the HF-09 class the owner ruled stays flagged |
 | **015, 018** | 015: `compare_env.EnvComparator.compare_folders:1033` — both sides' member lists already exist at `:1065-1066`, yet side A is loaded first at `:1139+` and emptiness is never checked. 018: `report_catalog.ExportEntry:88` has no export-only field, `MATRIX:381`, the picker derivation `:570-576`, `reports.py`, `scripts/ui/`, and `build/check_report_wiring.py` (already derives required touchpoints) | 015: all statewide PDF families. 018: `ramp_summary_excel`, `intersection_summary_pdf`, `highway_summary` | 015 shares `compare_env.py` with 001 (different function) — sequence after HF-04 | **One bundle.** Both are "the app must tell the user the truth immediately / at all"; neither touches a workbook cell, a count, or an image. Two disjoint files, one review |
 | **017** | `tsn_library.build_consolidated:909`, `_write_normalized_workbook:1152`, `normalized_workbook_identity:249`; `report_catalog.TSN` `normalization_version` (D2 auto-rebuild) | All 8 TSN datasets | Root cause is an explicit hypothesis — Stage 4 must establish it first | **Own bundle.** Invalidates every bound comparison generation, so its blast radius is the whole vs-TSN surface and it needs its own review |
 | **013** | Per-family classification + Summary/Notes disclosure across `compare_highway_log.py`, `compare_highway_sequence_tsn.py`, `compare_intersection_detail_tsn.py`, `compare_ramp_detail_pdf.py`, `compare_clean_highway_tsn.py`, likely one shared opt-in `CompareSchema` field and `compare_core._write_summary` | HL, HSL, ID (both), RD-PDF, Clean Road | Touches `_write_summary` (HF-02) and Clean Road Notes (HF-01) — must follow both. **Owner ruling 2026-07-26: disclosure only, the cells stay flagged** | **Own bundle, late.** Five families' Summary/Notes disclosure; mixing it into a presentation bundle is exactly what the prompt forbids. Now the lowest-risk semantics bundle — no count moves |
@@ -903,8 +903,11 @@ three paths that agree today (Direct self, Everything SELF, PDF-vs-Excel by-day
 matrix), both twins — 2 topology decisions.
 
 **Explicitly out of scope.** Highway Sequence **vs TSN** (its equate disclosure
-already exists and its counts must not move); every other family's self check;
-the Description representation class (HF-09); evidence.
+already exists and its counts must not move by a single cell); every other
+family's self check; **any shared equality change** — the normalization is opt-in
+and scoped to this comparator; the punctuation/case/slash Description class, which
+the owner ruled stays **flagged** (HF-09) and must not be swept up by this
+normalization; evidence.
 
 **Verified root cause.** The two editions represent one equation differently by
 design: the print writes a source line plus a target line, the Excel export folds
@@ -917,29 +920,74 @@ unqualified total. Codex's full-corpus canonicalization — 1,119 relations, 39
 county/route-boundary relations, three delayed target moves, zero unsupported
 cases — leaves **zero** differing rows and cells.
 
-**Files expected to change.** `scripts/compare_highway_sequence_pdf.py`, plus
-one opt-in `CompareSchema` field in `scripts/compare_core.py` only if the chosen
-branch needs engine support, plus checks.
+**Files expected to change.** `scripts/compare_highway_sequence_pdf.py` — the
+same-source loaders (`_tsmis_row_same_source:118`, `_load_tsmis_same_source:147`),
+`_SS_SCHEMA:156` and `_NOTES_PDF_VS_EXCEL:78-107` — plus an opt-in
+`CompareSchema` field in `scripts/compare_core.py` if the pair-aware rule needs
+engine support, plus checks. The vs-TSN schema (`_hsl._SCHEMA`) and every other
+family's schema must be untouched.
 
-**⚠ Owner policy gate.** The oracle's branches are "zero differing cells" (i.e.
-canonicalize the relation) or "a disclosed representation class excluded from the
-differing-cell count and named in Summary and Notes". Either changes a published
-count, so this bundle is governed by the `compare_core` correctness lock and by
+**✅ Owner ruling — 2026-07-26: NORMALIZE. These are not real discrepancies.**
+The oracle's two branches were "zero differing cells" (canonicalize the relation)
+or "a disclosed class excluded from the count". The owner reviewed the actual
+cells and ruled the **normalize** branch: the self check must report **zero**
+differing cells for the equate population. Summary/Notes disclosure is retained
+as documentation of the rule, not as the mechanism.
+
+**The evidence the ruling was made on** — route 001, `ORA 018.540` / `018.530`,
+rendered from both editions of the frozen pull (print page 6 vs
+`highway_sequence_route_001.xlsx` rows 120–121; images retained locally only,
+since they carry real TSMIS content):
+
+| Field | Print (PDF) | Excel export | Why it is not a data difference |
+|---|---|---|---|
+| `018.540` PM suffix | *blank* | `E` | The same single `E` sits on the **partner row** of the pair on the other side |
+| `018.540` HG | *blank* | `D` | Both editions carry `D` on `018.530`; the print does not repeat it on the annotation line |
+| `018.540` FT | *blank* | `H` | Same — both carry `H` on `018.530` |
+| `018.540` Description | `EQUATES TO END R REALIGNMENT` | `END R REALIGNMENT` | The print prepends the words `EQUATES TO ` |
+| `018.530` PM suffix | `E` | *blank* | The partner half of the moved suffix |
+| `018.530` HG / FT / Distance | `D` `H` `001.267` | `D` `H` `001.267` | Already equal |
+
+The print additionally colours the whole equate — `018.540`, `EQUATES TO` and the
+entire `018.530` line in red, `END R REALIGNMENT` in green, against black
+elsewhere (verified from the PDF's own character colours). That marker has no
+representation in an XLSX at all, which is precisely why the two editions place
+the pieces differently.
+
+**Design consequence Stage 4 must not miss.** A cell-by-cell normalization cannot
+close the 547 `PM Suffix` cells, because the `E` genuinely sits on a *different
+row* on each side. The rule has to be **pair-aware** — the equate's source and
+target rows canonicalized as one relation, which is exactly what Codex's
+audit-time canonicalization did over all 1,119 relations (39 county/route-boundary
+relations, three delayed target markers, zero unsupported cases, zero residual).
+
+**Guard rails, non-negotiable.** This moves a published count from 3,714 to 0, so:
+the change rides an **opt-in** mechanism scoped to this comparator — never a
+shared-formula or shared-equality edit; it honors the `compare_core` correctness
+lock and
 [the Phase-3 decision gates](../comparison-perfection/comparison-phase3-decision-gates.md)
-(D0's "is this a difference?" criterion). Stage 4 records the owner's chosen
-branch before touching equality, and proves it against an independent oracle, not
-the product's own parser.
+(D0's "is this a difference?" criterion); it is proved against an **independent**
+oracle over all 60,254 rows, not the product's own parser; Highway Sequence
+**vs TSN** counts must not move by a single cell; and the anti-suppression test
+below is mandatory — a genuine divergence at an equate row must still be
+reported.
 
-**Migration / compatibility.** A count change moves any bound canary and
-invalidates nothing persisted, but committed self-check generations built under
-the old rule must be distinguishable from new ones — prefer a schema/notes-level
-disclosure that makes the change self-evident in the workbook.
+**Migration / compatibility.** The published count moves 3,714 → 0, which moves
+any bound canary and invalidates nothing persisted — but a committed self-check
+generation built under the old rule must be distinguishable from a new one, so the
+Notes must state the normalized class explicitly and the workbook must make the
+rule self-evident. A reader who compares an old workbook against a new one has to
+be able to see *why* the number changed without reading the changelog.
 
-**Tests to add.** Extend `check_compare_highway_sequence.py` (and add an
-equation fixture): a source/target equation pair reports zero differences or a
-disclosed, excluded class; a *genuine* divergence at an equation row still
-reports a difference (the anti-suppression assertion); boundary relations and
-delayed target moves are covered explicitly.
+**Tests to add.** Extend `check_compare_highway_sequence.py` with equate
+fixtures built to the measured route-001 shape: (a) a source/target pair whose
+only differences are the prepended `EQUATES TO`, the non-repeated HG/FT and the
+moved `E` reports **zero** differences; (b) the same pair with a real Description
+label change still reports a difference; (c) the same pair with a real HG or FT
+change on the partner row still reports a difference; (d) an `E` present on one
+side only, anywhere in the pair, still reports a difference; (e) a county/route
+boundary relation and a delayed target marker are both covered; (f) the rule is
+inert for a schema that does not opt in.
 
 **Exact end-user generation path.** Consolidate tab → Highway Sequence both
 editions from the frozen `2026-07-23` pull; Compare tab → the PDF-vs-Excel self
@@ -969,17 +1017,29 @@ dispatch paths: full gate plus `check_compare_highway_sequence*.py`,
 `check_pdf_excel_matrix.py`, `check_day_matrix.py`.
 
 **Measurable acceptance criteria.**
-1. The frozen-pull self check reports **zero** differing cells, or a disclosed
-   class excluded from the count and named in Summary **and** Notes — proved over
-   all 60,254 rows.
-2. A genuine equation-row divergence is still reported (anti-suppression).
-3. HSL vs TSN counts unchanged; all three self paths agree exactly.
-4. Any moved canary re-blessed with cell-for-cell evidence and a documented
+1. The frozen-pull self check reports **zero** differing cells and **zero**
+   differing rows, proved over all 60,254 rows by an independent reader — not by
+   the product's own parser. (The oracle's disclose-and-exclude alternative is
+   closed by owner ruling; normalization is the required mechanism.)
+2. All four affected columns close, `PM Suffix` included — so the rule is
+   demonstrably pair-aware, not per-cell.
+3. **Anti-suppression, mandatory:** a genuine divergence injected at an equate row
+   (a changed Description label, a real HG/FT change on the partner row, an `E`
+   present on only one side anywhere in the pair) is still reported as a
+   difference. A fixture per case.
+4. Summary and Notes name the normalized equate class and its relation count so a
+   reader knows why the number is zero.
+5. HSL **vs TSN** counts unchanged to the cell; all three self paths agree
+   exactly.
+6. The rule is opt-in and inert for every other family — one unrelated family's
+   comparison proved byte-identical to its pre-fix twin.
+7. Any moved canary re-blessed with cell-for-cell evidence and a documented
    delta.
-5. Full gate green; the new fixture fails pre-fix.
+8. Full gate green; every new fixture fails pre-fix.
 
-**Rollback.** Revert the merge commit; counts return to the prior published
-values. Record in `IMPLEMENTATION.md` that a revert re-publishes the 3,714 cells.
+**Rollback.** Revert the merge commit; the self check re-publishes the 3,714
+equate cells. Record that explicitly in `IMPLEMENTATION.md` — a revert here is
+visible in the deliverable, unlike the presentation bundles.
 
 **Retained output / witness.** `…\_scratch\post-comparison-hotfixes\HF-06\`;
 `hotfix-bundles/HF-06/witness/` for the independent relation census and the
@@ -1569,6 +1629,8 @@ blocked by this program.
 | Split presentation into statewide-summary and large/detail, as the prompt's likely shape suggests? | **No.** Both classes are produced by the same `compare_core` writers; both need `_write_summary`'s `B` width (`:2998`) and the composite key column (`:2015`, `:2170`). Two branches would edit the same statements | PENDING | PENDING |
 | Should Clean Road (HF-01) also carry its own clipping fix so the user's sheet is complete in one bundle? | **No.** Clipping is one canonical finding (009) covering every family; fixing it inside HF-01 would put shared-writer changes in bundle 1. Instead HF-02 is sequenced second and must regenerate the merged HF-01 pair as its witness | PENDING | PENDING |
 | HF-01's design: can the 161 false positives fall to zero without an engine hook? | **Probably not.** Disclosure alone satisfies oracle branch (b) but not its second sentence. The recommended path marks the skipped anchors non-asserting via one opt-in `CompareSchema` field, on the per-cell ditto `N` precedent (`compare_core.py:1648-1650`). Odometer-based placement is forbidden by the build model | PENDING | PENDING |
+| Normalize or disclose the Highway Sequence self-check equates (HF-06)? | **RULED AND CLOSED by the owner, 2026-07-26 after reviewing the rendered cells: NORMALIZE to zero.** Route 001's five differing cells are the moved `E` suffix, the non-repeated HG/FT, and a prepended `EQUATES TO` — none is a disagreement about the road, and the print's red/green equate colouring cannot exist in an XLSX at all. Must be pair-aware (a per-cell rule cannot close `PM Suffix`), opt-in, proved by an independent oracle over all 60,254 rows, with vs-TSN counts frozen and an anti-suppression fixture per case | N/A — settled by the owner on rendered evidence | N/A |
+| Isn't that inconsistent with the HF-09 ruling? | **No — the two classes differ in kind, and the owner ruled each on its own evidence.** HF-09 is two independent sources ten months apart whose text genuinely differs (`,` vs `/`) → stays flagged. HF-06 is one pull rendered twice, where every piece of information is present on both sides but placed differently within a two-row pair → normalized. HF-06 must not widen into the HF-09 class | N/A | N/A |
 | Disclosure or normalization for representation-only Description differences (HF-09)? | **RULED AND CLOSED by the owner, 2026-07-26: disclosure only — the cells stay flagged and counted.** The comma-vs-slash Highway Log class (1,243 per format) and its siblings keep their red `D` state and stay in every total; HF-09 adds a count line and may not touch equality. This matches Stage 2's refusal to impose a new equality rule and the shipped `_quote_note` decision | N/A — settled by the owner | N/A |
 | Is the audit's evidence-eligibility rule a product requirement (HF-05)? | **Escalate, do not decide.** Applied literally it retires nearly the whole shipped evidence feature, including CMP-AUD-210's Excel-side binding and v0.32.0's `excel_column_for`. The finding's own oracle (exact-source binding) is satisfiable without that. Recorded as an owner policy gate; absent a ruling, implement the oracle | PENDING | PENDING |
 | 001 and 012 in one bundle? | **Yes, mandatory.** 012 is unobservable until 001 lands and the finding states that fixing 001 alone creates a new defect (108 false discrepancies on a same-source check) | PENDING | PENDING |

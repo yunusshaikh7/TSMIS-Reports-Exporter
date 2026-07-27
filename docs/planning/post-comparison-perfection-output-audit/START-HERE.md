@@ -29,11 +29,20 @@ planner challenges bundle size, ordering, overlaps, missing findings and
 acceptance tests; verifies Clean Road stays first; and either revises or signs.
 The plan's challenge log carries the open questions, including **two remaining
 owner policy gates** — the Clean Road skipped-anchor display (HF-01) and whether
-the audit's evidence-eligibility rule is a product requirement (HF-05). A third
-is **ruled and closed**: representation-only Description differences
-(the comma-vs-slash class and its siblings, PCOA-FINAL-013 / HF-09) stay
-**flagged and counted** — that bundle adds a disclosure count line and may not
-change equality.
+the audit's evidence-eligibility rule is a product requirement (HF-05).
+
+Two are **ruled and closed** (2026-07-26), each on its own rendered evidence, and
+they point in opposite directions on purpose:
+
+- **PCOA-FINAL-013 / HF-09 — stays FLAGGED.** The representation-only Description
+  class (`NEVADA STATE LINE , END OF COUNTY` vs `… /END OF COUNTY` and its
+  siblings) is two independent sources ten months apart whose text genuinely
+  differs. HF-09 adds a disclosure count line and **may not change equality**.
+- **PCOA-FINAL-011 / HF-06 — NORMALIZED to zero.** The Highway Sequence
+  PDF-vs-Excel equate cells are one pull rendered twice: the `E` suffix sits on the
+  partner row, HG/FT are simply not repeated on the print's annotation line, and
+  the Description is the same label with `EQUATES TO ` prepended. The rule must be
+  pair-aware, opt-in, and must not widen into the HF-09 class.
 
 **No code change is authorized until both planners sign and `HF-01` reads
 `READY`.**
