@@ -1,7 +1,7 @@
 # Post-Comparison Output Program — Start Here
 
-Workflow state: **Stages 1A, 1B, and 2 complete; Stage 2 is jointly approved;
-Stage 3 planning is next**
+Workflow state: **Stages 1A, 1B, and 2 complete and jointly approved; Stage 3
+is drafted by the first planner and AWAITING THE SECOND PLANNER**
 
 Last updated: 2026-07-26
 
@@ -15,7 +15,24 @@ first pass.
 
 Run
 [`prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md`](prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md)
-sequentially with the two Stage 3 planners, beginning in a new chat.
+as the **second** Stage 3 planner, in a new chat, on the documentation-only
+branch `planning/post-comparison-hotfix-bundles`.
+
+Claude drafted the plan as first planner (both sign-off rows read `NOT STARTED`
+when Prompt 03 was invoked, so the prompt's own first-planner rule applied — the
+same reversal Stage 2 recorded). [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md)
+now holds **11 bundles** — `HF-01` … `HF-11`, Clean Road first — a verified
+finding-to-file overlap map built by code inspection at `main` `a29bdb6`, all 22
+canonical findings mapped to exactly one primary bundle, a merge order, a
+branch/worktree lifecycle, and a whole-program definition of done. The second
+planner challenges bundle size, ordering, overlaps, missing findings and
+acceptance tests; verifies Clean Road stays first; and either revises or signs.
+The plan's challenge log carries the open questions, including three owner policy
+gates (Clean Road skipped-anchor display, the evidence-eligibility rule, and
+disclosure-vs-normalization for representation-only differences).
+
+**No code change is authorized until both planners sign and `HF-01` reads
+`READY`.**
 
 Stage 2 is closed with no open conflict:
 
@@ -36,7 +53,7 @@ Stage 2 is closed with no open conflict:
 | 1A | Codex independent deliverable audit | **COMPLETE** | Historical user request, normalized in `AUDIT-SCOPE-AND-PROVENANCE.md` | `MASTER-VERIFICATION.md`, `CODEX-FINDINGS.md` |
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
-| 3 | Agree on ordered implementation bundles | **READY — NEXT** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md` |
+| 3 | Agree on ordered implementation bundles | **DRAFTED — AWAITING SECOND PLANNER** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/HF-01/BUNDLE.md` |
 | 4 | Implement one bounded hotfix bundle | **LOOP after Stage 3** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<ID>/IMPLEMENTATION.md` |
 | 5 | Adversarially review and approve that bundle | **LOOP after each Stage 4** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<ID>/REVIEW.md`; merge or return to Stage 4 |
 
@@ -129,6 +146,9 @@ Claude's Stage 1B round also copied the frozen archive and the retained batch
 into `output\2026-07-23 ssor-prod`, `output\2026-07-09 ssor-prod` and
 `output\2026-07-09 ars-prod` (git-ignored) because the By Day / Baseline /
 PDF-vs-Excel matrices read run folders from `OUTPUT_ROOT`, and left By Day
-outputs under `output\comparisons\`. **These are safe to delete** — the raw
-archive and the ground-truth batch were never written to — but deleting them
-removes the inputs for re-running Stage 2's RC-3 probe.
+outputs under `output\comparisons\`. They are technically disposable — the raw
+archive and the ground-truth batch were never written to — but **RETAIN them
+until the Stage 3 plan's definition of done is met**: they are the by-day /
+Baseline / PDF-vs-Excel acceptance inputs for every hotfix bundle, and deleting
+them also removes the inputs for re-running Stage 2's RC-3 probe. (This
+supersedes the earlier "safe to delete" note.)
