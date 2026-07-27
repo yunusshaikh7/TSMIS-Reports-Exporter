@@ -29,7 +29,7 @@ A successful process exit is not approval.
 | Commit | **`c788b297bfc484748d7089bee0b99291d4264c3e`** — the frozen Stage 1B record. This SHA line is written by the single follow-up commit on top of it (a commit cannot contain its own hash). |
 | Generated-comparison root | `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-output-audit-claude-independent-2026-07-23\` |
 | Raw-check / evidence-inspection root | `<root>\inspection\` + `<root>\witness\` |
-| Retained artifacts | 2,328 files / 9,253,680,327 bytes (`<root>\witness\MANIFEST.json`, path + size + sha256 for each) |
+| Retained artifacts | 2,336 files / 9,570,952,287 bytes (`<root>\witness\MANIFEST.json`, path + size + sha256 for each) |
 | End-user entry points exercised | `matrix.build_comparison` (Everything: env / tsn / self), `day_matrix.build_day_cell` (By Day), `baseline_matrix.build_baseline_cell` (Baseline), `pdf_excel_matrix.build_pve_cell` (PDF-vs-Excel matrix), `<adapter>.compare_folders` and `<module>.compare` (classic Compare tab), `compare_clean_highway_tsn.compare` (ArcGIS tab), `tsn_library.build_consolidated(force=True)` (TSN normalize-all) |
 | Comparison cells generated | 96 across 9 production runs |
 | Independence declaration | signed below |
@@ -843,15 +843,15 @@ layer and marking it COUNTED or context.
 ## Output manifest
 
 `<root>\witness\MANIFEST.json` — path, size and sha256 for every retained artifact
-(2,328 files, 9,253,680,327 bytes).
+(2,336 files, 9,570,952,287 bytes).
 
 | Artifact or run group | Path | Files / bytes | Purpose |
 |---|---|---:|---|
 | Claude generated comparisons | `<root>\generated-comparisons\` | 148 / 3,298,876,816 | classic Compare-tab env / vs-TSN / self outputs and the ArcGIS comparison, both twins + sidecars |
-| Everything matrix comparisons | `<root>\everything-dest\comparisons\` | 1,236 / 2,926,182,980 | env (`ssor-prod\`) and tsn/self (`tsn\`) trees, evidence sets, result caches |
+| Everything matrix comparisons | `<root>\everything-dest\comparisons\` | 1,243 / 3,242,560,596 | env (`ssor-prod\`) and tsn/self (`tsn\`) trees, evidence sets, result caches |
 | Production by-day trees | `output\comparisons\{tsn-by-day, baseline-by-day, pdf-vs-excel-by-day}\` | 872 / 2,675,399,574 | By Day, Baseline and PDF-vs-Excel matrix outputs in the app's own locations |
-| Witnesses | `<root>\witness\` | 20 / 454,192 | inventories, header census, TSN rebuild record, independent recounts, twin comparisons, temp-capture listing, export-coverage table, run records |
-| Inspection tooling + recalculated copies | `<root>\inspection\` | 52 / 352,766,765 | every script written for this audit, the verdict data, and the Excel-recalculated data-only copies |
+| Witnesses | `<root>\witness\` | 21 / 1,348,474 | inventories, header census, TSN rebuild record, independent recounts, twin comparisons, temp-capture listing, export-coverage table, run records |
+| Inspection tooling + recalculated copies | `<root>\inspection\` | 52 / 352,766,827 | every script written for this audit, the verdict data, and the Excel-recalculated data-only copies |
 
 Note for the user: this round copied the frozen archive and the retained batch into
 `output\2026-07-23 ssor-prod`, `output\2026-07-09 ssor-prod` and
