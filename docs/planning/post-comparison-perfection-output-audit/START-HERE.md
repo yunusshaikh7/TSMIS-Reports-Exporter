@@ -21,18 +21,31 @@ branch `planning/post-comparison-hotfix-bundles`.
 Claude drafted the plan as first planner (both sign-off rows read `NOT STARTED`
 when Prompt 03 was invoked, so the prompt's own first-planner rule applied — the
 same reversal Stage 2 recorded). [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md)
-now holds **11 bundles** — `HF-01` … `HF-11`, Clean Road first — a verified
-finding-to-file overlap map built by code inspection at `main` `a29bdb6`, all 22
-canonical findings mapped to exactly one primary bundle, a merge order, a
-branch/worktree lifecycle, and a whole-program definition of done. The second
-planner challenges bundle size, ordering, overlaps, missing findings and
-acceptance tests; verifies Clean Road stays first; and either revises or signs.
-The plan's challenge log carries the open questions, including **two remaining
-owner policy gates** — the Clean Road skipped-anchor display (HF-01) and whether
-the audit's evidence-eligibility rule is a product requirement (HF-05).
+now holds **11 verified work-item specs (`HF-01` … `HF-11`) grouped into 6 review
+batches (`RB-1` … `RB-6`), Clean Road first** — plus a finding-to-file overlap map
+built by code inspection at `main` `a29bdb6`, all 22 canonical findings mapped to
+exactly one primary spec, a merge order, a branch/worktree lifecycle, and a
+whole-program definition of done. The batch layer is an owner decision (fewer
+branches, reviews and releases; 12 Codex passes instead of 22), as is the
+**pre-review release policy** — a batch may be released to the owner before its
+adversarial review, at most one shipped-but-unmerged at a time, with the full gate
+never deferred. The second planner challenges batch size, ordering, overlaps,
+missing findings and acceptance tests; verifies Clean Road stays first; and either
+revises or signs.
+**All four owner policy gates are now RULED (2026-07-26)** — no open owner
+question blocks the second planner:
 
-Two are **ruled and closed** (2026-07-26), each on its own rendered evidence, and
-they point in opposite directions on purpose:
+- **HF-01 — mark the skipped anchors.** The Clean Road cells whose ArcGIS side was
+  never built carry an explicit non-asserting "unavailable" marker and leave the
+  difference count, rather than a bare blank that reads as a disagreement.
+  Disclosure-only was rejected: it names the problem without naming which cells.
+- **HF-05 — exact-source evidence, keep the feature.** Each side is evidenced from
+  the document that side was compared from; no borrowed sibling prints; no prose
+  asserting unread sources; no artifact at all where a side cannot be bound. The
+  literal audit rule, which would retire nearly the whole shipped evidence
+  feature, is **not** adopted.
+
+The other two point in opposite directions on purpose:
 
 - **PCOA-FINAL-013 / HF-09 — stays FLAGGED.** The representation-only Description
   class (`NEVADA STATE LINE , END OF COUNTY` vs `… /END OF COUNTY` and its

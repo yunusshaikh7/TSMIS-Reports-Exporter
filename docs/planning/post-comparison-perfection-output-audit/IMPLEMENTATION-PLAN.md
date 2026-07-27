@@ -51,8 +51,14 @@ Canonical finding count carried into planning: **22 records — 20 actionable
 - **Roles are fixed for the whole program (owner decision, 2026-07-26): Claude
   implements every bundle; Codex performs both adversarial reviews on every
   bundle.** Claude never approves its own work.
-- Every bundle starts from the then-current `main`, uses its own
-  `hotfix/<bundle-id>-<slug>` branch and worktree, and merges to `main` only
+- **Work is specified as HF-nn items but branched, reviewed and merged as RB-n
+  batches** (owner decision, 2026-07-26: fewer branches, reviews and releases).
+  Six batches, twelve Codex review passes.
+- **A batch may be released to the owner before its review** under the
+  owner-authorized exception below, but at most one batch may be shipped and
+  unmerged at a time, and the full gate is never deferred.
+- Every batch starts from the then-current `main`, uses its own
+  `hotfix/<...>` branch and worktree, and merges to `main` only
   after two adversarial reviews approve it with at least one non-implementer
   approver.
 - A later bundle never branches from an unmerged earlier bundle.
@@ -134,21 +140,67 @@ missing Ramp Detail deliverables → the 1,778 prohibited images), then the
 count-affecting semantics that need owner rulings and oracle discipline, then the
 new capability, then the guards.
 
-## Agreed bundle queue
+## Work-item specs and review batches
 
-| Order | Bundle ID | Name | Canonical finding IDs | Scope style | Depends on | Branch | Status |
-|---:|---|---|---|---|---|---|---|
-| 1 | **HF-01** | Clean Road skipped-source truth and disclosure | PCOA-FINAL-010 | Report family | None | `hotfix/hf-01-clean-road-source-truth` | BLOCKED |
-| 2 | **HF-02** | Shared workbook presentation and self-description | PCOA-FINAL-008, -009, -014, -019 | Shared subsystem | None (HF-01 for the Clean Road witness) | `hotfix/hf-02-workbook-presentation` | BLOCKED |
-| 3 | **HF-03** | vs-TSN capture identity, provenance and temp hygiene | PCOA-FINAL-002, -003, -016 | Shared subsystem | None | `hotfix/hf-03-tsn-capture-provenance` | BLOCKED |
-| 4 | **HF-04** | Ramp Detail layout compatibility and same-source null parity | PCOA-FINAL-001, -012 | Report family | None | `hotfix/hf-04-ramp-detail-layout` | BLOCKED |
-| 5 | **HF-05** | Evidence eligibility, source binding and panel fidelity | PCOA-FINAL-004, -005, -006 | Shared subsystem | None | `hotfix/hf-05-evidence-binding` | BLOCKED |
-| 6 | **HF-06** | Highway Sequence self-check equation classification | PCOA-FINAL-011 | Report family (semantics) | HF-02 | `hotfix/hf-06-hsl-self-equation` | BLOCKED |
-| 7 | **HF-07** | Missing-side fast fail and export coverage truth | PCOA-FINAL-015, -018 | Shared subsystem | HF-04 | `hotfix/hf-07-fastfail-coverage` | BLOCKED |
-| 8 | **HF-08** | TSN normalization identity determinism | PCOA-FINAL-017 | Shared subsystem | HF-03 | `hotfix/hf-08-tsn-identity` | BLOCKED |
-| 9 | **HF-09** | Representation-only difference classification | PCOA-FINAL-013 | Cross-family (semantics) | HF-01, HF-02, HF-06 | `hotfix/hf-09-representation-class` | BLOCKED |
-| 10 | **HF-10** | Cross-environment PDF-vs-PDF evidence capability | PCOA-FINAL-007 | Shared subsystem (new capability) | HF-05 | `hotfix/hf-10-env-evidence` | BLOCKED |
-| 11 | **HF-11** | Source-side escalation and must-not-regress guards | PCOA-FINAL-020, -021, -022 | Program closeout | HF-06, HF-09 | `hotfix/hf-11-source-guards` | BLOCKED |
+Two layers, because the owner wants **fewer branches, reviews and releases**
+(2026-07-26) while the verified overlap map still governs *what* changes together:
+
+- an **HF-nn work-item spec** is one verified scope — root cause, files, tests,
+  oracle, acceptance. These are unchanged from the inspection above and are what
+  an implementer works from.
+- a **review batch (RB-n)** is one branch, one implementation pass, one pair of
+  Codex reviews, one merge. A batch carries one or more work-item specs.
+
+### Work-item specs
+
+| Spec | Name | Canonical finding IDs | Scope style | Batch |
+|---|---|---|---|---|
+| **HF-01** | Clean Road skipped-source truth and disclosure | PCOA-FINAL-010 | Report family | **RB-1** |
+| **HF-02** | Shared workbook presentation and self-description | PCOA-FINAL-008, -009, -014, -019 | Shared subsystem | RB-2 |
+| **HF-03** | vs-TSN capture identity, provenance and temp hygiene | PCOA-FINAL-002, -003, -016 | Shared subsystem | RB-2 |
+| **HF-04** | Ramp Detail layout compatibility and same-source null parity | PCOA-FINAL-001, -012 | Report family | RB-3 |
+| **HF-05** | Evidence eligibility, source binding and panel fidelity | PCOA-FINAL-004, -005, -006 | Shared subsystem | RB-4 |
+| **HF-06** | Highway Sequence self-check equation classification | PCOA-FINAL-011 | Report family (semantics) | RB-5 |
+| **HF-07** | Missing-side fast fail and export coverage truth | PCOA-FINAL-015, -018 | Shared subsystem | RB-6 |
+| **HF-08** | TSN normalization identity determinism | PCOA-FINAL-017 | Shared subsystem | RB-6 |
+| **HF-09** | Representation-only difference classification | PCOA-FINAL-013 | Cross-family (semantics) | RB-5 |
+| **HF-10** | Cross-environment PDF-vs-PDF evidence capability | PCOA-FINAL-007 | Shared subsystem (new capability) | RB-4 |
+| **HF-11** | Source-side escalation and must-not-regress guards | PCOA-FINAL-020, -021, -022 | Program closeout | RB-6 |
+
+### Review batches — the branch / review / merge unit
+
+| Order | Batch | Specs | Theme | Depends on | Branch | Status |
+|---:|---|---|---|---|---|---|
+| 1 | **RB-1** | HF-01 | Clean Road source truth — the owner's immediate need | None | `hotfix/hf-01-clean-road-source-truth` | BLOCKED |
+| 2 | **RB-2** | HF-02 + HF-03 | The deliverable looks right and describes itself truthfully — **56 of the 68 denials** | None (RB-1 for the Clean Road witness) | `hotfix/rb-02-deliverable-presentation` | BLOCKED |
+| 3 | **RB-3** | HF-04 | Ramp Detail — restores 9 comparison placements that produce nothing today | None | `hotfix/rb-03-ramp-detail-layout` | BLOCKED |
+| 4 | **RB-4** | HF-05 + HF-10 | Evidence, end to end: eligibility, binding, panels, and the missing cross-environment lane | None | `hotfix/rb-04-evidence` | BLOCKED |
+| 5 | **RB-5** | HF-06 + HF-09 | Difference classification — the two opposite rulings applied to the right classes | RB-1, RB-2 | `hotfix/rb-05-difference-classification` | BLOCKED |
+| 6 | **RB-6** | HF-07 + HF-08 + HF-11 | Engine hygiene, coverage truth, and the closeout guards | RB-2, RB-3, RB-5 | `hotfix/rb-06-hygiene-and-guards` | BLOCKED |
+
+**Six batches instead of eleven → twelve Codex review passes instead of
+twenty-two.** The groupings are not arbitrary; each is justified by the overlap
+map:
+
+- **RB-2** pairs the two invariance bundles. Both assert "every count, mask and
+  typed outcome is unchanged; only what the workbook *says and looks like*
+  changes", so one review can hold both to the same bar. They touch disjoint
+  files (`compare_core` + `summary_layout` vs `matrix_build` +
+  `compare_tsn_common`).
+- **RB-4** puts HF-10 with HF-05 because HF-10 already depended on it, and Codex
+  then reviews the evidence image sets **once** instead of twice.
+- **RB-5** pairs the two classification rulings deliberately: the main risk in
+  HF-06 is that its normalization leaks into the HF-09 class the owner ruled stays
+  flagged, and a single review of both is the natural place to catch that.
+- **RB-6** collects the three items with no deliverable-semantics effect.
+- **RB-1 stays alone** — it is the urgent one and must not wait on anything.
+
+**The cost, stated plainly.** RB-2 and RB-4 are the two large reviews. RB-4 is
+the heaviest in the program: an eligibility-rule change, a targeting fix, a
+truncation fix and a brand-new lane, all with "inspect every retained image"
+acceptance. If Codex denies part of a batch, the whole batch stays unmerged. If
+that becomes a problem in practice, split RB-4 back into HF-05 and HF-10 — the
+specs are already separate and need no re-planning.
 
 Allowed statuses:
 
@@ -161,22 +213,113 @@ Allowed statuses:
 - `JOINTLY APPROVED`
 - `MERGED`
 
-**Status transition rule.** On joint planner sign-off, **HF-01 becomes `READY`**
-and every other bundle stays `BLOCKED`. A bundle becomes `READY` only when every
-bundle in its `Depends on` column reads `MERGED`. This is what keeps
-implementation to one branch at a time while the user's `main` checkout stays
-usable.
+**Status transition rule.** On joint planner sign-off, **RB-1 becomes `READY`**
+and every other batch stays `BLOCKED`. A batch becomes `READY` only when every
+batch in its `Depends on` column reads `MERGED`. This keeps implementation to one
+branch at a time while the owner's `main` checkout stays usable.
+
+Statuses attach to **batches**. A batch that has been released to the owner but
+not yet reviewed stays at `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW` and records
+its shipped version in the batch row; shipping never advances a status.
+
+## Shipping a batch before Codex has reviewed it
+
+**Owner directive, 2026-07-26.** Codex usage is limited and the Clean Road fixes
+are needed soon, so a batch may be **released to the owner's own installs before
+its adversarial review**, with review and merge following afterwards. This is an
+explicit, owner-authorized exception to "no code change is authorized until its
+bundle is `READY`" — it is recorded here so the reviewer treats it as a decision,
+not a violation.
+
+### Release identity
+
+Normal full releases with a plain `MAJOR.MINOR.PATCH`, published as **full**
+GitHub releases so `/releases/latest` serves them and the in-app updater offers
+them exactly as it does any other version. No pre-release flag, no extra version
+component, no updater change.
+
+| Event | Version |
+|---|---|
+| Current `main` | `0.32.0` |
+| RB-1 shipped pre-review | `0.33.0` |
+| Codex-mandated changes to RB-1 | `0.33.1`, `0.33.2`, … |
+| RB-2 shipped | `0.34.0` |
+| …and so on, one minor per batch, patches for review fixes | |
+
+Verified against the code, so this needs no changes: `build/app.spec:40` pads the
+version into the Windows 4-tuple, `updater.parse_version` accepts the dotted
+numeric, and `is_newer` zero-pads so each release cleanly supersedes the last.
+
+### The cumulative-bundle hazard, and the rule that avoids it
+
+The updater performs a **whole-bundle swap** (`updater._BUNDLE_ITEMS` — the exe,
+`_internal`, and the two readmes). A release therefore replaces everything, so a
+release built from a branch that lacks an earlier shipped fix would silently
+**remove that fix** from the owner's install.
+
+**Rule: at most one shipped-but-unmerged batch at a time.** A batch may be
+*implemented* while an earlier one awaits review, but it may not be *released*
+until the earlier batch is merged to `main`. Every release is therefore built from
+a branch whose base already contains every previously released fix, and the
+plan's "each batch branches from the latest `main`" rule stays intact.
+
+If Codex ever backs up by more than one batch and something is urgent, the escape
+hatch is a throwaway `release/preview-<version>` branch that merges the
+shipped-but-unmerged hotfix branches purely to build from — never merged to
+`main`, deleted once the real merges land. Use it only when the simple rule is
+genuinely blocking, and record it in that batch's `IMPLEMENTATION.md`.
+
+### What must still be true before a pre-review release
+
+Deferring the *adversarial review* is the whole exception. Nothing else is
+deferred:
+
+1. The full gate is green — `build/run_checks.py -j 4 -k`, `compileall`, `ruff`,
+   `build.ps1 -SelfTest`. Shipping unreviewed is one risk; shipping ungated is a
+   different and unacceptable one.
+2. The batch's own acceptance run is complete and every measurable criterion in
+   its spec passes, with witnesses retained.
+3. `hotfix-bundles/<ID>/IMPLEMENTATION.md` is written before the tag, not after.
+4. `CHANGELOG.md` has that version's section (it is the source of the release
+   body via `build/gen_release_notes.py`).
+5. The release notes state plainly that the build **has not yet passed
+   adversarial review**, and name the batch.
+6. The batch status in this plan becomes
+   `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW` and its row records the shipped
+   version. It does **not** become `MERGED`.
+7. Tag from the batch branch and push the tag explicitly
+   (`git push origin refs/tags/v0.33.0`) — a release branch shares the tag name,
+   so an implicit push will not carry it.
+
+### If a shipped batch is later denied
+
+The owner is then running code that failed review, so that takes priority over
+starting the next batch. The remedy is a **patch bump** (`0.33.1`) carrying the
+required changes — never un-publishing the release, which would leave the install
+with no update path. Record the denial, the shipped version, and the remedying
+version in the batch's `REVIEW.md`.
+
+### One caveat specific to RB-1
+
+Clean Road output changes with this batch, and any comparison the owner generates
+from the pre-review build is produced under a design Codex has not yet approved.
+If review forces a different marker or disclosure design, those workbooks need
+regenerating. Worth knowing before running a statewide set on it.
 
 ## Proposed merge order
 
-`HF-01 → HF-02 → HF-03 → HF-04 → HF-05 → HF-06 → HF-07 → HF-08 → HF-09 →
-HF-10 → HF-11`
+`RB-1 → RB-2 → RB-3 → RB-4 → RB-5 → RB-6`
 
-Queue order and merge order are identical by construction: each bundle branches
+Batch order and merge order are identical by construction: each batch branches
 from the `main` produced by its predecessor's merge, so no rebase of an unmerged
-hotfix is ever required. HF-03, HF-04 and HF-05 have no inbound dependency and
-may be resequenced among themselves if the owner's priority changes, provided
-HF-05 still precedes HF-10 and HF-04 still precedes HF-07.
+hotfix is ever required. RB-2, RB-3 and RB-4 have no inbound dependency and may
+be resequenced among themselves if the owner's priority changes, provided RB-2
+still precedes RB-5 and RB-3 still precedes RB-6.
+
+Merging may lag shipping — see
+[Shipping a batch before Codex has reviewed it](#shipping-a-batch-before-codex-has-reviewed-it)
+— but the merge *order* never changes, and at most one batch may be shipped and
+unmerged at a time.
 
 ## Finding coverage — every canonical finding exactly once
 
@@ -300,21 +443,46 @@ and stop asserting the skipped anchors), `build/check_clean_road.py` (red→gree
 and — only if the design below requires it — one additive opt-in
 `CompareSchema` field in `scripts/compare_core.py`.
 
-**Planner design sketch (not binding).** Two acceptance branches exist; only one
-satisfies both sentences of the oracle. Recommended: (i) `_read_span_layer`
-records each unusable-PM span with its layer, route, county, prefix and the
-measures it did have; (ii) the build's marker sheet, message, `PARTIAL`
-completion and `clean_road_build` sidecar carry the count and the reason;
-(iii) the affected anchors are emitted with a reserved *unavailable* token rather
-than an empty cell, and the schema declares that token **non-asserting** so those
-cells render as `N`, display the reason, and leave the difference count — the
-per-cell precedent is the ditto `N` at `compare_core.py:1648-1650`, and this is
-exactly the "opt-in `CompareSchema` for report-specific behavior" carve-out;
-(iv) Summary and Notes state the skipped-row count, the affected anchor count and
-why. Fallback if the owner refuses any engine hook: disclosure only, which
-satisfies branch (b) but leaves the 161 visible — a reviewer must then record
-that the oracle's second sentence is unmet. **This is the bundle's one open
-design question and is listed in the challenge log.**
+**✅ Owner ruling — 2026-07-26: MARK THE SKIPPED ANCHORS (option (a)).** The
+owner reviewed the real cells and ruled the marker design, not disclosure-only.
+Required behaviour:
+
+1. `_read_span_layer` records each unusable-PM span with its layer, route,
+   county, prefix and the measures it did have.
+2. The build's marker sheet, result message, `PARTIAL` completion and
+   `clean_road_build` sidecar carry the count and the reason.
+3. The affected anchors are emitted with a reserved **unavailable** token instead
+   of an empty cell, and the schema declares that token **non-asserting**, so
+   those cells render as `N`, display the reason, and **leave the difference
+   count**. The per-cell precedent is the ditto `N` at
+   `compare_core.py:1648-1650`; this is the "opt-in `CompareSchema` for
+   report-specific behavior" carve-out and must be inert for every other schema.
+4. Summary and Notes state the skipped-source-row count, the affected anchor
+   count and why.
+
+**The evidence the ruling was made on** (Codex's exact-anchor join,
+`clean-road-comparison-unlocatable-impact.json`): 165 cells over 83 rows;
+`arcgis_blank_at_anchor` 162 / `arcgis_older_or_alternate_at_anchor` 3;
+`exact_false_positive` 161 / `materially_misrepresented_difference` 4; affected
+fields `THY_LT_TRAV_WAY_WIDTH_AMT` 82, `THY_LT_LANES_AMT` 81,
+`THY_RT_O_SHD_TOT_WIDTH_AMT` 1, `THY_RT_O_SHD_TRT_WIDTH_AMT` 1.
+
+| Case | Workbook today | TSN | Raw ArcGIS at the anchor | Class |
+|---|---|---|---|---|
+| row 18862 · `036 / HUM / 20.422` · `THY_LT_TRAV_WAY_WIDTH_AMT` | `(blank) ≠ 12` red | `12` | **`12`** (`SHS Travel Way L`, raw row 19778) | false positive — the systems agree |
+| row 18862 · same row · `THY_LT_LANES_AMT` | `(blank) ≠ 1` red | `1` | **`1`** | false positive |
+| row 19119 · `036 / TEH / 40.15` · `THY_LT_TRAV_WAY_WIDTH_AMT` | `(blank) ≠ 24` red | `24` | **`12`** @ 40.18, `24` @ 40.298 | real difference, hidden behind a blank |
+| row 14048 · `016 / YOL / 18.926` · `THY_RT_O_SHD_TOT_WIDTH_AMT` | `4 ≠ 5` red | `5` | **`5`** (older/alternate value painted) | false positive |
+
+Codex also scanned the published Summary and Notes for ten terms — `unlocat`,
+`missing pm`, `pm endpoint`, `locerror`, `skipped source`, … — and matched
+**zero cells**; `skipped_unlocatable_rows_disclosed` is `false`. So today the
+deliverable discloses none of this while Summary defines `(blank)` as "empty in
+the system".
+
+Disclosure-only was rejected because it tells a reader that 165 of the 291,292
+cells are suspect without telling them **which** — the marker identifies each one
+in place.
 
 **Migration / compatibility.** The build workbook gains a marker-sheet/sidecar
 field; `tsn_load_clean_road`'s normalizer and the marker version (`v1`) are
@@ -795,22 +963,36 @@ TSMIS side, which has a fixed grid, is boxed correctly. (c)
 ellipsis (header label capped at 24 on `:1266`), so 8 of 190 rendered examples
 endorse a **different string** than the one compared.
 
-**⚠ Owner policy gate — resolve before implementation.** The audit's eligibility
-rule (Prompt 01 item 10 / neutral scope rule 11: evidence is prohibited whenever
-either semantic side is a normalized XLSX) and the finding's acceptance oracle
-(each read-set member must be *the exact artifact its side was compared from*)
-are not the same rule. Read literally, the first would retire essentially the
-entire shipped evidence feature — every vs-TSN cell and all five SELF cells —
-including the CMP-AUD-210 Excel-side binding and the v0.32.0 `excel_column_for`
-work that `check_evidence_source_role.py` locks in. The oracle, by contrast, is
-satisfiable while keeping the feature: evidence each side **from the document that
-side was compared from** (an Excel-compared side from its workbook; the TSN side
-from the normalized workbook it was actually read from), never from a borrowed
-sibling print, and stop asserting sources that were not read. **Stage 4 must not
-choose between these on its own.** The implementer records the owner's ruling in
-`IMPLEMENTATION.md` before changing eligibility; without a ruling, implement the
-oracle (exact-source binding + honest prose + no artifact when a side cannot be
-bound) and leave feature retirement unshipped.
+**✅ Owner ruling — 2026-07-26: EXACT-SOURCE, keep the feature.** The audit's
+eligibility rule (Prompt 01 item 10 / neutral scope rule 11: evidence is
+prohibited whenever either semantic side is a normalized XLSX) and the finding's
+acceptance oracle (each read-set member must be *the exact artifact its side was
+compared from*) are not the same rule. Read literally, the first would retire
+essentially the entire shipped evidence feature — every vs-TSN cell and all five
+SELF cells — including the CMP-AUD-210 Excel-side binding and the v0.32.0
+`excel_column_for` work that `check_evidence_source_role.py` locks in. **The owner
+has ruled the oracle**: evidence each side from the document that side was
+compared from, never from a borrowed sibling print, and stop asserting sources
+that were not read. Feature retirement is **not** shipped.
+
+**The evidence the ruling was made on** — the existing
+`ssor-prod_highway_log_tsn` set, route 101 @ `011.603R`
+(`Description_1_stacked.png`) and its manifest:
+
+| Observation | Detail |
+|---|---|
+| Manifest read set | **13 entries: 1 consolidated XLSX + 12 TSN district PDFs.** The normalized TSN workbook the comparison actually compared against is *not* in it |
+| Top panel | `TSMIS (Excel) — highway_log_consolidated.xlsx · Highway Log!AD31200` — honest; the comparison did read that workbook |
+| Bottom panel | `TSN — D07 Highway Log TSN.pdf · page 144` — **not the compared document.** It is the raw input the normalized workbook was built from, so the values agree, but it is not what was read |
+| Excel cell drawn | `RIVERSIDE DR OFF RAMP  , O` — cut at 26 characters with no ellipsis, while the caption above carries the full `RIVERSIDE DR OFF RAMP , OC 53-1493` (finding 006, this exact cell) |
+
+**Required behaviour.** That image keeps existing: the TSMIS panel is unchanged,
+the TSN panel is redrawn from the **normalized workbook that was compared** (the
+same panel style the Excel side already uses), the truncation is fixed, and the
+workbook stops claiming "the compared cell in each source PDF" or declaring a
+`TSMIS PDFs:` directory it never read. Where a side cannot be bound to the
+document it was compared from, **no artifact of any kind is emitted** — manifest
+included.
 
 **Files expected to change.** `scripts/visual_evidence.py`, the
 `scripts/evidence_*.py` adapters (targeting), `scripts/matrix_build.py`
@@ -1550,13 +1732,18 @@ route-140 raw census.
 1. **Planning (this stage).** `planning/post-comparison-hotfix-bundles` off
    `main`, documentation only. On joint agreement it merges to `main` without
    force (after confirming remote `main` has not diverged) and is deleted.
-2. **Per bundle.** From the latest `main`:
-   `git worktree add ../TSMIS-hotfix-<id> -b hotfix/<bundle-id>-<slug> main`.
+2. **Per batch.** From the latest `main`:
+   `git worktree add ../TSMIS-hotfix-<id> -b hotfix/<batch-branch> main`.
    A separate worktree is preferred so the user's normal checkout stays usable;
    never switch or clean a dirty user worktree.
-3. **During Stage 4.** Only that bundle's agreed surface changes. The branch is
+3. **During Stage 4.** Only that batch's agreed surface changes. The branch is
    pushed if the remote is available and unchanged. It is never merged by the
    implementer.
+3b. **Optional pre-review release.** Bump `version.py`, add the `CHANGELOG.md`
+   section, tag on the batch branch, and push the tag explicitly
+   (`git push origin refs/tags/v<version>`) — a release branch shares the tag
+   name, so an implicit push will not carry it. Publish as a **full** GitHub
+   release so the in-app updater offers it. The branch still is not merged.
 4. **During Stage 5.** A `DENIED` review returns to Stage 4 on the **same**
    branch. Two approvals with at least one non-implementer approver are required
    to merge.
@@ -1592,9 +1779,11 @@ blocked by this program.
 
 ## Definition of done — whole program
 
-1. All eleven bundles read `MERGED`, each implemented by Claude and approved by
-   two Codex reviews — so every bundle has two adversarial approvals and no
-   approver was its implementer.
+1. All six batches read `MERGED`, each implemented by Claude and approved by two
+   Codex reviews — so every batch has two adversarial approvals and no approver
+   was its implementer. **Every batch released to the owner before review has
+   since been reviewed and merged** (or superseded by a patch release that was),
+   with no shipped-but-unreviewed work outstanding.
 2. Every canonical finding's acceptance oracle is demonstrated on the frozen
    archive, with its committed witness under `hotfix-bundles/<ID>/witness/`.
 3. The 88-decision topology is re-adjudicated: every decision denied in Stage 2
@@ -1628,17 +1817,19 @@ blocked by this program.
 |---|---|---|---|
 | Split presentation into statewide-summary and large/detail, as the prompt's likely shape suggests? | **No.** Both classes are produced by the same `compare_core` writers; both need `_write_summary`'s `B` width (`:2998`) and the composite key column (`:2015`, `:2170`). Two branches would edit the same statements | PENDING | PENDING |
 | Should Clean Road (HF-01) also carry its own clipping fix so the user's sheet is complete in one bundle? | **No.** Clipping is one canonical finding (009) covering every family; fixing it inside HF-01 would put shared-writer changes in bundle 1. Instead HF-02 is sequenced second and must regenerate the merged HF-01 pair as its witness | PENDING | PENDING |
-| HF-01's design: can the 161 false positives fall to zero without an engine hook? | **Probably not.** Disclosure alone satisfies oracle branch (b) but not its second sentence. The recommended path marks the skipped anchors non-asserting via one opt-in `CompareSchema` field, on the per-cell ditto `N` precedent (`compare_core.py:1648-1650`). Odometer-based placement is forbidden by the build model | PENDING | PENDING |
+| HF-01's design: can the 161 false positives fall to zero without an engine hook? | **RULED AND CLOSED by the owner, 2026-07-26 on the real cells: mark the anchors (option (a)).** Disclosure alone tells a reader that 165 of 291,292 cells are suspect without saying which. The marker rides one opt-in `CompareSchema` field on the per-cell ditto `N` precedent (`compare_core.py:1648-1650`) and must be inert for every other schema. Odometer/AR placement stays forbidden by the build model | N/A — settled by the owner on rendered evidence | N/A |
 | Normalize or disclose the Highway Sequence self-check equates (HF-06)? | **RULED AND CLOSED by the owner, 2026-07-26 after reviewing the rendered cells: NORMALIZE to zero.** Route 001's five differing cells are the moved `E` suffix, the non-repeated HG/FT, and a prepended `EQUATES TO` — none is a disagreement about the road, and the print's red/green equate colouring cannot exist in an XLSX at all. Must be pair-aware (a per-cell rule cannot close `PM Suffix`), opt-in, proved by an independent oracle over all 60,254 rows, with vs-TSN counts frozen and an anti-suppression fixture per case | N/A — settled by the owner on rendered evidence | N/A |
 | Isn't that inconsistent with the HF-09 ruling? | **No — the two classes differ in kind, and the owner ruled each on its own evidence.** HF-09 is two independent sources ten months apart whose text genuinely differs (`,` vs `/`) → stays flagged. HF-06 is one pull rendered twice, where every piece of information is present on both sides but placed differently within a two-row pair → normalized. HF-06 must not widen into the HF-09 class | N/A | N/A |
 | Disclosure or normalization for representation-only Description differences (HF-09)? | **RULED AND CLOSED by the owner, 2026-07-26: disclosure only — the cells stay flagged and counted.** The comma-vs-slash Highway Log class (1,243 per format) and its siblings keep their red `D` state and stay in every total; HF-09 adds a count line and may not touch equality. This matches Stage 2's refusal to impose a new equality rule and the shipped `_quote_note` decision | N/A — settled by the owner | N/A |
-| Is the audit's evidence-eligibility rule a product requirement (HF-05)? | **Escalate, do not decide.** Applied literally it retires nearly the whole shipped evidence feature, including CMP-AUD-210's Excel-side binding and v0.32.0's `excel_column_for`. The finding's own oracle (exact-source binding) is satisfiable without that. Recorded as an owner policy gate; absent a ruling, implement the oracle | PENDING | PENDING |
+| Is the audit's evidence-eligibility rule a product requirement (HF-05)? | **RULED AND CLOSED by the owner, 2026-07-26: exact-source, keep the feature.** Applied literally the audit rule retires nearly the whole shipped evidence feature, including CMP-AUD-210's Excel-side binding and v0.32.0's `excel_column_for`. The finding's own oracle is satisfiable without that: each side evidenced from the document it was compared from, no borrowed sibling prints, no prose asserting unread sources, and no artifact at all where a side cannot be bound | N/A — settled by the owner on the route-101 image and its manifest | N/A |
 | 001 and 012 in one bundle? | **Yes, mandatory.** 012 is unobservable until 001 lands and the finding states that fixing 001 alone creates a new defect (108 false discrepancies on a same-source check) | PENDING | PENDING |
-| 015 and 018 together — unrelated fixes? | **Accepted as one bundle.** Two disjoint files, no workbook/count/image effect, one coherent theme (tell the user immediately, and tell them at all). If the second planner disagrees, split into HF-07a/HF-07b without changing any other boundary | PENDING | PENDING |
+| 015 and 018 together — unrelated fixes? | **Accepted, and the owner then batched them with 017 and the closeout guards into RB-6.** All five items are disjoint files with no workbook/count/image effect. Note the one ordering risk inside RB-6: 017's root cause is an unverified hypothesis, so implement 015/018/021/022 first and split 017 out if its cause cannot be established, rather than letting it hold the batch | PENDING | PENDING |
 | Per-bundle `BUNDLE.md` at Stage 3 or Stage 4? | **This plan's section is the frozen contract**; `BUNDLE.md` is transcribed from it at the start of each Stage 4 with only base SHA/implementer/reviewer filled. Writing eleven near-duplicate contracts now would create a second authority that drifts — the failure mode the predecessor project logged repeatedly. `HF-01/BUNDLE.md` exists because it is the first `READY` bundle | PENDING | PENDING |
 | Who implements and who reviews? | **Settled by owner decision (2026-07-26): Claude implements all eleven bundles; Codex performs both reviews on every bundle.** Codex is therefore never the implementer, so Prompt 05's "at least one non-implementer approver" holds everywhere and Claude never approves its own work. The cost is that both reviews come from one agent — review 2 must re-derive independently and name what review 1 missed, not restate it | PENDING | PENDING |
 | Does Codex-only review weaken the Claude-unique findings? | **It is a scheduling constraint, not a soundness one.** For PCOA-FINAL-003, -006, -014, -015, -017, -018, -019 and -022 the durable witness is Claude's, but the firewall has ended, the key witnesses are committed in-repo, and Prompt 05 item 5 independently requires the reviewer to recount from raw rather than trust any prior parser. Each affected bundle names the exact witness Codex must bind to | PENDING | PENDING |
-| Are eleven bundles too many? | **No.** Each is one implementation pass with one complete adversarial output review, and the map shows only five same-file overlaps, all on disjoint functions in merge order. Fewer bundles would mix normalization behaviour, evidence policy, visual cleanup and source-row correctness — which the prompt forbids | PENDING | PENDING |
+| Six review batches instead of eleven bundles? | **Owner directive, 2026-07-26: fewer branches, reviews and releases, because Codex usage is limited.** The verified HF-nn specs are unchanged and still govern what changes together; batching only changes the branch/review/merge unit — 12 Codex passes instead of 22. Named cost: RB-4 (all evidence) and RB-2 are large reviews, and a partial denial holds a whole batch. RB-4 splits back into HF-05 + HF-10 with no re-planning if that bites | PENDING | PENDING |
+| Releasing a batch to the owner before Codex reviews it? | **Owner directive, 2026-07-26.** Explicit, authorized exception to the `READY` gate, recorded so the reviewer treats it as a decision. Bounded by: at most one shipped-but-unmerged batch; the full gate, the acceptance run and `IMPLEMENTATION.md` are never deferred; the release notes say it is unreviewed; a denial is remedied by a patch release, never by un-publishing. The cumulative-bundle hazard is real — the updater swaps the whole bundle — which is what the one-at-a-time rule exists to prevent | PENDING | PENDING |
+| Are eleven bundles too many? | **Superseded by the batching directive above; kept for the record.** **No.** Each is one implementation pass with one complete adversarial output review, and the map shows only five same-file overlaps, all on disjoint functions in merge order. Fewer bundles would mix normalization behaviour, evidence policy, visual cleanup and source-row correctness — which the prompt forbids | PENDING | PENDING |
 | Does any bundle leave `main` unreleasable? | **No.** HF-04 is the only one that changes an input contract, and it must accept both censused layouts rather than swapping one pinned layout for another; HF-08 forces exactly one disclosed re-comparison; every other bundle is additive or presentation-only | PENDING | PENDING |
 
 ## Joint planning approval

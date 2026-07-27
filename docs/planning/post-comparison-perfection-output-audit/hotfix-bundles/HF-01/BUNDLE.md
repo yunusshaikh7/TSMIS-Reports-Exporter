@@ -10,7 +10,8 @@ sign [IMPLEMENTATION-PLAN.md](../../IMPLEMENTATION-PLAN.md))
 
 | Field | Value |
 |---|---|
-| Queue order | **1 — first implementation bundle** |
+| Queue order | **1 — first implementation batch (RB-1 = HF-01 alone)** |
+| Pre-review release | **Permitted** (owner directive 2026-07-26). Ship as full release **`v0.33.0`**, tagged on this branch, so the in-app updater offers it; branch stays unmerged until Codex approves. All conditions in the plan's *Shipping a batch before Codex has reviewed it* section apply |
 | Branch | `hotfix/hf-01-clean-road-source-truth` |
 | Base `main` commit | PENDING (the `main` head at branch time; plan drafted against `a29bdb6`) |
 | Canonical finding IDs | **PCOA-FINAL-010** (P1) |
@@ -72,27 +73,46 @@ raw ArcGIS `1/12`, workbook shows ArcGIS blank), spanning 165 `D` cells / 83
 comparison rows / 87 source endpoints; 162 display a blank ArcGIS side and three
 an older or alternate value.
 
-## Design gate (resolve before coding)
+## Design — RULED by the owner, 2026-07-26
 
-Two acceptance branches exist and only one satisfies both sentences of the
-oracle:
+**Mark the skipped anchors (option (a)).** Disclosure-only was rejected because it
+tells a reader that 165 of the 291,292 cells are suspect without saying which.
+Required:
 
-- **Recommended — suppress + disclose.** (i) `_read_span_layer` records each
-  unusable-PM span with its layer, route, county, prefix and the measures it did
-  have; (ii) the marker sheet, result message, `PARTIAL` completion and sidecar
-  carry the count and reason; (iii) the affected anchors are emitted with a
-  reserved *unavailable* token instead of an empty cell and the schema declares
-  that token **non-asserting**, so those cells render `N`, show the reason, and
-  leave the difference count; (iv) Summary and Notes state the skipped-source-row
-  count, the affected anchor count and why.
-- **Fallback — disclosure only**, if the owner refuses any engine hook. This
-  satisfies oracle branch (b) but leaves the 161 visible; the reviewer must then
-  record explicitly that the oracle's second sentence is unmet.
+1. `_read_span_layer` records each unusable-PM span with its layer, route, county,
+   prefix and the measures it did have.
+2. The marker sheet, result message, `PARTIAL` completion and the
+   `clean_road_build` sidecar carry the count and the reason.
+3. The affected anchors are emitted with a reserved **unavailable** token instead
+   of an empty cell, and the schema declares that token **non-asserting** — those
+   cells render `N`, show the reason, and leave the difference count. The
+   mechanism is one opt-in `CompareSchema` field on the per-cell ditto `N`
+   precedent (`compare_core.py:1648-1650`) and **must be inert for every schema
+   that does not set it**.
+4. Summary and Notes state the skipped-source-row count, the affected anchor count
+   and why.
 
-The implementer records which branch the owner ruled for in `IMPLEMENTATION.md`
-before changing comparison output. If the verified root cause or the required
-design differs materially from this section, **stop and return the bundle to
-Stage 3** rather than expanding scope (Prompt 04 rule).
+Odometer/AR-based placement of a missing endpoint remains forbidden — the build
+model keys on county + PM prefix + postmile and never on odometers.
+
+**The ruled-on evidence** (Codex `clean-road-comparison-unlocatable-impact.json`;
+165 cells / 83 rows; blank-at-anchor 162, older-or-alternate 3; false positives
+161, misrepresented 4):
+
+| Case | Workbook today | TSN | Raw ArcGIS at the anchor |
+|---|---|---|---|
+| row 18862 · `036 / HUM / 20.422` · `THY_LT_TRAV_WAY_WIDTH_AMT` | `(blank) ≠ 12` | `12` | **`12`** (`SHS Travel Way L`, raw row 19778) |
+| row 18862 · same row · `THY_LT_LANES_AMT` | `(blank) ≠ 1` | `1` | **`1`** |
+| row 19119 · `036 / TEH / 40.15` · `THY_LT_TRAV_WAY_WIDTH_AMT` | `(blank) ≠ 24` | `24` | **`12`** @ 40.18, `24` @ 40.298 — a real difference hidden behind a blank |
+| row 14048 · `016 / YOL / 18.926` · `THY_RT_O_SHD_TOT_WIDTH_AMT` | `4 ≠ 5` | `5` | **`5`** — an older/alternate value was painted |
+
+A term scan of the published Summary and Notes (`unlocat`, `missing pm`,
+`pm endpoint`, `locerror`, `skipped source`, …) matched **zero cells**;
+`skipped_unlocatable_rows_disclosed` is `false`.
+
+If the verified root cause or the required design differs materially from this
+section, **stop and return the bundle to Stage 3** rather than expanding scope
+(Prompt 04 rule).
 
 ## Migration and compatibility
 
