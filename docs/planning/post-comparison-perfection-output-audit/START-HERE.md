@@ -27,9 +27,13 @@ canonical findings mapped to exactly one primary bundle, a merge order, a
 branch/worktree lifecycle, and a whole-program definition of done. The second
 planner challenges bundle size, ordering, overlaps, missing findings and
 acceptance tests; verifies Clean Road stays first; and either revises or signs.
-The plan's challenge log carries the open questions, including three owner policy
-gates (Clean Road skipped-anchor display, the evidence-eligibility rule, and
-disclosure-vs-normalization for representation-only differences).
+The plan's challenge log carries the open questions, including **two remaining
+owner policy gates** — the Clean Road skipped-anchor display (HF-01) and whether
+the audit's evidence-eligibility rule is a product requirement (HF-05). A third
+is **ruled and closed**: representation-only Description differences
+(the comma-vs-slash class and its siblings, PCOA-FINAL-013 / HF-09) stay
+**flagged and counted** — that bundle adds a disclosure count line and may not
+change equality.
 
 **No code change is authorized until both planners sign and `HF-01` reads
 `READY`.**

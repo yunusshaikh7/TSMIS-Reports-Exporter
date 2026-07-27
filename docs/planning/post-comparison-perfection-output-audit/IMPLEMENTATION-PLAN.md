@@ -91,7 +91,7 @@ this commit and are anchors, not contracts).
 | **011** | `compare_highway_sequence_pdf.py` — `_SS_SCHEMA:156`, `_tsmis_row_same_source:118`, `_load_tsmis_same_source:147`, and `_NOTES_PDF_VS_EXCEL:78-107`, which *already* describes the equate class in prose while the totals stay unqualified | Highway Sequence self only | Count-affecting → Phase-3 decision gates. Establishes the disclosed-class pattern HF-09 reuses | **Own bundle.** Family-local file, but equality/count semantics — it must not travel with presentation work |
 | **015, 018** | 015: `compare_env.EnvComparator.compare_folders:1033` — both sides' member lists already exist at `:1065-1066`, yet side A is loaded first at `:1139+` and emptiness is never checked. 018: `report_catalog.ExportEntry:88` has no export-only field, `MATRIX:381`, the picker derivation `:570-576`, `reports.py`, `scripts/ui/`, and `build/check_report_wiring.py` (already derives required touchpoints) | 015: all statewide PDF families. 018: `ramp_summary_excel`, `intersection_summary_pdf`, `highway_summary` | 015 shares `compare_env.py` with 001 (different function) — sequence after HF-04 | **One bundle.** Both are "the app must tell the user the truth immediately / at all"; neither touches a workbook cell, a count, or an image. Two disjoint files, one review |
 | **017** | `tsn_library.build_consolidated:909`, `_write_normalized_workbook:1152`, `normalized_workbook_identity:249`; `report_catalog.TSN` `normalization_version` (D2 auto-rebuild) | All 8 TSN datasets | Root cause is an explicit hypothesis — Stage 4 must establish it first | **Own bundle.** Invalidates every bound comparison generation, so its blast radius is the whole vs-TSN surface and it needs its own review |
-| **013** | Per-family classification + Summary/Notes disclosure across `compare_highway_log.py`, `compare_highway_sequence_tsn.py`, `compare_intersection_detail_tsn.py`, `compare_ramp_detail_pdf.py`, `compare_clean_highway_tsn.py`, likely one shared opt-in `CompareSchema` field and `compare_core._write_summary` | HL, HSL, ID (both), RD-PDF, Clean Road | Touches `_write_summary` (HF-02) and Clean Road Notes (HF-01) — must follow both. Needs an **owner policy gate** | **Own bundle, late.** Five families plus a disclosure-vs-normalization decision; mixing it into a presentation bundle is exactly what the prompt forbids |
+| **013** | Per-family classification + Summary/Notes disclosure across `compare_highway_log.py`, `compare_highway_sequence_tsn.py`, `compare_intersection_detail_tsn.py`, `compare_ramp_detail_pdf.py`, `compare_clean_highway_tsn.py`, likely one shared opt-in `CompareSchema` field and `compare_core._write_summary` | HL, HSL, ID (both), RD-PDF, Clean Road | Touches `_write_summary` (HF-02) and Clean Road Notes (HF-01) — must follow both. **Owner ruling 2026-07-26: disclosure only, the cells stay flagged** | **Own bundle, late.** Five families' Summary/Notes disclosure; mixing it into a presentation bundle is exactly what the prompt forbids. Now the lowest-risk semantics bundle — no count moves |
 | **007** | `matrix_build.build_cell_comparison:561` takes no evidence argument (verified); a third evidence flavor is needed beside `FLAVOR_TSN`/`FLAVOR_SELF` (`visual_evidence.py:159-161`), plus `matrix_state`/`gui_matrix` toggle+camera plumbing | Ramp Summary, RD-PDF, ID-PDF, HL-PDF, HSL-PDF — Everything ENV | **Depends on HF-05**: the new capability must satisfy 004's exact-source test and 005's targeting assertion at birth | **Own bundle, last of the code work.** It is a new capability, not a repair; building it before the renderer contract is fixed would ship the same defects into a new lane |
 | **020, 021, 022** | No product behavior change. 020 is a vendor escalation record; 021 and 022 are must-not-regress guards that exist only as audit prose today (HL PDF-only rows; HSL pre/post re-skin print layouts + the leading `GENERATE` line) | HL both editions; the four re-skinned print families | 021/022 guard parsers that HF-06 and HF-09 touch — land the guards last so they lock the final state | **Own bundle, closeout.** Turning two prose guards into executable checks is real work and deserves its own review |
 
@@ -1204,11 +1204,13 @@ Direct, By Day and Everything vs TSN plus the Clean Road comparison: Highway Log
 1,243 × 2 formats, Highway Sequence 11 × 2, Ramp Detail (PDF) 2, Intersection
 Detail 1 × 2, Clean Road Highway 5.
 
-**Explicitly out of scope.** Suppressing the KER 046 `''F'' ST` vs `"F" ST` pair,
-which the product already deliberately annotates through the evidence
-`_quote_note` — suppressing it would reverse a shipped decision; any equality
-change not separately approved; the Highway Sequence self-check equation class
-(HF-06); route 140's missing columns (HF-11 / vendor).
+**Explicitly out of scope.** **Any equality, normalization or count change
+whatsoever** — the owner ruling above closes that branch, so a diff that removes
+even one cell from a published total is scope leakage and a reviewer must reject
+it. Also out of scope: suppressing the KER 046 `''F'' ST` vs `"F" ST` pair, which
+the product already deliberately annotates through the evidence `_quote_note`;
+the Highway Sequence self-check equation class (HF-06); route 140's missing
+columns (HF-11 / vendor).
 
 **Verified root cause.** The differences are **real literal differences between
 two sources** — normalization is not the cause (all 15,410 Ramp Detail and all
@@ -1218,12 +1220,22 @@ appears in *both* fresh export formats, ruling out a PDF-extraction artifact).
 The defect is that unqualified headline totals do not distinguish this exactly
 measured punctuation/case/quote/presentation class from substantive data changes.
 
-**⚠ Owner policy gate.** The oracle offers disclosure **or** a separately
-approved normalization. Disclosure is the low-risk branch and is strongly
-preferred by this plan: a normalization change moves equality, is governed by the
-`compare_core` correctness lock and the Phase-3 gates, and would need
-cell-for-cell proof plus canary re-blesses across five families. Stage 4 records
-the ruling before implementing; absent a ruling, implement disclosure.
+**✅ Owner ruling — 2026-07-26: DISCLOSURE ONLY. These differences stay
+flagged.** The oracle offered disclosure **or** a separately approved
+normalization; the owner has ruled that the punctuation/case/quote/slash class
+must remain counted and visible, so the normalization branch is **closed** and no
+equality change may be proposed under this bundle. Concretely: the comma-vs-slash
+Description pairs (`NEVADA STATE LINE , END OF COUNTY` vs
+`NEVADA STATE LINE /END OF COUNTY`, 1,243 per format), `SLO SB CO LINE` vs
+`SLO/SB CO LINE`, `CITRUS AVE OC 54-1293` vs `Citrus Ave OC 54-1293`,
+`NB OFF TO S. GEYSERVILLE` vs `NB OFF TO S.GEYSERVILLE`, `''F'' ST` vs `"F" ST`,
+and the Clean Road leading-apostrophe landmarks all keep their red `D` state and
+stay inside every published total. The bundle adds a **count line**, nothing
+more.
+
+This is consistent with Stage 2, which explicitly declined to impose a new
+equality rule ("the literal differences remain truthful"), and with the shipped
+`_quote_note` decision for KER 046, which treats such a pair as worth *showing*.
 
 **Files expected to change.** `scripts/compare_highway_log.py`,
 `scripts/compare_highway_sequence_tsn.py`,
@@ -1232,12 +1244,12 @@ the ruling before implementing; absent a ruling, implement disclosure.
 plus a shared opt-in classifier hook (likely one `CompareSchema` field and its
 Summary rendering in `scripts/compare_core.py`), plus checks.
 
-**Migration / compatibility.** Under disclosure, no count moves and every
-committed generation stays valid — the workbook simply says more. Under
-normalization, every affected family's counts move and every affected canary must
-be re-blessed; the plan requires that branch to be split per family if the owner
-chooses it, and the bundle returns to Stage 3 for re-planning rather than
-absorbing five families of equality change in one pass.
+**Migration / compatibility.** Under the ruled disclosure branch **no count
+moves**, no canary moves, and every committed comparison generation stays valid —
+the workbook simply says more about a total it already published. That makes this
+the lowest-risk of the semantics bundles. If implementation discovers that
+disclosure is impossible without touching equality, it **stops and returns the
+bundle to Stage 3** rather than proceeding (Prompt 04 rule).
 
 **Tests to add.** Per family: a fixture pair differing only in punctuation, case,
 quote style or landmark edge presentation is counted (disclosure branch) **and**
@@ -1275,17 +1287,20 @@ family's `check_compare_*`.
 
 **Measurable acceptance criteria.**
 1. Summary and Notes disclose the representation-only class and its exact count
-   separately from substantive differences, per family — or, under an approved
-   normalization, counts move by exactly the proved deltas with re-blessed
-   canaries and cell-for-cell evidence.
-2. The disclosed counts equal an independently derived census.
-3. No undisclosed equality change; no corrected differing-row total asserted.
-4. The `_quote_note` behaviour is preserved.
-5. Families that do not set the hook are byte-identical.
-6. Full gate green; every new fixture fails pre-fix.
+   separately from substantive differences, per family. (The oracle's
+   normalization alternative is closed by owner ruling.)
+2. **Every affected cell is still flagged**: each of the 1,243 ×2 / 11 ×2 / 2 /
+   1 ×2 / 5 cells keeps its red `D` state, and every published differing-cell and
+   differing-row total is **numerically unchanged** from pre-fix, proved per
+   family.
+3. The disclosed counts equal an independently derived census.
+4. No equality change of any kind; no corrected differing-row total asserted.
+5. The `_quote_note` behaviour is preserved.
+6. Families that do not set the hook are byte-identical.
+7. Full gate green; every new fixture fails pre-fix.
 
-**Rollback.** Revert the merge commit. Under disclosure this only removes the
-extra lines; under normalization it re-publishes the prior counts — record which.
+**Rollback.** Revert the merge commit; because no count moves, this only removes
+the disclosure lines and cannot change any verdict.
 
 **Retained output / witness.** `…\_scratch\post-comparison-hotfixes\HF-09\`;
 `hotfix-bundles/HF-09/witness/` for the per-family independent class census and
@@ -1554,6 +1569,7 @@ blocked by this program.
 | Split presentation into statewide-summary and large/detail, as the prompt's likely shape suggests? | **No.** Both classes are produced by the same `compare_core` writers; both need `_write_summary`'s `B` width (`:2998`) and the composite key column (`:2015`, `:2170`). Two branches would edit the same statements | PENDING | PENDING |
 | Should Clean Road (HF-01) also carry its own clipping fix so the user's sheet is complete in one bundle? | **No.** Clipping is one canonical finding (009) covering every family; fixing it inside HF-01 would put shared-writer changes in bundle 1. Instead HF-02 is sequenced second and must regenerate the merged HF-01 pair as its witness | PENDING | PENDING |
 | HF-01's design: can the 161 false positives fall to zero without an engine hook? | **Probably not.** Disclosure alone satisfies oracle branch (b) but not its second sentence. The recommended path marks the skipped anchors non-asserting via one opt-in `CompareSchema` field, on the per-cell ditto `N` precedent (`compare_core.py:1648-1650`). Odometer-based placement is forbidden by the build model | PENDING | PENDING |
+| Disclosure or normalization for representation-only Description differences (HF-09)? | **RULED AND CLOSED by the owner, 2026-07-26: disclosure only — the cells stay flagged and counted.** The comma-vs-slash Highway Log class (1,243 per format) and its siblings keep their red `D` state and stay in every total; HF-09 adds a count line and may not touch equality. This matches Stage 2's refusal to impose a new equality rule and the shipped `_quote_note` decision | N/A — settled by the owner | N/A |
 | Is the audit's evidence-eligibility rule a product requirement (HF-05)? | **Escalate, do not decide.** Applied literally it retires nearly the whole shipped evidence feature, including CMP-AUD-210's Excel-side binding and v0.32.0's `excel_column_for`. The finding's own oracle (exact-source binding) is satisfiable without that. Recorded as an owner policy gate; absent a ruling, implement the oracle | PENDING | PENDING |
 | 001 and 012 in one bundle? | **Yes, mandatory.** 012 is unobservable until 001 lands and the finding states that fixing 001 alone creates a new defect (108 false discrepancies on a same-source check) | PENDING | PENDING |
 | 015 and 018 together — unrelated fixes? | **Accepted as one bundle.** Two disjoint files, no workbook/count/image effect, one coherent theme (tell the user immediately, and tell them at all). If the second planner disagrees, split into HF-07a/HF-07b without changing any other boundary | PENDING | PENDING |
