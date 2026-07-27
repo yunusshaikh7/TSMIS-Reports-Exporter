@@ -5,7 +5,8 @@ not be the bundle's implementer.
 
 Before using, replace:
 
-- `<BUNDLE_ID>` with the implemented bundle ID.
+- `<BUNDLE_ID>` with the implemented **RB bundle ID**. HF IDs are work-item
+  specs and are not reviewed separately while their RB remains combined.
 - `<REVIEWER>` with `Codex` or `Claude`.
 
 ---
