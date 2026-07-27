@@ -7,7 +7,7 @@ Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW**
 | Implementer | Claude (owner decision 2026-07-26: Claude implements every bundle) |
 | Branch | `hotfix/rb-1-clean-road-source-truth` (worktree `C:\Users\Yunus\Projects\TSMIS-rb1-worktree`; the user's `main` checkout untouched) |
 | Base `main` commit | `9c774d4edacf6ae3b6e86d15b62e5d876a690a48` (plan drafted against `a29bdb6`; the delta is the Stage 3 planning docs only) |
-| Implementation commit | recorded on push (this file is committed with the implementation) |
+| Implementation commit | `93e12c23a8eeb8686817248d662e4d30125de0ec` (+ this SHA-recording follow-up) |
 | Generated-output root | `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\` (bulk); committed machine-readable witnesses in `../HF-01/witness/` |
 
 ## Changes
