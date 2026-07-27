@@ -1,0 +1,454 @@
+{
+ "_note": "Claude Stage 1B verdicts. Order of families is the audit document's order. B = [direct, byday, everything]; C = [baseline, everything-env]; D = [direct, everything-self].",
+ "A": {
+  "Ramp Summary": [
+   "APPROVED",
+   "APPROVED"
+  ],
+  "Ramp Detail": [
+   "DENIED",
+   "DENIED"
+  ],
+  "Highway Sequence Listing": [
+   "APPROVED",
+   "APPROVED"
+  ],
+  "Highway Log": [
+   "APPROVED",
+   "APPROVED"
+  ],
+  "Intersection Summary": [
+   "APPROVED",
+   "APPROVED"
+  ],
+  "Intersection Detail": [
+   "BLOCKED",
+   "BLOCKED"
+  ],
+  "Highway Log (PDF)": [
+   "APPROVED",
+   "APPROVED"
+  ],
+  "Intersection Detail (PDF)": [
+   "BLOCKED",
+   "BLOCKED"
+  ],
+  "Highway Detail": [
+   "BLOCKED",
+   "BLOCKED"
+  ],
+  "Highway Detail (PDF)": [
+   "BLOCKED",
+   "BLOCKED"
+  ],
+  "Highway Sequence Listing (PDF)": [
+   "APPROVED",
+   "APPROVED"
+  ],
+  "Ramp Detail (PDF)": [
+   "APPROVED",
+   "APPROVED"
+  ]
+ },
+ "B": {
+  "Ramp Summary": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ]
+  ],
+  "Ramp Detail": [
+   [
+    "DENIED",
+    "DENIED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ]
+  ],
+  "Highway Sequence Listing": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ]
+  ],
+  "Highway Log": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ]
+  ],
+  "Intersection Summary": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ]
+  ],
+  "Intersection Detail": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ]
+  ],
+  "Highway Log (PDF)": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ]
+  ],
+  "Intersection Detail (PDF)": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ]
+  ],
+  "Highway Detail": [
+   [
+    "BLOCKED",
+    "BLOCKED"
+   ],
+   [
+    "BLOCKED",
+    "BLOCKED"
+   ],
+   [
+    "BLOCKED",
+    "BLOCKED"
+   ]
+  ],
+  "Highway Detail (PDF)": [
+   [
+    "BLOCKED",
+    "BLOCKED"
+   ],
+   [
+    "BLOCKED",
+    "BLOCKED"
+   ],
+   [
+    "BLOCKED",
+    "BLOCKED"
+   ]
+  ],
+  "Highway Sequence Listing (PDF)": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ]
+  ],
+  "Ramp Detail (PDF)": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ]
+  ]
+ },
+ "C": {
+  "Ramp Summary": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "APPROVED",
+    "APPROVED"
+   ]
+  ],
+  "Ramp Detail": [
+   [
+    "DENIED",
+    "DENIED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ]
+  ],
+  "Highway Sequence Listing": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "APPROVED",
+    "APPROVED"
+   ]
+  ],
+  "Highway Log": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "APPROVED",
+    "APPROVED"
+   ]
+  ],
+  "Intersection Summary": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "APPROVED",
+    "APPROVED"
+   ]
+  ],
+  "Intersection Detail": [
+   [
+    "BLOCKED",
+    "BLOCKED"
+   ],
+   [
+    "APPROVED",
+    "APPROVED"
+   ]
+  ],
+  "Highway Log (PDF)": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "APPROVED",
+    "APPROVED"
+   ]
+  ],
+  "Intersection Detail (PDF)": [
+   [
+    "BLOCKED",
+    "BLOCKED"
+   ],
+   [
+    "APPROVED",
+    "APPROVED"
+   ]
+  ],
+  "Highway Detail": [
+   [
+    "BLOCKED",
+    "BLOCKED"
+   ],
+   [
+    "BLOCKED",
+    "BLOCKED"
+   ]
+  ],
+  "Highway Detail (PDF)": [
+   [
+    "BLOCKED",
+    "BLOCKED"
+   ],
+   [
+    "BLOCKED",
+    "BLOCKED"
+   ]
+  ],
+  "Highway Sequence Listing (PDF)": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "APPROVED",
+    "APPROVED"
+   ]
+  ],
+  "Ramp Detail (PDF)": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "APPROVED",
+    "APPROVED"
+   ]
+  ]
+ },
+ "D": {
+  "Ramp Detail": [
+   [
+    "DENIED",
+    "DENIED"
+   ],
+   [
+    "DENIED",
+    "DENIED"
+   ]
+  ],
+  "Highway Sequence Listing": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "APPROVED",
+    "APPROVED"
+   ]
+  ],
+  "Highway Log": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "APPROVED",
+    "APPROVED"
+   ]
+  ],
+  "Intersection Detail": [
+   [
+    "APPROVED",
+    "APPROVED"
+   ],
+   [
+    "APPROVED",
+    "APPROVED"
+   ]
+  ],
+  "Ramp Summary": [
+   [
+    "N/A",
+    "N/A"
+   ],
+   [
+    "N/A",
+    "N/A"
+   ]
+  ],
+  "Intersection Summary": [
+   [
+    "N/A",
+    "N/A"
+   ],
+   [
+    "N/A",
+    "N/A"
+   ]
+  ],
+  "Highway Detail": [
+   [
+    "BLOCKED",
+    "BLOCKED"
+   ],
+   [
+    "BLOCKED",
+    "BLOCKED"
+   ]
+  ]
+ },
+ "F": {
+  "Values": "APPROVED",
+  "Formulas": "APPROVED"
+ },
+ "EVIDENCE": {
+  "env": {
+   "ramp_summary": "N/A",
+   "ramp_detail": "N/A",
+   "intersection_summary": "N/A",
+   "intersection_detail": "N/A",
+   "intersection_detail_pdf": "N/A",
+   "ramp_detail_pdf": "N/A",
+   "highway_sequence": "N/A",
+   "highway_log": "N/A",
+   "highway_log_pdf": "N/A",
+   "highway_sequence_pdf": "N/A"
+  },
+  "tsn": {
+   "ramp_summary": "N/A",
+   "ramp_detail": "BLOCKED",
+   "intersection_summary": "N/A",
+   "intersection_detail": "DENIED",
+   "intersection_detail_pdf": "DENIED",
+   "ramp_detail_pdf": "DENIED",
+   "highway_sequence": "DENIED",
+   "highway_log": "DENIED",
+   "highway_log_pdf": "DENIED",
+   "highway_sequence_pdf": "APPROVED"
+  },
+  "self": {
+   "ramp_detail_pdf": "BLOCKED",
+   "highway_sequence_pdf": "DENIED",
+   "intersection_detail_pdf": "N/A",
+   "highway_log": "DENIED",
+   "highway_log_pdf": "DENIED"
+  }
+ }
+}
