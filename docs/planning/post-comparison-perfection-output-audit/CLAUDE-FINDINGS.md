@@ -26,7 +26,7 @@ A successful process exit is not approval.
 | Started (UTC) | 2026-07-26 |
 | Completed (UTC) | 2026-07-26 |
 | Audit branch | `claude/post-comparison-output-audit` (from `main` @ `617bd52`) |
-| Commit | `35dce6e1e15c3191a7fabe5f1adb4618a4ed8daf` (amended to record itself) |
+| Commit | **`c788b297bfc484748d7089bee0b99291d4264c3e`** — the frozen Stage 1B record. This SHA line is written by the single follow-up commit on top of it (a commit cannot contain its own hash). |
 | Generated-comparison root | `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-output-audit-claude-independent-2026-07-23\` |
 | Raw-check / evidence-inspection root | `<root>\inspection\` + `<root>\witness\` |
 | Retained artifacts | 2,328 files / 9,253,680,327 bytes (`<root>\witness\MANIFEST.json`, path + size + sha256 for each) |
