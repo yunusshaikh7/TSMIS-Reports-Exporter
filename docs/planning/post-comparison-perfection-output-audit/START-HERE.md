@@ -1,7 +1,7 @@
 # Post-Comparison Output Program — Start Here
 
-Workflow state: **Stages 1A, 1B, and 2 complete and jointly approved; Stage 3
-is drafted by the first planner and AWAITING THE SECOND PLANNER**
+Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
+RB-1 / Clean Road is READY for Stage 4**
 
 Last updated: 2026-07-26
 
@@ -14,15 +14,23 @@ first pass.
 ## Next action
 
 Run
-[`prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md`](prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md)
-as the **second** Stage 3 planner, in a new chat, on the documentation-only
-branch `planning/post-comparison-hotfix-bundles`.
+[`prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
+in a new **Claude** chat with:
+
+```text
+<BUNDLE_ID> = RB-1
+<IMPLEMENTER> = Claude
+```
+
+RB-1 carries work item HF-01 only and uses the exact branch
+`hotfix/rb-1-clean-road-source-truth`. Its frozen contract is
+[`hotfix-bundles/RB-1/BUNDLE.md`](hotfix-bundles/RB-1/BUNDLE.md).
 
 Claude drafted the plan as first planner (both sign-off rows read `NOT STARTED`
 when Prompt 03 was invoked, so the prompt's own first-planner rule applied — the
 same reversal Stage 2 recorded). [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md)
-now holds **11 verified work-item specs (`HF-01` … `HF-11`) grouped into 6 review
-batches (`RB-1` … `RB-6`), Clean Road first** — plus a finding-to-file overlap map
+now holds **11 verified work-item specs (`HF-01` … `HF-11`) grouped into 6
+implementation/review bundles (`RB-1` … `RB-6`), Clean Road first** — plus a finding-to-file overlap map
 built by code inspection at `main` `a29bdb6`, all 22 canonical findings mapped to
 exactly one primary spec, a merge order, a branch/worktree lifecycle, and a
 whole-program definition of done. The batch layer is an owner decision (fewer
@@ -32,16 +40,25 @@ released to the owner *before* its adversarial review, at most one at a time, wi
 the full gate, the acceptance run and the implementation record never deferred. It
 is a capability, not a plan: no batch is scheduled to use it, and the default path
 (implement → two reviews → merge → release) applies everywhere unless the owner
-says otherwise for a named batch. The second planner challenges batch size, ordering, overlaps,
-missing findings and acceptance tests; verifies Clean Road stays first; and either
-revises or signs.
+says otherwise for a named batch.
+
+Codex completed the second-planner challenge and signed the plan. The final pass
+re-opened the owning code, rechecked all 22 assignments, and made four material
+corrections: (1) HF-01's 165 non-asserting cells now have the exact
+`291,292 - 165 = 291,127` count oracle; (2) RB IDs now unambiguously control
+Prompts 04/05, records, branches, statuses and merges; (3) HF-04 must produce
+both censused layouts rather than pass through continued refusal; and (4)
+ordinary workbook regression uses published semantic/state equivalence rather
+than unreliable raw OOXML package-byte identity.
 **All four owner policy gates are now RULED (2026-07-26)** — no open owner
 question blocks the second planner:
 
 - **HF-01 — mark the skipped anchors.** The Clean Road cells whose ArcGIS side was
-  never built carry an explicit non-asserting "unavailable" marker and leave the
-  difference count, rather than a bare blank that reads as a disagreement.
-  Disclosure-only was rejected: it names the problem without naming which cells.
+  never built carry an explicit non-asserting "unavailable" marker and are
+  excluded from the differing-cell count, rather than a bare blank that reads as
+  a disagreement. All 165 affected `D` cells become `N`, so the exact post-fix
+  count is **291,127**. Disclosure-only was rejected: it names the problem
+  without naming which cells.
 - **HF-05 — exact-source evidence, keep the feature.** Each side is evidenced from
   the document that side was compared from; no borrowed sibling prints; no prose
   asserting unread sources; no artifact at all where a side cannot be bound. The
@@ -60,8 +77,7 @@ The other two point in opposite directions on purpose:
   the Description is the same label with `EQUATES TO ` prepended. The rule must be
   pair-aware, opt-in, and must not widen into the HF-09 class.
 
-**No code change is authorized until both planners sign and `HF-01` reads
-`READY`.**
+Both planners have signed. **RB-1 is READY; no other RB is authorized yet.**
 
 Stage 2 is closed with no open conflict:
 
@@ -82,9 +98,9 @@ Stage 2 is closed with no open conflict:
 | 1A | Codex independent deliverable audit | **COMPLETE** | Historical user request, normalized in `AUDIT-SCOPE-AND-PROVENANCE.md` | `MASTER-VERIFICATION.md`, `CODEX-FINDINGS.md` |
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
-| 3 | Agree on ordered implementation bundles | **DRAFTED — AWAITING SECOND PLANNER** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/HF-01/BUNDLE.md` |
-| 4 | Implement one bounded hotfix bundle | **LOOP after Stage 3** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **LOOP after each Stage 4** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<ID>/REVIEW.md`; merge or return to Stage 4 |
+| 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/RB-1/BUNDLE.md` |
+| 4 | Implement one bounded RB bundle | **RB-1 READY** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **LOOP after each Stage 4** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.
@@ -126,17 +142,18 @@ The firewall ends only after Claude has marked its own matrix and findings
 | `FINAL-RECONCILIATION.md` | Stage 2 decision-by-decision conflict resolution |
 | `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` | Stage 2 canonical, deduplicated findings |
 | `IMPLEMENTATION-PLAN.md` | Stage 3 approved bundle queue and acceptance contracts |
-| `hotfix-bundles/<ID>/` | Stage 4 implementation log and Stage 5 review record for one bundle |
+| `hotfix-bundles/<RB-ID>/` | Stage 4 contract/implementation log and Stage 5 review record for one implementation bundle |
+| `hotfix-bundles/<HF-ID>/witness/` | Small committed witness for one work-item acceptance oracle |
 
 No finding is implementation authority until it appears in
 `FINAL-FINDINGS-FOR-IMPLEMENTATION.md`. No code change is authorized until its
-bundle appears as `READY` in `IMPLEMENTATION-PLAN.md`.
+owning **RB bundle** appears as `READY` in `IMPLEMENTATION-PLAN.md`.
 
 ## Branch and worktree policy
 
 - Audit and planning branches contain documentation only.
 - Every implementation bundle uses a new branch from the latest `main`, named
-  `hotfix/<bundle-id>-<short-slug>`.
+  `hotfix/<rb-id>-<short-slug>`.
 - Prefer a separate worktree for every hotfix so the user's normal checkout
   remains available.
 - A hotfix branch contains only its agreed bundle. Do not opportunistically

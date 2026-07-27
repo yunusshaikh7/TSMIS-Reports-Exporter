@@ -2,7 +2,8 @@
 
 Before using, replace:
 
-- `<BUNDLE_ID>` with the agreed ID, for example `HF-01`.
+- `<BUNDLE_ID>` with the agreed **RB implementation-bundle ID**, for example
+  `RB-1`. HF IDs are work-item specs and are not invoked separately.
 - `<IMPLEMENTER>` with `Codex` or `Claude`.
 
 ---
@@ -31,11 +32,14 @@ Branch/worktree setup:
 1. Fetch without force and verify `main` is clean and current.
 2. Prefer a separate worktree so the user's normal app checkout remains
    available. Never switch or clean a dirty user worktree.
-3. Create the exact planned branch
-   `hotfix/<bundle-id>-<slug>` from the latest `main`.
+3. Create the exact RB branch recorded in `IMPLEMENTATION-PLAN.md`
+   (`hotfix/<rb-id>-<slug>`) from the latest `main`.
 4. If the branch already exists, verify it belongs to this bundle and resume
    it rather than creating a duplicate.
 5. Do not branch from another hotfix.
+6. Before changing code, replace the pending base in
+   `hotfix-bundles/<BUNDLE_ID>/BUNDLE.md` with the exact `main` SHA used to
+   create the branch.
 
 Implementation rules:
 

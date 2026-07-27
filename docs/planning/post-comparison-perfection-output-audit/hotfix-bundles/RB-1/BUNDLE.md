@@ -1,18 +1,20 @@
-# `HF-01` — Bundle Contract
+# `RB-1` — Bundle Contract
 
-Status: **DRAFT — AWAITING SECOND PLANNER** (becomes `READY` when both planners
-sign [IMPLEMENTATION-PLAN.md](../../IMPLEMENTATION-PLAN.md))
+Status: **READY**
 
-> This file is transcribed from the HF-01 section of
+> This RB-level contract carries work item **HF-01** and is transcribed from the
+> HF-01 section of
 > [IMPLEMENTATION-PLAN.md](../../IMPLEMENTATION-PLAN.md), which is the frozen
-> contract. Where the two disagree, the plan wins. Only the base `main` SHA and
-> the implementer/reviewer names are filled in here at Stage 4.
+> contract. Where the two disagree, the plan wins. Stage 4 fills the base
+> `main` SHA and implementation metadata; the owner-ruled roles are already
+> fixed.
 
 | Field | Value |
 |---|---|
-| Queue order | **1 — first implementation batch (RB-1 = HF-01 alone)** |
+| Bundle / work items | **RB-1 / HF-01 only** |
+| Queue order | **1 — first implementation bundle** |
 | Rush ship | **Eligible, not planned.** The default path applies unless the owner explicitly invokes a [rush ship](../../IMPLEMENTATION-PLAN.md#expedited-release-rush-ship) for this batch. If invoked: full release on the next minor, tagged on this branch so the in-app updater offers it, status `RUSH-SHIPPED — AWAITING ADVERSARIAL REVIEW`, branch unmerged until Codex approves, and every condition in that section applies. Note the output-regeneration caveat — this batch changes what the Clean Road deliverable says about differences |
-| Branch | `hotfix/hf-01-clean-road-source-truth` |
+| Branch | `hotfix/rb-1-clean-road-source-truth` |
 | Base `main` commit | PENDING (the `main` head at branch time; plan drafted against `a29bdb6`) |
 | Canonical finding IDs | **PCOA-FINAL-010** (P1) |
 | Implementer | **Claude** (owner decision 2026-07-26: Claude implements every bundle) |
@@ -85,7 +87,8 @@ Required:
    `clean_road_build` sidecar carry the count and the reason.
 3. The affected anchors are emitted with a reserved **unavailable** token instead
    of an empty cell, and the schema declares that token **non-asserting** — those
-   cells render `N`, show the reason, and leave the difference count. The
+   165 cells render `N`, show the reason, and are excluded from the
+   differing-cell count. The
    mechanism is one opt-in `CompareSchema` field on the per-cell ditto `N`
    precedent (`compare_core.py:1648-1650`) and **must be inert for every schema
    that does not set it**.
@@ -133,40 +136,43 @@ section, **stop and return the bundle to Stage 3** rather than expanding scope
 | Gate | Required commands / outputs | Approval rule |
 |---|---|---|
 | End-user path | GUI **ArcGIS tab** → build Clean Road Highway from `arcgis_layers/` at the TSN extract's own as-of date → compare vs the TSN `CA HIGHWAYS` extract, `mode="both"`. Drive the shipped GUI/worker path, not `consolidate()`/`compare()` directly | Generated as a user would generate it; assertions are on the written files |
-| Values deliverable | Both twins regenerated; values twin read `data_only=True` | 161 false positives → **0**; the 4 misrepresented cells show the real value or an explicit skipped marker; no genuine difference lost |
+| Values deliverable | Both twins regenerated; values twin read `data_only=True` | All 165 witnessed `D` cells become explicit unavailable `N` cells; the exact differing-cell total is **291,127**; no cell outside the 165-cell witness moves |
 | Formula deliverable | Recalculate the formulas twin in installed Excel | Every SELF-CHECK row `OK`, no `#REF!`/`#VALUE!`, semantically equal to the values twin on every changed cell class |
-| Source-truth recount | App-free reader joining each visible ArcGIS row's `Key (helper)` to the Comparison sheet's hidden `__CMP_E2_KEY_V1_TOKEN`, inferring no missing span; restate statewide totals | The 165-cell before/after set reproduces the finding exactly pre-fix, and the post-fix total equals 291,292 minus exactly the itemized false-positive delta |
+| Source-truth recount | App-free reader joining each visible ArcGIS row's `Key (helper)` to the Comparison sheet's hidden `__CMP_E2_KEY_V1_TOKEN`, inferring no missing span; restate statewide totals | The 165-cell before/after set reproduces the finding exactly pre-fix; the post-fix total is **291,127 = 291,292 - 165**; the four raw disagreements remain itemized as diagnostic source facts |
 | Visual usability | Inspect *Summary*, *Notes*, *Comparison*, *ArcGIS Build*, *Provenance* at native scale | Disclosure legible in its stored width; grey context headers unchanged; skipped-anchor display unambiguous; nothing newly clipped |
 | PDF/Excel sibling parity | n/a — Clean Road has no PDF edition | n/a, stated explicitly |
 | PDF/PDF evidence | n/a — Clean Road has no evidence adapter | **Prove zero evidence artifacts** before and after |
 | Mixed-format evidence | Same | No evidence leakage of any kind |
 | Canary | `CRH-SW-E2` re-blessed in `comparison-canary-bindings.md` | Documented delta with exact input/output evidence |
-| Regression | Full gate: `build\.venv\Scripts\python.exe build\run_checks.py -j 4 -k`, `compileall`, `ruff`, `build.ps1 -SelfTest`; plus `check_clean_road.py`, `check_compare_equality_policy.py`, `check_compare_audit.py`, `check_comparison_artifact_schema.py`, and — if the `CompareSchema` hook is used — `check_compare_ditto.py` and one unaffected family (Intersection Summary vs TSN) proved byte-identical to its pre-fix twin | Never a subset of the gate (v0.17.3 lesson). Unrelated approved behavior unchanged |
+| Regression | Full gate: `build\.venv\Scripts\python.exe build\run_checks.py -j 4 -k`, `compileall`, `ruff`, `build.ps1 -SelfTest`; plus `check_clean_road.py`, `check_compare_equality_policy.py`, `check_compare_audit.py`, `check_comparison_artifact_schema.py`, and — if the `CompareSchema` hook is used — `check_compare_ditto.py` and one unaffected family (Intersection Summary vs TSN) proved identical in published cells, state masks, counts and typed outcome | Never a subset of the gate (v0.17.3 lesson). Raw OOXML package bytes are not the invariant; unrelated approved behavior is unchanged |
 
 **New test (must fail on the base commit).** In `build/check_clean_road.py`, on
 the synthetic mini-library: a span row with one unusable PM endpoint and usable
 AR/odometer measures must (a) appear in the build's skip record, (b) make the
 build report `PARTIAL` with non-zero `skipped_inputs`, (c) surface on the marker
 sheet and in the sidecar, and (d) in a real `mode="both"` comparison against a
-TSN row carrying the same value, **not** produce a counted difference — while a
-genuinely differing anchor still does.
+TSN row carrying the same value, **not** produce a counted difference — while
+the same skipped-source condition carrying a different value is also an explicit
+`N`; a control row whose placement is valid and genuinely differs remains `D`.
 
 ## Measurable acceptance criteria
 
 1. The 161 exact false positives are **0**.
-2. The 4 misrepresented cells show the real ArcGIS value or an explicit skipped
-   marker — never an unqualified blank.
+2. All 165 affected cells, including the 4 raw-source disagreements, show the
+   explicit unavailable/skipped marker and state `N` — never an unqualified
+   blank or an asserting `D`.
 3. Summary **and** Notes state the skipped-source-row count, the affected anchor
    count, and the reason (`LocError=NO ERROR` rows with a missing PM endpoint).
 4. Both twins regenerate; the formulas twin recalculates clean in installed Excel.
 5. `CRH-SW-E2` re-blessed with a documented delta and exact evidence.
 6. Full gate green; `check_clean_road.py` fails pre-fix and passes post-fix.
-7. No genuine difference disappeared: the post-fix differing-cell total equals
-   291,292 minus exactly the proved false-positive delta, itemized.
+7. The post-fix differing-cell total is exactly **291,127** (`291,292 - 165`).
+   No asserting difference outside the exact 165-cell witness changes; the four
+   raw-source disagreements remain itemized as unavailable diagnostic facts.
 
 ## Dependencies and rollback
 
-- Prerequisite merged bundles: **none** — HF-01 is first.
+- Prerequisite merged bundles: **none** — RB-1 is first.
 - Regression surface: Clean Road Highway only for code; the shared
   `compare_core` hook (if used) must be proved inert for every other schema.
 - Findings to verify but **not** re-implement here: PCOA-FINAL-009 (Clean Road
@@ -188,5 +194,5 @@ genuinely differing anchor still does.
 
 | Planner | Decision | Commit / date |
 |---|---|---|
-| Claude (first plan) | **DRAFTED — AWAITING SECOND PLANNER** | this commit / 2026-07-26 |
-| Codex (final challenge) | NOT STARTED | PENDING |
+| Claude (first plan) | **APPROVED — FIRST PLAN** | `4e34bee` / 2026-07-26 |
+| Codex (final challenge) | **APPROVED — JOINT AGREEMENT** | this commit / 2026-07-26 |

@@ -1,11 +1,12 @@
-# `<BUNDLE_ID>` — Bundle Contract
+# `<BUNDLE_ID>` — RB Bundle Contract
 
 Status: **DRAFT**
 
 | Field | Value |
 |---|---|
+| Bundle / work items | `<BUNDLE_ID>` (RB ID) / PENDING HF IDs |
 | Queue order | PENDING |
-| Branch | `hotfix/<bundle-id>-<slug>` |
+| Branch | `hotfix/<rb-id>-<slug>` |
 | Base `main` commit | PENDING |
 | Canonical finding IDs | PENDING |
 | Implementer | PENDING |
