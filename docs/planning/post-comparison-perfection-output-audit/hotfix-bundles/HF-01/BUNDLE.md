@@ -11,7 +11,7 @@ sign [IMPLEMENTATION-PLAN.md](../../IMPLEMENTATION-PLAN.md))
 | Field | Value |
 |---|---|
 | Queue order | **1 — first implementation batch (RB-1 = HF-01 alone)** |
-| Pre-review release | **Permitted** (owner directive 2026-07-26). Ship as full release **`v0.33.0`**, tagged on this branch, so the in-app updater offers it; branch stays unmerged until Codex approves. All conditions in the plan's *Shipping a batch before Codex has reviewed it* section apply |
+| Rush ship | **Eligible, not planned.** The default path applies unless the owner explicitly invokes a [rush ship](../../IMPLEMENTATION-PLAN.md#expedited-release-rush-ship) for this batch. If invoked: full release on the next minor, tagged on this branch so the in-app updater offers it, status `RUSH-SHIPPED — AWAITING ADVERSARIAL REVIEW`, branch unmerged until Codex approves, and every condition in that section applies. Note the output-regeneration caveat — this batch changes what the Clean Road deliverable says about differences |
 | Branch | `hotfix/hf-01-clean-road-source-truth` |
 | Base `main` commit | PENDING (the `main` head at branch time; plan drafted against `a29bdb6`) |
 | Canonical finding IDs | **PCOA-FINAL-010** (P1) |

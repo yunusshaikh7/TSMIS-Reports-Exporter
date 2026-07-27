@@ -26,10 +26,13 @@ batches (`RB-1` … `RB-6`), Clean Road first** — plus a finding-to-file overl
 built by code inspection at `main` `a29bdb6`, all 22 canonical findings mapped to
 exactly one primary spec, a merge order, a branch/worktree lifecycle, and a
 whole-program definition of done. The batch layer is an owner decision (fewer
-branches, reviews and releases; 12 Codex passes instead of 22), as is the
-**pre-review release policy** — a batch may be released to the owner before its
-adversarial review, at most one shipped-but-unmerged at a time, with the full gate
-never deferred. The second planner challenges batch size, ordering, overlaps,
+branches, reviews and releases; 12 Codex passes instead of 22). The plan also
+defines **rush ship** — a named, owner-invoked exception under which a batch may be
+released to the owner *before* its adversarial review, at most one at a time, with
+the full gate, the acceptance run and the implementation record never deferred. It
+is a capability, not a plan: no batch is scheduled to use it, and the default path
+(implement → two reviews → merge → release) applies everywhere unless the owner
+says otherwise for a named batch. The second planner challenges batch size, ordering, overlaps,
 missing findings and acceptance tests; verifies Clean Road stays first; and either
 revises or signs.
 **All four owner policy gates are now RULED (2026-07-26)** — no open owner

@@ -54,9 +54,10 @@ Canonical finding count carried into planning: **22 records — 20 actionable
 - **Work is specified as HF-nn items but branched, reviewed and merged as RB-n
   batches** (owner decision, 2026-07-26: fewer branches, reviews and releases).
   Six batches, twelve Codex review passes.
-- **A batch may be released to the owner before its review** under the
-  owner-authorized exception below, but at most one batch may be shipped and
-  unmerged at a time, and the full gate is never deferred.
+- **The default release path is implement → two Codex reviews → merge → release.**
+  A **rush ship** (owner-invoked only, per batch) may release a batch before its
+  review, but at most one batch may be rush-shipped and unmerged at a time, and the
+  full gate, the acceptance run and `IMPLEMENTATION.md` are never deferred.
 - Every batch starts from the then-current `main`, uses its own
   `hotfix/<...>` branch and worktree, and merges to `main` only
   after two adversarial reviews approve it with at least one non-implementer
@@ -208,6 +209,8 @@ Allowed statuses:
 - `READY`
 - `IMPLEMENTING`
 - `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW`
+- `RUSH-SHIPPED — AWAITING ADVERSARIAL REVIEW` — implemented, gated, and released
+  to the owner before review under the [rush-ship exception](#expedited-release-rush-ship)
 - `REVIEW 1 APPROVED — AWAITING REVIEW 2`
 - `DENIED — RETURN TO IMPLEMENTATION`
 - `JOINTLY APPROVED`
@@ -218,18 +221,60 @@ and every other batch stays `BLOCKED`. A batch becomes `READY` only when every
 batch in its `Depends on` column reads `MERGED`. This keeps implementation to one
 branch at a time while the owner's `main` checkout stays usable.
 
-Statuses attach to **batches**. A batch that has been released to the owner but
-not yet reviewed stays at `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW` and records
-its shipped version in the batch row; shipping never advances a status.
+Statuses attach to **batches**. A rush-shipped batch reads
+`RUSH-SHIPPED — AWAITING ADVERSARIAL REVIEW` until its first review lands, then
+follows the normal review statuses; the release log keeps the record either way.
+**Shipping never advances a status** — only a review does.
 
-## Shipping a batch before Codex has reviewed it
+## Expedited release (rush ship)
 
-**Owner directive, 2026-07-26.** Codex usage is limited and the Clean Road fixes
-are needed soon, so a batch may be **released to the owner's own installs before
-its adversarial review**, with review and merge following afterwards. This is an
-explicit, owner-authorized exception to "no code change is authorized until its
-bundle is `READY`" — it is recorded here so the reviewer treats it as a decision,
-not a violation.
+**The default path is unchanged: implement → two Codex reviews → merge →
+release.** Every batch follows it unless the owner says otherwise.
+
+**Rush ship** is a named, owner-invoked exception, defined here so that if it ever
+happens the reviewer knows exactly what it was and what it was not. It exists
+because Codex usage is limited and a report may occasionally need to be right on
+the owner's machine sooner than a review cycle allows. It is **not** planned for
+any particular batch — including Clean Road — and may go unused for the whole
+program.
+
+### Vocabulary
+
+| Term | Meaning |
+|---|---|
+| **Rush ship** | The owner releases a batch to their own installs **before** its adversarial review. Review and merge follow afterwards, unchanged in rigor |
+| `RUSH-SHIPPED — AWAITING ADVERSARIAL REVIEW` | The batch status during that window. It replaces `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW` and reverts to the normal review statuses as reviews land |
+| **Rush release** | The version published that way. Recorded in the release log below and in the batch's `IMPLEMENTATION.md` |
+| **Remedying release** | A patch version that carries changes a review demanded after a rush release |
+| **Reprioritization** | Moving a batch earlier in the queue. A *different*, cheaper lever — it skips nothing |
+
+### Two levers — try the cheap one first
+
+If a report needs to be right quickly, **reordering** may be enough and costs
+nothing in review integrity: RB-2, RB-3 and RB-4 have no inbound dependency and
+may be resequenced freely, provided RB-2 still precedes RB-5 and RB-3 still
+precedes RB-6. Only when the needed fix cannot wait for a review cycle at all is
+a rush ship warranted.
+
+### Who may invoke it
+
+**The owner, explicitly, per batch.** Never the implementer's judgment, never
+implied by urgency in a ticket or a comment, and never a standing permission — one
+rush ship does not authorize the next. Absent an explicit owner instruction naming
+the batch, the implementer follows the default path.
+
+This is an explicit, owner-authorized exception to "no code change is authorized
+until its bundle is `READY`" — recorded here so the reviewer treats it as a
+decision, not a violation.
+
+### Release log
+
+Empty by design. If a rush ship happens, it is recorded here in the same commit
+that tags it.
+
+| Version | Batch | Kind | Tag date | Reviewed | Remedied by |
+|---|---|---|---|---|---|
+| *(none yet)* | | | | | |
 
 ### Release identity
 
@@ -241,10 +286,14 @@ component, no updater change.
 | Event | Version |
 |---|---|
 | Current `main` | `0.32.0` |
-| RB-1 shipped pre-review | `0.33.0` |
-| Codex-mandated changes to RB-1 | `0.33.1`, `0.33.2`, … |
-| RB-2 shipped | `0.34.0` |
-| …and so on, one minor per batch, patches for review fixes | |
+| First batch released — whether rushed or normal | `0.33.0` |
+| Changes a review demanded afterwards (remedying release) | `0.33.1`, `0.33.2`, … |
+| Next batch released | `0.34.0` |
+| …one minor per batch, patches for review fixes | |
+
+A rush release is **numbered no differently** from a normal one. Its exceptional
+status lives in the release notes, the release log, and the batch status — never in
+the version string, because the version has to stay comparable for the updater.
 
 Verified against the code, so this needs no changes: `build/app.spec:40` pads the
 version into the Windows 4-tuple, `updater.parse_version` accepts the dotted
@@ -269,7 +318,7 @@ shipped-but-unmerged hotfix branches purely to build from — never merged to
 `main`, deleted once the real merges land. Use it only when the simple rule is
 genuinely blocking, and record it in that batch's `IMPLEMENTATION.md`.
 
-### What must still be true before a pre-review release
+### What must still be true before a rush release
 
 Deferring the *adversarial review* is the whole exception. Nothing else is
 deferred:
@@ -283,9 +332,9 @@ deferred:
 4. `CHANGELOG.md` has that version's section (it is the source of the release
    body via `build/gen_release_notes.py`).
 5. The release notes state plainly that the build **has not yet passed
-   adversarial review**, and name the batch.
+   adversarial review**, name the batch, and name the term (*rush ship*).
 6. The batch status in this plan becomes
-   `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW` and its row records the shipped
+   `RUSH-SHIPPED — AWAITING ADVERSARIAL REVIEW`, and the release log records the
    version. It does **not** become `MERGED`.
 7. Tag from the batch branch and push the tag explicitly
    (`git push origin refs/tags/v0.33.0`) — a release branch shares the tag name,
@@ -299,12 +348,26 @@ required changes — never un-publishing the release, which would leave the inst
 with no update path. Record the denial, the shipped version, and the remedying
 version in the batch's `REVIEW.md`.
 
-### One caveat specific to RB-1
+### What Codex must do differently when reviewing a rush-shipped batch
 
-Clean Road output changes with this batch, and any comparison the owner generates
-from the pre-review build is produced under a design Codex has not yet approved.
-If review forces a different marker or disclosure design, those workbooks need
-regenerating. Worth knowing before running a statewide set on it.
+1. **Review the shipped tag as well as the branch head.** They may have diverged
+   if work continued after the tag. Record both SHAs.
+2. **Treat the release as evidence of nothing.** A published version is not an
+   approval and carries no presumption; the acceptance bar is identical.
+3. **Escalate a denial.** The owner is running denied code, so remedying it takes
+   priority over starting the next batch, and the verdict must say so explicitly.
+4. **Ask what was generated from it.** Any deliverable the owner produced on a
+   rush build was produced under an unapproved design. If the review changes that
+   design, the review record must name what needs regenerating.
+
+### The output-regeneration caveat, for any rush ship
+
+Any comparison generated from a rush build is produced under a design Codex has not
+yet approved. If review forces a different design, those workbooks need
+regenerating. This bites hardest where a batch changes what the deliverable *says*
+about differences — RB-1 (Clean Road markers), RB-5 (classification) — and barely
+at all for the presentation and hygiene batches. Worth knowing before running a
+statewide set on a rush build.
 
 ## Proposed merge order
 
@@ -316,10 +379,9 @@ hotfix is ever required. RB-2, RB-3 and RB-4 have no inbound dependency and may
 be resequenced among themselves if the owner's priority changes, provided RB-2
 still precedes RB-5 and RB-3 still precedes RB-6.
 
-Merging may lag shipping — see
-[Shipping a batch before Codex has reviewed it](#shipping-a-batch-before-codex-has-reviewed-it)
-— but the merge *order* never changes, and at most one batch may be shipped and
-unmerged at a time.
+Merging may lag shipping if the owner invokes a
+[rush ship](#expedited-release-rush-ship) — but the merge *order* never changes,
+and at most one batch may be rush-shipped and unmerged at a time.
 
 ## Finding coverage — every canonical finding exactly once
 
@@ -1739,11 +1801,12 @@ route-140 raw census.
 3. **During Stage 4.** Only that batch's agreed surface changes. The branch is
    pushed if the remote is available and unchanged. It is never merged by the
    implementer.
-3b. **Optional pre-review release.** Bump `version.py`, add the `CHANGELOG.md`
-   section, tag on the batch branch, and push the tag explicitly
-   (`git push origin refs/tags/v<version>`) — a release branch shares the tag
-   name, so an implicit push will not carry it. Publish as a **full** GitHub
-   release so the in-app updater offers it. The branch still is not merged.
+3b. **Rush ship, only if the owner invokes it** ([definition](#expedited-release-rush-ship)).
+   Bump `version.py`, add the `CHANGELOG.md` section, tag on the batch branch, and
+   push the tag explicitly (`git push origin refs/tags/v<version>`) — a release
+   branch shares the tag name, so an implicit push will not carry it. Publish as a
+   **full** GitHub release so the in-app updater offers it. Record it in the
+   release log. The branch still is not merged.
 4. **During Stage 5.** A `DENIED` review returns to Stage 4 on the **same**
    branch. Two approvals with at least one non-implementer approver are required
    to merge.
@@ -1828,7 +1891,7 @@ blocked by this program.
 | Who implements and who reviews? | **Settled by owner decision (2026-07-26): Claude implements all eleven bundles; Codex performs both reviews on every bundle.** Codex is therefore never the implementer, so Prompt 05's "at least one non-implementer approver" holds everywhere and Claude never approves its own work. The cost is that both reviews come from one agent — review 2 must re-derive independently and name what review 1 missed, not restate it | PENDING | PENDING |
 | Does Codex-only review weaken the Claude-unique findings? | **It is a scheduling constraint, not a soundness one.** For PCOA-FINAL-003, -006, -014, -015, -017, -018, -019 and -022 the durable witness is Claude's, but the firewall has ended, the key witnesses are committed in-repo, and Prompt 05 item 5 independently requires the reviewer to recount from raw rather than trust any prior parser. Each affected bundle names the exact witness Codex must bind to | PENDING | PENDING |
 | Six review batches instead of eleven bundles? | **Owner directive, 2026-07-26: fewer branches, reviews and releases, because Codex usage is limited.** The verified HF-nn specs are unchanged and still govern what changes together; batching only changes the branch/review/merge unit — 12 Codex passes instead of 22. Named cost: RB-4 (all evidence) and RB-2 are large reviews, and a partial denial holds a whole batch. RB-4 splits back into HF-05 + HF-10 with no re-planning if that bites | PENDING | PENDING |
-| Releasing a batch to the owner before Codex reviews it? | **Owner directive, 2026-07-26.** Explicit, authorized exception to the `READY` gate, recorded so the reviewer treats it as a decision. Bounded by: at most one shipped-but-unmerged batch; the full gate, the acceptance run and `IMPLEMENTATION.md` are never deferred; the release notes say it is unreviewed; a denial is remedied by a patch release, never by un-publishing. The cumulative-bundle hazard is real — the updater swaps the whole bundle — which is what the one-at-a-time rule exists to prevent | PENDING | PENDING |
+| Releasing a batch to the owner before Codex reviews it? | **Owner directive, 2026-07-26: build the capability and the vocabulary, do not schedule it.** No batch — Clean Road included — is planned to use it; the default path applies unless the owner explicitly invokes a *rush ship* for a named batch. Bounded by: at most one rush-shipped batch unmerged; the full gate, the acceptance run and `IMPLEMENTATION.md` never deferred; the release notes say it is unreviewed; a denial is remedied by a patch release, never by un-publishing. The cumulative-bundle hazard is real — the updater swaps the whole bundle — which is what the one-at-a-time rule prevents. Reprioritizing a batch is the cheaper lever and skips nothing | PENDING | PENDING |
 | Are eleven bundles too many? | **Superseded by the batching directive above; kept for the record.** **No.** Each is one implementation pass with one complete adversarial output review, and the map shows only five same-file overlaps, all on disjoint functions in merge order. Fewer bundles would mix normalization behaviour, evidence policy, visual cleanup and source-row correctness — which the prompt forbids | PENDING | PENDING |
 | Does any bundle leave `main` unreleasable? | **No.** HF-04 is the only one that changes an input contract, and it must accept both censused layouts rather than swapping one pinned layout for another; HF-08 forces exactly one disclosed re-comparison; every other bundle is additive or presentation-only | PENDING | PENDING |
 
