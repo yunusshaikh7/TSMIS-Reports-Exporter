@@ -1,7 +1,7 @@
 # Post-Comparison Output Program — Start Here
 
-Workflow state: **Stage 1A and 1B complete; Stage 2 has one of two reviewer
-signatures — Codex owes the second, adversarial pass**
+Workflow state: **Stages 1A, 1B, and 2 complete; Stage 2 is jointly approved;
+Stage 3 planning is next**
 
 Last updated: 2026-07-26
 
@@ -14,21 +14,20 @@ first pass.
 ## Next action
 
 Run
-[`prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md`](prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md)
-in a new **Codex** chat, as the **second** Stage 2 reviewer.
+[`prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md`](prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md)
+sequentially with the two Stage 3 planners, beginning in a new chat.
 
-Claude filled `FINAL-RECONCILIATION.md` and `FINAL-FINDINGS-FOR-IMPLEMENTATION.md`
-and signed the first cross-check. Codex must independently challenge every
-conflict resolution and every canonical finding rather than ratify them, correct
-errors with an audit trail, and must not erase Claude's reasoning. Both files are
-marked `AWAITING SECOND REVIEW` on branch
-`audit/post-comparison-final-reconciliation`.
+Stage 2 is closed with no open conflict:
 
-Priority challenges named by the first reviewer: R-01 (the clipping gate that
-decides 40 verdicts), R-04/R-05 (evidence crop verdicts that differ by sampling
-luck), R-06 plus UN-01 (the evidence-eligibility rule is read two ways), R-09
-plus UN-04 (the Highway Sequence equation canonicalization rests on Codex alone),
-and R-10 (Clean Road, where Claude's approval rested on canary agreement).
+- the 88-decision topology is **0 APPROVED / 68 DENIED / 16 BLOCKED / 4 N/A**;
+- the exact 25-cell evidence registry is **6 APPROVED / 16 DENIED / 3 N/A**;
+- the canonical handoff contains **22 records**: **9 P1 / 9 P2 / 2 P3 /
+  2 NO FIX**, of which 20 are actionable;
+- all four formerly open Stage 2 issues were closed, and the controlling
+  evidence rule was corrected with an explicit second-review audit trail.
+
+`FINAL-RECONCILIATION.md` and
+`FINAL-FINDINGS-FOR-IMPLEMENTATION.md` are now joint implementation authority.
 
 ## Workflow
 
@@ -36,8 +35,8 @@ and R-10 (Clean Road, where Claude's approval rested on canary agreement).
 |---|---|---|---|---|
 | 1A | Codex independent deliverable audit | **COMPLETE** | Historical user request, normalized in `AUDIT-SCOPE-AND-PROVENANCE.md` | `MASTER-VERIFICATION.md`, `CODEX-FINDINGS.md` |
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
-| 2 | Codex/Claude cross-check and canonical findings | **IN PROGRESS — Claude signed, AWAITING SECOND REVIEW by Codex** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
-| 3 | Agree on ordered implementation bundles | **BLOCKED on the second Stage 2 signature** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md` |
+| 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
+| 3 | Agree on ordered implementation bundles | **READY — NEXT** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md` |
 | 4 | Implement one bounded hotfix bundle | **LOOP after Stage 3** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<ID>/IMPLEMENTATION.md` |
 | 5 | Adversarially review and approve that bundle | **LOOP after each Stage 4** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<ID>/REVIEW.md`; merge or return to Stage 4 |
 

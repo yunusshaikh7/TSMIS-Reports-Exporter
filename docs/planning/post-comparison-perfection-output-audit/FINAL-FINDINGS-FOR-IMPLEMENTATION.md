@@ -2,11 +2,11 @@
 
 > Workflow artifact: **Stage 2 — canonical joint findings**
 >
-> Status: **AWAITING SECOND REVIEW**
+> Status: **JOINTLY APPROVED**
 >
-> Authority: After Codex and Claude both sign Stage 2, this is the sole findings
-> backlog consumed by implementation planning. Stage 1 finding files remain audit
-> evidence and must not be treated as competing backlogs.
+> Authority: Codex and Claude have both signed Stage 2. This is the sole findings
+> backlog consumed by implementation planning. Stage 1 finding files remain
+> audit evidence and must not be treated as competing backlogs.
 >
 > New-chat entry point: [START-HERE.md](START-HERE.md). Conflict resolutions and
 > the joint decision arithmetic live in
@@ -24,12 +24,12 @@ are Stage 3 (`prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md`).
 | Claude Stage 1 commit | `c788b29` (freeze), SHA recorded by `4bb1f1b`, manifest refreshed by `edf307d` |
 | Frozen source archive | `2026-07-23 ssor-prod.zip`, SHA-256 `217F172F7EF7DB527A1EF30E2BFD12D1D6B810BCA55C0D38B7733CB4BE74266F`, 152,681,267 bytes — re-verified in Stage 2 |
 | Site of origin | **Development site of SSOR-prod.** Permanent/main-site equivalence is NOT established |
-| Canonical finding count | **22** |
-| P1 / P2 / P3 / no-fix | **9 / 9 / 3 / 1** |
+| Canonical record count | **22** (20 actionable findings + two no-fix records) |
+| P1 / P2 / P3 / no-fix | **9 / 9 / 2 / 2** |
 | Clean Road finding IDs | PCOA-FINAL-010, PCOA-FINAL-013 |
 | Source-side (vendor, not code) | PCOA-FINAL-020 |
 | Latent (not yet observable) | PCOA-FINAL-012 |
-| Owner-decision-gated | PCOA-FINAL-013 (see UN-02), evidence eligibility rule (see UN-01) |
+| Open Stage 2 conflicts | **None** |
 | Deferred future-test IDs | DEF-01 … DEF-05 |
 
 ## Severity definitions used here
@@ -47,16 +47,16 @@ are Stage 3 (`prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md`).
 | PCOA-FINAL-001 | P1 | Ramp Detail Excel export refused end to end while its consolidation reports success | Ramp Detail | CX-001, CX-002, CX-005, CL-001, CL-004 |
 | PCOA-FINAL-002 | P1 | Matrix-lane vs-TSN workbooks lose the TSN print identity and print a false rebuild instruction | vs-TSN, matrix lanes | CX-003, CL-002 |
 | PCOA-FINAL-003 | P2 | vs-TSN Provenance names a transient `%TEMP%` path as the compared input | vs-TSN, matrix lanes | CL-003 |
-| PCOA-FINAL-004 | P1 | Evidence is generated for prohibited mixed-source pairs, then describes sources it never read | Visual evidence | CX-009, CL-010 |
-| PCOA-FINAL-005 | P1 | Blank compared values are boxed on the wrong record in TSN district prints | Visual evidence | CX-011, CL-016, CX-009 (part) |
+| PCOA-FINAL-004 | P1 | Evidence is generated for prohibited mixed-source pairs, then describes sources it never read | Visual evidence | CX-009, CX-011 (eligibility consequence), CL-010 |
+| PCOA-FINAL-005 | P1 | Evidence target boxes can point to the wrong field or record | Visual evidence | CX-011, CL-016, CX-009 (part) |
 | PCOA-FINAL-006 | P1 | Excel-side evidence panels silently truncate the drawn value at 26 characters | Visual evidence | CL-015, CX-009 (part) |
-| PCOA-FINAL-007 | P2 | Eligible PDF-vs-PDF evidence is unavailable in cross-environment mode and for Ramp Summary vs TSN | Visual evidence | CX-004, CL-014 |
+| PCOA-FINAL-007 | P2 | Eligible PDF-vs-PDF evidence is unavailable in cross-environment mode | Visual evidence | CX-004 (ENV scope), CL-014 |
 | PCOA-FINAL-008 | P1 | Statewide summary workbooks clip category identities beyond recognition | Workbook presentation | CX-013 |
 | PCOA-FINAL-009 | P2 | Large/detail workbooks clip Summary, Spot Check, and composite-key content | Workbook presentation | CX-014 |
 | PCOA-FINAL-010 | P1 | Clean Road silently skips live source rows, publishing false and misrepresented differences | Clean Road Highway | CX-015 |
 | PCOA-FINAL-011 | P1 | Highway Sequence PDF-vs-Excel self check publishes 3,714 representation-only differences | Highway Sequence self | CX-007 |
 | PCOA-FINAL-012 | P2 | Ramp Detail self check will publish 108 asymmetric null-token differences once unblocked (latent) | Ramp Detail self | CX-006 |
-| PCOA-FINAL-013 | P2 | Punctuation/case/quote-only Description differences published as data discrepancies | Multiple, shared | CX-008, CX-010, CX-012 |
+| PCOA-FINAL-013 | P2 | Representation-only Description differences are not separated from substantive changes | Multiple, shared | CX-008, CX-010, CX-012 |
 | PCOA-FINAL-014 | P2 | Per-field table reports never-compared CONTEXT columns as `0` differences | Highway Sequence, shared | CL-011 |
 | PCOA-FINAL-015 | P2 | An absent second side is reported only after the first side is fully parsed | Engine, all PDF families | CL-012 |
 | PCOA-FINAL-016 | P3 | Private TSN capture directories accumulate in `%TEMP%` | vs-TSN, matrix lanes | CL-005 |
@@ -64,7 +64,7 @@ are Stage 3 (`prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md`).
 | PCOA-FINAL-018 | P2 | Three enabled report editions have no verification path at all | Report catalog | CL-007 |
 | PCOA-FINAL-019 | P3 | The values twin's headline verdict is an uncached formula | Workbook presentation | CL-008 |
 | PCOA-FINAL-020 | P1 | **Source-side:** the route 140 Highway Log Excel export is missing whole columns its own print carries | Vendor / site | CL-017 |
-| PCOA-FINAL-021 | P3 | Two Highway Log PDF/Excel row-universe residuals remain unattributed | Highway Log | CL-013 |
+| PCOA-FINAL-021 | NO FIX | Prior 7.9 Highway Log PDF contains two genuine PDF-only rows | Highway Log source truth | CL-013 |
 | PCOA-FINAL-022 | NO FIX | Site-side export changes observed and absorbed — must not regress | Parsers | CL-009 |
 
 ---
@@ -113,10 +113,11 @@ Two things around that correct refusal are defects:
    sibling reports get this right: Intersection Detail names "the current (July
    2026) site format" and Highway Detail names "the exact 34-column export header".
 
-**User impact.** Nine of the twelve Ramp Detail deliverables do not exist. Only
-the PDF edition of the family remains verifiable — and because the Excel side is
-also the self check's other leg, the one workflow that could prove whether the
-two editions agree is unavailable for this family too.
+**User impact.** Eight decisions in the exact 88-cell topology do not produce a
+deliverable. The separate PDF-vs-Excel by-day corroborating path fails too,
+making nine production comparison placements in all. Only the PDF edition's
+non-self workflows remain verifiable; because Excel is the self check's other
+leg, no path can currently prove that the two editions agree.
 
 **Root cause.** *Verified:* a site-side export change plus a single pinned
 positional header contract. *Explicitly a hypothesis, not verified:* that the
@@ -261,22 +262,25 @@ exists and is readable after the run completes.
 
 | Field | Value |
 |---|---|
-| **Aliases** | PCOA-CX-009 (modality half), PCOA-CL-010 |
+| **Aliases** | PCOA-CX-009 (modality half), PCOA-CX-011 (eligibility consequence), PCOA-CL-010 |
 | **Family** | Highway Sequence, Highway Log, Intersection Detail (both editions), Ramp Detail (PDF) |
 | **Workflows** | By Day vs TSN, Everything vs TSN, Everything SELF |
 | **Values / formulas scope** | None — this is an evidence-only defect |
-| **Evidence scope** | **9 registry cells** produce prohibited artifacts; Codex counts 14 artifact sets across both dispatch paths, 1,394 PNGs reviewed |
+| **Evidence scope** | **11 registry cells** produce prohibited artifacts; **18 artifact sets / 1,778 retained PNGs** across By Day and Everything |
 
 **Verified behavior.** Evidence is required only when **both semantic sources are
 PDFs**. It is produced anyway in three distinct shapes:
 
-* **Excel semantic side** — `highway_sequence` and `highway_log` vs TSN compare
+* **Excel TSMIS side** — `highway_sequence` and `highway_log` vs TSN compare
   the consolidated **XLSX**; manifest read sets are `1 TSMIS xlsx + 12 TSN pdf`,
   and each left panel is labelled `TSMIS (Excel)`.
-* **XLSX semantic side** — `intersection_detail`, `intersection_detail_pdf` and
-  `ramp_detail_pdf` vs TSN compare the **normalized XLSX** while the TSN panel is
-  rendered from a statewide print in `tsn_library\<report>\pdf\` that was never
-  compared.
+* **Normalized-XLSX TSN side** — every vs-TSN comparison reads a normalized
+  workbook. `intersection_detail`, `intersection_detail_pdf` and
+  `ramp_detail_pdf` borrow a different statewide PDF from
+  `tsn_library\<report>\pdf\`. Highway Log / Highway Sequence (including their
+  PDF rows) render the raw district PDFs that produced the library, but Prompt
+  01 item 10 explicitly says that provenance does not make
+  PDF-vs-normalized-XLSX evidence eligible.
 * **Self checks** — all five SELF cells have one Excel side by construction.
 
 The workbook then **asserts sources it did not read**: every image sheet says
@@ -311,22 +315,22 @@ illustrated source was never compared, with prose asserting it was.
 
 **Acceptance test.** For every generated evidence set, each read-set member is
 the exact artifact its side was compared from (assert against the comparison's
-own provenance, not against file extension); and no evidence artifact of any kind
-— manifest included — is emitted for a pair failing that test. Re-run the 9
-prohibited cells and assert zero artifacts. **See UN-01: the eligibility rule
-needs one authoritative definition before this test is written.**
+own provenance, not against file extension); and no evidence artifact of any
+kind — manifest included — is emitted for a pair failing that test. Re-run all
+11 prohibited registry cells plus their By Day counterparts and assert zero
+artifacts.
 
 ---
 
-## PCOA-FINAL-005 — P1 — Blank compared values are boxed on the wrong record in TSN district prints
+## PCOA-FINAL-005 — P1 — Evidence target boxes can point to the wrong field or record
 
 | Field | Value |
 |---|---|
 | **Aliases** | PCOA-CX-011, PCOA-CL-016, PCOA-CX-009 (wrong-target crops) |
-| **Family** | Highway Log (PDF), Highway Sequence (PDF) — the two audit-`REQUIRED` PDF/PDF cells |
+| **Family** | Highway Log and Highway Sequence, both editions |
 | **Workflows** | By Day vs TSN, Everything vs TSN |
 | **Values / formulas scope** | None |
-| **Evidence scope** | Both `REQUIRED` evidence cells are DENIED on this alone |
+| **Evidence scope** | All affected artifacts are `PROHIBITED`; this is an independent renderer defect |
 
 **Verified behavior.** When the compared value is **blank on the TSN district
 print**, the red target box lands on adjacent printed content instead of the
@@ -356,10 +360,11 @@ defect. Codex's Everything HL PDF set passed 180/180 only because it happened no
 to draw one; Claude's run of the same cell did draw one and failed. A crop-accuracy
 verdict is therefore not reproducible run-to-run, which is itself worth fixing.
 
-**User impact.** In exactly the two configurations the audit rule *requires*
-evidence for, the illustrated proof points at a different record than the one
-being asserted — the strongest possible failure for an artifact whose only job is
-to show where a difference is.
+**User impact.** These artifacts must not be generated under the final evidence
+rule, but when they are generated the illustrated proof can point at a different
+record than the one being asserted — the strongest possible failure for an
+artifact whose only job is to show where a difference is. The same targeting
+mechanism remains relevant to future eligible PDF-vs-PDF ENV evidence.
 
 **Secondary, milder symptom (both rounds).** A ~1-character left overshoot on
 some targets (TSN `EQUATES TO` FT blanks, one Intersection Detail `CS Eff-Date`),
@@ -376,9 +381,9 @@ Codex: `source-audit/highway-sequence-pdf-vs-tsn-evidence-manual-review.json`,
 either side, the target rectangle must fall inside the row rectangle of the
 record named in the caption, and must not intersect any glyph belonging to
 another record or to a different field. Assert on the **whole** generated set,
-not a sample, for both `REQUIRED` cells, and specifically over the
-`EQUATES TO` and blank-Description populations that the current sampler reaches
-only by chance.
+not a sample, specifically over the `EQUATES TO` and blank-Description
+populations that the current sampler reaches only by chance. Apply the same
+targeting assertion to future eligible PDF-vs-PDF ENV evidence.
 
 ---
 
@@ -409,10 +414,10 @@ Codex independently observed the same class on two further sets ("two truncated
 TSMIS crops" on HSL, "four truncate the captioned TSMIS Description" on HL),
 which corroborates it on artifacts Claude never opened.
 
-**Verified not to affect PDF crops.** Both audit-`REQUIRED` PDF/PDF cells render
-full 39- and 55-character values untruncated. The defect is confined to exactly
-the configurations PCOA-FINAL-004 says should not be illustrated at all — so a
-fix for 004 may retire this, and a fix for this must not be assumed to fix 004.
+**Verified not to affect PDF crops.** The observed PDF crop panels render full
+39- and 55-character values untruncated. All currently generated panels in this
+scope are prohibited by PCOA-FINAL-004, so a fix for 004 may retire this, and a
+fix for this must not be assumed to fix 004.
 
 **User impact.** The picture, whose entire purpose is to show the value in
 context, endorses a **different string** from the one compared. The heading line
@@ -429,15 +434,15 @@ examples in both layouts.
 
 ---
 
-## PCOA-FINAL-007 — P2 — Eligible PDF-vs-PDF evidence is unavailable in cross-environment mode and for Ramp Summary vs TSN
+## PCOA-FINAL-007 — P2 — Eligible PDF-vs-PDF evidence is unavailable in cross-environment mode
 
 | Field | Value |
 |---|---|
 | **Aliases** | PCOA-CX-004, PCOA-CL-014 |
 | **Family** | Ramp Summary, Ramp Detail (PDF), Intersection Detail (PDF), Highway Log (PDF), Highway Sequence (PDF) |
-| **Workflows** | Everything ENV (5 cells), Everything TSN (`ramp_summary`), By Day vs TSN (`ramp_summary`) |
+| **Workflows** | Everything ENV (5 cells) |
 | **Values / formulas scope** | None |
-| **Evidence scope** | **6 registry cells** DENIED for absence |
+| **Evidence scope** | **5 registry cells** DENIED for absence |
 
 **Verified behavior.** Five cross-environment cells compare PDF against PDF —
 the one configuration the audit rule calls `REQUIRED` — and all have large
@@ -446,10 +451,10 @@ Ramp Detail PDF 376 + 5/8 one-sided; Highway Log PDF 88,238 + 2,095/1,174;
 Highway Sequence PDF 1,904 + 7/246). **No evidence artifact of any kind exists
 anywhere under the env, baseline, or PDF-vs-Excel trees**, and
 `matrix_build.build_cell_comparison` **takes no evidence argument at all** — so
-this is an unimplemented capability, not a failed generation. Ramp Summary vs TSN
-is separately eligible (its TSMIS side consolidates 126 route PDFs and its TSN
-library raw *is* `Ramp Summary Statewide_TSN.pdf`) and likewise produced zero
-files with evidence explicitly enabled.
+this is an unimplemented capability, not a failed generation. Ramp Summary vs
+TSN is not part of this finding: that comparison reads a normalized TSN XLSX, so
+its clean evidence absence is correctly `APPROVED` under Prompt 01 item 10 even
+though raw PDFs exist upstream on both sides.
 
 **User impact.** The user cannot obtain illustrated proof for the comparisons
 most likely to need it. Nothing leaked, so no wrong artifact was delivered — the
@@ -458,11 +463,10 @@ harm is a missing capability, which is why this is P2 rather than P1.
 **Ownership hint (inspection-supported).** `matrix_build.build_cell_comparison`
 (no evidence parameter on the env path).
 
-**Acceptance test.** With evidence enabled, each of the 6 cells produces a bound
-manifest, evidence workbook, image set, and a read set that satisfies
-PCOA-FINAL-004's test — or the product states in the UI that evidence is not
-offered for that mode, and the registry records it as an intentional `N/A`.
-**Gated on UN-01.**
+**Acceptance test.** With evidence enabled, each of the 5 cells produces a bound
+manifest, evidence workbook, image set, and a PDF-only read set that satisfies
+PCOA-FINAL-004's exact-source test. Every retained crop is accurate and readable;
+absence or relabelling the supported comparison as `N/A` does not pass.
 
 ---
 
@@ -656,11 +660,14 @@ differences as data disagreements. The product already discloses this exact
 equation-relation class in the vs-TSN `Notes`, so the omission is inconsistent
 within the product itself.
 
-**Reconciliation note.** Claude produced the identical numbers and explicitly
-recorded *"which edition is right needs source adjudication — recorded, not
-attributed"*; Codex performed that adjudication. This resolution therefore rests
-on **one round only** — see UN-04; Codex must re-state its method so Claude can
-challenge it in the second pass.
+**Final cross-check.** The second reviewer re-ran the adjudication against the
+complete 60,254-row witness and directly inspected raw route 001 on both sides.
+The XLSX carries the equation source at `ORA R 018.540` and its target at
+`ORA 018.530`; the rendered source PDF page 6 prints `ORA R 018.540 EQUATES TO
+END R REALIGNMENT` followed by the target line `ORA 018.530 E D H 001.267`.
+That source/target representation is exactly the class canonicalized across all
+1,119 relations. The cross-check is recorded as `SR-04` in
+`stage2-second-review-crosscheck.json`; no unsupported relation remains.
 
 **Witnesses.** Codex: `source-audit/self-highway-sequence-discrepancy-audit.json`,
 `highway-sequence-pdf-excel-equation-parity.json`, `run-ledgers/self-full-both.json`.
@@ -715,7 +722,7 @@ all 15,213 rows.
 
 ---
 
-## PCOA-FINAL-013 — P2 — Punctuation/case/quote-only Description differences published as data discrepancies
+## PCOA-FINAL-013 — P2 — Representation-only Description differences are not separated from substantive changes
 
 | Field | Value |
 |---|---|
@@ -724,7 +731,7 @@ all 15,213 rows.
 | **Workflows** | Direct vs TSN, By Day vs TSN, Everything vs TSN, Clean Road |
 | **Values / formulas scope** | Both twins — shared discrepancy masks |
 | **Evidence scope** | None |
-| **Status** | **FACT CONFIRMED — CHARACTERIZATION IS AN OWNER DECISION (UN-02)** |
+| **Status** | **CONFIRMED DISCLOSURE / CLASSIFICATION DEFECT** |
 
 **Verified behavior.** Independent full-field classification of hash-bound
 comparison payloads found these token-identical-modulo-presentation cells:
@@ -742,33 +749,35 @@ a PDF-extraction artifact. Normalization is not the cause: all 15,410 Ramp Detai
 and all 16,626 Intersection Detail TSN rows match their raw sources
 field-for-field, and Clean Road's 60,083 × 74 normalization changes zero cells.
 
-**Why this is referred, not asserted as a defect.** These are **real literal
-differences between two sources**. A comparator that reports them is not lying.
-Whether the engine should normalise them away, disclose them as a class, or
-publish them as-is is a domain-contract decision reserved to the owner under the
-`compare_core` correctness lock — equality and normalization changes must follow
-the approved contract and be proved cell-for-cell.
+**Defect boundary.** These are **real literal differences between two sources**,
+so no automatic equality or normalization change is asserted here. The defect is
+that unqualified headline totals do not distinguish this exactly measured
+punctuation/case/quote/presentation class from substantive data changes. A reader
+cannot tell how much of the total is merely representational. Any future equality
+or normalization change remains subject to the `compare_core` correctness lock
+and must be separately approved and proved cell-for-cell.
 
-**A tension the owner should weigh.** The Intersection Detail pair
+**A shipped behavior that constrains any normalization choice.** The Intersection Detail pair
 `''F'' ST` vs `"F" ST` is the KER 046 @ 50.904 case the product **already
 deliberately annotates** through the evidence `_quote_note` clarifier — i.e. it
 has previously been treated as worth *showing*, not suppressing. Suppressing it
 now would reverse a shipped decision.
 
-**User impact if left as-is.** Highway Log vs TSN overstates its differing-cell
-count by 1,243 per format against a reader who considers `,` and `/` equivalent.
-Because affected rows may also differ in other fields, **no corrected
-differing-row total is asserted.**
+**User impact.** Highway Log vs TSN combines 1,243 presentation-only Description
+cells per format with substantive cells under one unqualified total. Because
+affected rows may also differ in other fields, **no corrected differing-row total
+is asserted.**
 
 **Witnesses.** Codex: `source-audit/direct-all-field-semantic-candidates.json`,
 `highway-log-description-semantic-classification.json`,
 `direct-description-semantic-classification-remaining.json`,
 `clean-road-highway-landmark-four-source-trace.json`.
 
-**Acceptance test.** *Cannot be written until UN-02 is decided.* Once decided,
-either (a) the affected counts fall by exactly 1,243 / 11 / 2 / 1 / 5 with a
-re-blessed canary and cell-for-cell evidence, or (b) Summary and Notes disclose
-the class with its exact count so a reader can discount it.
+**Acceptance test.** Either (a) Summary and Notes disclose the representation-only
+class and its exact count separately from substantive differences, or (b) a
+separately approved normalization changes equality and the affected counts move
+by the exact proved deltas, with re-blessed canaries and cell-for-cell evidence.
+No undisclosed change to equality semantics is accepted.
 
 ---
 
@@ -1010,7 +1019,7 @@ on delivery, the route 140 self check reports zero `X ≠ (blank)` differences o
 
 ---
 
-## PCOA-FINAL-021 — P3 — Two Highway Log PDF/Excel row-universe residuals remain unattributed
+## PCOA-FINAL-021 — NO FIX — Prior 7.9 Highway Log PDF contains two genuine PDF-only rows
 
 | Field | Value |
 |---|---|
@@ -1019,6 +1028,7 @@ on delivery, the route 140 self check reports zero `X ≠ (blank)` differences o
 | **Workflows** | Classic environment (the diagnosis path) |
 | **Values / formulas scope** | Diagnostic |
 | **Evidence scope** | None |
+| **Status** | **Validated source truth — regression guard, not a defect** |
 
 **Verified behavior.** Cross-environment over the same two days: Excel edition
 52,821 / 51,884 rows, 50,327 paired, 89,811 differing cells; PDF edition
@@ -1027,18 +1037,26 @@ workbooks' own *Routes* sheets localizes the entire difference to **4 routes** �
 `005` (15 rows), `074`, `101`, `140` (1 row each), net −14 / +2, reconciling both
 totals exactly.
 
-**What is and is not explained.** Route 140 is PCOA-FINAL-020. Route 005 was
+**Complete attribution.** Route 140 is PCOA-FINAL-020. Route 005 was
 traced by Codex to real source divergence (the raw PDF advances an otherwise
 identical payload to `R000.548` while Excel retains it at `000.243`; and at
 `R025.780` the raw sides genuinely differ in mileage, county odometer, city, RU,
-roadbed type and record date). **Routes 074 and 101 — one row each — are not
-attributed by either round.** Carried as UN-03.
+roadbed type and record date). The final source audit resolves the last two rows:
 
-**User impact.** Minimal today; recorded so the residual is not lost and so the
-reconciliation is not mistaken for complete.
+* route `074`, location `000.000`, occurrence 2 is present in the prior 7.9 raw
+  PDF (page 7, line 31) and absent from its Excel sibling: PDF count 2, Excel
+  count 1;
+* route `101`, location `R022.828` is present in the prior 7.9 raw PDF (page 142,
+  line 23) and absent from its Excel sibling: PDF count 1, Excel count 0.
 
-**Acceptance test.** The single-row PDF/Excel differences at routes 074 and 101
-are traced to raw source and classified as real divergence or parser behavior.
+Both are genuine PDF-only source rows retained correctly by the PDF path. The
+second review confirmed the witness integrity and closes the former attribution
+gap.
+
+**Regression guard.** Continue retaining both source rows in the PDF-derived
+universe and do not synthesize them in the Excel-derived universe. Witness:
+`source-audit/prior-7.9-highway-log-sibling-raw-source-audit.json`, independently
+cross-checked as `SR-02` in `stage2-second-review-crosscheck.json`.
 
 ---
 
@@ -1092,6 +1110,7 @@ denials above.
 | **TSN normalization fidelity** | Intersection Detail: all 16,626 raw rows project to the 38-column library with zero differences across 631,788 cells. Ramp Detail: all 15,410 rows match raw field-for-field. Clean Road: 60,083 × 74 with zero changed, missing or extra cells | Codex `intersection-detail-tsn-normalization-parity.json`, `ramp-detail-tsn-normalization-parity.json`, `clean-road-highway-tsn-normalization-parity.json` |
 | **Consolidation completeness** | App-independent raw-XLSX audit of complete typed row multisets across 8 datasets and 288,800 raw rows: zero missing, zero extra consolidated rows | Codex `tabular-consolidation-raw-cell-parity.json` |
 | **PDF editions reproduce their Excel siblings** | Intersection Detail cross-environment differs by **one cell** in 559,606; Intersection Detail vs TSN is byte-identical. Against TSN the PDF editions pair *better* (Highway Log +634 rows, Highway Sequence +433) — the premise the PDF consolidators exist for | Claude `VC-13` |
+| **Prior 7.9 Highway Log PDF-only rows are source truth** | Route 074 at `000.000` occurrence 2 and route 101 at `R022.828` exist in the raw PDF and not in its Excel sibling; the PDF-derived universe correctly retains both | Codex `prior-7.9-highway-log-sibling-raw-source-audit.json`; Stage 2 `SR-02` |
 | **One-sided classes are disclosed, not dropped** | The vs-TSN *Summary by Category* sheet states TSN-only bookkeeping classes in prose and counts them in the typed outcome; TSMIS `+ - INVALID DATA` = 2,620 vs TSN 0 is surfaced | Claude `VC-5`, `VC-9` |
 | **Intersection Detail header canonicalization** | 16,328 differing rows concentrate in **4 of 35** columns with the other 31 at exactly 0 — a position misalignment would scatter across all 35. A genuine site-side correction, reported truthfully | Claude `VC-12` |
 | **Clean Road ArcGIS build rule fidelity** | Exactly rule-faithful across 57,728 rows, 252 routes, 74 fields, 4,271,872 cells, zero mismatches or duplicate keys. **The build rule is not the defect in PCOA-FINAL-010** | Codex `clean-road-highway-raw-source-truth.json` |
@@ -1111,8 +1130,8 @@ denials above.
 
 | Reviewer | Decision | Commit | Date | Notes |
 |---|---|---|---|---|
-| Claude | **SIGNED (first Stage 2 cross-check)** | this commit | 2026-07-26 | 22 canonical findings; three bounded rechecks retained; every Stage 1 finding mapped |
-| Codex | NOT STARTED | PENDING | PENDING | Must challenge every resolution, especially R-01, R-04, R-06, R-09 and UN-04 |
+| Claude | **APPROVED (first Stage 2 cross-check)** | `aa0d086` | 2026-07-26 | 22 canonical records; every Stage 1 finding mapped |
+| Codex | **APPROVED (final Stage 2 cross-check)** | this commit | 2026-07-26 | Challenged every resolution; corrected evidence scope, closed all four formerly open issues, and found no open conflict |
 
-Stage 3 may begin only when both decisions are `APPROVED`. Then run
+Stage 3 is unblocked. Run
 [Prompt 03 — agree implementation plan](prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md).

@@ -1,0 +1,154 @@
+{
+  "schema": 1,
+  "stage": "Stage 2 final challenge",
+  "reviewer": "Codex",
+  "review_date": "2026-07-26",
+  "first_review_commit": "aa0d086",
+  "branch": "audit/post-comparison-final-reconciliation",
+  "preconditions": {
+    "codex_stage1_complete": true,
+    "claude_stage1_complete": true,
+    "codex_artifact_root_readable": true,
+    "claude_artifact_root_readable": true,
+    "claude_commit_in_branch_history": true,
+    "application_code_changed_in_stage2": false
+  },
+  "corrections": [
+    {
+      "id": "SR-01",
+      "issue": "Evidence eligibility for every vs-TSN cell",
+      "controlling_text": [
+        "AUDIT-SCOPE-AND-PROVENANCE.md rule 11",
+        "PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md item 10"
+      ],
+      "decision": "PROHIBITED whenever the compared TSN side is a normalized XLSX, even when that normalized workbook was built from PDFs and those PDFs are available to the renderer.",
+      "draft_correction": "Everything TSN ramp_summary changes from REQUIRED/DENIED to PROHIBITED/APPROVED. Highway Log PDF and Highway Sequence PDF remain DENIED, now for prohibited generation rather than for a required crop gate.",
+      "registry_before": {
+        "approved": 5,
+        "denied": 17,
+        "n_a": 3
+      },
+      "registry_after": {
+        "approved": 6,
+        "denied": 16,
+        "n_a": 3
+      },
+      "prohibited_artifact_scope": {
+        "everything_registry_cells": 11,
+        "by_day_and_everything_artifact_sets": 18,
+        "retained_pngs": 1778
+      }
+    },
+    {
+      "id": "SR-02",
+      "issue": "Highway Log route 074 and 101 row-universe residuals",
+      "source_witness": "Codex source-audit/prior-7.9-highway-log-sibling-raw-source-audit.json",
+      "decision": "Both residuals are genuine prior-7.9 PDF-only source rows, not unattributed product behavior.",
+      "rows": [
+        {
+          "route": "074",
+          "location": "000.000",
+          "occurrence": 2,
+          "pdf_occurrences": 2,
+          "excel_occurrences": 1,
+          "raw_pdf_page": 7,
+          "raw_pdf_line": 31,
+          "raw_source_passed": true
+        },
+        {
+          "route": "101",
+          "location": "R022.828",
+          "occurrence": 1,
+          "pdf_occurrences": 1,
+          "excel_occurrences": 0,
+          "raw_pdf_page": 142,
+          "raw_pdf_line": 23,
+          "raw_source_passed": true
+        }
+      ],
+      "draft_correction": "PCOA-FINAL-021 becomes a no-fix source-truth record."
+    },
+    {
+      "id": "SR-03",
+      "issue": "Punctuation, case, spacing, and quote-only Description differences",
+      "decision": "The literal source differences are real, so no equality change is presumed. The deliverable defect is that unqualified headline/per-field totals do not distinguish this verified representation-only class from substantive data changes.",
+      "acceptance_paths": [
+        "Preserve literal comparison and disclose the exact representation-only class and counts in Summary/Notes.",
+        "Apply an owner-approved normalization and prove the exact expected count deltas cell-for-cell."
+      ],
+      "unresolved_contract_question": false
+    }
+  ],
+  "high_risk_confirmations": [
+    {
+      "id": "SR-04",
+      "issue": "Highway Sequence same-day equation canonicalization",
+      "source_witness": "Codex source-audit/highway-sequence-pdf-excel-equation-parity.json",
+      "full_corpus": {
+        "shared_rows": 60254,
+        "pdf_only_rows": 0,
+        "excel_only_rows": 0,
+        "published_differing_rows": 1395,
+        "published_differing_cells": 3714,
+        "equation_source_rows": 1119,
+        "boundary_relations": 39,
+        "delayed_target_suffix_moves": 3,
+        "unsupported_relations": 0,
+        "semantic_differing_rows_after_canonicalization": 0,
+        "semantic_differing_cells_after_canonicalization": 0,
+        "all_witness_checks_passed": true
+      },
+      "raw_sample": {
+        "route": "001",
+        "pdf_page": 6,
+        "pdf_source_line": "ORA R 018.540 EQUATES TO END R REALIGNMENT",
+        "pdf_target_line": "ORA 018.530 E D H 001.267",
+        "excel_source_row": "ORA R 018.540 E D H [blank distance] END R REALIGNMENT",
+        "excel_target_row": "ORA [blank prefix] 018.530 [blank suffix] D H 001.267 [blank description]"
+      },
+      "decision": "PCOA-FINAL-011 upheld; no open recheck remains."
+    },
+    {
+      "id": "SR-05",
+      "issue": "Visible clipping",
+      "source_witness": "stage2-clipping-recheck.json",
+      "measured_cells": 268,
+      "independent_render_check": "Claude Ramp Summary vs TSN Comparison A1:C10 rendered with artifact-tool; populated column B blocks overflow and category labels visibly collapse to Highway Group: / On/Off: fragments.",
+      "decision": "PCOA-FINAL-008 and PCOA-FINAL-009 upheld."
+    },
+    {
+      "id": "SR-06",
+      "issue": "Clean Road skipped-row impact",
+      "source_witness": "Codex source-audit/clean-road-comparison-unlocatable-impact.json",
+      "exact_anchor_cells": 165,
+      "exact_false_positives": 161,
+      "materially_misrepresented_differences": 4,
+      "comparison_rows": 83,
+      "integrity_passed": true,
+      "decision": "PCOA-FINAL-010 upheld."
+    }
+  ],
+  "terminal_totals": {
+    "deliverable_decisions": {
+      "total": 88,
+      "approved": 0,
+      "denied": 68,
+      "blocked": 16,
+      "n_a": 4
+    },
+    "everything_evidence_cells": {
+      "total": 25,
+      "approved": 6,
+      "denied": 16,
+      "n_a": 3
+    },
+    "canonical_records": {
+      "total": 22,
+      "p1": 9,
+      "p2": 9,
+      "p3": 2,
+      "no_fix": 2
+    }
+  },
+  "unresolved_conflicts": 0
+}
