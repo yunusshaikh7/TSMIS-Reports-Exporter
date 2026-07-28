@@ -1,7 +1,6 @@
 # `RB-1` — Implementation Record
 
-Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (review 1's blocking
-finding RB1-R1-001 is implemented; re-review from the new head)
+Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
 
 | Field | Value |
 |---|---|
@@ -11,6 +10,7 @@ finding RB1-R1-001 is implemented; re-review from the new head)
 | Implementation commit | `93e12c23a8eeb8686817248d662e4d30125de0ec` (first implementation) |
 | Review 1 | Codex, `a26725b…` — **DENIED** on RB1-R1-001 (clipped disclosure), recorded in `5090190…` |
 | Review 1 remedy commit | `84b82de` — `fix: make the Clean Road skipped-source disclosure legible (RB-1 review 1)` (+ this SHA-recording follow-up) |
+| Review 1 re-review | Codex, `6d2a2ce…` — **APPROVED**; exact matrix and signature in `REVIEW.md` |
 | Generated-output root | `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\` (bulk; the remedy run is in its `r1-remedy\` subfolder and the Review 1 proof files are untouched); committed machine-readable witnesses in `../HF-01/witness/` |
 
 ## Changes

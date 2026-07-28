@@ -1,6 +1,6 @@
 # `RB-1` — Adversarial Review Record
 
-Status: **DENIED — RETURN TO IMPLEMENTATION**
+Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
 
 ## Review identity
 
@@ -9,153 +9,183 @@ Status: **DENIED — RETURN TO IMPLEMENTATION**
 | Bundle / work item | `RB-1` / `HF-01` |
 | Reviewed branch | `hotfix/rb-1-clean-road-source-truth` |
 | Recorded base `main` | `9c774d4edacf6ae3b6e86d15b62e5d876a690a48` |
-| Implementation commit | `93e12c23a8eeb8686817248d662e4d30125de0ec` |
-| Reviewed head | `a26725b59a5dc5c9445d43af03c9a3ea4041b484` |
+| Original denied head | `a26725b59a5dc5c9445d43af03c9a3ea4041b484` |
+| Review-return implementation | `84b82de` plus SHA-recording follow-up |
+| Reviewed head | `6d2a2ce2e70688bfaa20e8f2e11039165742d55e` |
 | Implementer | Claude |
-| Review 1 | Codex — independent reviewer; **did not implement this bundle** |
-| Review 2 | PENDING — do not run until the Review 1 return is implemented |
-| Final merge commit | PENDING — branch remains unmerged |
+| Approving reviewer | Codex — independent; did not implement this bundle |
+| Review 2 | PENDING — must independently review this exact approved head plus this review-record commit |
+| Merge | PENDING — first approval only; branch remains unmerged |
 
 ## Verdict
 
-**DENIED.** The source-truth semantics, exact recount, formula-workbook
-generation, real GUI generation path, evidence absence, full gate, and
-unaffected-family regression all passed independent review. The bundle
-nevertheless fails a mandatory acceptance criterion: the newly added disclosure
-on
-`ArcGIS Build!A4:B108` is clipped and unreadable in its stored presentation.
+**APPROVED.** RB-1 satisfies its frozen PCOA-FINAL-010 contract at the exact
+reviewed head. The 102 unplaceable source spans are recorded and disclosed,
+all 174 affected build anchors carry the explicit unavailable token, all 165
+paired positions are non-asserting `N`, the nine one-sided positions remain
+`U`, the 161 false positives fall to zero, and the four genuine raw-source
+disagreements remain itemized diagnostic facts. The statewide differing-cell
+total is exactly **291,127 = 291,292 − 165** with no unexpected asserting or
+published-cell change.
 
-This violates the frozen bundle's
-[visual-usability rule](BUNDLE.md#required-verification-matrix), which requires
-the disclosure to be legible in its stored width and forbids new clipping, and
-the Stage 3 ruling that RB-1's own marker/disclosure must be legible even though
-HF-02 owns the pre-existing cross-family clipping program.
+The prior blocking finding `RB1-R1-001` is closed. The regenerated
+`ArcGIS Build` sheet is an itemized **111-row × 14-column** disclosure with
+purposeful widths, wrapped cells, and sufficient stored row heights. Installed
+Excel's font metrics report zero narrow columns and zero short wrapped rows;
+both native-scale and fit-width PDFs pass page-by-page inspection.
+
+No runtime scope leakage was found. The Prompt 04 change only makes the already
+specified denial-return loop executable, and the status/record/witness changes
+are required workflow support.
 
 ## Commands and source inputs
 
 | Purpose | Reviewer command / method | Result |
 |---|---|---|
-| Branch and scope | `git status --short --branch`; `git diff --name-status`, `--stat`, and `--check` from recorded base `9c774d4…` to reviewed head `a26725b…` | **PASS** — clean reviewed head; 16 files, 3,239 insertions / 37 deletions; only the allowed producer, Clean Road comparator, inert shared schema hook, test, canary, plan/records, and witnesses |
-| Targeted head tests | `build\.venv\Scripts\python.exe` running `build/check_clean_road.py`, `check_compare_equality_policy.py`, `check_compare_audit.py`, `check_comparison_artifact_schema.py`, and `check_compare_ditto.py` | **PASS** — all five |
-| Required base-red proof | Archived base `9c774d4…`, copied only head's new `build/check_clean_road.py`, then ran it with the base scripts | **PASS** — 19 semantic failures, including the defect signature `got 3` differing cells instead of `1` |
-| Full gate | `GIT_CONFIG_COUNT=1`, `GIT_CONFIG_KEY_0=safe.directory`, `GIT_CONFIG_VALUE_0=C:/Users/Yunus/Projects/TSMIS-Reports-Exporter`; then `build\.venv\Scripts\python.exe build\run_checks.py -j 4 -k` | **PASS** — 157 / 157. An initial sandbox run was 156 / 157 only because child `git` rejected the managed workspace; the unchanged invocation-scoped safe-directory rerun was fully green |
-| Compile / lint / frozen app | `python -m compileall -q scripts build`; `uvx … ruff check scripts --select E9,F63,F7,F82,F811,F401`; `powershell -File build\build.ps1 -SelfTest` | **PASS** — compile clean; Ruff “All checks passed”; exact shipped executable `SMOKE OK`, 173 MB onefolder |
-| Real end-user generation | Reviewer-owned driver called `GuiApi.start_arcgis_build` → `ConsolidateWorker` → GUI terminal, then `GuiApi.start_arcgis_compare` → `_begin_compare` / `_launch_compare` → worker → GUI terminal; only the native save dialog returned one explicit absent destination | **PASS** — both terminal results `status=ok`, `completion=partial`; zero GUI errors; build and both twins written |
-| Independent source/value audit | Reviewer-owned openpyxl/OOXML reader over every raw ArcGIS span layer plus the frozen pre/post build and values workbooks; imported no product module and did not consume the implementation witness as an oracle; joined the ArcGIS sheet's visible `Key (helper)` to Comparison's hidden `__CMP_E2_KEY_V1_TOKEN` | **PASS** — exact counts and zero unexpected published changes; details below |
-| Installed-Excel formula audit | `powershell -File tmp\rb1-review\audit_formula_excel.ps1` against the independently GUI-generated formulas and values twins; Excel `CalculateFullRebuild`, save, cached/live comparison | **NOT COMPLETED — REVIEWER ENVIRONMENT.** Two attempts drove Excel above 9 GB private memory with severe paging on the 16 GB reviewer host; both ended in host blue screens before Excel saved or emitted audit JSON. No pass is claimed. This lane is not needed to reach denial because visual usability already fails. |
-| Native visual audit | Native-Excel PDFs rendered, then every required Summary, Notes, Comparison, ArcGIS Build, and Provenance view inspected; workbook OOXML layout/styles checked separately | **FAIL** — one blocking, newly introduced clipping defect on `ArcGIS Build` |
+| Preconditions / exact scope | `git status --short`; `git rev-parse HEAD`; `git diff --name-status --stat --check 9c774d4…..6d2a2ce…`; branch/worktree/origin checks | **PASS** — clean exact head; base and head match the implementation record; retained artifacts present |
+| Targeted head tests | `build\.venv\Scripts\python.exe` running `check_clean_road.py`, `check_compare_equality_policy.py`, `check_compare_audit.py`, `check_comparison_artifact_schema.py`, and `check_compare_ditto.py` | **PASS** — all five |
+| Required base-red proof | Archived exact base `9c774d4…`, copied only the current `build/check_clean_road.py`, ran it against base scripts | **PASS** — 24 HF-01 failures, including the defect signature `got 3` differing cells instead of `1`; exact head is fully green |
+| Full gate | `build\.venv\Scripts\python.exe build\run_checks.py -j 4 -k` | **PASS** — 157 / 157 in 109.5 s |
+| Compile / lint / frozen app | `python -m compileall -q scripts build`; `uvx ruff check scripts --select E9,F63,F7,F82,F811,F401`; `powershell -File build\build.ps1 -SelfTest` | **PASS** — compile clean; Ruff “All checks passed”; exact frozen executable `SMOKE OK` |
+| Relevant failure / publication paths | `check_compare_build_freshness.py`; `check_consolidate_worker_publication.py`; `check_consolidate_toctou.py`; `check_comparison_publication.py` | **PASS** — stale snapshots fail closed; producer certificates survive; TOCTOU declines preserve appeared files; interrupted metadata leaves the workbook untrusted |
+| Real end-user generation | Reviewer driver invoked `GuiApi.start_arcgis_build` → `ConsolidateWorker` → GUI terminal, then `GuiApi.start_arcgis_compare` → normal compare worker/terminal; only the native save dialog returned one absent destination | **PASS** — both endpoint replies `ok`; both terminal results `status=ok`, `completion=partial`; zero GUI errors; build and both twins committed |
+| Independent source/value audit | Reviewer-owned openpyxl/OOXML scanner over all raw ArcGIS span layers and the frozen pre/post build and values workbooks; imports no product module and does not consume implementation witness counts | **PASS** — exact 102/174/165/9/161/4 relationships; zero unexpected build, comparison, or layout change |
+| Formula structure / cached results | Reviewer-owned all-sheet streaming OOXML census plus installed Excel 16 cached-result audit of the retained successful full-rebuild twin; twins opened sequentially, read-only | **PASS** — 6,507,937 formula cells; zero cached errors; exact 291,127 / 50,012 totals; 174/174 target parity; zero Summary/Spot Check/Comparison error cells |
+| Native visual audit | Installed Excel font-metric measurement and PDF export; all six rendered pages inspected; prior passed comparison-sheet renders bound to the fresh twin by a complete non-Provenance lockstep audit | **PASS** — all required sheets pass; details below |
+| Unaffected-family regression | Reviewer-owned lockstep audit of same-day base/head Intersection Summary values workbooks and typed sidecars | **PASS** — every non-Provenance cell equal, hidden states/dimensions equal, typed payload SHA equal |
 
-### Frozen and reviewer-generated identities
+The GUI wrapper returned a nonzero console status only after it had written the
+complete result JSON, because the CP1252 console could not echo the Unicode
+`✗` verdict character. The recorded application endpoints and GUI terminal
+results are both successful; this is a reviewer-harness display issue.
+
+### Exact identities
 
 | Input / artifact | Bytes | SHA-256 |
 |---|---:|---|
-| ArcGIS layer library index `arcgis_layers\00_INDEX.xlsx` | 6,993 | `CCD1BDFFC0A122797B95B73CF311D5CB6B8996B7BB55AFDD742A2C4F2CF23ABE` |
+| ArcGIS layer index `arcgis_layers\00_INDEX.xlsx` | 6,993 | `CCD1BDFFC0A122797B95B73CF311D5CB6B8996B7BB55AFDD742A2C4F2CF23ABE` |
 | TSN raw `CA HIGHWAYS 09.08.2025.xlsx` | 21,290,781 | `BBD1ACF9D4A8FEF86F96A0A2CF54BE1105E8C919600DBCD05A325B194F5C86E5` |
+| TSN normalized input | 14,864,394 | `7F1086FEAFE061531B682B12D0DDA161F5256DF50FCC89A954DF8B87A4656AAB` |
 | Frozen pre-fix build | 10,824,390 | `8F9766AC75E3F1CD10729B6090FE2532DA90C821776D3114E28F65DF70BA6376` |
-| Retained post-fix build | 10,828,144 | `8BDD9247771CF2580775F4F0A1DD87706E75F3533C33EC9DB25D41A9AB4B305E` |
 | Frozen pre-fix values comparison | 199,766,125 | `A59177DCDAFCD46369D6438E7773B16A18A3175BCEA11AA347395CE874E493C5` |
-| Retained post-fix values comparison | 200,034,918 | `AFAAB4BACA82D31694BBE2D98E0EE362C91303A79843ED0DC77F4930DEFE3A12` |
-| Independently GUI-generated build | 10,828,183 | `3F420A16C5C2E131A9F092C3DD1E08A887CBE89BA7F9F07CF5413D2A53F84767` |
-| Independently GUI-generated values twin | 199,821,578 | `C103C4EC41E6F435C3ABEA8D88F76E817E39DD43DD57B7589778509124050856` |
-| Independently GUI-generated formulas twin, before Excel recalc | 468,206,187 | `0A0DB15CF4DDC20FBA1666408A906523E5C3945A25FF4C0005CA14BB60760C54` |
-| Same formulas twin, after Excel recalc/save | Not produced | N/A — reviewer audit did not complete |
-| Retained native-Excel `built ArcGIS Build top.pdf` | 119,074 | `42A41C5D820A7709285F189A77EA5A619AD86853DA996F5BFC3CBFF595C37141` |
+| Reviewer fresh build | 10,833,363 | `5BB7B5AB96FA8293280C5C82F57EA44CA2870CB7F8B459F8A8099724024EAE03` |
+| Reviewer fresh values twin | 199,821,558 | `90FEF8BF17F96877A6C1584EC292A06994EAD224A8B3283A53B88297CE387B81` |
+| Reviewer fresh formulas twin, before recalculation | 468,206,168 | `3B022E5ED951D26CA4750AB6CC45204F2592269C2FBD8010E629CC18217B1455` |
+| Retained successful installed-Excel recalculation | 581,844,790 | `F7412CA0D96E926E0CCC8B3CC3B224BB382A88676CD6588B78B4F494B3B2BEAE` |
+| Native `ArcGIS Build` top, 100% | 222,771 | `13935BE3CAA445F6655664D050CE2A53E0CB1357112DB8AACF6B403F23E95368` |
+| Native `ArcGIS Build` full, fit width | 315,535 | `4EDAE7A64256FB1E923B0543E5FD1D5DC7A6C3259B40B7F50FAD288338205C1C` |
 
-The alternate reviewer-generated workbook byte hashes are expected: generation
-time, run identity, provenance paths, and Excel caches differ. The acceptance
-invariant is published semantic/state equivalence, not raw ZIP identity.
+Raw ZIP hashes differ across valid generations because timestamps,
+provenance paths, and Excel formula caches are run identity. Published
+cells/states, typed payloads, layout, and exact source bindings are the
+acceptance invariants.
+
+Reviewer outputs are retained at:
+
+`C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\r1-codex-rereview\`
+
+The implementation's successfully recalculated twin remains at:
+
+`C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\r1-remedy\`
 
 ## Contract and diff audit
 
-| Check | Review 1 | Evidence / notes |
+| Check | Result | Evidence / notes |
 |---|---|---|
-| Every in-scope finding is fixed | **FAIL — acceptance incomplete** | PCOA-FINAL-010's value/source-truth defect is fixed, but its RB-1-specific visual-usability criterion fails |
-| No out-of-scope behavior changed | **PASS** | Shared `CompareSchema.unavailable_rule` defaults inert; no unrelated production file changed; unaffected Intersection Summary is semantically identical |
-| Implementation matches allowed surface | **PASS** | Producer records/marks skipped spans; Clean Road opts into one non-asserting rule; test/canary/docs/witness changes are required support |
-| Tests exercise end-user generation paths | **PASS** | New semantic test is base-red/head-green; reviewer also generated through the actual GUI API/worker closures |
-| Migration / old-build behavior | **PASS** | Older or skip-free builds use the plain schema; skip-free control stays `COMPLETE`; `PARTIAL` propagates for the real 102-row run |
-| Atomic publication / failure behavior | **PASS for changed scope** | GUI logs show temporary pair names followed by both final twins, no GUI error, and zero evidence artifacts; existing atomic/failure checks are included in the 157-test gate |
-| Performance / rerun behavior | **PASS for changed scope** | The real 57,728-row build and 65,164-row two-twin comparison completed inside the review driver's 30/60-minute operation budgets; output sizes are recorded above. The marker result is deterministic at 102/174, the skip-free and old-build controls pass, and no publication/performance subsystem was changed |
-| Provenance / stale-cache behavior | **PASS** | Provenance names real inputs and hashes and records producer completion `partial`; build-freshness/state snapshots remain valid |
+| PCOA-FINAL-010 fixed | **PASS** | Exact source and discrepancy matrix below |
+| No out-of-scope runtime change | **PASS** | Shared `CompareSchema.unavailable_rule` defaults inert; only Clean Road opts in; unchanged Intersection Summary is semantically identical |
+| Allowed implementation surface | **PASS** | Producer, Clean Road comparator, one additive shared schema hook, dedicated test, canary, records, and witnesses |
+| Migration / prior build behavior | **PASS** | Older/skip-free builds retain plain-schema behavior; skip-free control stays `COMPLETE`; real run propagates `PARTIAL` |
+| Atomic publication / stale state | **PASS** | Same generation ID and typed payload on both fresh twins; provenance binds exact build/TSN hashes; stale snapshot and interrupted-publication checks fail closed |
+| Rerun / idempotency | **PASS** | Fresh re-generation matches the first-review twin on every non-Provenance cell except the expected Summary created date; typed payload hash is identical |
+| Performance | **PASS** | Full data GUI build plus both twins completed in 2,659 s; no changed subsystem exceeded its operation budget |
+| Evidence policy | **PASS** | Zero `*evidence*` files before, after, in the delta, and across the complete fresh output tree |
+| Canary | **PASS** | `CRH-SW-E3` records the exact −165 delta, per-field deltas, input identities, and supersession of E2 |
 
-## Independent source and discrepancy audit
+## Independent source and discrepancy results
 
-| Measure | Independent result | Contract result |
-|---|---:|---|
-| Raw span layers / live as-of span rows scanned | 26 / 207,602 | Re-derived without product parsing |
-| Skipped rows | **102** | Exact |
-| Layer split | 100 `SHS Travel Way L`; 2 `SHS O Shld Width R` | Exact |
-| Endpoint split / `LocError` | 101 known begins; 1 known end; all `NO ERROR` | Exact |
-| Expected / actual build markers | **174 / 174** | Exact; zero missing, zero unexpected |
-| Marker split | 171 left travel-way; 3 right outside-shoulder cells | Exact |
-| Paired comparison markers | **165**, all old `D` → new `N` | Exact |
-| One-sided marker displays | **9**, state remains `U` | Exact; no count change |
-| Exact false positives | **161 → 0** | Pass |
-| Raw-source disagreement diagnostics | **4**, still itemized | Pass; now non-asserting |
-| Differing cells | **291,127 = 291,292 − 165** | Exact |
-| Paired / ArcGIS-only / TSN-only rows | **52,647 / 5,081 / 7,436** | Unchanged |
-| Differing / identical paired rows | **50,012 / 2,635** | Unchanged |
-| Unexpected build-data changes | **0** | Pass |
-| Unexpected comparison display/state/count changes | **0** | Pass |
-| Unexpected published layout changes | **0** | Pass |
+| Measure | Independent result |
+|---|---:|
+| Raw span layers / live as-of span rows scanned | 26 / 207,602 |
+| Skipped raw rows | **102** |
+| Layer split | 100 `SHS Travel Way L`; 2 `SHS O Shld Width R` |
+| Endpoint / `LocError` | 101 known begins; 1 known end; all `NO ERROR` |
+| Usable AR / odometer pairs | 102 / 100 |
+| Expected / actual build tokens | **174 / 174** |
+| Missing / unexpected tokens | **0 / 0** |
+| Build-data changes / unexpected changes | **174 / 0** |
+| Paired / one-sided affected positions | **165 / 9** |
+| Exact false positives | **161 → 0** |
+| Genuine raw-source disagreements | **4**, still itemized and non-asserting |
+| Differing cells | **291,127** |
+| Paired / ArcGIS-only / TSN-only rows | **52,647 / 5,081 / 7,436** |
+| Differing / identical paired rows | **50,012 / 2,635** |
+| Unexpected comparison display/state/count changes | **0** |
+| Unexpected layout changes | **0** |
 
-All 174 expected positions were bound independently from raw ArcGIS facts to
-the frozen build, then through the published helper-token join. The 165 paired
-cells display `(unavailable: source span skipped)` and state `N`; the nine
-one-sided positions display the same token while retaining `U`. Nearby genuine
-differences remain red/asserting and counted.
+The four diagnostic raw disagreements remain at Comparison rows 19,119 and
+19,122 for `THY_LT_TRAV_WAY_WIDTH_AMT` and `THY_LT_LANES_AMT`; each is rendered
+with the explicit unavailable token and state `N`, not a fabricated value or
+asserting difference.
 
 ## Values, formulas, visual, evidence, and regression matrix
 
-| Gate | Review 1 | Independent artifacts / notes |
+| Gate | Result | Evidence / notes |
 |---|---|---|
-| Values and discrepancy truth | **PASS** | Exact 174-marker / 165 `D→N` / 9 `U` set; 291,127 differing cells; no out-of-witness asserting change |
-| Installed-Excel formula parity | **NOT COMPLETED — REVIEWER ENVIRONMENT** | No independent native-recalc pass is claimed. The implementer witness records a pass and every completed reviewer semantic/value/test gate passed, but two full-rebuild attempts blue-screened the 16 GB reviewer host before save. Rerun on a suitably provisioned host after the P1 return; this cannot change the current denial. |
-| Visual deliverable usability | **FAIL** | Summary, Notes, Comparison, and Provenance pass; newly added `ArcGIS Build!A4:B108` disclosure is clipped |
+| Values twin | **PASS** | Exact 291,127 total; all 174 target displays/states correct; zero unexpected published change |
+| Formulas twin | **PASS** | Retained Excel full-rebuild hash `F7412CA0…`; independent OOXML has zero cached errors; installed Excel cached read has 174/174 parity, exact counts, and zero errors |
+| Formula self-check | **PASS** | Summary rows 102–111 are ten exact `OK` results; zero exact `CHECK` or error cells on Summary/Spot Check |
 | PDF/Excel sibling parity | **N/A** | Clean Road has no PDF edition |
-| PDF/PDF evidence completeness/crops | **N/A** | Clean Road has no evidence adapter |
-| No mixed-format evidence leakage | **PASS** | Zero `*evidence*` artifacts before/after and in the independently generated output tree |
-| Canary | **PASS** | CRH-SW-E3 records the exact −165 delta and supersedes E2 |
-| Unaffected-family regression | **PASS** | Intersection Summary: every non-Provenance cell equal; panes/states/dimensions equal; both snapshots remain `veryHidden`; typed payload SHA on base/head `f7e3296db9aad6a22e42dd4b436aab46fd42e14a7957f53a0e55599df37ddeaf`; completion `complete` |
-| Full regression gate | **PASS** | 157 / 157, compileall, focused Ruff, and frozen executable self-test |
+| Evidence images/crops | **N/A** | Clean Road has no evidence adapter |
+| Mixed-format evidence leakage | **PASS** | Zero prohibited evidence artifacts |
+| Unaffected-family regression | **PASS** | Every non-Provenance Intersection Summary cell equal; both snapshots remain `veryHidden`; typed payload `f7e3296d…` equal; completion `complete` |
+| Full regression gate | **PASS** | 157/157, compileall, focused Ruff, frozen executable self-test |
+
+One reviewer-owned full-rebuild attempt on the fresh formulas twin was stopped
+after 34 minutes when Excel reached an 8.6 GB working set and host free memory
+fell below 1 GB. The workbook had not saved and its hash remained unchanged, so
+no pass is claimed from that attempt. Acceptance instead rests on the retained
+successful installed-Excel full rebuild, independently checked by all-sheet
+OOXML and a resource-safe sequential Excel cached-result audit. This is
+transparent reviewer-host safety handling, not a product failure.
 
 ### Required native-sheet inspection
 
 | Sheet | Result | Notes |
 |---|---|---|
-| Summary | **PASS** | 102 skipped spans, 174 anchors, and reason legible; counts/formula results agree |
-| Notes | **PASS** | Disclosure is first and fully readable |
-| Comparison | **PASS** | Markers are visually distinguishable from genuine red `≠` differences, excluded from `Diffs`, and grey context headers are unchanged |
-| ArcGIS Build | **FAIL** | New rows 4–108 are not legible in their stored presentation; details below |
-| Provenance | **PASS** | Durable paths, both input hashes, and producer completion `partial` are readable |
+| Summary | **PASS** | 102 skips, 174 anchors, reason, partial status, exact totals, and ten `OK` self-checks remain legible; fresh twin differs from the passed first-review render only by the created date |
+| Notes | **PASS** | Skipped-source disclosure is first and fully readable; fresh sheet is cell-for-cell identical to the passed first-review render |
+| Comparison | **PASS** | Markers remain visually distinct from genuine red `≠` differences, are excluded from `Diffs`, and freeze/filter/state-mask behavior is unchanged; fresh sheet is cell-for-cell identical |
+| ArcGIS Build | **PASS** | Fresh 111×14 sheet; Excel metric oracle: zero narrow columns, zero short wrapped rows; native 100% and full fit-width PDFs inspected on every page |
+| Provenance | **PASS** | Exact build and TSN paths/hashes plus producer `partial` are readable; only expected run-identity values changed |
 
-## Blocking finding
+## Finding disposition
 
-| ID | Priority | Finding | Required change | Status |
-|---|---|---|---|---|
-| RB1-R1-001 | **P1 / blocking** | `scripts/consolidate_clean_highway.py:1082-1086` appends three new disclosure rows and 102 warning rows to `ArcGIS Build`, but applies no presentation. OOXML has no explicit column-width records, `baseColWidth=8`, `defaultRowHeight=15`, and every new cell uses style 0 with neither wrap nor shrink-to-fit. Native Excel renders the labels as `Skipped so…`, `Marked an…`, and `Unavailabl…`; B6 is cut off; B7:B108 contain 280–329 characters each yet render only their opening fragment. The retained proof is `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\built ArcGIS Build top.pdf` (SHA above). These are RB-1's newly introduced rows, not HF-02's pre-existing general clipping. | Make all new A4:B108 labels, marker text, and 102 itemized warning/details legible at native scale using purposeful widths/wrapping/row heights or an equivalently readable structure. Regenerate the build and both twins because build hash/provenance changes, then rerun the complete visual/formula/count/GUI/regression matrix. Keep the remedy limited to RB-1's new marker-sheet content. | **OPEN — RETURN TO PROMPT 04** |
-
-The real GUI run completed and produced valid output; its wrapper returned a
-non-zero console status only after writing the complete result JSON because the
-reviewer's CP1252 terminal could not print the Unicode `✗` verdict character.
-That is a reviewer-harness display issue, not an application failure.
-
-The implementation record's pre-existing cancellation observation
-(`_cancelled()` takes no argument while unchanged callers pass `events`) was
-confirmed as present at the base and is not charged to RB-1. It remains outside
-this bundle and does not weaken the blocking visual finding above.
-
-## Approval
-
-| Reviewer | Relationship to implementation | Decision | Reviewed commit / timestamp |
+| ID | Priority | Original finding | Disposition |
 |---|---|---|---|
-| Codex — Review 1 | Independent; not the implementer | **DENIED — RETURN TO IMPLEMENTATION** | `a26725b59a5dc5c9445d43af03c9a3ea4041b484` / `2026-07-28T00:03:08.6792773-07:00` |
-| Review 2 | PENDING | NOT STARTED | PENDING |
+| RB1-R1-001 | P1 / blocking | New `ArcGIS Build` disclosure was clipped at default widths/heights | **CLOSED** — itemized 14-column table, stored widths, wrapping, sufficient row heights, fresh Excel metrics/PDF inspection green |
 
-**Reviewer signature:** Codex, Review 1 — `2026-07-28T00:03:08.6792773-07:00`.
+The pre-existing `_cancelled(events)` call-shape defect remains present at the
+base and is outside RB-1. It is not charged to this bundle.
 
-Do not merge. Resume
-`hotfix/rb-1-clean-road-source-truth` through Prompt 04 with
-`<BUNDLE_ID> = RB-1` and `<IMPLEMENTER> = Claude`. After the exact return above
-is implemented and the acceptance artifacts are regenerated, run Prompt 05
-again from the new reviewed head.
+## Approval history
+
+| Review event | Reviewer relationship | Decision | Reviewed commit / timestamp |
+|---|---|---|---|
+| Review 1 attempt 1 | Codex; independent non-implementer | **DENIED — RETURN TO IMPLEMENTATION** | `a26725b59a5dc5c9445d43af03c9a3ea4041b484` / `2026-07-28T00:03:08.6792773-07:00` |
+| Review 1 re-review | Codex; independent non-implementer | **APPROVED** | `6d2a2ce2e70688bfaa20e8f2e11039165742d55e` / `2026-07-28T08:26:47.3070509-07:00` |
+| Review 2 | PENDING — separate review | NOT STARTED | PENDING |
+
+**Reviewer signature:** Codex, Review 1 — APPROVED —
+`2026-07-28T08:26:47.3070509-07:00`.
+
+Do not merge. Run Prompt 05 again in a separate Codex review with:
+
+```text
+<BUNDLE_ID> = RB-1
+<REVIEWER> = Codex
+```
+
+The second review must independently challenge the exact approved head plus
+this review-record commit. Only joint approval authorizes merge, post-merge
+smoke checks, push, and branch/worktree cleanup.

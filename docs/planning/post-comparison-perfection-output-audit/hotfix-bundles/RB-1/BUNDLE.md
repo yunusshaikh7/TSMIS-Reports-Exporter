@@ -1,7 +1,6 @@
 # `RB-1` — Bundle Contract
 
-Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (review 1 denied on
-RB1-R1-001; the remedy is implemented and the acceptance matrix re-run)
+Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
 
 > This RB-level contract carries work item **HF-01** and is transcribed from the
 > HF-01 section of

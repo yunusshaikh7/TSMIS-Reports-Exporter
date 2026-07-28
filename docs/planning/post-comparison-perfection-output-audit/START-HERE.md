@@ -1,8 +1,8 @@
 # Post-Comparison Output Program — Start Here
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
-RB-1 / Clean Road is IMPLEMENTED — AWAITING ADVERSARIAL REVIEW (Stage 5), with
-Review 1's blocking finding RB1-R1-001 implemented and re-accepted**
+RB-1 / Clean Road is REVIEW 1 APPROVED — AWAITING REVIEW 2 (Stage 5);
+Review 1's blocking finding RB1-R1-001 is closed**
 
 Last updated: 2026-07-28
 
@@ -16,7 +16,7 @@ first pass.
 
 Run
 [`prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md)
-in a new **Codex** chat (review 1 of 2, re-review from the new head) with:
+in a new **Codex** chat (review 2 of 2, independently challenging Review 1) with:
 
 ```text
 <BUNDLE_ID> = RB-1
@@ -38,6 +38,11 @@ acceptance output is retained at
 `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\` (the
 remedy run in its `r1-remedy\` subfolder; Review 1's own proof files are
 untouched). The branch is NOT merged.
+
+Codex Review 1 re-reviewed exact head
+`6d2a2ce2e70688bfaa20e8f2e11039165742d55e`, closed RB1-R1-001, and
+approved the complete matrix. Reviewer-owned re-review artifacts are retained
+in the same HF-01 root under `r1-codex-rereview\`. Review 2 is still pending.
 
 Claude drafted the plan as first planner (both sign-off rows read `NOT STARTED`
 when Prompt 03 was invoked, so the prompt's own first-planner rule applied — the
@@ -90,8 +95,8 @@ The other two point in opposite directions on purpose:
   the Description is the same label with `EQUATES TO ` prepended. The rule must be
   pair-aware, opt-in, and must not widen into the HF-09 class.
 
-Both planners signed the Stage 3 plan. **RB-1 was READY, is now DENIED —
-RETURN TO IMPLEMENTATION, and no other RB is authorized yet.**
+Both planners signed the Stage 3 plan. **RB-1 has Review 1 approval and awaits
+Review 2; no other RB is authorized yet.**
 
 Stage 2 is closed with no open conflict:
 
@@ -113,8 +118,8 @@ Stage 2 is closed with no open conflict:
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/RB-1/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-1 DENIED — RETURN TO IMPLEMENTATION** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **REVIEW 1 DENIED — LOOP TO STAGE 4** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-1 IMPLEMENTATION COMPLETE** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **REVIEW 1 APPROVED — AWAITING REVIEW 2** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.
