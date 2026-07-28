@@ -1,13 +1,13 @@
-# Prompt 05 — Adversarial Review and Approval of One Hotfix
+# Prompt 05 — Bounded Adversarial Review and Approval of One Hotfix
 
-Use this prompt sequentially with Codex and Claude. At least one reviewer must
-not be the bundle's implementer.
+Use this prompt sequentially with the two assigned reviewers. At least one
+approver must not be the bundle's implementer.
 
 Before using, replace:
 
 - `<BUNDLE_ID>` with the implemented **RB bundle ID**. HF IDs are work-item
   specs and are not reviewed separately while their RB remains combined.
-- `<REVIEWER>` with `Codex` or `Claude`.
+- `<REVIEWER>` with the assigned reviewer.
 
 ---
 
@@ -27,64 +27,159 @@ Read:
 6. `docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/<BUNDLE_ID>/REVIEW.md`
 7. The complete branch diff from its recorded `main` base.
 
-Preconditions:
+## Preconditions
 
-- The bundle status is `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW`.
+- For Review 1, the bundle status is
+  `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW`.
+- For Review 2, the bundle status is
+  `REVIEW 1 APPROVED — AWAITING REVIEW 2`.
 - The hotfix branch and retained outputs exist.
 - The implementation document identifies an exact base/head SHA.
+- Every expensive acceptance operation required by `BUNDLE.md` has already
+  been performed by the implementation and is represented by a retained,
+  hash-bound result.
 - `<BUNDLE_ID>` and `<REVIEWER>` were replaced.
 
-If a precondition fails, stop and record the missing item. Do not review a
-different bundle.
+If a precondition fails, stop and record one exact missing item. Do not review
+a different bundle, build replacement implementation evidence, or enter an
+open-ended investigation.
 
-Review independently and assume the implementation may be subtly wrong:
+## Non-duplication and review budget
+
+**Review validates implementation evidence; it does not repeat the
+implementation.** Independence means independent reasoning, diff inspection,
+targeted probes, and attempts to falsify the recorded result. It does **not**
+mean regenerating the same statewide workbooks, rerunning the same full raw
+recount, or recalculating the same large Excel file.
+
+Use evidence in this order:
+
+1. exact source diff and commit identities;
+2. committed tests and machine-readable witnesses;
+3. retained deliverables bound by path, size, SHA-256, source identity, and
+   generation metadata;
+4. Review 1's signed evidence, when performing Review 2;
+5. small targeted reviewer probes only where the preceding evidence leaves a
+   concrete uncertainty.
+
+A `BUNDLE.md` instruction to generate, recalculate, recount, render, or inspect
+an acceptance corpus is an obligation for the implementation evidence set. It
+is **not** an instruction for each reviewer to repeat that costly operation.
+The reviewer verifies its binding, coverage, internal consistency, and selected
+adversarial examples. Regenerate only when a concrete mismatch makes the
+retained evidence unusable.
+
+Hard limits for one review:
+
+- The review must be shorter than the recorded implementation effort and has
+  an absolute ceiling of **30 minutes** of active wall-clock work.
+- Reviewer-started processes may not exceed **2 GB additional working memory**.
+- Do not start an operation expected to run longer than **5 minutes**, create
+  more than **500 MB** of new output, or require installed Excel
+  `CalculateFullRebuild` without explicit owner approval obtained **before**
+  starting it.
+- Never launch a fresh statewide GUI generation, whole-corpus comparison,
+  installed-Excel full rebuild, full raw-source recount, complete image
+  recapture, or frozen application build when valid same-head evidence already
+  exists.
+- Do not create a new bespoke whole-corpus audit framework during review.
+  Missing implementation evidence is an evidence gap to report, not a project
+  for the reviewer to reconstruct.
+- Attempt a failing reviewer tool or harness at most once. A sandbox, console,
+  rendering, or reviewer-machine failure is not a product failure and does not
+  authorize repeated or larger retries.
+- At the budget boundary, stop tools and issue the verdict from the evidence
+  already checked. Do not leave the review in a self-extending loop.
+
+Any exception requires the owner's explicit approval with the expected runtime,
+memory, and output size stated first. Without that approval, use retained
+evidence or return one bounded evidence-gap finding.
+
+## Bounded adversarial review
+
+Assume the implementation may be subtly wrong, but test that hypothesis
+proportionately:
 
 1. Confirm the diff contains the whole agreed scope and no unrelated changes.
-2. Reproduce the original defect or bind to a durable pre-fix witness.
-3. Run the planned unit, integration, and neighboring-family regression tests.
-4. Generate the affected comparisons through the actual end-user production
-   workflow.
-5. Recount the relevant raw source independently. Do not accept the
-   implementation's own parser as the only oracle.
-6. Audit values and formulas separately, including installed-Excel
-   recalculation/cached parity when required.
-7. Inspect every affected workbook sheet at native scale for correctness,
-   clipping, instructions, keys, filters, panes, merges, and formula/error
-   behavior.
-8. Recheck every targeted false-positive class and deterministic adversarial
-   samples. Confirm genuine discrepancies remain visible.
-9. Compare PDF and Excel siblings where applicable.
-10. Recheck semantic evidence eligibility. Inspect every eligible retained
-    evidence image and prove prohibited artifacts are absent.
-11. Verify all bundle acceptance criteria and that prior clean behavior did
-    not regress.
-12. Challenge performance, atomic publication, provenance, stale-cache,
-    rerun/idempotency, and failure-path behavior relevant to the changed code.
+2. Confirm the original defect is bound to a durable pre-fix witness and the
+   new tests fail on the recorded base and pass on the reviewed head.
+3. Map every acceptance criterion to an exact test, witness, retained artifact,
+   or rendered page. Reject stale, unbound, incomplete, or contradictory
+   evidence.
+4. Inspect the changed logic independently and identify the most plausible
+   regression or false-pass mechanism.
+5. Run only the targeted tests needed to challenge that mechanism. Verify the
+   implementation's recorded full gate rather than rerunning it; the full
+   post-merge smoke runs once on `main`.
+6. For source truth, inspect the independent reader's method and verify a small
+   deterministic set of raw rows, boundary cases, totals, and genuine
+   discrepancies. Do not repeat a whole-corpus recount that is already
+   hash-bound.
+7. For values and formulas, verify retained twin identities, cached-error and
+   self-check results, exact changed-cell classes, totals, and parity witnesses.
+   Do not perform another full Excel recalculation when a successful
+   same-head recalculated artifact is retained.
+8. Inspect the retained native-scale renders for every changed sheet. Re-render
+   only a missing or contradictory page. Large image sets must have an
+   automated manifest/coverage oracle; manually inspect the named risk cases,
+   not a second complete capture.
+9. Verify sibling parity and evidence eligibility from retained manifests,
+   source bindings, and targeted images where applicable. Prove prohibited
+   artifacts absent with the recorded automated gate.
+10. Verify neighboring-family invariance through semantic/state/count/typed
+    outcome witnesses and one targeted gate. Raw OOXML package bytes are not an
+    ordinary regression invariant.
+11. Challenge performance, atomic publication, provenance, stale-cache,
+    rerun/idempotency, and failure behavior through existing focused tests and
+    retained transaction records.
+12. For Review 2, explicitly state what Review 1 could have missed and how the
+    bounded challenge addressed it. Do not copy Review 1 and do not recreate
+    Review 1's entire run.
+
+Approval does not require the reviewer to reproduce every expensive operation.
+It requires exact same-head evidence for every acceptance criterion, an
+independent challenge of the changed logic, and no unresolved contradiction.
+
+## Review record
 
 Update `hotfix-bundles/<BUNDLE_ID>/REVIEW.md` with:
 
-- reviewer identity and whether the reviewer implemented the bundle;
-- branch/base/head SHA reviewed;
-- commands and source inputs;
+- reviewer identity, review number, and whether the reviewer implemented the
+  bundle;
+- branch/base/runtime-head/review-record-head SHA reviewed;
+- elapsed review time and confirmation that the resource budget was respected;
+- evidence reused, including hashes, and the small commands newly run;
+- acceptance-criterion coverage and the adversarial challenge performed;
 - exact deliverable and discrepancy results;
 - values/formulas, visual, evidence, and regression matrices;
+- Review 2's challenge to Review 1, when applicable;
 - actionable failures with file/artifact references;
 - final verdict `APPROVED` or `DENIED`;
 - reviewer signature and timestamp.
 
-Decision protocol:
+## Decision protocol
 
-- If any acceptance criterion fails, mark the bundle `DENIED — RETURN TO
-  IMPLEMENTATION`, leave the hotfix branch unmerged, update
-  `IMPLEMENTATION-PLAN.md`, and hand the exact failures back to Prompt 04 on
-  the same branch.
+- A concrete acceptance failure means `DENIED — RETURN TO IMPLEMENTATION`.
+- A material missing or unbound artifact means `DENIED — EVIDENCE GAP`, naming
+  exactly one bounded item the implementation must supply. The reviewer does
+  not generate it.
+- Reviewer-environment failures are recorded separately and are not charged to
+  the product unless an existing product test or retained transaction record
+  corroborates them.
+- If every criterion has exact same-head evidence and the adversarial challenge
+  finds no contradiction, the verdict is `APPROVED`. Do not withhold approval
+  merely because the reviewer did not duplicate an already successful
+  expensive run.
 - If you are the first approving reviewer, mark it
   `REVIEW 1 APPROVED — AWAITING REVIEW 2`, commit the review record, and stop.
-- If you are the second approving reviewer, first challenge the first review;
-  do not copy it. The bundle is mergeable only when both reviews approve and
-  at least one approver is not the implementer.
+- If you are the second approving reviewer, the bundle is mergeable only when
+  both reviews approve and at least one approver is not the implementer.
 
-After final approval:
+No review may respond to uncertainty by silently expanding scope. It must
+approve, deny for a concrete failure, or deny for one exact evidence gap within
+the review budget.
+
+## After final approval
 
 1. Mark the bundle `JOINTLY APPROVED`.
 2. Fetch and confirm remote `main` has not diverged.
@@ -96,7 +191,8 @@ After final approval:
    locally and remotely when applicable.
 8. Preserve `main`, `gh-pages`, unrelated branches, retained audit artifacts,
    and review documents.
-9. Start the next bundle from this updated `main`.
+9. Prepare the next bundle's readiness record from this updated `main`; do not
+   begin its implementation or expensive acceptance run inside this review.
 
 Report the verdict, exact failing criteria or approval evidence, reviewer
 sign-offs, merge SHA if merged, branch/worktree cleanup, and the next eligible
