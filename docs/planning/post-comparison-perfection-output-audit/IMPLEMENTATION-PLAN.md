@@ -226,6 +226,32 @@ acceptance. If Codex denies part of a batch, the whole batch stays unmerged. If
 that becomes a problem in practice, split RB-4 back into HF-05 and HF-10 — the
 specs are already separate and need no re-planning.
 
+**✅ Owner ruling — 2026-07-28: BOUNDED REVIEWS ARE APPROVED.** Codex Review 1
+rewrote Prompt 05 (`fa84016`) to cap a single review at 30 minutes of active
+work, 2 GB of reviewer working memory, 5-minute operations, 500 MB of new
+output, and no installed-Excel `CalculateFullRebuild` without prior owner
+approval — after two full-rebuild attempts blue-screened the reviewer's 16 GB
+host during RB-1 Review 1. The owner approves that model, including its two
+consequences, which a reviewer must therefore NOT treat as findings:
+
+1. **Review 2 may rely on Review 1's signed evidence** as one ranked source
+   rather than regenerating the acceptance corpus. `BUNDLE.md`'s "challenge
+   review 1 and re-derive from source, never copy it" continues to govern
+   REASONING and targeted probes; it is no longer read as a duty to repeat a
+   costly regeneration. Independent re-derivation of a *specific* contested
+   fact is still expected wherever the retained evidence leaves a concrete
+   uncertainty.
+2. **No independent reviewer performs the formulas-twin full rebuild.** For
+   RB-1 the installed-Excel recalculation therefore stands on the
+   implementation's own recorded run alone (witness
+   `hotfix-bundles/HF-01/witness/formulas-twin-recalc.json`; live verdict
+   291,127, all 165 positions live-`N`, every SELF-CHECK OK, zero error cells).
+   The owner accepts that single-source verification for this bundle.
+
+The prompt change itself is owner-sanctioned workflow support, not scope
+leakage. This ruling does not relax any other acceptance criterion, and it does
+not change the two-approval merge gate.
+
 **Second-planner size gate.** The six-bundle owner decision is accepted only
 with the original completeness bar intact. RB-2 and RB-4 may not trade fewer
 reviews for sampled or partial output review. Before either becomes `READY`, its

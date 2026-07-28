@@ -44,6 +44,19 @@ Codex Review 1 re-reviewed exact head
 approved the complete matrix. Reviewer-owned re-review artifacts are retained
 in the same HF-01 root under `r1-codex-rereview\`. Review 2 is still pending.
 
+**Read before starting Review 2 — owner ruling, 2026-07-28.** The bounded
+review model Review 1 wrote into Prompt 05 (`fa84016`) is **owner-approved**:
+the 30-minute / 2 GB / 5-minute-operation / 500 MB caps stand, and no reviewer
+performs the installed-Excel `CalculateFullRebuild`. Two consequences are
+owner-accepted and **must not be raised as findings**: Review 2 may rely on
+Review 1's signed evidence as a ranked source instead of regenerating the
+acceptance corpus, and RB-1's formulas-twin recalculation stands on the
+implementation's own recorded run alone. The prompt change is sanctioned
+workflow support, not scope leakage. Everything else — the two-approval merge
+gate, every acceptance criterion, and Review 2's duty to reason independently
+and probe anything the retained evidence leaves uncertain — is unchanged. Full
+text: [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md) § bounded reviews.
+
 Claude drafted the plan as first planner (both sign-off rows read `NOT STARTED`
 when Prompt 03 was invoked, so the prompt's own first-planner rule applied — the
 same reversal Stage 2 recorded). [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md)
