@@ -10,7 +10,7 @@ finding RB1-R1-001 is implemented; re-review from the new head)
 | Base `main` commit | `9c774d4edacf6ae3b6e86d15b62e5d876a690a48` (plan drafted against `a29bdb6`; the delta is the Stage 3 planning docs only) |
 | Implementation commit | `93e12c23a8eeb8686817248d662e4d30125de0ec` (first implementation) |
 | Review 1 | Codex, `a26725b…` — **DENIED** on RB1-R1-001 (clipped disclosure), recorded in `5090190…` |
-| Review 1 remedy commit | recorded in the SHA-recording follow-up to this commit |
+| Review 1 remedy commit | `84b82de` — `fix: make the Clean Road skipped-source disclosure legible (RB-1 review 1)` (+ this SHA-recording follow-up) |
 | Generated-output root | `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\` (bulk; the remedy run is in its `r1-remedy\` subfolder and the Review 1 proof files are untouched); committed machine-readable witnesses in `../HF-01/witness/` |
 
 ## Changes
