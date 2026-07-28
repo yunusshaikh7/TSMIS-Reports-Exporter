@@ -1,6 +1,6 @@
 # `RB-1` — Implementation Record
 
-Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
+Status: **DENIED — RETURN TO IMPLEMENTATION**
 
 | Field | Value |
 |---|---|
@@ -11,6 +11,7 @@ Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
 | Review 1 | Codex, `a26725b…` — **DENIED** on RB1-R1-001 (clipped disclosure), recorded in `5090190…` |
 | Review 1 remedy commit | `84b82de` — `fix: make the Clean Road skipped-source disclosure legible (RB-1 review 1)` (+ this SHA-recording follow-up) |
 | Review 1 re-review | Codex, `6d2a2ce…` — **APPROVED**; exact matrix and signature in `REVIEW.md` |
+| Review 2 | Codex, `d330312…` — **DENIED — RETURN TO IMPLEMENTATION** on `RB1-R2-001` (the four diagnostic source facts are absent from Summary and Notes) |
 | Generated-output root | `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\` (bulk; the remedy run is in its `r1-remedy\` subfolder and the Review 1 proof files are untouched); committed machine-readable witnesses in `../HF-01/witness/` |
 
 ## Changes
@@ -249,10 +250,29 @@ retained base artifact reported one cell — the Summary banner's `created
 the base artifact was regenerated from the archived base tree on the same day;
 the same-day base-vs-head diff is the zero above.
 
+## Review 2 return — Codex, 2026-07-28 (`RB1-R2-001` OPEN)
+
+Review 2 denied exact head `d330312efc949523caf07f1fec4e867afed87cf7`
+on one controlling acceptance failure. `IMPLEMENTATION-PLAN.md` HF-01
+criterion 7 requires the four genuine route 036 / TEH / 40.15 and 40.352
+lane/width disagreements to remain itemized in **Summary/Notes and the retained
+witness**. The witness itemizes them, but a bounded read-only scan of the
+retained values twin found none of the route/county/postmile identities in
+either sheet; `_schema_for` and `_disclosure_lines` emit aggregate 102 / 174 /
+reason prose only.
+
+Resume Prompt 04 on this branch. In the existing allowed comparator/test
+surface, itemize the exact four unavailable, non-asserting facts in both
+Summary and Notes; add a deterministic `check_clean_road.py` assertion; then
+regenerate both comparison twins and affected native renders and rerun the
+scoped acceptance matrix plus the full implementation gate. Preserve every
+already-passed count, state, marker-sheet geometry, formula result, and
+neighboring-family invariant. Review 1's `RB1-R1-001` remains closed.
+
 ## Rollback
 
 Revert the bundle's merge commit. The built workbook regenerates on demand; no
 persisted comparison schema version changes; an old build compares under the plain
 schema by design — a revert needs a rebuild, not a data migration.
 
-Do not merge this branch. When complete, push it and run Prompt 05.
+Do not merge this branch. Resume Prompt 04 for `RB1-R2-001`; after the remedy is implemented, gated, recorded, and pushed, run Prompt 05 again.

@@ -1,8 +1,8 @@
 # Post-Comparison Output Program — Start Here
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
-RB-1 / Clean Road is REVIEW 1 APPROVED — AWAITING REVIEW 2 (Stage 5);
-Review 1's blocking finding RB1-R1-001 is closed**
+RB-1 / Clean Road is DENIED — RETURN TO IMPLEMENTATION (Stage 4);
+Review 1's RB1-R1-001 is closed and Review 2's RB1-R2-001 is open**
 
 Last updated: 2026-07-28
 
@@ -15,12 +15,12 @@ first pass.
 ## Next action
 
 Run
-[`prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md)
-in a new **Codex** chat (review 2 of 2, independently challenging Review 1) with:
+[`prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
+in a new **Claude** chat, resuming the existing RB-1 branch, with:
 
 ```text
 <BUNDLE_ID> = RB-1
-<REVIEWER> = Codex
+<IMPLEMENTER> = Claude
 ```
 
 RB-1 (work item HF-01, branch `hotfix/rb-1-clean-road-source-truth`) was
@@ -42,7 +42,13 @@ untouched). The branch is NOT merged.
 Codex Review 1 re-reviewed exact head
 `6d2a2ce2e70688bfaa20e8f2e11039165742d55e`, closed RB1-R1-001, and
 approved the complete matrix. Reviewer-owned re-review artifacts are retained
-in the same HF-01 root under `r1-codex-rereview\`. Review 2 is still pending.
+in the same HF-01 root under `r1-codex-rereview\`.
+Review 2 then denied exact requested head
+`d330312efc949523caf07f1fec4e867afed87cf7` on `RB1-R2-001`: the
+controlling plan requires the four genuine route 036 / TEH / 40.15 and 40.352
+lane/width source facts to be itemized in Summary and Notes as well as the
+retained witness, but both sheets contain aggregate coverage only. Exact probe,
+evidence bindings, and signature are in `hotfix-bundles/RB-1/REVIEW.md`.
 
 **Read before starting Review 2 — owner ruling, 2026-07-28.** The bounded
 review model Review 1 wrote into Prompt 05 (`fa84016`) is **owner-approved**:
@@ -108,8 +114,8 @@ The other two point in opposite directions on purpose:
   the Description is the same label with `EQUATES TO ` prepended. The rule must be
   pair-aware, opt-in, and must not widen into the HF-09 class.
 
-Both planners signed the Stage 3 plan. **RB-1 has Review 1 approval and awaits
-Review 2; no other RB is authorized yet.**
+Both planners signed the Stage 3 plan. **RB-1 is denied and must return to
+implementation for RB1-R2-001; no other RB is authorized yet.**
 
 Stage 2 is closed with no open conflict:
 
@@ -131,8 +137,8 @@ Stage 2 is closed with no open conflict:
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/RB-1/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-1 IMPLEMENTATION COMPLETE** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **REVIEW 1 APPROVED — AWAITING REVIEW 2** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-1 RETURN REQUIRED — RB1-R2-001** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **REVIEW 2 DENIED — RETURN TO STAGE 4** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

@@ -1,6 +1,6 @@
 # `RB-1` — Bundle Contract
 
-Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
+Status: **DENIED — RETURN TO IMPLEMENTATION**
 
 > This RB-level contract carries work item **HF-01** and is transcribed from the
 > HF-01 section of

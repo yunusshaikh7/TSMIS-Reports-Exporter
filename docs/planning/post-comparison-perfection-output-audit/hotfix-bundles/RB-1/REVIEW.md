@@ -1,6 +1,6 @@
 # `RB-1` — Adversarial Review Record
 
-Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
+Status: **DENIED — RETURN TO IMPLEMENTATION**
 
 ## Review identity
 
@@ -11,13 +11,16 @@ Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
 | Recorded base `main` | `9c774d4edacf6ae3b6e86d15b62e5d876a690a48` |
 | Original denied head | `a26725b59a5dc5c9445d43af03c9a3ea4041b484` |
 | Review-return implementation | `84b82de` plus SHA-recording follow-up |
-| Reviewed head | `6d2a2ce2e70688bfaa20e8f2e11039165742d55e` |
+| Review 1 reviewed head | `6d2a2ce2e70688bfaa20e8f2e11039165742d55e` |
+| Review 1 record head | `c90908d73e22bf945c4d85484465350ae2882c22` |
+| Review 2 requested / record head | `d330312efc949523caf07f1fec4e867afed87cf7` |
+| Runtime code head | `84b82de2873f733864b1da3cad037738e898be8d` (no runtime/test/witness change through `d330312`) |
 | Implementer | Claude |
 | Approving reviewer | Codex — independent; did not implement this bundle |
-| Review 2 | PENDING — must independently review this exact approved head plus this review-record commit |
-| Merge | PENDING — first approval only; branch remains unmerged |
+| Review 2 | Codex — independent; did not implement this bundle; **DENIED — RETURN TO IMPLEMENTATION** |
+| Merge | BLOCKED — Review 2 denied; branch remains unmerged |
 
-## Verdict
+## Review 1 verdict
 
 **APPROVED.** RB-1 satisfies its frozen PCOA-FINAL-010 contract at the exact
 reviewed head. The 102 unplaceable source spans are recorded and disclosed,
@@ -174,18 +177,128 @@ base and is outside RB-1. It is not charged to this bundle.
 |---|---|---|---|
 | Review 1 attempt 1 | Codex; independent non-implementer | **DENIED — RETURN TO IMPLEMENTATION** | `a26725b59a5dc5c9445d43af03c9a3ea4041b484` / `2026-07-28T00:03:08.6792773-07:00` |
 | Review 1 re-review | Codex; independent non-implementer | **APPROVED** | `6d2a2ce2e70688bfaa20e8f2e11039165742d55e` / `2026-07-28T08:26:47.3070509-07:00` |
-| Review 2 | PENDING — separate review | NOT STARTED | PENDING |
+| Review 2 | Codex; independent non-implementer | **DENIED — RETURN TO IMPLEMENTATION** (`RB1-R2-001`) | `d330312efc949523caf07f1fec4e867afed87cf7` / `2026-07-28T14:12:09.5621720-07:00` |
 
 **Reviewer signature:** Codex, Review 1 — APPROVED —
 `2026-07-28T08:26:47.3070509-07:00`.
 
-Do not merge. Run Prompt 05 again in a separate Codex review with:
+## Review 2 — Codex, 2026-07-28
+
+### Verdict
+
+**DENIED — RETURN TO IMPLEMENTATION.** Review 2 found one concrete failure of
+the controlling HF-01 acceptance contract:
+
+`IMPLEMENTATION-PLAN.md` criterion 7 requires the four genuine raw-source
+disagreements to remain itemized in **Summary/Notes and the retained witness**
+as unavailable, non-asserting source facts. The retained witness itemizes them,
+but the reviewed comparison's Summary and Notes do not. They disclose only the
+aggregate 102 skipped spans, 174 marked anchors, and missing-postmile reason.
+
+The four required identities are route `036`, county `TEH`, postmiles `40.15`
+and `40.352`, for `THY_LT_LANES_AMT` and
+`THY_LT_TRAV_WAY_WIDTH_AMT` (Comparison rows 19,119 and 19,122). A bounded
+read-only probe of the retained values twin found zero occurrences of `036`,
+`TEH`, `40.15`, or `40.352` in either Summary or Notes. The implementation
+matches that result: `_schema_for` and `_disclosure_lines` emit only aggregate
+coverage prose.
+
+This is not an evidence gap and does not contradict the passed count/state
+work. It is a user-facing acceptance failure in the workbook text, so Prompt
+05 requires return to Stage 4.
+
+### Review identity and budget
+
+| Field | Value |
+|---|---|
+| Reviewer / pass | Codex / Review 2 |
+| Implemented bundle? | **No** |
+| Branch | `hotfix/rb-1-clean-road-source-truth` |
+| Recorded base | `9c774d4edacf6ae3b6e86d15b62e5d876a690a48` |
+| Runtime code head | `84b82de2873f733864b1da3cad037738e898be8d` |
+| Review 1 approved head / record | `6d2a2ce2e70688bfaa20e8f2e11039165742d55e` / `c90908d73e22bf945c4d85484465350ae2882c22` |
+| Requested review-record head | `d330312efc949523caf07f1fec4e867afed87cf7` |
+| Runtime equivalence | `c90908d..d330312` changes only `START-HERE.md`, `IMPLEMENTATION-PLAN.md`, and Prompt 05; runtime, tests, witnesses, and retained workbook semantics are unchanged |
+| Elapsed active review | 26 minutes |
+| Resource budget | **RESPECTED** — no generation, recount, Excel recalculation, build, or whole-corpus run; the only workbook probe was read-only, completed in 101 seconds, and created no output; the copied retained PNGs total under 4 MB |
+
+The desktop image viewer failed on the retained PNGs with a Windows sandbox
+ACL-helper error. This is recorded as a reviewer-environment failure, not a
+product failure. Review 2 relied on Review 1's signed native-render evidence
+and the retained `visual-audit.json`, as the owner-approved bounded-review
+policy permits; the denial does not depend on visual layout.
+
+### Evidence reused and bounded commands
+
+| Evidence / command | Binding / result |
+|---|---|
+| Complete branch diff | `git diff --name-status --stat --check 9c774d4..d330312`; exactly the allowed runtime/test/canary/record/witness surface plus owner-sanctioned Prompt 04/05 workflow support; clean |
+| Runtime-equivalence diff | `git diff --name-status c90908d..d330312`; three policy documents only |
+| Review 1 signed record | Review 1 approval at `6d2a2ce…`, recorded by `c90908d…`; exact source/count/formula/visual/evidence/regression matrix retained |
+| 165-cell recount | `165-cell-before-after-recount.json`, SHA-256 `EDA2B971C19F5B8411D4F84DA7146931D61A96313D04DC7442866C10019ED58D` |
+| Four diagnostic facts | `four-raw-source-disagreements.json`, SHA-256 `55E4109BE39E8EEB7B6DB6B84C2A69648017BB3A27BADCFF744752F350D9754F` |
+| Formula acceptance | `formulas-twin-recalc.json`, SHA-256 `0BB3B55C404ADFA0EAE45F6D2D54F86C93F776C40C97B8635E3F5C262DD4F934`; retained recalculated twin `F7412CA0…` |
+| Build/source truth | `build-diff.json` / `skip-census.json`, SHA-256 `B65F6BF8128CB632F05711DB809A811833DDA8D8C1DF71C61C77E4473D7B1129` / `48135721205CDA801542AFC261B4C013A7FE2C19F9653CAEC25D0064FBBE0441` |
+| Neighbor regression | `is-regression.json`, SHA-256 `D703600686EEBF85DD0D1307C5C82CD21F708A30BCFAE240EC6548DE58E892BD` |
+| Marker presentation | `r1-marker-excel-metrics.json` / `r1-marker-presentation.json`, SHA-256 `0831A39D0F0D8DC6D39A1C6FD7366E694512D1DA068B0F154707A22E4C62F1D0` / `5E6B704B060D158FC914CF99697D065827423DF7C39729EE4E7DF13B0B5B81CA` |
+| Pre-existing Review 2 generation | Runtime-equivalent `c90908d` worktree; manifest-bound build `DB78CA6D…`, values twin `A25F15F7…`, formulas twin `E78C9F0A…`; used only as supplemental retained evidence |
+| Targeted adversarial probe | Read-only `openpyxl` scan of Summary and Notes in the retained values twin: aggregate coverage present; zero route/county/postmile identifier hits for the four required facts |
+
+No full gate, statewide regeneration, raw-source recount, Excel rebuild,
+application build, or fresh visual capture was repeated.
+
+### Review 2 challenge to Review 1
+
+Review 1 could miss a contract-transcription mismatch: `RB-1/BUNDLE.md`
+shortens criterion 7 to say only that the four facts remain itemized, while
+`IMPLEMENTATION-PLAN.md` — which both the bundle and the plan declare
+controlling — explicitly says they remain itemized in Summary/Notes and the
+retained witness. Review 1 proved that the witness and Comparison rows retain
+the facts, but did not test their presence in Summary or Notes. Review 2
+challenged that exact blind spot by re-reading the controlling criterion,
+inspecting the disclosure-producing code, and scanning only those two retained
+sheets.
+
+### Acceptance-criterion coverage
+
+| Criterion | Review 2 result | Exact evidence |
+|---|---|---|
+| 1. 161 false positives become zero | **PASS (reused, no contradiction)** | 165-cell recount; all affected paired positions `D→N`; exact total 291,127 |
+| 2. All 165 paired cells show marker and `N` | **PASS (reused, no contradiction)** | Recount plus Review 1 source/value audit |
+| 3. Summary and Notes state 102 / 174 / reason | **PASS (targeted probe)** | Both sheets contain the aggregate coverage line |
+| 4. Both twins regenerate; formula twin clean | **PASS (owner-accepted implementation evidence)** | `formulas-twin-recalc.json`; retained `F7412CA0…`; no reviewer rebuild required or permitted |
+| 5. Canary re-blessed | **PASS (diff inspection)** | `CRH-SW-E3`, exact −165 delta and input identities |
+| 6. Full gate; base-red/head-green | **PASS (signed retained evidence)** | Review 1: 157/157 plus compile, Ruff, frozen self-test; runtime unchanged through `d330312` |
+| 7. Exact 291,127; no outside move; four facts itemized in Summary/Notes and witness | **FAIL** | Count/no-outside-move and witness itemization pass; Summary/Notes itemization fails |
+
+### Values, formulas, visual, evidence, and regression matrix
+
+| Gate | Result | Notes |
+|---|---|---|
+| Values / source truth | **PASS (reused)** | 291,127; 165 paired `N`; nine one-sided `U`; four diagnostic facts retained |
+| Formulas | **PASS (owner-accepted retained implementation result)** | All SELF-CHECK rows `OK`; zero cached errors; no Review 2 full rebuild |
+| Visual | **PASS evidence reused; reviewer viewer failure recorded separately** | Review 1 signed native-scale inspection and marker metric/PDF witnesses remain same-runtime-head evidence |
+| Evidence eligibility | **PASS (reused)** | Clean Road has no adapter; zero prohibited evidence artifacts |
+| Neighbor regression | **PASS (reused)** | Intersection Summary semantic/state/count/typed witness unchanged |
+| User-facing diagnostic disclosure | **FAIL** | Aggregate disclosure only; four required source facts absent from Summary and Notes |
+
+### Actionable finding
+
+| ID | Priority | Failure | Required return |
+|---|---|---|---|
+| `RB1-R2-001` | P1 / blocking | `IMPLEMENTATION-PLAN.md` HF-01 criterion 7 requires the four genuine route 036 / TEH / 40.15 and 40.352 lane/width facts to remain itemized in Summary/Notes and the retained witness. The witness passes, but both sheets omit every route/county/postmile identity. | In the existing RB-1 comparator surface, itemize all four facts in **both Summary and Notes** as unavailable/non-asserting facts; add a deterministic `check_clean_road.py` assertion for their exact identities; regenerate both comparison twins and the affected native renders; rerun the scoped acceptance matrix and full implementation gate. Preserve all passed counts, states, marker geometry, and neighbor invariants. |
+
+Review 1's `RB1-R1-001` remains **CLOSED**; Review 2 does not reopen the
+marker-sheet legibility remedy.
+
+
+**Reviewer signature:** Codex, Review 2 — DENIED — RETURN TO IMPLEMENTATION —
+`2026-07-28T14:12:09.5621720-07:00`.
+
+Do not merge. Resume Prompt 04 on the existing
+`hotfix/rb-1-clean-road-source-truth` branch with:
 
 ```text
 <BUNDLE_ID> = RB-1
-<REVIEWER> = Codex
+<IMPLEMENTER> = Claude
 ```
-
-The second review must independently challenge the exact approved head plus
-this review-record commit. Only joint approval authorizes merge, post-merge
-smoke checks, push, and branch/worktree cleanup.
