@@ -36,6 +36,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import textwrap
 from collections import defaultdict
 from pathlib import Path
 
@@ -63,6 +64,11 @@ OUT_PATH = OUT_DIR / FILENAME
 # anchor is never counted as a difference and never reads as "empty in the
 # system". compare_clean_highway_tsn imports it; never reuse the text as data.
 UNAVAILABLE_TOKEN = "(unavailable: source span skipped)"
+
+# Why a span is skipped — one wording for the marker sheet and the sidecar.
+SKIP_REASON = ("as-of spans whose begin or end postmile is unreadable cannot "
+               "be placed by the county+postmile rule; their known-endpoint "
+               "anchors are marked instead of guessed")
 
 # The 74-column THY header (clean_highway_columns is the shared contract).
 THY_HEADER = list(chc.HEADER)
@@ -268,22 +274,35 @@ def _skipped_span_record(tag, r, b, e):
     }
 
 
+def _skip_values_text(s):
+    """One skipped span's own attribute values as `NAME=value` text — the
+    unassertable source facts, stated in full for both the itemized marker
+    table and the warning line."""
+    attrs = SPAN_LAYERS[s["tag"]][1]
+    return ", ".join(f"{a}={'' if v is None else v}"
+                     for a, v in zip(attrs, s["values"]))
+
+
+def _skip_station_text(s):
+    """The one PM endpoint the span DID have, as postmile text ("" when the
+    row carries neither)."""
+    return "" if s["station"] is None else crl.pm_text(s["station"])
+
+
 def _skip_warning(s):
     """The human-readable line one skipped span contributes to `warnings`
-    (the marker sheet, the sidecar, and the result message ride on it) —
-    itemizing the span's own attribute values, so the record states the
-    unassertable source facts in full."""
+    (the sidecar, the log and the result message ride on it) — itemizing the
+    span's own attribute values, so the record states the unassertable source
+    facts in full. The marker sheet states the same facts as a table."""
     where = f"{s['route']} {s['county'] or '?'}/{s['prefix'] or '-'}"
     if s["known_endpoint"] == "begin":
-        span_txt = f"begin {crl.pm_text(s['station'])} → end unreadable"
+        span_txt = f"begin {_skip_station_text(s)} → end unreadable"
     elif s["known_endpoint"] == "end":
-        span_txt = f"begin unreadable → end {crl.pm_text(s['station'])}"
+        span_txt = f"begin unreadable → end {_skip_station_text(s)}"
     else:
         span_txt = "both postmiles unreadable"
     loc = f", LocError={s['loc_error']}" if s["loc_error"] else ""
-    attrs = SPAN_LAYERS[s["tag"]][1]
-    vals = ", ".join(f"{a}={'' if v is None else v}"
-                     for a, v in zip(attrs, s["values"]))
+    vals = _skip_values_text(s)
     if s["marked_cells"]:
         tail = (f" — its {s['marked_cells']} anchor cell(s) are marked "
                 f"'{UNAVAILABLE_TOKEN}'.")
@@ -1046,8 +1065,140 @@ _PROV_TIER_FILL = {
 }
 
 
+# The marker sheet is part of the delivered workbook, so its presentation is
+# part of the record: Excel clips a label whose neighbour is occupied and cuts
+# any text at its column's edge. The sheet therefore declares purposeful
+# column widths, wraps whatever cannot fit in a row tall enough for every
+# wrapped line, and states the skipped spans as a TABLE — one short field per
+# column — rather than one long sentence per row (RB-1 review 1, RB1-R1-001).
+_MARKER_LABEL_WIDTH = 24
+_MARKER_VALUE_WIDTH = 56
+_MARKER_LINE_PT = 15              # one line of the default 11pt font
+_MARKER_PADDING = 2               # cell inset + a margin over Excel's metric
+_MARKER_HEADER_FILL = "D9D9D9"
+
+# (header, stored width) for the itemized skipped-span table. Its first two
+# columns are shared with the label/value block above, so those widths serve
+# both blocks. Widths were MEASURED against installed Excel's own font metrics
+# (bold headers included), not estimated.
+_SKIP_TABLE_COLUMNS = (
+    ("Source layer", _MARKER_LABEL_WIDTH),
+    ("Attribute values", _MARKER_VALUE_WIDTH),
+    ("Route", 8),
+    ("Alignment", 12),
+    ("County", 9),
+    ("PM prefix", 12),
+    ("Known endpoint", 17),
+    ("Known PM", 11),
+    ("LocError", 11),
+    ("Begin OD", 11),
+    ("End OD", 11),
+    ("From AR", 12),
+    ("To AR", 12),
+    ("Marked cells", 15),
+)
+
+
+def _wrapped_lines(text, width):
+    """How many lines `text` needs at a column `width` characters wide (Excel
+    wraps on words and breaks a word longer than the column)."""
+    room = max(int(width) - _MARKER_PADDING, 8)
+    return len(textwrap.wrap(str(text), room)) or 1
+
+
+def _skip_table_row(s):
+    """One skipped span as the itemized table's row — each field short enough
+    to read in its own column."""
+    return [s["layer"], _skip_values_text(s), s["route"], s["alignment"],
+            s["county"], s["prefix"], s["known_endpoint"] or "",
+            _skip_station_text(s), s["loc_error"], s["begin_od"], s["end_od"],
+            s["from_ar"], s["to_ar"], s["marked_cells"]]
+
+
+def _write_marker_sheet(wb, asof_date, lib_root, warnings, skips, n_marked):
+    """The build's own record sheet: build identity, the HF-01 skipped-source
+    disclosure the comparator reads back, any warning, and — when spans were
+    skipped — the itemized table naming every one of them."""
+    from openpyxl.cell import WriteOnlyCell
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    ws = wb.create_sheet(MARKER_SHEET)
+    widths = ([w for _name, w in _SKIP_TABLE_COLUMNS] if skips
+              else [_MARKER_LABEL_WIDTH, _MARKER_VALUE_WIDTH])
+    for i, width in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = width
+    top = Alignment(vertical="top")
+    left_top = Alignment(horizontal="left", vertical="top")
+    wrap_left_top = Alignment(horizontal="left", vertical="top",
+                              wrap_text=True)
+    wrap_top = Alignment(vertical="top", wrap_text=True)
+    header_font = Font(bold=True)
+    header_fill = PatternFill("solid", fgColor=_MARKER_HEADER_FILL)
+    row_no = 0
+
+    def put(cells, height=None):
+        nonlocal row_no
+        row_no += 1
+        if height:
+            ws.row_dimensions[row_no].height = height
+        ws.append(cells)
+
+    def styled(value, alignment):
+        c = WriteOnlyCell(ws, value=value)
+        c.alignment = alignment
+        return c
+
+    def lines_for(value, width):
+        """Rows a value needs at that column width. A number always takes one:
+        General format rounds its display rather than clipping it."""
+        if value is None or isinstance(value, (int, float)):
+            return 1
+        return _wrapped_lines(value, width)
+
+    def pair(label, value):
+        """A label/value row of the header block. Values are left-aligned so
+        they read as a block beside their labels (counts included), and a
+        value too wide for its column wraps in a row tall enough for it."""
+        lines = lines_for(value, _MARKER_VALUE_WIDTH)
+        put([styled(label, top),
+             styled(value, wrap_left_top if lines > 1 else left_top)],
+            height=lines * _MARKER_LINE_PT if lines > 1 else None)
+
+    pair("Build version", BUILD_VERSION)
+    pair("As-of date", asof_date.isoformat())
+    pair("Layer library", str(lib_root))
+    # HF-01: the build's own skipped-source record — the comparator reads
+    # these keys to disclose the condition in the comparison's Summary/Notes.
+    pair("Skipped source spans", len(skips))
+    pair("Marked anchor cells", n_marked)
+    pair("Unavailable marker", UNAVAILABLE_TOKEN)
+    pair("Skipped source reason", SKIP_REASON)
+    for w in warnings:
+        pair("Warning", w)
+    if not skips:
+        return
+    put([])
+    head = []
+    for name, _width in _SKIP_TABLE_COLUMNS:
+        c = WriteOnlyCell(ws, value=name)
+        c.font, c.fill = header_font, header_fill
+        head.append(c)
+    put(head)
+    for s in skips:
+        row = _skip_table_row(s)
+        lines = max(lines_for(v, w)
+                    for v, (_name, w) in zip(row, _SKIP_TABLE_COLUMNS))
+        if lines == 1:
+            put(row)
+            continue
+        put([v if lines_for(v, w) == 1 else styled(v, wrap_top)
+             for v, (_name, w) in zip(row, _SKIP_TABLE_COLUMNS)],
+            height=lines * _MARKER_LINE_PT)
+
+
 def _write_workbook(out_path, rows, index, asof_date, lib_root, warnings,
-                    n_skipped=0, n_marked=0):
+                    skips=(), n_marked=0):
     from openpyxl import Workbook
     from openpyxl.cell import WriteOnlyCell
     from openpyxl.styles import PatternFill
@@ -1073,17 +1224,7 @@ def _write_workbook(out_path, rows, index, asof_date, lib_root, warnings,
                 c.fill = fill
                 cells.append(c)
             prov.append(cells)
-    marker = wb.create_sheet(MARKER_SHEET)
-    marker.append(["Build version", BUILD_VERSION])
-    marker.append(["As-of date", asof_date.isoformat()])
-    marker.append(["Layer library", str(lib_root)])
-    # HF-01: the build's own skipped-source record — the comparator reads
-    # these keys to disclose the condition in the comparison's Summary/Notes.
-    marker.append(["Skipped source spans", n_skipped])
-    marker.append(["Marked anchor cells", n_marked])
-    marker.append(["Unavailable marker", UNAVAILABLE_TOKEN])
-    for w in warnings:
-        marker.append(["Warning", w])
+    _write_marker_sheet(wb, asof_date, lib_root, warnings, skips, n_marked)
     tmp = out_path.with_name(out_path.name + ".tmp")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -1232,13 +1373,16 @@ def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes)
         events.on_log(f"  {len(skips)} source span(s) have an unreadable "
                       f"postmile endpoint — {marked} anchor cell(s) marked "
                       f"'{UNAVAILABLE_TOKEN}'")
+    # The marker sheet states these same facts as its itemized skip table (one
+    # readable column per field), so it carries the other warnings as lines.
+    other_warnings = list(warnings)
     for s in skips:
         w = _skip_warning(s)
         warnings.append(w)
         events.on_log(f"  note: {w}")
 
-    _write_workbook(out_path, rows, index, asof_date, lib_root, warnings,
-                    n_skipped=len(skips), n_marked=marked)
+    _write_workbook(out_path, rows, index, asof_date, lib_root, other_warnings,
+                    skips=skips, n_marked=marked)
     result = ConsolidateResult(
         status="ok",
         message=(f"Built {len(rows):,} clean-road highway rows "
@@ -1265,10 +1409,7 @@ def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes)
                     "count": len(skips),
                     "marked_anchor_cells": marked,
                     "unavailable_marker": UNAVAILABLE_TOKEN,
-                    "reason": ("as-of spans whose begin or end postmile is "
-                               "unreadable cannot be placed by the "
-                               "county+postmile rule; their known-endpoint "
-                               "anchors are marked instead of guessed"),
+                    "reason": SKIP_REASON,
                     "spans": _skip_sidecar_entries(skips),
                 },
             }}):

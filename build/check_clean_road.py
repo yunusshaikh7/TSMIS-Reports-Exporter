@@ -24,6 +24,7 @@ Run from the repo root:
 import json
 import sys
 import tempfile
+import textwrap
 from datetime import datetime
 from pathlib import Path
 
@@ -271,6 +272,54 @@ def _rows_of(path, sheet):
         it = wb[sheet].iter_rows(values_only=True)
         header = [str(c) if c is not None else "" for c in next(it)]
         return header, [list(r) for r in it]
+    finally:
+        wb.close()
+
+
+_LINE_PT = 15          # one line of the default 11pt font
+_PADDING = 2           # cell inset + a margin over Excel's own font metric
+
+
+def _illegible_marker_cells(path):
+    """Every stored cell of the build marker sheet must be READABLE at its
+    column's stored width: Excel clips a label whose neighbour is occupied and
+    cuts text at the column edge, so a cell must either fit its column or wrap
+    in a row tall enough for every wrapped line. Numbers are exempt — General
+    format rounds their display instead of clipping. Returns the offenders
+    (RB-1 review 1 / RB1-R1-001)."""
+    wb = load_workbook(path)
+    try:
+        ws = wb[chc.ARC_MARKER_SHEET]
+        widths = {}
+        for dim in ws.column_dimensions.values():
+            if dim.width:
+                for i in range(dim.min, dim.max + 1):
+                    widths[i] = dim.width
+        bad = []
+        for row in ws.iter_rows():
+            for c in row:
+                if c.value is None or not str(c.value).strip():
+                    continue
+                width = widths.get(c.column)
+                if not width:
+                    bad.append(f"{c.coordinate}: column has no stored width")
+                    continue
+                if isinstance(c.value, (int, float)):
+                    continue
+                text = str(c.value)
+                if len(text) <= width - _PADDING:
+                    continue
+                if not (c.alignment and c.alignment.wrap_text):
+                    bad.append(f"{c.coordinate}: {len(text)} chars in a "
+                               f"{width:g}-wide column and does not wrap")
+                    continue
+                lines = len(textwrap.wrap(text,
+                                          max(int(width) - _PADDING, 8)))
+                height = getattr(ws.row_dimensions.get(c.row), "height", None)
+                if height is None or height + 0.5 < lines * _LINE_PT:
+                    bad.append(f"{c.coordinate}: wraps to {lines} lines but "
+                               f"the row is {height} tall")
+        return bad
     finally:
         wb.close()
 
@@ -679,9 +728,29 @@ def test_skipped_span_source_truth():
               marker.get("Marked anchor cells") == [2])
         check("marker: names the unavailable token",
               marker.get("Unavailable marker") == [tok])
-        check("marker: one warning per skipped span",
-              sum("O Shld Width R" in str(w) for w in
-                  marker.get("Warning", [])) == 3)
+        check("marker: states the skip reason",
+              "postmile" in str(marker.get("Skipped source reason", [""])[0]))
+        # The itemized table: one readable column per field, so the 102-span
+        # statewide record is scannable instead of 102 long sentences.
+        want_head = [n for n, _w in getattr(cch, "_SKIP_TABLE_COLUMNS", ())]
+        head_at = [i for i, r in enumerate(mrows)
+                   if r and str(r[0]) == "Source layer"]
+        trows = ([r for r in mrows[head_at[0] + 1:] if r and r[0]]
+                 if head_at else [])
+        check("marker: the skip table names every field",
+              bool(head_at) and [str(c) for c in mrows[head_at[0]]
+                                 if c is not None] == want_head)
+        check("marker: one itemized table row per skipped span",
+              len(trows) == 3
+              and all(r[0] == "SHS O Shld Width R" and r[2] == "001"
+                      and r[4] == "ORA" and r[8] == "NO ERROR"
+                      and "Shld_Width_Total_Out_R=" in str(r[1])
+                      for r in trows))
+        check("marker: the table's known PM and marked counts are exact",
+              sorted(str(r[7]) for r in trows) == ["0.7", "1.5", "2.2"]
+              and sorted(r[13] for r in trows) == [0, 1, 1])
+        check("marker: every disclosure cell is legible at its stored width",
+              _illegible_marker_cells(out) == [])
         sidecar = json.loads(
             (out.parent / (out.name + ".outcome.json")).read_text("utf-8"))
         rec = (sidecar.get("clean_road_build") or {}).get(
@@ -799,6 +868,8 @@ def test_skipped_span_source_truth():
         check("a skip-free marker records zeroes",
               getattr(cht, "_build_skip_facts",
                       lambda _p: None)(clean_out) == (0, 0))
+        check("a skip-free marker is legible too",
+              _illegible_marker_cells(clean_out) == [])
 
 
 def main():

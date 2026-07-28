@@ -1,6 +1,6 @@
 {
  "old": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-output-audit-claude-independent-2026-07-23\\generated-comparisons\\arcgis\\clean_highway arcgis-vs-tsn (values).xlsx",
- "new": "C:\\Users\\Yunus\\Projects\\TSMIS-rb1-worktree\\output\\comparisons\\arcgis\\ArcGIS_vs_TSN_CleanRoadHighway_Comparison 2026-07-27 (values).xlsx",
+ "new": "output\\comparisons\\arcgis\\ArcGIS_vs_TSN_CleanRoadHighway_Comparison 2026-07-28 (values).xlsx",
  "token": "(unavailable: source span skipped)",
  "comparison": {
   "rows": 65164,
@@ -23,9 +23,9 @@
   "u_token_displays": 9,
   "field_delta": {
    "THY_LT_LANES_AMT": 81,
+   "THY_RT_O_SHD_TOT_WIDTH_AMT": 1,
    "THY_LT_TRAV_WAY_WIDTH_AMT": 82,
-   "THY_RT_O_SHD_TRT_WIDTH_AMT": 1,
-   "THY_RT_O_SHD_TOT_WIDTH_AMT": 1
+   "THY_RT_O_SHD_TRT_WIDTH_AMT": 1
   },
   "witness_rows": 83,
   "unexpected": [],

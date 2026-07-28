@@ -1,9 +1,10 @@
 # Post-Comparison Output Program — Start Here
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
-RB-1 / Clean Road Review 1 is DENIED — RETURN TO IMPLEMENTATION (Stage 4)**
+RB-1 / Clean Road is IMPLEMENTED — AWAITING ADVERSARIAL REVIEW (Stage 5), with
+Review 1's blocking finding RB1-R1-001 implemented and re-accepted**
 
-Last updated: 2026-07-27
+Last updated: 2026-07-28
 
 This is the entry point for every new Codex or Claude chat. Read this file
 before opening the other audit documents. The project deliberately separates
@@ -14,27 +15,29 @@ first pass.
 ## Next action
 
 Run
-[`prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
-in a new **Claude** chat on the existing hotfix branch with:
+[`prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md)
+in a new **Codex** chat (review 1 of 2, re-review from the new head) with:
 
 ```text
 <BUNDLE_ID> = RB-1
-<IMPLEMENTER> = Claude
+<REVIEWER> = Codex
 ```
 
 RB-1 (work item HF-01, branch `hotfix/rb-1-clean-road-source-truth`) was
-implemented, but Codex Review 1 denied it because the newly added
-`ArcGIS Build!A4:B108` labels, marker, and 102 warning/detail rows are clipped
-at native scale. The exact failure, passing checks, and required return are in
-[`hotfix-bundles/RB-1/REVIEW.md`](hotfix-bundles/RB-1/REVIEW.md). Resume the
-same branch; do not create a replacement branch or widen into HF-02's
-pre-existing cross-family clipping scope. The implementation record is
+implemented, denied by Codex Review 1 on the clipped `ArcGIS Build` disclosure
+(RB1-R1-001), and that return is now implemented: the marker sheet carries
+measured stored column widths, wrapped cells in tall-enough rows, and the 102
+skips as an itemized 14-column table. The build and both twins were
+regenerated and the whole acceptance matrix re-run — the review's own
+`REVIEW.md` findings table, the new "Review 1 remedy" section of
 [`hotfix-bundles/RB-1/IMPLEMENTATION.md`](hotfix-bundles/RB-1/IMPLEMENTATION.md),
 the frozen contract
-[`hotfix-bundles/RB-1/BUNDLE.md`](hotfix-bundles/RB-1/BUNDLE.md), and the
-committed witnesses `hotfix-bundles/HF-01/witness/`. Bulk acceptance output is
-retained at `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\`.
-The branch is NOT merged.
+[`hotfix-bundles/RB-1/BUNDLE.md`](hotfix-bundles/RB-1/BUNDLE.md) and the
+committed witnesses `hotfix-bundles/HF-01/witness/` are the record. Bulk
+acceptance output is retained at
+`C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\` (the
+remedy run in its `r1-remedy\` subfolder; Review 1's own proof files are
+untouched). The branch is NOT merged.
 
 Claude drafted the plan as first planner (both sign-off rows read `NOT STARTED`
 when Prompt 03 was invoked, so the prompt's own first-planner rule applied — the

@@ -1748,7 +1748,7 @@ and can no longer read green while source rows are unplaceable.
 
 | Role | Exact file | Length | SHA-256 |
 |---|---|---:|---|
-| ArcGIS (built, RB-1) | `output\arcgis_cleanroad\clean_highway_built.xlsx` | 10,828,144 | `8BDD9247771CF2580775F4F0A1DD87706E75F3533C33EC9DB25D41A9AB4B305E` |
+| ArcGIS (built, RB-1 — review-1 remedy build) | `output\arcgis_cleanroad\clean_highway_built.xlsx` | 10,833,361 | `1ADB594425DD846AC93C8500834FBD24E9D8D497F6595FFCB30D496AE8AD360A` |
 | TSN (normalized, rebuilt from the same raw — sha differs per PCOA-FINAL-017; projected content proved identical cell-for-cell) | `tsn_library\clean_highway\consolidated\tsn_clean_highway_normalized.xlsx` | 14,864,394 | `7F1086FEAFE061531B682B12D0DDA161F5256DF50FCC89A954DF8B87A4656AAB` |
 
 Acceptance evidence (RB-1, 2026-07-27): (A) a build-level cell diff of the new
@@ -1769,3 +1769,18 @@ decision gates are honored: the equality change is opt-in per-report schema
 (`unavailable_rule`), proved inert for every other family (Intersection
 Summary vs TSN regenerated identically, zero cells, on both code states), and
 the count move is exactly the owner-ruled 165-cell witness — nothing else.
+
+**Review-1 remedy rebuild (2026-07-28).** RB-1's first review denied the bundle
+on a PRESENTATION defect only (RB1-R1-001: the new `ArcGIS Build` disclosure was
+stored at Excel's default width/height and clipped). The remedy gives that sheet
+measured stored column widths, wrapped cells in tall-enough rows, and states the
+102 skips as an itemized 14-column table; the build was regenerated, so the
+ArcGIS input identity above moved from `8BDD9247…` (10,828,144) to
+`1ADB5944…` (10,833,361). **Nothing else in this canary moves**: a cell-level
+diff of the two builds shows **0** differences across all 57,729 data rows,
+Provenance identical, the same 174 marker tokens and the same `102 / 174`
+sidecar record, so every expected count above — 291,127 differing cells, the
+paired/one-sided/differing/identical row totals, the four per-field deltas and
+the typed asserted/context split — is re-verified unchanged on the regenerated
+twins. The TSN normalized input is the SAME cached artifact (`7F1086FE…`), not
+a rebuild.

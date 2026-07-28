@@ -1,23 +1,26 @@
 # `RB-1` — Implementation Record
 
-Status: **DENIED — RETURN TO IMPLEMENTATION**
+Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (review 1's blocking
+finding RB1-R1-001 is implemented; re-review from the new head)
 
 | Field | Value |
 |---|---|
 | Implementer | Claude (owner decision 2026-07-26: Claude implements every bundle) |
 | Branch | `hotfix/rb-1-clean-road-source-truth` (worktree `C:\Users\Yunus\Projects\TSMIS-rb1-worktree`; the user's `main` checkout untouched) |
 | Base `main` commit | `9c774d4edacf6ae3b6e86d15b62e5d876a690a48` (plan drafted against `a29bdb6`; the delta is the Stage 3 planning docs only) |
-| Implementation commit | `93e12c23a8eeb8686817248d662e4d30125de0ec` (+ this SHA-recording follow-up) |
-| Generated-output root | `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\` (bulk); committed machine-readable witnesses in `../HF-01/witness/` |
+| Implementation commit | `93e12c23a8eeb8686817248d662e4d30125de0ec` (first implementation) |
+| Review 1 | Codex, `a26725b…` — **DENIED** on RB1-R1-001 (clipped disclosure), recorded in `5090190…` |
+| Review 1 remedy commit | recorded in the SHA-recording follow-up to this commit |
+| Generated-output root | `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\` (bulk; the remedy run is in its `r1-remedy\` subfolder and the Review 1 proof files are untouched); committed machine-readable witnesses in `../HF-01/witness/` |
 
 ## Changes
 
 | File | Change | Finding IDs |
 |---|---|---|
-| `scripts/consolidate_clean_highway.py` | `UNAVAILABLE_TOKEN` constant. `_read_span_layer` now RECORDS every as-of span whose begin or end postmile is unreadable (`_skipped_span_record`: layer, route, county, prefix, the one known endpoint, OD + AR measures, `LocError`, the attribute values — read via the new optional `_SKIP_DETAIL_COLS`), instead of silently `continue`-ing. `_skip_warning` renders one itemized line per span (values included) into the existing `warnings` channel, so the marker sheet, `PARTIAL` completion, `skipped_inputs`, the sidecar and the result message all light up through the machinery `_split_parked` already used. `_mark_unavailable_anchors` writes the token into each skipped span's anchor cells — the built row containing the span's one known endpoint (begin anchors `b <= s < e`, end anchors `b < s <= e`), on the roadbed kinds that layer paints (`_skip_kinds` mirrors `_paint_row`), in its direct value columns (`_TAG_MARK_COLUMNS`), and ONLY where the painted value differs from the span's own projected value (`_skip_value` mirrors `_seg_code`/`_seg_num`/City) — a value corroborated by a placeable span is source truth, not an omission. Cell-first evaluation credits every co-anchored span against the ORIGINAL painted value. The marker sheet gains `Skipped source spans` / `Marked anchor cells` / `Unavailable marker` rows; the sidecar gains `clean_road_build.skipped_source_spans` (count, marked cells, reason, marker, per-span records); the result message names the marked-anchor count | PCOA-FINAL-010 |
+| `scripts/consolidate_clean_highway.py` | `UNAVAILABLE_TOKEN` constant. `_read_span_layer` now RECORDS every as-of span whose begin or end postmile is unreadable (`_skipped_span_record`: layer, route, county, prefix, the one known endpoint, OD + AR measures, `LocError`, the attribute values — read via the new optional `_SKIP_DETAIL_COLS`), instead of silently `continue`-ing. `_skip_warning` renders one itemized line per span (values included) into the existing `warnings` channel, so the marker sheet, `PARTIAL` completion, `skipped_inputs`, the sidecar and the result message all light up through the machinery `_split_parked` already used. `_mark_unavailable_anchors` writes the token into each skipped span's anchor cells — the built row containing the span's one known endpoint (begin anchors `b <= s < e`, end anchors `b < s <= e`), on the roadbed kinds that layer paints (`_skip_kinds` mirrors `_paint_row`), in its direct value columns (`_TAG_MARK_COLUMNS`), and ONLY where the painted value differs from the span's own projected value (`_skip_value` mirrors `_seg_code`/`_seg_num`/City) — a value corroborated by a placeable span is source truth, not an omission. Cell-first evaluation credits every co-anchored span against the ORIGINAL painted value. The marker sheet gains `Skipped source spans` / `Marked anchor cells` / `Unavailable marker` rows; the sidecar gains `clean_road_build.skipped_source_spans` (count, marked cells, reason, marker, per-span records); the result message names the marked-anchor count. **Review 1 remedy (RB1-R1-001):** the marker sheet is written by the extracted `_write_marker_sheet` with MEASURED stored column widths, wrapped values in rows tall enough for every wrapped line, and the 102 skips as an itemized 14-column table instead of 102 long warning lines (`_SKIP_TABLE_COLUMNS`, `_skip_table_row`, `_skip_values_text`, `_skip_station_text`, `_wrapped_lines`); `SKIP_REASON` becomes one constant shared by the marker sheet and the sidecar. Values, counts and every other sheet are untouched | PCOA-FINAL-010 |
 | `scripts/compare_core.py` | ONE additive opt-in `CompareSchema` field: `unavailable_rule: tuple = ()` (`(token, Summary note)`), plus the `unavailable_token` property. Gated behavior (all inert when unset — the default and ditto-only formula strings are byte-identical): `compared_cell` marks a cell whose ASCII-TRIMmed value equals the token on either side NON-ASSERTING (state `N`, display = side A per the ditto convention); `_matched_state_expr` adds the formula twin (`EXACT(trim, token)` OR-branch), which also covers Spot Check's independent recompute; `_write_summary` renders the schema's resolved disclosure note; `run_compare` validates the pair shape. Precedent: the per-cell ditto `N` | PCOA-FINAL-010 |
 | `scripts/compare_clean_highway_tsn.py` | Imports `UNAVAILABLE_TOKEN` from the producer. `_NOTES_TITLE`/`_NOTES_LINES` restructure (same content). `_build_skip_facts` reads the built workbook's marker counts — an older or skip-free build returns `(0, 0)` and gets the plain module schema, so previously built workbooks still compare byte-identically. `_schema_for` builds the per-run schema via `dataclasses.replace`: `unavailable_rule` with the resolved Summary note (102 / 174 / reason) + a Notes writer with `_disclosure_lines` PREPENDED (the disclosure cannot be buried under the 74-line column table). `compare()` uses it | PCOA-FINAL-010 |
-| `build/check_clean_road.py` | `test_skipped_span_source_truth` — the hermetic red→green test (synthetic library, no real data): a span with one unreadable PM endpoint and usable OD/AR measures must (a) appear in the skip record (sidecar + marker + per-span exact counts), (b) make the build `PARTIAL` with non-zero `skipped_inputs`, (c) surface on the marker sheet, and (d) in a real `mode="both"` comparison: token vs the span's own value → `N` (the false-positive class), token vs a different value → `N` (the misrepresented class), a correctly placed genuine difference stays `D` and is the only counted cell. Covers begin- and end-anchors, kind eligibility (an R-row anchor), the matches-raw no-mark rule, the marker/token display, the Summary + Notes disclosures, the merged producer-partial note, old-build compatibility, and the skip-free COMPLETE control. `_build_library` gains the `extra=` fixture hook + a `LocError` column; `getattr` fallbacks make the base-commit run fail with semantic FAILs, not a crash | PCOA-FINAL-010 |
+| `build/check_clean_road.py` | `test_skipped_span_source_truth` — the hermetic red→green test (synthetic library, no real data): a span with one unreadable PM endpoint and usable OD/AR measures must (a) appear in the skip record (sidecar + marker + per-span exact counts), (b) make the build `PARTIAL` with non-zero `skipped_inputs`, (c) surface on the marker sheet, and (d) in a real `mode="both"` comparison: token vs the span's own value → `N` (the false-positive class), token vs a different value → `N` (the misrepresented class), a correctly placed genuine difference stays `D` and is the only counted cell. Covers begin- and end-anchors, kind eligibility (an R-row anchor), the matches-raw no-mark rule, the marker/token display, the Summary + Notes disclosures, the merged producer-partial note, old-build compatibility, and the skip-free COMPLETE control. `_build_library` gains the `extra=` fixture hook + a `LocError` column; `getattr` fallbacks make the base-commit run fail with semantic FAILs, not a crash. **Review 1 remedy:** `_illegible_marker_cells` asserts the marker sheet's STORED geometry — every cell either fits its stored column width or wraps in a row tall enough for every wrapped line — on both the skipped and skip-free builds, plus the itemized table's header, row count, known-PM values and marked-cell counts. Six of these fail on the reviewed head and nothing else does | PCOA-FINAL-010 |
 | `docs/planning/comparison-perfection/comparison-canary-bindings.md` | **CRH-SW-E3** re-bless (supersedes CRH-SW-E2's expected counts) with the exact input identities and the three acceptance legs | contract requirement |
 | `docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/RB-1/BUNDLE.md` | Base `main` SHA filled; status | — |
 | `docs/planning/post-comparison-perfection-output-audit/IMPLEMENTATION-PLAN.md` | RB-1 status → `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW` (queue + coverage + HF-01 rows together) | — |
@@ -91,10 +94,13 @@ stays record-only.
 |---|---|---:|
 | ArcGIS layer library | junction to the owner's `arcgis_layers/` — byte-identical to the audited library (`00_INDEX` SHA `CCD1BDFF…`, layer counts reproduced exactly) | — |
 | TSN raw `CA HIGHWAYS 09.08.2025.xlsx` | `BBD1ACF9D4A8FEF86F96A0A2CF54BE1105E8C919600DBCD05A325B194F5C86E5` | — |
-| Built workbook (new) | `8BDD9247771CF2580775F4F0A1DD87706E75F3533C33EC9DB25D41A9AB4B305E` | 10,828,144 |
-| TSN normalized (rebuilt in the worktree; content proved identical, bytes differ per PCOA-FINAL-017) | `7F1086FEAFE061531B682B12D0DDA161F5256DF50FCC89A954DF8B87A4656AAB` | 14,864,394 |
-| Comparison formulas twin (post-recalc, cached) | `7680C6F37B64FE5469184EA71B81DC81834A84C61F871187EF2813D0CFAE3842` | 581,780,067 |
-| Comparison values twin | `AFAAB4BACA82D31694BBE2D98E0EE362C91303A79843ED0DC77F4930DEFE3A12` | 200,034,918 |
+| TSN normalized (built in the worktree; content proved identical, bytes differ per PCOA-FINAL-017) — the SAME cached artifact was reused by the remedy run, not rebuilt | `7F1086FEAFE061531B682B12D0DDA161F5256DF50FCC89A954DF8B87A4656AAB` | 14,864,394 |
+| Built workbook — first implementation run (superseded) | `8BDD9247771CF2580775F4F0A1DD87706E75F3533C33EC9DB25D41A9AB4B305E` | 10,828,144 |
+| Comparison values twin — first run (superseded) | `AFAAB4BACA82D31694BBE2D98E0EE362C91303A79843ED0DC77F4930DEFE3A12` | 200,034,918 |
+| Comparison formulas twin — first run, post-recalc (superseded) | `7680C6F37B64FE5469184EA71B81DC81834A84C61F871187EF2813D0CFAE3842` | 581,780,067 |
+| **Built workbook — review-1 remedy (current)** | `1ADB594425DD846AC93C8500834FBD24E9D8D497F6595FFCB30D496AE8AD360A` | 10,833,361 |
+| **Comparison values twin — remedy (current)** | `3EC093F64E7F65B2D822328CD5C12E333E12F71692C5B38D17534B2AA58032BC` | 199,821,556 |
+| **Comparison formulas twin — remedy, post-recalc (current)** | `F7412CA0D96E926E0CCC8B3CC3B224BB382A88676CD6588B78B4F494B3B2BEAE` | 581,844,790 |
 
 ## Scope and residual risk
 
@@ -168,6 +174,80 @@ structure). Regenerate the build and both comparison twins because the build
 hash/provenance changes, then rerun the visual, formula, count, GUI-path, and
 regression acceptance matrix. Keep the change confined to RB-1's new marker
 sheet content; the pre-existing cross-family clipping program remains HF-02.
+
+## Review 1 remedy — Claude, 2026-07-28 (RB1-R1-001 CLOSED)
+
+The denial is a presentation defect in RB-1's own new marker-sheet content, and
+the remedy is confined to it. `consolidate_clean_highway._write_marker_sheet`
+(extracted from `_write_workbook`) now declares the sheet's stored geometry
+instead of inheriting Excel's 8-character base width and 15-point default row.
+
+1. **Purposeful stored column widths.** The sheet writes explicit `<cols>`
+   records — 24 for the label column and 56 for the value column, plus the full
+   14-column table geometry when spans were skipped. The widths were MEASURED
+   against installed Excel's own font metrics, bold header cells included, not
+   estimated: the first measured pass rejected a 54-wide value column that Excel
+   said needed 53.43 units for the longest attribute text, and the constants
+   were raised until Excel reported no column short and no row short.
+2. **Wrapping with a row tall enough for it.** A value too wide for its column
+   is written wrapped, and its row height is set to (wrapped lines × 15pt), so
+   the whole string is visible in the STORED presentation rather than depending
+   on a reader widening anything. Numbers stay unwrapped by design — General
+   format rounds a number's display instead of clipping it.
+3. **The 102 itemized skips are a TABLE, not 102 sentences** — the review's
+   sanctioned "equivalently readable structure". One row per span with every
+   field in its own sized column: `Source layer`, `Attribute values`, `Route`,
+   `Alignment`, `County`, `PM prefix`, `Known endpoint`, `Known PM`,
+   `LocError`, `Begin OD`, `End OD`, `From AR`, `To AR`, `Marked cells`. No
+   cell on the sheet is a 280–329-character run-on any more, and the record is
+   scannable and sortable.
+4. **A `Skipped source reason` row** states the reason on the marker sheet
+   itself, wrapped and legible, from the same new `SKIP_REASON` constant the
+   sidecar uses — so the two wordings cannot drift.
+5. **Alignment**, so the block reads as a block: labels top-aligned against the
+   first line of a wrapped value; values left-aligned beside their labels
+   instead of counts floating at the far right of a 56-wide column.
+
+The prose warning lines are UNCHANGED and still ride the `warnings` channel
+into `skipped_inputs=102`, `PARTIAL`, the result message, the log and the
+sidecar (`warnings` list byte-identical). Only the marker sheet's presentation
+of them moved, from 102 clipped sentences to the itemized table.
+
+**Deliberately unchanged:** every published value, state mask, display, count
+and typed outcome; the comparison workbooks' own layout; the `CompareSchema`
+hook; the pre-existing cross-family clipping program (HF-02). Column widths are
+a column-scoped record, so making rows 4–108 legible necessarily also renders
+the three pre-existing marker rows legible — inherent to the required remedy,
+not an additional change.
+
+### Remedy verification
+
+| Gate | Method | Result |
+|---|---|---|
+| Base-red at the REVIEWED HEAD | `build/check_clean_road.py` from this head run against archived `a26725b…` scripts | **PASS** — exactly **6** FAILs, all presentation (`states the skip reason`, `skip table names every field`, `one itemized table row per skipped span`, `known PM and marked counts`, `every disclosure cell is legible at its stored width`, `a skip-free marker is legible too`) and nothing else — the defect signature isolated to RB-1's new marker content |
+| Base-red at the ORIGINAL base | same check against archived `9c774d4…` scripts | **PASS** — **24** semantic FAILs including the original signature `got 3` differing cells instead of `1` |
+| Hermetic green | `build/check_clean_road.py` at this head | **PASS** — all checks, including the new stored-geometry assertion on both the skip and skip-free marker sheets |
+| Stored-presentation audit (independent) | An OOXML reader over the rebuilt workbook's package — no product module, no openpyxl object model: `<cols>` widths, row `ht`, per-cell `wrapText` via `styles.xml`, values via `sharedStrings` | **PASS** — **0** illegible cells over the whole 111-row sheet; 14 stored column widths; the skip table carries all 14 headers and exactly **102** rows |
+| Installed-Excel legibility oracle | Excel's own font metrics decide: per column, AutoFit over that column's unwrapped cells with each cell's real font (bold headers included) must not exceed the STORED width; per wrapped row, AutoFit height at the stored width must not exceed the STORED height | **PASS** — `columns_too_narrow: []`, `rows_too_short: []` on the real rebuilt workbook |
+| Native-scale visual | Native-Excel PDF of `ArcGIS Build` at **Zoom 100** (no fit-to-page shrink), rendered and read | **PASS** — labels, counts, the 34-char marker token, the wrapped reason and every table column (through the 10-digit `From AR`/`To AR`) render in full; nothing clipped |
+| Presentation-only proof | Every data-sheet cell of the rebuilt workbook vs the pre-remedy build (`8BDD9247…`) | **PASS** — **0** cell differences across all **57,729** rows, Provenance identical, the same **174** tokens, sidecar still `102 / 174` |
+| Producer semantics after the remedy | The build's own terminal result and sidecar | **PASS** — `status=ok completion=partial skipped_inputs=102 failed=0`; message still names 102 unplaceable spans and 174 marked anchors; sidecar `102 / 174`; the `warnings` list is unchanged (only the marker sheet's presentation of it moved) |
+| Regenerated end-user comparison | The whole shipped path re-run: `start_arcgis_build` → `ConsolidateWorker`, then `start_arcgis_compare` / `_begin_compare` / `_launch_compare` with `mode="both"`, reusing the SAME cached normalized TSN artifact (`7F1086FE…`, not rebuilt) | **PASS** — `status=ok completion=partial`; **52,647** paired / **5,081** ArcGIS-only / **7,436** TSN-only / **50,012** differing rows / **2,635** identical / **291,127** differing cells / asserted **2,579,538** / context **1,263,693** — every CRH-SW-E3 figure reproduced unchanged |
+| Regenerated source-truth recount | App-free lockstep recount of the frozen pre-fix values twin (`A59177DC…`) vs the remedy values twin | **PASS** — 291,292 → **291,127**; **165** mask flips AND **165** display flips; the **9** one-sided anchors display the token at state `U`; per-field deltas exactly **−82 / −81 / −1 / −1**; **0** unexpected changes across all **65,164** rows |
+
+| Regenerated formula deliverable | Installed-Excel `CalculateFullRebuild` + Save on the remedy formulas twin, then an app-free read of the cached results | **PASS** — verdict `✗ DIFFERENCES FOUND — 291,127 differing cell(s), 12,517 one-sided row(s)`; live `Diffs` sum **291,127**; all **165** witnessed positions live-`N` displaying the marker; **every** SELF-CHECK OK; **0** error cells on Summary / Spot Check / Comparison; both disclosure notes present |
+| Regenerated neighboring-family regression | Intersection Summary vs TSN generated from the SAME inputs by the ORIGINAL base code (`9c774d4…`, archived tree) and by this head, **both on the same day** so code is the only variable; full-sheet semantic diff, Provenance excluded as run identity | **PASS** — **0** differing cells on every sheet, both `__CMP_E2_SNAPSHOT_A/B` included; 58 paired / 53 differing cells on both |
+| Regenerated build-level source truth | Cell diff of the rebuilt workbook vs the frozen audit-approved PRE-fix build (`8F9766AC…`) | **PASS** — same **57,728**-row universe (0 extra either side); **174/174** expected tokens present; **0** unexpected cell changes; the marker sheet is purely ADDITIVE (3 rows → 111, the original three keys still first) |
+| Full gate (re-run over the final tree) | `build\.venv` `run_checks.py -j 4 -k`, `compileall`, gate-exact `ruff check scripts`, `build.ps1 -SelfTest` | **PASS** — **157 passed, 0 failed of 157**; compile clean; Ruff "All checks passed!"; `Frozen self-test PASSED` — the EXACT shipped exe runs every code path (`SMOKE OK`, 173 MB onefolder) |
+
+Retained: `HF-01\r1-remedy\` (the measurement JSON and both native-Excel PDFs);
+the Review 1 proof `HF-01\built ArcGIS Build top.pdf` is untouched.
+
+Note on the regression method: an earlier diff against the previous day's
+retained base artifact reported one cell — the Summary banner's `created
+2026-07-27` vs `2026-07-28` run stamp. That is run identity, not behavior, so
+the base artifact was regenerated from the archived base tree on the same day;
+the same-day base-vs-head diff is the zero above.
 
 ## Rollback
 
