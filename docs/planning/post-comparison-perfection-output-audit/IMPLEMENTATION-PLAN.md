@@ -177,7 +177,7 @@ Two layers, because the owner wants **fewer branches, reviews and releases**
 
 | Order | Batch | Specs | Theme | Depends on | Branch | Status |
 |---:|---|---|---|---|---|---|
-| 1 | **RB-1** | HF-01 | Clean Road source truth — the owner's immediate need | None | `hotfix/rb-1-clean-road-source-truth` | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| 1 | **RB-1** | HF-01 | Clean Road source truth — the owner's immediate need | None | `hotfix/rb-1-clean-road-source-truth` | **DENIED — RETURN TO IMPLEMENTATION** |
 | 2 | **RB-2** | HF-02 + HF-03 | The deliverable looks right and describes itself truthfully — **56 of the 68 denials** | None (RB-1 for the Clean Road witness) | `hotfix/rb-2-deliverable-presentation` | BLOCKED |
 | 3 | **RB-3** | HF-04 | Ramp Detail — restores 9 comparison placements that produce nothing today | None | `hotfix/rb-3-ramp-detail-layout` | BLOCKED |
 | 4 | **RB-4** | HF-05 + HF-10 | Evidence, end to end: eligibility, binding, panels, and the missing cross-environment lane | None | `hotfix/rb-4-evidence` | BLOCKED |
@@ -452,7 +452,7 @@ mapping also proves one primary implementation/review bundle per finding:
 
 | RB bundle | Work items | Canonical findings | Count | Queue status |
 |---|---|---|---:|---|
-| **RB-1** | HF-01 | 010 | 1 | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| **RB-1** | HF-01 | 010 | 1 | **DENIED — RETURN TO IMPLEMENTATION** |
 | **RB-2** | HF-02, HF-03 | 002, 003, 008, 009, 014, 016, 019 | 7 | BLOCKED |
 | **RB-3** | HF-04 | 001, 012 | 2 | BLOCKED |
 | **RB-4** | HF-05, HF-10 | 004, 005, 006, 007 | 4 | BLOCKED |
@@ -526,7 +526,18 @@ Two consequences the reviewer must plan for:
 | Implementer | Claude |
 | Review 1 | **Codex** (holds `clean-road-comparison-unlocatable-impact.json` and `CLEAN-ROAD-HIGHWAY-RAW-SOURCE-TRUTH-FINAL.md`) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-1: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| Status | **Inherits RB-1: DENIED — RETURN TO IMPLEMENTATION** |
+
+**Review 1 return (Codex, 2026-07-27).** Values/source truth,
+formula-workbook generation, the real GUI path, full gate, and unaffected
+Intersection Summary regression passed independently. Visual usability failed:
+the newly added
+`ArcGIS Build!A4:B108` labels, marker, and 102 itemized warnings are unwrapped
+in default-width/default-height cells and are clipped in native Excel. Resume
+Prompt 04 on `hotfix/rb-1-clean-road-source-truth`; make only RB-1's new marker
+sheet disclosure legible, regenerate the build and both twins, and rerun the
+complete acceptance matrix. Exact evidence and commands are in
+`hotfix-bundles/RB-1/REVIEW.md`.
 
 **Exact scope.** Clean Road Highway only: the ArcGIS build
 (`clean_highway_built.xlsx`) and the ArcGIS-vs-TSN comparison in **both**
@@ -1975,7 +1986,9 @@ blocked by this program.
 | Claude | First plan | **APPROVED — FIRST PLAN** | `4e34bee` | 2026-07-26 | 11 work-item specs, 22 findings mapped once, overlap map built from code inspection at `a29bdb6` |
 | Codex | Final challenge | **APPROVED — JOINT AGREEMENT** | this commit | 2026-07-26 | Independently checked code ownership and mapping; corrected four material acceptance/workflow ambiguities without changing any owner ruling |
 
-Stage 3 is complete. Every finding is mapped exactly once and **RB-1 is READY**.
-Run
+Stage 3 is complete and every finding remains mapped exactly once. RB-1 became
+`READY`, was implemented, and **Review 1 denied it on 2026-07-27**. Resume
 [Prompt 04 — implement a hotfix bundle](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
-with `<BUNDLE_ID>` = `RB-1` and `<IMPLEMENTER>` = `Claude`.
+on the existing `hotfix/rb-1-clean-road-source-truth` branch with
+`<BUNDLE_ID>` = `RB-1` and `<IMPLEMENTER>` = `Claude`; the exact return is in
+`hotfix-bundles/RB-1/REVIEW.md`.

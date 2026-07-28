@@ -1,6 +1,6 @@
 # `RB-1` — Implementation Record
 
-Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW**
+Status: **DENIED — RETURN TO IMPLEMENTATION**
 
 | Field | Value |
 |---|---|
@@ -143,6 +143,31 @@ stays record-only.
   sum above the global 174 — the sidecar's `count`/`marked_anchor_cells` are the
   exact global truth); the symmetric either-side token rule in `compared_cell`
   (mirrors the ditto precedent; only side A can carry it in practice).
+
+## Review 1 return — Codex, 2026-07-27
+
+Review 1 independently reproduced the source census, marker/count semantics,
+state transitions, formula-workbook generation, GUI generation path, full
+gate, and unaffected-family regression, but **denied** the bundle on its
+visual-usability acceptance criterion.
+
+The newly appended `ArcGIS Build!A4:B108` disclosure is not legible in the
+workbook's stored presentation. The sheet has no explicit column-width records,
+uses its 8-character base width and 15-point default row height, and writes
+every new cell with style 0 (no wrap and no shrink-to-fit). Native Excel renders
+the new labels as `Skipped so…`, `Marked an…`, and `Unavailabl…`; the marker
+token is cut off, and all 102 warning/detail rows (280–329 characters each) are
+truncated. The retained proof is
+`HF-01\built ArcGIS Build top.pdf` (SHA-256
+`42A41C5D820A7709285F189A77EA5A619AD86853DA996F5BFC3CBFF595C37141`).
+
+Prompt 04 must resume this same branch and make the new labels, token, and all
+102 warning/detail rows legible at native scale (for example, with purposeful
+column widths plus wrapping/row heights, or an equivalently readable
+structure). Regenerate the build and both comparison twins because the build
+hash/provenance changes, then rerun the visual, formula, count, GUI-path, and
+regression acceptance matrix. Keep the change confined to RB-1's new marker
+sheet content; the pre-existing cross-family clipping program remains HF-02.
 
 ## Rollback
 
