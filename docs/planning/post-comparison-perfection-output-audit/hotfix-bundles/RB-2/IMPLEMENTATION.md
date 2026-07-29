@@ -8,7 +8,7 @@ Status: **IMPLEMENTING — acceptance run `RB2-A1` in progress**
 | Implementer | Claude (owner decision 2026-07-26: Claude implements every bundle) |
 | Branch | `hotfix/rb-2-deliverable-presentation` (worktree `C:\Users\Yunus\Projects\TSMIS-rb2-worktree`; the user's `main` checkout is untouched and still clean) |
 | Base `main` commit | `896083e014d0451d5b05e5b6b024339aebc84d74` — clean, identical to `origin/main`, fetched without force before branching |
-| Implementation commit | `da1d480ede1f79671f4573b311ac2e402cd16eaf` |
+| Implementation commits | `da1d480ede1f79671f4573b311ac2e402cd16eaf` (the change), `eb54b96` (the Excel-measured geometry correction below) |
 | Pushed | `origin/hotfix/rb-2-deliverable-presentation` |
 | Canonical findings | PCOA-FINAL-002, -003, -008, -009, -014, -016, -019 |
 | Generated-output root | `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-02\` (workbooks + measurements) and `…\HF-03\` (TSN rebuild + capture lifecycle); committed machine-readable witnesses under `hotfix-bundles/HF-02/witness/` and `hotfix-bundles/HF-03/witness/` |
@@ -63,9 +63,56 @@ Both new check files were run against the **base commit's own `scripts/`** (junc
 | One-sided path | A route-bearing schema with rows on one side only, both flavors | **PASS** — the Only-in key columns fit; the empty-key case falls back to the declared minimum |
 | Acceptance run `RB2-A1` | *(in progress — see below)* | |
 
+## The first measured pass FAILED — and set the constants
+
+The audit's own gate (Calibri metrics, the same tolerance) reported **0** clipped
+cells as soon as the first version of the fix was in. Installed Excel did not
+agree. Run over the REAL first generated workbook — `ssor-prod_ramp_summary_tsn`
+from the Everything lane — Excel's own AutoFit rejected the geometry three ways,
+and each rejection is now a measured constant rather than an assumption:
+
+| What Excel said | Why the first pass was short | Constant |
+|---|---|---|
+| A column stored as `46` reports `ColumnWidth 45.29`, and the label needs `46.00` | Excel's character width is the stored number minus 0.71, so a width computed in characters and stored raw is always that much narrow | `_STORED_WIDTH_OFFSET = 0.71` |
+| `→ Comparison row:` needs `18.43` where the fit stored `18`; `TSN row (key-matched):` needs `22.29` where it stored `22` | rasterizing a 10 pt font at 13 px loses ~2.5 % per glyph to integer rounding, and the unhinted advance sum still runs 1.3–2.4 % under Excel's own | `_MEASURE_SCALE = 4` (oversample, then scale back) + `_MEASURE_MARGIN = 1.05` |
+| `15213 ≠ 15410` needs `12.57` in a column the schema declared `12` | a declared `cmp_width` was being treated as a ceiling, so a schema could clip its own difference cells | a declared width is now a **floor**, never a ceiling |
+
+After the correction, re-measured on the same real pair, **both twins**:
+
+| Sheet | `columns_too_narrow` | `rows_too_short` |
+|---|---|---|
+| Summary | `[]` | `[]` |
+| Spot Check | `[]` | `[]` |
+| Comparison | `[]` | `[]` |
+| Summary by Category | `[]` | `[]` |
+| Provenance | `[]` | `[]` |
+
+The oracle is Excel's own metrics, not an estimate: every populated cell whose
+right neighbour blocks it from spilling is re-measured on a scratch sheet
+carrying that cell's real font — an unwrapped cell must fit its column's STORED
+width, and a wrapped cell's row must be at least the height Excel autofits to at
+that width. Deliberately hidden columns (the state-mask chunks) and the
+Stage-2-validated 45.75 pt wrapped header band are excluded as out of scope.
+Witness: `HF-02\excel-metrics-ramp-summary{,2,3}.json` — the failing pass is
+retained beside the passing one.
+
 ## Acceptance run `RB2-A1`
 
-*(to be completed)*
+*(in progress — the generation was restarted from scratch after the geometry
+correction so every measured workbook carries the final geometry)*
+
+### Early confirmations on real data
+
+The first regenerated matrix-lane workbook already carries every HF-03 outcome
+the finding demanded, on the real corpus rather than a fixture:
+
+| Oracle | Pre-fix (audited) | This run |
+|---|---|---|
+| `Summary by Category!A6` | *"TSN print: no source-claims record beside this normalized workbook (older normalization) — rebuild the TSN library to capture the print identity."* | **`TSN print identity: OTM22270 · Event 4843742 · reference 09/15/2025 · submitted by TRLBUGNI · generated 05:10 PM (STATEWIDE).`** — the exact line the audit's Direct-lane controlled differential recorded |
+| occurrences of "rebuild the TSN library" | 1 | **0** |
+| `%TEMP%` strings anywhere in the workbook | present | **0** |
+| `.provenance.json` TSN `selection` | `…\AppData\Local\Temp\tsmis-tsn-consumer-…\tsn_ramp_summary_normalized.xlsx` | `…\tsn_library\ramp_summary\consolidated\tsn_ramp_summary_normalized.xlsx` — **exists and is readable after the run**, with `read_via: verified private copy of the selection` |
+| values twin `Summary!B3` read `data_only` | `None` | `✗ DIFFERENCES FOUND — 23 differing cell(s), 2 one-sided row(s) — details below.` |
 
 ## Scope and residual risk
 
