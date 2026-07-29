@@ -199,6 +199,25 @@ instead printed *"TSN print: no source-claims record beside this normalized
 workbook (older normalization) — rebuild the TSN library to capture the print
 identity."* — the categorically false instruction PCOA-FINAL-002 was raised on.
 
+**The audit's worst measured cell — identity widened, instruction wrapped.**
+Ramp Summary classic environment, `Summary!B13:B14`, recorded **364 px short**,
+the largest overrun in the whole audit. Fitting it by width alone would need a
+~93-character column, so the planner's sketch chose wrapping for instructions
+and widening for identities. That is exactly what the workbook now does:
+
+```
+ramp_summary new-vs-prior-ssor (values).xlsx: 0 materially clipped   (was 5)
+
+Summary column B stored width: 46.0        <- unchanged
+  B13: wrap=True  row_height=45.0  "In SSOR-PROD 2026-07-23 only (missing from ..."
+  B14: wrap=True  row_height=45.0  "In SSOR-PROD 2026-07-09 only (missing from ..."
+  B15: wrap=False row_height=None  'FIELD-LEVEL DISCREPANCIES (matched rows)'
+```
+
+`B15` is the control: a short banner in the same column, untouched and still
+unwrapped at the default height. Only cells that would actually clip changed,
+and the sheet did not get wider.
+
 **Criterion 3 — PCOA-FINAL-014's named test, on the real Highway Sequence vs TSN
 workbook.** The finding names `City`, `HG` and `Distance To Next Point`
 specifically; the *DIFFERENCES BY FIELD* table now reads:
