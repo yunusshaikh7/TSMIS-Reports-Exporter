@@ -102,6 +102,25 @@ retained beside the passing one.
 *(in progress — the generation was restarted from scratch after the geometry
 correction so every measured workbook carries the final geometry)*
 
+### What the base-code pass covers, and the one lane it deliberately omits
+
+The base tree (`main` @ `896083e`, its `scripts/` copied verbatim, reading the
+SAME TSN library and the SAME frozen run folders through junctions) exists for
+exactly one claim: HF-02 criterion 5 — every count, mask and typed outcome
+unchanged, **proved per family**. It runs the Everything lane for all 12
+families plus the Direct and classic lanes.
+
+It does **not** re-run the By Day lane, and that is a redundancy removal rather
+than sampling: By Day drives the same comparator over the same consolidated
+store and the same TSN library as the Everything lane, so a base pass over it
+would re-derive numbers already proved for that family and nothing else. **No
+family loses its base-vs-head diff.**
+
+HF-03's before/after classification needs no base pass at all — the "before"
+table is the committed Stage 2 witness (`stage2-tsn-provenance-scope.json`:
+18 workbooks per lane, 12 warned, 18 carrying a `%TEMP%` path) and the "after"
+is this run's head, re-derived independently by both of RC-3's methods.
+
 ### Early confirmations on real data
 
 The first regenerated matrix-lane workbook already carries every HF-03 outcome
