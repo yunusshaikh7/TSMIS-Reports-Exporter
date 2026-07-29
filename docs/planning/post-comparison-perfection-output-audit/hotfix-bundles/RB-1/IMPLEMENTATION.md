@@ -379,7 +379,7 @@ withhold.
 | Native-scale visual | Native-Excel PDFs of BOTH disclosure sheets at **Zoom 100** (no fit-to-page shrink), rendered to images and read page by page | **PASS** — on `ArcGIS Marked Anchors` every column renders in full: route/county/prefix, the begin postmile, the roadbed, the 26-character `THY_*` column names, the withheld values, `SHS Travel Way L` / `SHS O Shld Width R` and the span's known postmile. Numbers keep Excel's conventional right alignment inside their table column, exactly as the Review-1-approved skip table does; the label/value block's left alignment (the RB1-R1-001 fix) is untouched |
 | Neighbouring-family regression | Intersection Summary vs TSN generated from the same inputs by the ORIGINAL base code (`9c774d4…`, archived tree) and by this head, both on the same day; full-sheet semantic diff | **PASS** — **0** differing cells on **every** sheet including both `__CMP_E2_SNAPSHOT_A/B` **and** Provenance; 58 paired / 53 differing cells on both. The callable-note hook is inert for every schema that does not set `unavailable_rule` |
 | Full gate | `build\.venv` `run_checks.py -j 4 -k`, `compileall`, gate-exact `ruff check scripts`, `build.ps1 -SelfTest` | **PASS** — **157 passed, 0 failed of 157** (169 s); compile clean; Ruff "All checks passed!"; `Frozen self-test PASSED` — the EXACT shipped exe runs every code path (`SMOKE OK`, 173 MB onefolder) |
-| Regenerated formula deliverable | Installed-Excel `CalculateFullRebuild` + Save on the remedy formulas twin (68.7 min, 468,206,894 → 581,854,795 bytes), then an app-free read of the cached results | **PASS** — live verdict `✗ DIFFERENCES FOUND — 291,127 differing cell(s), 12,517 one-sided row(s)`; **10 of 10** SELF-CHECK rows `OK`, including *Per-field difference counts add up to the total differing cells* and *Build-time source identity and duplicate pairing snapshot is current*; **zero** error cells on every sheet; the itemized disclosure bullet present and naming all six facts. So Excel computes the same truth live that the values twin publishes |
+| Regenerated formula deliverable | Installed-Excel `CalculateFullRebuild` + Save on the remedy formulas twin (68.7 min, `F75189D1…` 468,206,894 → `1393164A…` 581,854,795 bytes), then an app-free read of the cached results that hashes the workbook in the same pass | **PASS** — live verdict `✗ DIFFERENCES FOUND — 291,127 differing cell(s), 12,517 one-sided row(s)`; **10 of 10** SELF-CHECK rows `OK`, including *Per-field difference counts add up to the total differing cells* and *Build-time source identity and duplicate pairing snapshot is current*; **zero** error cells on every sheet; the itemized disclosure bullet present and naming all six facts. So Excel computes the same truth live that the values twin publishes |
 
 **On the four Provenance cells.** Both inputs' recorded path and SHA moved
 because the Review 1 remedy ran from the `TSMIS-rb1-worktree` working tree and
@@ -393,9 +393,34 @@ data sheet and the very-hidden `__CMP_E2_SNAPSHOT_B` are cell-identical across
 **60,085** and **60,084** rows. The ArcGIS SHA moved because the build gained
 the new sheet, proved additive above.
 
-Retained: `HF-01\r2-remedy\` (the Excel metric JSONs and the native-scale +
-fit-width PDFs of both disclosure sheets); `r1-remedy\` and the Review 1 and
-Review 2 reviewer folders are untouched.
+Retained: `HF-01\r2-remedy\` (both workbooks, the built workbook, the Excel
+metric JSONs and the native-scale + fit-width PDFs of both disclosure sheets);
+`r1-remedy\` and the Review 1 and Review 2 reviewer folders are untouched.
+
+### Exact identities of the offered artifacts (RB1-R2-EG-001)
+
+Every artifact this bundle offers for approval, by size and SHA-256 — including
+the **post-recalculation** formulas twin, so the successful installed-Excel
+rebuild is bound to the exact bytes it was performed on rather than only to the
+pre-recalculation workbook the sidecars name:
+
+| Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| ArcGIS build (`clean_highway_built.xlsx`) | 10,840,933 | `0D8575CA0C496594D2E47F51BC1BA39673384F4FDDE4A7995D497BE1959A6DDF` |
+| Values twin (`RB1-R2-Remedy (values).xlsx`) | 199,822,285 | `173E245248C4A26F06F523577DE41DF062D6433FE801FEFEA4D1EE2D8FE3FB99` |
+| Formulas twin, **as generated** (pre-recalculation) | 468,206,894 | `F75189D109D4007DDE3488CB18ADD970DD73AC4FDC5C5D9AE50FCFAA15C41165` |
+| Formulas twin, **after the successful installed-Excel `CalculateFullRebuild` + Save** | 581,854,795 | `1393164AAF50C7C4D2B7C54B33150C3D6BCDD5CB5BA8604557BC6A78EB8205F0` |
+
+The first three identities are the shipped run's own record
+(`witness/r2-shipped-run.json`, hashed by the driver as each file was
+written). The fourth is produced by `witness/formulas-twin-recalc.json`'s own
+reader, which hashes the workbook in the SAME pass that reads its cached
+results — so the recorded verdict, the ten `OK` self-checks and the zero error
+cells are bound to that hash by construction, not by transcription. That
+witness also hashes the retained copy at
+`HF-01\r2-remedy\RB1-R2-Remedy.xlsx` and records
+`retained_copy_matches: true`, so the bytes offered for review are provably
+the bytes recalculated.
 
 ## Rollback
 

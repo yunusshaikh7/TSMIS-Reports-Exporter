@@ -1797,6 +1797,9 @@ build and both twins were regenerated, so the input identities move again:
 |---|---|---:|---|
 | ArcGIS (built, RB-1 — review-2 remedy build) | `output\arcgis_cleanroad\clean_highway_built.xlsx` | 10,840,933 | `0D8575CA0C496594D2E47F51BC1BA39673384F4FDDE4A7995D497BE1959A6DDF` |
 | TSN (normalized, main-checkout copy of the same raw) | `tsn_library\clean_highway\consolidated\tsn_clean_highway_normalized.xlsx` | 14,864,396 | `30048451ED26917896CD001A9791F24C833FC6D3BAB3B90277CAE8F5BB794FED` |
+| Values twin (the canary's published artifact) | `RB1-R2-Remedy (values).xlsx` | 199,822,285 | `173E245248C4A26F06F523577DE41DF062D6433FE801FEFEA4D1EE2D8FE3FB99` |
+| Formulas twin, as generated | `RB1-R2-Remedy.xlsx` | 468,206,894 | `F75189D109D4007DDE3488CB18ADD970DD73AC4FDC5C5D9AE50FCFAA15C41165` |
+| Formulas twin, after the successful installed-Excel recalculation | same path, saved in place | 581,854,795 | `1393164AAF50C7C4D2B7C54B33150C3D6BCDD5CB5BA8604557BC6A78EB8205F0` |
 
 **Nothing else in this canary moves.** A cell-level diff of the review-2 build
 against the review-1 build shows **0** differences across all 57,728 data rows,
