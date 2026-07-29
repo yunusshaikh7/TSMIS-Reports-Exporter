@@ -144,6 +144,25 @@ generated tree):
 | `ssor-prod_highway_sequence_tsn.xlsx` (the family whose PDF sibling recorded 82) | — | **0** |
 | `ssor-prod_intersection_detail_tsn.xlsx` (statewide detail, 29 MB) | — | **0** |
 
+**HF-03 criteria 1 and 3, swept across every deliverable built so far.** The
+zip/sheet-XML probe (RC-3 method 1 — never opens the object model) over the 14
+comparison workbooks committed by the Everything lane at that point:
+
+```
+14 comparison deliverables: false-rebuild=0  temp-path=0
+```
+
+and the TSN print identities carried are exactly the codes the audit recorded
+for the Direct lane, family by family:
+
+| Family | Identity in the matrix-lane workbook | Audit's Direct-lane control |
+|---|---|---|
+| Highway Log (both editions) | `OTM52010` | `OTM52010 California State Highway Log · report 09/15/25` |
+| Highway Sequence | `OTM22025` | `OTM22025 Highway Locations · report 15-SEP-25` |
+| Intersection Summary | `OTM22250` | `OTM22250 · Event 4843738 · 09/15/2025` |
+| Ramp Summary | `OTM22270` | `OTM22270 · Event 4843742 · reference 09/15/2025 · TRLBUGNI` |
+| Intersection Detail | *(none)* | identity-silent **by design** — the contract requires it gain the honest provenance path but **no invented identity line**, and it has |
+
 **Criterion 3 — PCOA-FINAL-014's named test, on the real Highway Sequence vs TSN
 workbook.** The finding names `City`, `HG` and `Distance To Next Point`
 specifically; the *DIFFERENCES BY FIELD* table now reads:
