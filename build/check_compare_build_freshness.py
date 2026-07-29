@@ -170,7 +170,9 @@ def test_excel(c, source, root):
                                and (not stale or banner.startswith("✗")))
             c.check(f"{name}: certification state is correct",
                     error is None and expected_banner
-                    and freshness == ("CHECK" if stale else "OK"),
+                    # the freshness row states the certifying words itself
+                    # (PCOA-FINAL-019), not the generic CHECK
+                    and freshness == ("REGENERATE REQUIRED" if stale else "OK"),
                     f"error={error!r}; banner={banner!r}; fresh={freshness!r}")
             if expected_diffs is not None:
                 c.check(

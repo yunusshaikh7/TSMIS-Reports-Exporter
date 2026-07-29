@@ -601,6 +601,39 @@ def _sha256_file(path):
     return h.hexdigest()
 
 
+_CAPTURE_ORIGIN_KEY = "tsn_capture_origin"
+
+
+def _durable_selection(path, digest, size):
+    """The DURABLE path this input was taken from, when it is a verified
+    private capture of one (PCOA-FINAL-003).
+
+    The matrix lanes compare a byte-verified private copy of the canonical TSN
+    library workbook, and that copy is deleted when the run ends — so recording
+    its own pathname answers "what did this workbook compare?" with a directory
+    the reader can never open. The capture records where it came from and the
+    content identity it proved; this substitutes the canonical path ONLY when
+    that identity equals the bytes just hashed here and the canonical file is
+    still readable. Anything else keeps the literal path that was read."""
+    origin = consolidation_meta.read_extra(path, _CAPTURE_ORIGIN_KEY)
+    if not isinstance(origin, dict):
+        return None
+    identity = origin.get("identity")
+    selection = origin.get("selection")
+    if not isinstance(identity, dict) or not isinstance(selection, str):
+        return None
+    if (identity.get("sha256") != digest
+            or identity.get("byte_length") != size):
+        return None
+    canonical = Path(selection)
+    try:
+        if not canonical.is_file():
+            return None
+    except OSError:  # silent-ok: an unverifiable origin keeps the literal path
+        return None
+    return str(canonical.resolve(strict=False))
+
+
 def capture_input_provenance(sides):
     """[{role, name, selection, sha256, size, mtime_ns}] for ``sides`` =
     ((role_label, path), ...), hashed BEFORE any loader reads (CMP-AUD-098
@@ -618,17 +651,24 @@ def capture_input_provenance(sides):
             raise ValueError(f"Could not capture the {role} input identity for "
                              f"{path.name}: {type(e).__name__}: {e}")
         producer = consolidation_meta.read_outcome(path)
-        captured.append({
+        durable = _durable_selection(path, digest, st.st_size)
+        record = {
             "role": role,
             "kind": "file",
             "name": path.name,
-            "selection": str(path.resolve(strict=False)),
+            "selection": durable or str(path.resolve(strict=False)),
             "sha256": digest,
             "size": st.st_size,
             "mtime_ns": st.st_mtime_ns,
             "producer_completion": (producer.completion if producer is not None
                                     else None),
-        })
+        }
+        if durable:
+            # Say HOW it was read, without naming a path that stops existing:
+            # the digest above is of the bytes this comparison actually read,
+            # and they were proved equal to the canonical workbook's.
+            record["read_via"] = "verified private copy of the selection"
+        captured.append(record)
     return captured
 
 

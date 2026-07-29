@@ -505,6 +505,17 @@ def _get(value, *names, default=None):
     return default
 
 
+def _freshness_cell(summary):
+    """The Summary's live build-time identity guard — the workbook's own
+    fail-closed certification row (PCOA-FINAL-019 moved the values twin's
+    headline to a stored literal; this row is what still turns it red)."""
+    for row in summary.iter_rows(values_only=True):
+        if (len(row) > 2 and row[1] == "Build-time source identity and "
+                "duplicate pairing snapshot is current"):
+            return row[2]
+    return None
+
+
 def _record_for_dimensions(records, na, nb):
     for record in records or ():
         if (_get(record, "side_a_size", "n_a", "na") == na
@@ -595,10 +606,12 @@ def test_public_pairing_results(c):
                  f"quality={_get(capped_outcome, 'pairing_quality')!r}"))
         c.check("317x316 emits the structured positional fallback diagnostic",
                 _diag_is_complete(capped_diag, 317, 316, 316), repr(capped_diag))
+        # PCOA-FINAL-019: a values twin stores its headline so a consumer that
+        # never recalculates can read it; the live freshness guard moved to the
+        # SELF-CHECK row (asserted separately below) and lost no strength.
         c.check("317x316 never presents fallback artifacts as certified differences",
                 isinstance(capped_banner, str)
-                and capped_banner.startswith("=IF(")
-                and "REGENERATE REQUIRED" in capped_banner
+                and not capped_banner.startswith("=")
                 and "✗ PARTIAL / PAIRING LIMIT" in capped_banner
                 and "diagnostic counts, not certified differences" in capped_banner
                 and "DIFFERENCES FOUND" not in capped_banner
@@ -621,11 +634,12 @@ def test_public_pairing_results(c):
             no_green_book = load_workbook(
                 tmp / "317x317.xlsx", data_only=False, read_only=True)
             no_green_banner = no_green_book["Summary"]["B3"].value
+            no_green_freshness = _freshness_cell(no_green_book["Summary"])
             no_green_book.close()
         except Exception as exc:
             no_green_result = no_green_outcome = None
             no_green_diag = exc
-            no_green_banner = exc
+            no_green_banner = no_green_freshness = exc
         c.check("317x317 clean fallback is partial/capped and never match/green",
                 no_green_result is not None
                 and _get(no_green_result, "completion") == "partial"
@@ -643,11 +657,15 @@ def test_public_pairing_results(c):
                 repr(no_green_diag))
         c.check("317x317 workbook Summary is visibly non-certifying",
                 isinstance(no_green_banner, str)
-                and no_green_banner.startswith("=IF(")
-                and "REGENERATE REQUIRED" in no_green_banner
+                and not no_green_banner.startswith("=")
                 and "✗ PARTIAL / PAIRING LIMIT" in no_green_banner
                 and "EVERYTHING MATCHES" not in no_green_banner,
                 repr(no_green_banner))
+        c.check("317x317 workbook keeps its live build-freshness guard",
+                isinstance(no_green_freshness, str)
+                and no_green_freshness.startswith("=IF(")
+                and "REGENERATE REQUIRED" in no_green_freshness,
+                repr(no_green_freshness))
         c.check("317x317 returned summary is visibly non-certifying",
                 no_green_result is not None
                 and no_green_result.summary_lines
@@ -770,7 +788,9 @@ def test_helper_key_injection(c, run_excel=False):
                 checks = [row[2] for row in summary.iter_rows(values_only=True)
                           if len(row) > 2 and isinstance(row[1], str)
                           and isinstance(row[2], str)
-                          and row[2] in ("OK", "CHECK")]
+                          # the build-freshness row says the certifying words
+                          # rather than the generic CHECK (PCOA-FINAL-019)
+                          and row[2] in ("OK", "CHECK", "REGENERATE REQUIRED")]
                 excel_error = None
             except Exception as exc:
                 statuses = diffs = checks = ()

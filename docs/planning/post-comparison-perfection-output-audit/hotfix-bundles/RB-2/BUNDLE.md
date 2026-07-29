@@ -16,7 +16,7 @@ Status: **READY**
 | Theme | The deliverable looks right and describes itself truthfully — 56 of the 68 Stage 2 denials |
 | Branch | `hotfix/rb-2-deliverable-presentation` |
 | Readiness source `main` | `3dbd62daa0b3522c5338354b9d80304db8b771b0` — RB-1 merged, its post-merge record committed, and this state pushed to `origin/main` before readiness preparation |
-| Base `main` commit | **PENDING** — Stage 4 must create the branch from the then-latest clean `main` and replace this cell with that exact SHA |
+| Base `main` commit | `896083e014d0451d5b05e5b6b024339aebc84d74` — the branch `hotfix/rb-2-deliverable-presentation` was created from this exact clean, current `main` (identical to `origin/main`) in worktree `C:\Users\Yunus\Projects\TSMIS-rb2-worktree` |
 | Canonical finding IDs | **PCOA-FINAL-002, -003, -008, -009, -014, -016, -019** |
 | Implementer | **Claude** (owner decision 2026-07-26) |
 | First reviewer | **Codex** — independent non-implementer |

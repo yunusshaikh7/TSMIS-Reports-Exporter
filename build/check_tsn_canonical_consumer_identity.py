@@ -566,9 +566,155 @@ def test_both_evidence_entry_points():
         shutil.rmtree(root, ignore_errors=True)
 
 
+# Read through getattr so this file degrades to semantic FAILs on a tree that
+# predates the fix instead of crashing (the red proof has to be readable).
+_CAPTURE_PREFIX = getattr(matrix_build, "_TSN_CAPTURE_PREFIX",
+                          "tsmis-tsn-consumer-")
+_CARRIED_KEYS = getattr(matrix_build, "_TSN_CARRIED_SIDECAR_KEYS",
+                        ("tsn_source_claims", "tsn_normalization_version",
+                         "tsn_raw_manifest", "tsn_normalized_workbook_identity",
+                         "tsn_artifact_identity_token"))
+_ORIGIN_KEY = getattr(matrix_build, "TSN_CAPTURE_ORIGIN_KEY",
+                      "tsn_capture_origin")
+_STALE_AGE_S = getattr(matrix_build, "_STALE_CAPTURE_AGE_S", 6 * 3600)
+_SWEEP = getattr(matrix_build, "_sweep_stale_tsn_captures", lambda *_a: None)
+
+
+def _capture_dirs():
+    return sorted(Path(tempfile.gettempdir()).glob(_CAPTURE_PREFIX + "*"))
+
+
+def test_capture_carries_its_source_record():
+    """PCOA-FINAL-002 / -003 / -016 — the private copy the matrix lanes compare
+    must describe itself exactly as the canonical library workbook does, name a
+    DURABLE selection, and leave nothing behind."""
+    print("\nPrivate TSN capture — claims, provenance and temp lifecycle:")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_tsn_capture_record_"))
+    before_dirs = set(_capture_dirs())
+    try:
+        library = root / "tsn_ramp_summary_normalized.xlsx"
+        wb = Workbook()
+        wb.active["A1"] = "TSN"
+        wb.save(library)
+        wb.close()
+        claims = {"schema_version": 1,
+                  "identity": {"report_id": "OTM22270",
+                               "event_id": "4843742",
+                               "reference_date": "09/15/2025",
+                               "submitter": "TRLBUGNI",
+                               "generated_time": "09/15/25 08:12",
+                               "location_criteria": "STATEWIDE"}}
+        identity = tsn_library.normalized_workbook_identity(library)
+        result = ConsolidateResult(
+            status="ok", output_path=str(library), completion=outcome.COMPLETE,
+            skipped_inputs=0, failed_inputs=0)
+        assert consolidation_meta.write_outcome(
+            library, result, extra={
+                "tsn_source_claims": claims,
+                "tsn_normalization_version": 7,
+                "tsn_raw_manifest": {"files": ["raw.pdf"]},
+                "tsn_normalized_workbook_identity": identity,
+                "tsn_artifact_identity_token": "token-fixture",
+            })
+
+        import compare_ramp_summary_tsn as rstsn
+        import compare_tsn_common as ctc
+        direct_line = rstsn.claims_notes(
+            consolidation_meta.read_extra(library, "tsn_source_claims"))
+
+        with matrix_build.captured_tsn_workbook(library, identity) as captured:
+            captured = Path(captured)
+            carried = {key: consolidation_meta.read_extra(captured, key)
+                       for key in _CARRIED_KEYS}
+            lane_line = rstsn.claims_notes(
+                consolidation_meta.read_extra(captured, "tsn_source_claims"))
+            prov = ctc.capture_input_provenance((("TSN", captured),))[0]
+            live_dir = captured.parent
+        check("the capture carries every library sidecar claim field",
+              carried == {"tsn_source_claims": claims,
+                          "tsn_normalization_version": 7,
+                          "tsn_raw_manifest": {"files": ["raw.pdf"]},
+                          "tsn_normalized_workbook_identity": identity,
+                          "tsn_artifact_identity_token": "token-fixture"},
+              repr(carried))
+        check("a matrix-lane comparison prints the Direct lane's identity line",
+              lane_line == direct_line
+              and "OTM22270" in lane_line[0]
+              and not any("rebuild the TSN library" in line
+                          for line in lane_line),
+              repr(lane_line))
+        check("provenance names the durable selection, never the capture path",
+              prov["selection"] == str(library.resolve())
+              and str(live_dir) not in prov["selection"]
+              and prov.get("read_via")
+              and prov["sha256"] == identity["sha256"],
+              repr(prov))
+        check("the capture's own outcome record still survives capture",
+              prov["producer_completion"] == outcome.COMPLETE, repr(prov))
+        check("a successful capture leaves no directory behind",
+              not live_dir.exists() and set(_capture_dirs()) == before_dirs,
+              repr(sorted(set(_capture_dirs()) - before_dirs)))
+
+        # An unverifiable origin record must NOT rewrite the selection.
+        loose = root / "loose.xlsx"
+        shutil.copy2(library, loose)
+        assert consolidation_meta.write_outcome(
+            loose, ConsolidateResult(
+                status="ok", output_path=str(loose), completion=outcome.COMPLETE),
+            extra={_ORIGIN_KEY: {
+                "version": 1, "selection": str(root / "missing.xlsx"),
+                "identity": identity}})
+        forged = ctc.capture_input_provenance((("TSN", loose),))[0]
+        check("an origin whose canonical file is gone keeps the literal path",
+              forged["selection"] == str(loose.resolve())
+              and "read_via" not in forged, repr(forged))
+
+        # Failure and cancellation both unwind through the same cleanup.
+        for label, error in (("failure", ValueError("boom")),
+                             ("cancellation", KeyboardInterrupt())):
+            dirs = None
+            try:
+                with matrix_build.captured_tsn_workbook(library, identity) as cap:
+                    dirs = Path(cap).parent
+                    raise error
+            except (ValueError, KeyboardInterrupt):
+                pass
+            check(f"a {label} mid-capture leaves no directory behind",
+                  dirs is not None and not dirs.exists()
+                  and set(_capture_dirs()) == before_dirs)
+
+        # The killed-process case: an abandoned directory older than any live
+        # capture is swept; a fresh one and an unrecognized one are not.
+        abandoned = Path(tempfile.mkdtemp(
+            prefix=_CAPTURE_PREFIX))
+        shutil.copy2(library, abandoned / library.name)
+        shutil.copy2(consolidation_meta.meta_path(library),
+                     consolidation_meta.meta_path(abandoned / library.name))
+        fresh = Path(tempfile.mkdtemp(prefix=_CAPTURE_PREFIX))
+        shutil.copy2(library, fresh / library.name)
+        foreign = Path(tempfile.mkdtemp(prefix=_CAPTURE_PREFIX))
+        shutil.copy2(library, foreign / library.name)
+        (foreign / "foreign-member.txt").write_bytes(b"not ours")
+        old = os.stat(abandoned).st_mtime - _STALE_AGE_S - 60
+        for stale_dir in (abandoned, foreign):
+            os.utime(stale_dir, (old, old))
+        _SWEEP(None)
+        check("the sweep removes an abandoned capture directory",
+              not abandoned.exists())
+        check("the sweep never touches a capture that could still be live",
+              fresh.exists() and (fresh / library.name).exists())
+        check("the sweep leaves an unrecognized directory alone",
+              foreign.exists() and (foreign / "foreign-member.txt").exists())
+        shutil.rmtree(fresh, ignore_errors=True)
+        shutil.rmtree(foreign, ignore_errors=True)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
 def main():
     test_publication_and_cache_identity()
     test_both_evidence_entry_points()
+    test_capture_carries_its_source_record()
     if _fail:
         print(f"\nFAILED: {len(_fail)} check(s): {_fail}")
         return 1
