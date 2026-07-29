@@ -1,57 +1,111 @@
 {
- "a": "C:\\Users\\Yunus\\AppData\\Local\\Temp\\claude\\C--Users-Yunus-Projects-TSMIS-Reports-Exporter\\0c6bb2e5-aa2f-4359-b109-aba0086c650b\\scratchpad\\is_reg2\\is_base_today (values).xlsx",
- "b": "C:\\Users\\Yunus\\AppData\\Local\\Temp\\claude\\C--Users-Yunus-Projects-TSMIS-Reports-Exporter\\0c6bb2e5-aa2f-4359-b109-aba0086c650b\\scratchpad\\is_reg2\\is_head_today (values).xlsx",
+ "old": "C:\\Users\\Yunus\\AppData\\Local\\Temp\\claude\\C--Users-Yunus-Projects-TSMIS-Reports-Exporter\\0c6bb2e5-aa2f-4359-b109-aba0086c650b\\scratchpad\\is_reg2\\is_base_today (values).xlsx",
+ "new": "C:\\Users\\Yunus\\AppData\\Local\\Temp\\claude\\C--Users-Yunus-Projects-TSMIS-Reports-Exporter\\0c6bb2e5-aa2f-4359-b109-aba0086c650b\\scratchpad\\is_reg2\\is_head_r2 (values).xlsx",
+ "sheets_old": [
+  "Summary",
+  "Spot Check",
+  "Comparison",
+  "Only in TSMIS",
+  "Only in TSN",
+  "TSMIS",
+  "TSN",
+  "Summary by Category",
+  "__CMP_E2_SNAPSHOT_A",
+  "__CMP_E2_SNAPSHOT_B",
+  "Provenance"
+ ],
+ "sheets_new": [
+  "Summary",
+  "Spot Check",
+  "Comparison",
+  "Only in TSMIS",
+  "Only in TSN",
+  "TSMIS",
+  "TSN",
+  "Summary by Category",
+  "__CMP_E2_SNAPSHOT_A",
+  "__CMP_E2_SNAPSHOT_B",
+  "Provenance"
+ ],
  "sheets": {
   "Summary": {
-   "diff_cells": 0,
-   "row_count_delta": 0,
-   "sample": []
+   "rows": 44,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
   },
   "Spot Check": {
-   "diff_cells": 0,
-   "row_count_delta": 0,
-   "sample": []
+   "rows": 21,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
   },
   "Comparison": {
-   "diff_cells": 0,
-   "row_count_delta": 0,
-   "sample": []
+   "rows": 67,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
   },
   "Only in TSMIS": {
-   "diff_cells": 0,
-   "row_count_delta": 0,
-   "sample": []
+   "rows": 9,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
   },
   "Only in TSN": {
-   "diff_cells": 0,
-   "row_count_delta": 0,
-   "sample": []
+   "rows": 1,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
   },
   "TSMIS": {
-   "diff_cells": 0,
-   "row_count_delta": 0,
-   "sample": []
+   "rows": 68,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
   },
   "TSN": {
-   "diff_cells": 0,
-   "row_count_delta": 0,
-   "sample": []
+   "rows": 60,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
   },
   "Summary by Category": {
-   "diff_cells": 0,
-   "row_count_delta": 0,
-   "sample": []
+   "rows": 94,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
   },
   "__CMP_E2_SNAPSHOT_A": {
-   "diff_cells": 0,
-   "row_count_delta": 0,
-   "sample": []
+   "rows": 67,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
   },
   "__CMP_E2_SNAPSHOT_B": {
-   "diff_cells": 0,
-   "row_count_delta": 0,
-   "sample": []
+   "rows": 59,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
   },
-  "Provenance": "excluded (run-identity cells)"
- }
+  "Provenance": {
+   "rows": 15,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
+  }
+ },
+ "sheets_with_changes": {},
+ "ok": true
 }

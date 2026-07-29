@@ -53,6 +53,7 @@ log = logging.getLogger(__name__)
 REPORT_NAME = "Clean Road Highway (ArcGIS)"
 SHEET_NAME = chc.ARC_SHEET
 MARKER_SHEET = chc.ARC_MARKER_SHEET
+MARKED_SHEET = chc.ARC_MARKED_SHEET
 BUILD_VERSION = 1
 FILENAME = "clean_highway_built.xlsx"
 OUT_DIR = paths.OUTPUT_ROOT / "arcgis_cleanroad"
@@ -951,6 +952,21 @@ def _blankish(v):
     return v
 
 
+def _marked_cell_records(row, col, route, county, prefix, kind, withheld):
+    """One record per (marked cell, span that could not assert it): WHERE the
+    marker sits — the built row's own identity, spelled the way the comparison
+    keys a row (route · county · PM prefix · begin PM · roadbed) — and WHAT
+    that span would have written there. The comparison reads these back to
+    itemize the markers whose withheld value the TSN extract disagrees with;
+    the values themselves are never published as our side's answer."""
+    return [{"route": route, "county": county, "prefix": prefix,
+             "begin_pm": row[_COL["THY_BEGIN_PM_AMT"]],
+             "roadbed": kind or "", "column": THY_HEADER[col],
+             "value": raw, "layer": s["layer"],
+             "known_pm": _skip_station_text(s)}
+            for s, raw in withheld]
+
+
 def _mark_unavailable_anchors(rows, skips):
     """Write UNAVAILABLE_TOKEN into each skipped span's anchor cells: the
     built row(s) whose postmile range contains the span's one known endpoint
@@ -959,11 +975,11 @@ def _mark_unavailable_anchors(rows, skips):
     painted value is NOT already the span's own value (a value corroborated
     by a placeable span is source truth, not an omission). Positions are
     never inferred from AR/odometer measures. Mutates the freshly built rows
-    in place (they are this builder's own pre-write buffer) and returns the
-    number of cells marked. Each skip's `marked_cells` counts the anchor
-    cells whose value IT could not assert — a cell shared by co-anchored
-    spans credits each of them, so the per-span numbers can sum above the
-    returned global cell count."""
+    in place (they are this builder's own pre-write buffer) and returns
+    `(cells marked, one record per (marked cell, withholding span))`. Each
+    skip's `marked_cells` counts the anchor cells whose value IT could not
+    assert — a cell shared by co-anchored spans credits each of them, so the
+    per-span numbers (and the record count) can sum above the CELL count."""
     by_cp = defaultdict(list)
     for s in skips:
         if s["known_endpoint"] is None or not s["county"]:
@@ -972,8 +988,8 @@ def _mark_unavailable_anchors(rows, skips):
             continue
         by_cp[(s["route"], s["county"], s["prefix"])].append(s)
     if not by_cp:
-        return 0
-    marked = 0
+        return 0, []
+    marked, records = 0, []
     for row in rows:
         route = ((row[_COL["THY_ROUTE_NAME"]] or "")
                  + (row[_COL["THY_ROUTE_SUFFIX_CODE"]] or ""))
@@ -1009,15 +1025,17 @@ def _mark_unavailable_anchors(rows, skips):
                 per_cell[_COL[name]].append((s, raw))
         for i, anchored in per_cell.items():
             painted = _blankish(row[i])
-            withheld = [s for s, raw in anchored
+            withheld = [(s, raw) for s, raw in anchored
                         if painted != _blankish(raw)]
             if not withheld:
                 continue                 # corroborated — nothing was omitted
+            records.extend(_marked_cell_records(row, i, route, county, prefix,
+                                                kind, withheld))
             row[i] = UNAVAILABLE_TOKEN
             marked += 1
-            for s in withheld:
+            for s, _raw in withheld:
                 s["marked_cells"] += 1
-    return marked
+    return marked, records
 
 
 def _skip_sidecar_entries(skips):
@@ -1099,11 +1117,41 @@ _SKIP_TABLE_COLUMNS = (
 )
 
 
+# (header, stored width) for the itemized MARKED-ANCHOR table on its own sheet
+# — one row per (marked cell, span that could not assert it). It is a separate
+# sheet because its columns are nothing like the skipped-span table's, and one
+# shared width vector could not keep both legible. Widths were MEASURED the
+# same way as the skip table's: installed Excel's own font metrics over the
+# widest real THY column name, the widest layer name and a bold header. Excel
+# stores a width of N as N-0.71, so a column that merely "fits" by character
+# count still clips — the first measured pass rejected 30 for `Column`
+# (Excel needed 29.71 against a stored 29.29) and 15 for `Span known PM`.
+_MARKED_TABLE_COLUMNS = (
+    ("Route", 9),
+    ("County", 9),
+    ("PM prefix", 11),
+    ("Begin PM", 11),
+    ("Roadbed", 10),
+    ("Column", 32),
+    ("Withheld source value", 25),
+    ("Source layer", 26),
+    ("Span known PM", 17),
+)
+
+
 def _wrapped_lines(text, width):
     """How many lines `text` needs at a column `width` characters wide (Excel
     wraps on words and breaks a word longer than the column)."""
     room = max(int(width) - _MARKER_PADDING, 8)
     return len(textwrap.wrap(str(text), room)) or 1
+
+
+def _lines_for(value, width):
+    """Rows a value needs at that column width. A number always takes one:
+    General format rounds its display rather than clipping it."""
+    if value is None or isinstance(value, (int, float)):
+        return 1
+    return _wrapped_lines(value, width)
 
 
 def _skip_table_row(s):
@@ -1115,33 +1163,38 @@ def _skip_table_row(s):
             s["from_ar"], s["to_ar"], s["marked_cells"]]
 
 
-def _write_marker_sheet(wb, asof_date, lib_root, warnings, skips, n_marked):
-    """The build's own record sheet: build identity, the HF-01 skipped-source
-    disclosure the comparator reads back, any warning, and — when spans were
-    skipped — the itemized table naming every one of them."""
-    from openpyxl.cell import WriteOnlyCell
-    from openpyxl.styles import Alignment, Font, PatternFill
+def _marked_table_row(m):
+    """One marked anchor cell as the itemized table's row: where the marker
+    sits, which column it covers, and what the skipped span would have put
+    there."""
+    return [m["route"], m["county"], m["prefix"], m["begin_pm"], m["roadbed"],
+            m["column"], "" if m["value"] is None else m["value"],
+            m["layer"], m["known_pm"]]
+
+
+def _disclosure_sheet(wb, name, widths):
+    """A new disclosure sheet carrying its measured column widths (Excel clips
+    at the stored width, so every disclosure declares its own)."""
     from openpyxl.utils import get_column_letter
 
-    ws = wb.create_sheet(MARKER_SHEET)
-    widths = ([w for _name, w in _SKIP_TABLE_COLUMNS] if skips
-              else [_MARKER_LABEL_WIDTH, _MARKER_VALUE_WIDTH])
+    ws = wb.create_sheet(name)
     for i, width in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = width
-    top = Alignment(vertical="top")
-    left_top = Alignment(horizontal="left", vertical="top")
-    wrap_left_top = Alignment(horizontal="left", vertical="top",
-                              wrap_text=True)
-    wrap_top = Alignment(vertical="top", wrap_text=True)
-    header_font = Font(bold=True)
-    header_fill = PatternFill("solid", fgColor=_MARKER_HEADER_FILL)
-    row_no = 0
+    return ws
+
+
+def _sheet_pen(ws):
+    """Row helpers bound to one sheet: `put` appends a row (setting its height
+    BEFORE the append, which write-only mode requires) and `styled` decorates
+    one cell."""
+    from openpyxl.cell import WriteOnlyCell
+
+    state = {"row": 0}
 
     def put(cells, height=None):
-        nonlocal row_no
-        row_no += 1
+        state["row"] += 1
         if height:
-            ws.row_dimensions[row_no].height = height
+            ws.row_dimensions[state["row"]].height = height
         ws.append(cells)
 
     def styled(value, alignment):
@@ -1149,18 +1202,62 @@ def _write_marker_sheet(wb, asof_date, lib_root, warnings, skips, n_marked):
         c.alignment = alignment
         return c
 
-    def lines_for(value, width):
-        """Rows a value needs at that column width. A number always takes one:
-        General format rounds its display rather than clipping it."""
-        if value is None or isinstance(value, (int, float)):
-            return 1
-        return _wrapped_lines(value, width)
+    return put, styled
+
+
+def _put_table(ws, put, columns, table_rows):
+    """Write one itemized disclosure table: a bold, filled header row, then a
+    row per record whose every cell is legible — anything too wide for its
+    column wraps, in a row tall enough for the tallest wrapped cell."""
+    from openpyxl.cell import WriteOnlyCell
+    from openpyxl.styles import Alignment, Font, PatternFill
+
+    wrap_top = Alignment(vertical="top", wrap_text=True)
+    header_font = Font(bold=True)
+    header_fill = PatternFill("solid", fgColor=_MARKER_HEADER_FILL)
+    head = []
+    for name, _width in columns:
+        c = WriteOnlyCell(ws, value=name)
+        c.font, c.fill = header_font, header_fill
+        head.append(c)
+    put(head)
+    for row in table_rows:
+        lines = max(_lines_for(v, w) for v, (_name, w) in zip(row, columns))
+        if lines == 1:
+            put(row)
+            continue
+        cells = []
+        for v, (_name, w) in zip(row, columns):
+            if _lines_for(v, w) == 1:
+                cells.append(v)
+            else:
+                c = WriteOnlyCell(ws, value=v)
+                c.alignment = wrap_top
+                cells.append(c)
+        put(cells, height=lines * _MARKER_LINE_PT)
+
+
+def _write_marker_sheet(wb, asof_date, lib_root, warnings, skips, n_marked,
+                        marked_cells):
+    """The build's own record sheet: build identity, the HF-01 skipped-source
+    disclosure the comparator reads back, any warning, and — when spans were
+    skipped — the itemized table naming every one of them."""
+    from openpyxl.styles import Alignment
+
+    widths = ([w for _name, w in _SKIP_TABLE_COLUMNS] if skips
+              else [_MARKER_LABEL_WIDTH, _MARKER_VALUE_WIDTH])
+    ws = _disclosure_sheet(wb, MARKER_SHEET, widths)
+    put, styled = _sheet_pen(ws)
+    top = Alignment(vertical="top")
+    left_top = Alignment(horizontal="left", vertical="top")
+    wrap_left_top = Alignment(horizontal="left", vertical="top",
+                              wrap_text=True)
 
     def pair(label, value):
         """A label/value row of the header block. Values are left-aligned so
         they read as a block beside their labels (counts included), and a
         value too wide for its column wraps in a row tall enough for it."""
-        lines = lines_for(value, _MARKER_VALUE_WIDTH)
+        lines = _lines_for(value, _MARKER_VALUE_WIDTH)
         put([styled(label, top),
              styled(value, wrap_left_top if lines > 1 else left_top)],
             height=lines * _MARKER_LINE_PT if lines > 1 else None)
@@ -1174,31 +1271,32 @@ def _write_marker_sheet(wb, asof_date, lib_root, warnings, skips, n_marked):
     pair("Marked anchor cells", n_marked)
     pair("Unavailable marker", UNAVAILABLE_TOKEN)
     pair("Skipped source reason", SKIP_REASON)
+    if marked_cells:
+        pair("Marked anchor detail", MARKED_SHEET)
     for w in warnings:
         pair("Warning", w)
     if not skips:
         return
     put([])
-    head = []
-    for name, _width in _SKIP_TABLE_COLUMNS:
-        c = WriteOnlyCell(ws, value=name)
-        c.font, c.fill = header_font, header_fill
-        head.append(c)
-    put(head)
-    for s in skips:
-        row = _skip_table_row(s)
-        lines = max(lines_for(v, w)
-                    for v, (_name, w) in zip(row, _SKIP_TABLE_COLUMNS))
-        if lines == 1:
-            put(row)
-            continue
-        put([v if lines_for(v, w) == 1 else styled(v, wrap_top)
-             for v, (_name, w) in zip(row, _SKIP_TABLE_COLUMNS)],
-            height=lines * _MARKER_LINE_PT)
+    _put_table(ws, put, _SKIP_TABLE_COLUMNS, [_skip_table_row(s) for s in skips])
+
+
+def _write_marked_sheet(wb, marked_cells):
+    """The itemized per-cell record behind the marker count: one row per
+    (marked anchor cell, span whose value it withholds). The comparison reads
+    it back to name the markers whose withheld value TSN disagrees with — the
+    facts a bare marker would otherwise hide."""
+    if not marked_cells:
+        return
+    ws = _disclosure_sheet(wb, MARKED_SHEET,
+                           [w for _name, w in _MARKED_TABLE_COLUMNS])
+    put, _styled = _sheet_pen(ws)
+    _put_table(ws, put, _MARKED_TABLE_COLUMNS,
+               [_marked_table_row(m) for m in marked_cells])
 
 
 def _write_workbook(out_path, rows, index, asof_date, lib_root, warnings,
-                    skips=(), n_marked=0):
+                    skips=(), n_marked=0, marked_cells=()):
     from openpyxl import Workbook
     from openpyxl.cell import WriteOnlyCell
     from openpyxl.styles import PatternFill
@@ -1224,7 +1322,9 @@ def _write_workbook(out_path, rows, index, asof_date, lib_root, warnings,
                 c.fill = fill
                 cells.append(c)
             prov.append(cells)
-    _write_marker_sheet(wb, asof_date, lib_root, warnings, skips, n_marked)
+    _write_marker_sheet(wb, asof_date, lib_root, warnings, skips, n_marked,
+                        marked_cells)
+    _write_marked_sheet(wb, marked_cells)
     tmp = out_path.with_name(out_path.name + ".tmp")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -1368,7 +1468,7 @@ def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes)
     # HF-01: mark each skipped span's anchor cells, then surface every skip
     # through the same warnings channel the split pass already uses (marker
     # sheet, PARTIAL completion, skipped_inputs, sidecar, result message).
-    marked = _mark_unavailable_anchors(rows, skips)
+    marked, marked_cells = _mark_unavailable_anchors(rows, skips)
     if skips:
         events.on_log(f"  {len(skips)} source span(s) have an unreadable "
                       f"postmile endpoint — {marked} anchor cell(s) marked "
@@ -1382,7 +1482,7 @@ def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes)
         events.on_log(f"  note: {w}")
 
     _write_workbook(out_path, rows, index, asof_date, lib_root, other_warnings,
-                    skips=skips, n_marked=marked)
+                    skips=skips, n_marked=marked, marked_cells=marked_cells)
     result = ConsolidateResult(
         status="ok",
         message=(f"Built {len(rows):,} clean-road highway rows "
@@ -1408,6 +1508,7 @@ def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes)
                 "skipped_source_spans": {
                     "count": len(skips),
                     "marked_anchor_cells": marked,
+                    "marked_anchor_sheet": MARKED_SHEET if marked else "",
                     "unavailable_marker": UNAVAILABLE_TOKEN,
                     "reason": SKIP_REASON,
                     "spans": _skip_sidecar_entries(skips),

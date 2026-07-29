@@ -1784,3 +1784,40 @@ paired/one-sided/differing/identical row totals, the four per-field deltas and
 the typed asserted/context split — is re-verified unchanged on the regenerated
 twins. The TSN normalized input is the SAME cached artifact (`7F1086FE…`), not
 a rebuild.
+
+**Review-2 remedy rebuild (2026-07-28).** RB-1's second review denied the
+bundle on a DISCLOSURE gap only (RB1-R2-001: the genuine raw-source
+disagreements were itemized in the witness but not in the comparison's own
+Summary and Notes). The remedy makes the build record what each unavailable
+marker withholds — a new itemized `ArcGIS Marked Anchors` sheet — and the
+comparison itemize every marker that withholds a value TSN does not show. The
+build and both twins were regenerated, so the input identities move again:
+
+| Role | Exact file | Length | SHA-256 |
+|---|---|---:|---|
+| ArcGIS (built, RB-1 — review-2 remedy build) | `output\arcgis_cleanroad\clean_highway_built.xlsx` | 10,840,933 | `0D8575CA0C496594D2E47F51BC1BA39673384F4FDDE4A7995D497BE1959A6DDF` |
+| TSN (normalized, main-checkout copy of the same raw) | `tsn_library\clean_highway\consolidated\tsn_clean_highway_normalized.xlsx` | 14,864,396 | `30048451ED26917896CD001A9791F24C833FC6D3BAB3B90277CAE8F5BB794FED` |
+
+**Nothing else in this canary moves.** A cell-level diff of the review-2 build
+against the review-1 build shows **0** differences across all 57,728 data rows,
+Provenance identical, the same **174** marker tokens and the same `102 / 174`
+sidecar record; the new sheet is wholly additive (183 rows = 1 header + 174
+marked cells + the 8 extra records the co-anchored cells owe) and the marker
+sheet gains exactly one pointer row. A full-sheet lockstep diff of the two
+values twins shows the `Comparison` sheet **cell-identical over 65,165 rows**,
+`Spot Check` / `Routes` / both `Only in …` / both data sheets and BOTH
+very-hidden `__CMP_E2_SNAPSHOT_A/B` all at **0**; only `Summary` (1 cell — the
+disclosure bullet), `Notes` (the disclosure block) and `Provenance` (4 cells —
+input path + SHA) differ. So every expected count above is re-verified
+unchanged on the regenerated twins.
+
+The TSN normalized SHA differs from the review-1 row because the review-1 run
+executed from the `TSMIS-rb1-worktree` working tree and this one from the main
+checkout: `paths.DATA_ROOT` is per-tree, so each holds its own normalized copy
+independently built from the IDENTICAL raw extract
+(`CA HIGHWAYS 09.08.2025.xlsx`, `BBD1ACF9…`, 21,290,781 bytes). This is the
+PCOA-FINAL-017 byte non-determinism already noted above, and the content
+equality is proved directly: the `TSN` data sheet and `__CMP_E2_SNAPSHOT_B` are
+cell-identical across 60,085 and 60,084 rows respectively. **When re-verifying
+this canary, bind to the raw extract and the projected content, not to a
+normalized SHA — that byte image is per-tree.**

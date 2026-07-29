@@ -1,0 +1,21 @@
+{
+  "build": "output\\arcgis_cleanroad\\clean_highway_built.xlsx",
+  "sheet": "ArcGIS Marked Anchors",
+  "used_rows": 183,
+  "used_cols": 9,
+  "stored_widths": {
+    "1": 8.29,
+    "2": 8.29,
+    "3": 10.29,
+    "4": 10.29,
+    "5": 9.29,
+    "6": 31.29,
+    "7": 24.29,
+    "8": 25.29,
+    "9": 16.29
+  },
+  "wrapped_rows": 0,
+  "rows_too_short": [],
+  "columns_too_narrow": [],
+  "verdict": "PASS"
+}

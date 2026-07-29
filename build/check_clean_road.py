@@ -281,44 +281,50 @@ _PADDING = 2           # cell inset + a margin over Excel's own font metric
 
 
 def _illegible_marker_cells(path):
-    """Every stored cell of the build marker sheet must be READABLE at its
-    column's stored width: Excel clips a label whose neighbour is occupied and
-    cuts text at the column edge, so a cell must either fit its column or wrap
-    in a row tall enough for every wrapped line. Numbers are exempt — General
-    format rounds their display instead of clipping. Returns the offenders
-    (RB-1 review 1 / RB1-R1-001)."""
+    """Every stored cell of the build's DISCLOSURE sheets must be READABLE at
+    its column's stored width: Excel clips a label whose neighbour is occupied
+    and cuts text at the column edge, so a cell must either fit its column or
+    wrap in a row tall enough for every wrapped line. Numbers are exempt —
+    General format rounds their display instead of clipping. Returns the
+    offenders (RB-1 review 1 / RB1-R1-001)."""
     wb = load_workbook(path)
     try:
-        ws = wb[chc.ARC_MARKER_SHEET]
-        widths = {}
-        for dim in ws.column_dimensions.values():
-            if dim.width:
-                for i in range(dim.min, dim.max + 1):
-                    widths[i] = dim.width
         bad = []
-        for row in ws.iter_rows():
-            for c in row:
-                if c.value is None or not str(c.value).strip():
-                    continue
-                width = widths.get(c.column)
-                if not width:
-                    bad.append(f"{c.coordinate}: column has no stored width")
-                    continue
-                if isinstance(c.value, (int, float)):
-                    continue
-                text = str(c.value)
-                if len(text) <= width - _PADDING:
-                    continue
-                if not (c.alignment and c.alignment.wrap_text):
-                    bad.append(f"{c.coordinate}: {len(text)} chars in a "
-                               f"{width:g}-wide column and does not wrap")
-                    continue
-                lines = len(textwrap.wrap(text,
-                                          max(int(width) - _PADDING, 8)))
-                height = getattr(ws.row_dimensions.get(c.row), "height", None)
-                if height is None or height + 0.5 < lines * _LINE_PT:
-                    bad.append(f"{c.coordinate}: wraps to {lines} lines but "
-                               f"the row is {height} tall")
+        sheets = [n for n in (chc.ARC_MARKER_SHEET,
+                              getattr(chc, "ARC_MARKED_SHEET", ""))
+                  if n and n in wb.sheetnames]
+        for name in sheets:
+            ws = wb[name]
+            widths = {}
+            for dim in ws.column_dimensions.values():
+                if dim.width:
+                    for i in range(dim.min, dim.max + 1):
+                        widths[i] = dim.width
+            for row in ws.iter_rows():
+                for c in row:
+                    if c.value is None or not str(c.value).strip():
+                        continue
+                    where = f"{name}!{c.coordinate}"
+                    width = widths.get(c.column)
+                    if not width:
+                        bad.append(f"{where}: column has no stored width")
+                        continue
+                    if isinstance(c.value, (int, float)):
+                        continue
+                    text = str(c.value)
+                    if len(text) <= width - _PADDING:
+                        continue
+                    if not (c.alignment and c.alignment.wrap_text):
+                        bad.append(f"{where}: {len(text)} chars in a "
+                                   f"{width:g}-wide column and does not wrap")
+                        continue
+                    lines = len(textwrap.wrap(text,
+                                              max(int(width) - _PADDING, 8)))
+                    height = getattr(ws.row_dimensions.get(c.row), "height",
+                                     None)
+                    if height is None or height + 0.5 < lines * _LINE_PT:
+                        bad.append(f"{where}: wraps to {lines} lines but the "
+                                   f"row is {height} tall")
         return bad
     finally:
         wb.close()
@@ -692,7 +698,10 @@ def test_skipped_span_source_truth():
     #  - begin known @1.5, both values equal the painted ones -> recorded,
     #    nothing marked;
     #  - end known @2.2 (begin unreadable) inside the R-window -> marks the
-    #    R row's Total (kind eligibility: base/R rows carry the RT block).
+    #    R row's Total (kind eligibility: base/R rows carry the RT block);
+    #  - a SECOND end-known @2.2 span carrying a different Total -> the same
+    #    cell now stands in front of TWO unplaceable values (the real 036/TEH
+    #    shape), one of which is the value TSN shows.
     skip_mark = _span(ora, 0.7, None, 0.7,
                       {"Shld_Width_Total_Out_R": 4, "Shld_Width_Treated_Out_R": 8,
                        "LocError": "NO ERROR"}, od_end=0.9)
@@ -701,18 +710,22 @@ def test_skipped_span_source_truth():
     skip_end = _span(ora, None, 2.2, None,
                      {"Shld_Width_Total_Out_R": 4, "Shld_Width_Treated_Out_R": 8,
                       "LocError": "NO ERROR"}, od_end=2.4)
+    skip_end2 = _span(ora, None, 2.2, None,
+                      {"Shld_Width_Total_Out_R": 5, "Shld_Width_Treated_Out_R": 8,
+                       "LocError": "NO ERROR"}, od_end=2.6)
     with tempfile.TemporaryDirectory() as td:
         td = Path(td)
         lib = td / "lib"
         _build_library(lib, extra={"SHS O Shld Width R":
-                                   [skip_mark, skip_match, skip_end]})
+                                   [skip_mark, skip_match, skip_end,
+                                    skip_end2]})
         out = td / "built.xlsx"
         res = cch.consolidate(events=Events(), asof=ASOF, lib_root=lib,
                               out_path=out)
         check("build still ok", res.status == "ok")
         check("build reports PARTIAL (a skipped span is incomplete coverage)",
               res.completion == "partial")
-        check("skipped_inputs counts the three spans", res.skipped_inputs == 3)
+        check("skipped_inputs counts the four spans", res.skipped_inputs == 4)
         check("result message names the marked anchors",
               "anchor cell(s)" in (res.message or ""))
 
@@ -722,8 +735,8 @@ def test_skipped_span_source_truth():
         for r in mrows:
             if r and r[0] is not None:
                 marker.setdefault(str(r[0]), []).append(r[1])
-        check("marker: skipped source spans = 3",
-              marker.get("Skipped source spans") == [3])
+        check("marker: skipped source spans = 4",
+              marker.get("Skipped source spans") == [4])
         check("marker: marked anchor cells = 2",
               marker.get("Marked anchor cells") == [2])
         check("marker: names the unavailable token",
@@ -741,14 +754,17 @@ def test_skipped_span_source_truth():
               bool(head_at) and [str(c) for c in mrows[head_at[0]]
                                  if c is not None] == want_head)
         check("marker: one itemized table row per skipped span",
-              len(trows) == 3
+              len(trows) == 4
               and all(r[0] == "SHS O Shld Width R" and r[2] == "001"
                       and r[4] == "ORA" and r[8] == "NO ERROR"
                       and "Shld_Width_Total_Out_R=" in str(r[1])
                       for r in trows))
         check("marker: the table's known PM and marked counts are exact",
-              sorted(str(r[7]) for r in trows) == ["0.7", "1.5", "2.2"]
-              and sorted(r[13] for r in trows) == [0, 1, 1])
+              sorted(str(r[7]) for r in trows) == ["0.7", "1.5", "2.2", "2.2"]
+              and sorted(r[13] for r in trows) == [0, 1, 1, 1])
+        check("marker: points at the itemized marked-anchor sheet",
+              marker.get("Marked anchor detail")
+              == [getattr(chc, "ARC_MARKED_SHEET", "")])
         check("marker: every disclosure cell is legible at its stored width",
               _illegible_marker_cells(out) == [])
         sidecar = json.loads(
@@ -756,17 +772,17 @@ def test_skipped_span_source_truth():
         rec = (sidecar.get("clean_road_build") or {}).get(
             "skipped_source_spans") or {}
         check("sidecar: count/marked/reason recorded",
-              rec.get("count") == 3 and rec.get("marked_anchor_cells") == 2
+              rec.get("count") == 4 and rec.get("marked_anchor_cells") == 2
               and "postmile" in str(rec.get("reason")))
         spans = rec.get("spans") or []
         check("sidecar: spans carry layer/route/county/anchor/measures",
-              len(spans) == 3
+              len(spans) == 4
               and all(s.get("layer") == "SHS O Shld Width R"
                       and s.get("route") == "001" and s.get("county") == "ORA"
                       and s.get("loc_error") == "NO ERROR"
                       and s.get("station_pm") for s in spans))
         check("sidecar: per-span marked-cell counts are exact",
-              sorted(s.get("marked_cells") for s in spans) == [0, 1, 1])
+              sorted(s.get("marked_cells") for s in spans) == [0, 1, 1, 1])
 
         # (d) the anchors themselves: marked where information was omitted,
         # untouched where the placeable coverage corroborates the span.
@@ -794,6 +810,42 @@ def test_skipped_span_source_truth():
               all(r[tot] != tok for r in rows
                   if r[col["THY_BEGIN_PM_AMT"]] is not None
                   and 1.0 <= r[col["THY_BEGIN_PM_AMT"]] < 2.0))
+
+        # The itemized per-cell record: WHERE every marker sits and WHAT it
+        # withholds. The comparison joins it to TSN to name the anchors whose
+        # withheld value TSN disagrees with (RB-1 review 2 / RB1-R2-001), so a
+        # missing or wrong row here is a missing user-facing source fact.
+        marked_rows = []
+        _wbm = load_workbook(out, read_only=True, data_only=True)
+        try:
+            _mname = getattr(chc, "ARC_MARKED_SHEET", "")
+            if _mname and _mname in _wbm.sheetnames:
+                marked_rows = [list(r) for r in
+                               _wbm[_mname].iter_rows(values_only=True)]
+        finally:
+            _wbm.close()
+        check("marked-anchor sheet: header names every field",
+              bool(marked_rows)
+              and [str(c) for c in marked_rows[0] if c is not None]
+              == [n for n, _w in getattr(cch, "_MARKED_TABLE_COLUMNS", ())])
+        body = [r for r in marked_rows[1:] if r and r[0]]
+        check("marked-anchor sheet: a row per (marked cell, withholding span)",
+              len(body) == 3
+              and all(r[0] == "001" and r[1] == "ORA"
+                      and r[5] == "THY_RT_O_SHD_TOT_WIDTH_AMT"
+                      and r[7] == "SHS O Shld Width R" for r in body))
+        check("marked-anchor sheet: the withheld values and known PMs are "
+              "exact (the co-anchored cell keeps BOTH)",
+              sorted((r[6], str(r[8])) for r in body)
+              == [(4, "0.7"), (4, "2.2"), (5, "2.2")])
+        check("marked-anchor sheet: the begin postmiles ARE the anchor rows'",
+              bool(anchor_a) and bool(anchor_b)
+              and sorted({str(r[3]) for r in body})
+              == sorted({str(r[col["THY_BEGIN_PM_AMT"]])
+                         for r in (anchor_a[0], anchor_b[0])}))
+        check("marked-anchor sheet: both roadbeds are named",
+              sorted({"" if r[4] is None else str(r[4])
+                      for r in body}) == ["", "R"])
 
         # The comparison: token vs the SAME value the span carried (the
         # false-positive class, TSN=4 at the begin anchor) and token vs a
@@ -843,7 +895,7 @@ def test_skipped_span_source_truth():
             summary = [str(c.value) for row in vwb["Summary"].iter_rows()
                        for c in row if c.value is not None]
             check("Summary disclosure: skipped-span count + marked anchors",
-                  any("SOURCE COVERAGE" in t and "3 source span(s)" in t
+                  any("SOURCE COVERAGE" in t and "4 source span(s)" in t
                       and "2 anchor cell(s)" in t for t in summary))
             check("Summary carries the producer's PARTIAL input note",
                   any("producer outcome is 'partial'" in t for t in summary))
@@ -853,6 +905,26 @@ def test_skipped_span_source_truth():
                   any("SOURCE COVERAGE" in t and "postmile" in t
                       for t in notes)
                   and any("NON-ASSERTING" in t for t in notes))
+            # RB1-R2-001: the marker must not HIDE the source fact it stands
+            # in front of. The end anchor withholds 4 where TSN says 5 — that
+            # exact identity must be itemized in BOTH sheets, and the begin
+            # anchor (whose withheld 4 equals TSN's 4) must NOT be.
+            conflict = ("001", "ORA", "THY_RT_O_SHD_TOT_WIDTH_AMT",
+                        "ArcGIS source 4 @ 2.2", "TSN 5")
+            check("Summary itemizes the raw-source disagreement by identity",
+                  any(all(p in t for p in conflict) for t in summary))
+            check("Notes itemizes the same disagreement by identity",
+                  any(all(p in t for p in conflict) for t in notes))
+            check("both sheets classify the marked anchors 1 same / 1 differs",
+                  all(any("1 withhold only the value TSN already shows" in t
+                          and "1 withhold at least one value TSN does not" in t
+                          for t in texts) for texts in (summary, notes)))
+            check("the corroborated anchor is never itemized",
+                  sum(1 for t in notes if ": ArcGIS source " in t) == 1)
+            check("a co-anchored marker names EVERY value it stands in front "
+                  "of, not just the nearest",
+                  any("ArcGIS source 4 @ 2.2, 5 @ 2.2" in t
+                      for t in summary + notes))
         finally:
             vwb.close()
 
@@ -867,7 +939,7 @@ def test_skipped_span_source_truth():
               res2.status == "ok" and res2.completion == "complete")
         check("a skip-free marker records zeroes",
               getattr(cht, "_build_skip_facts",
-                      lambda _p: None)(clean_out) == (0, 0))
+                      lambda _p: None)(clean_out) == (0, 0, {}))
         check("a skip-free marker is legible too",
               _illegible_marker_cells(clean_out) == [])
 

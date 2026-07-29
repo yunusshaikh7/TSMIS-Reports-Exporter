@@ -221,6 +221,9 @@ class CompareSchema:
     # value exists but could not be placed (the Clean Road Highway build's
     # skipped-span anchors), so the comparison must neither count the anchor
     # as a difference nor present the blank/stale cell as source truth.
+    # The note may instead be a CALLABLE resolved when the Summary is written,
+    # for facts only knowable once both sides are loaded (Clean Road itemizes
+    # the markers whose withheld source value TSN disagrees with).
     # Default () -> every other comparison (and the regression-locked
     # canaries) is byte-identical.
     unavailable_rule: tuple = ()
@@ -3320,8 +3323,13 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None, warnings=(),
     if sc.unavailable_rule:
         # HF-01: the schema's resolved disclosure line — the skipped-source
         # count, the marked-anchor count and the reason, supplied by the
-        # comparator from the producer's own build record.
-        notes.append(f"• ⚠ {sc.unavailable_rule[1]}")
+        # comparator from the producer's own build record. A CALLABLE note is
+        # resolved here, so a report may state facts that are only knowable
+        # once both sides are loaded (the Clean Road markers whose withheld
+        # source value TSN disagrees with) without reading its inputs ahead of
+        # the substrate's digest-before-read contract.
+        note = sc.unavailable_rule[1]
+        notes.append(f"• ⚠ {note() if callable(note) else note}")
     if warnings:
         shown = warnings[:20]
         notes.append(
@@ -3470,11 +3478,15 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
     if sc.unavailable_rule and (
             not isinstance(sc.unavailable_rule, tuple)
             or len(sc.unavailable_rule) != 2
-            or not all(isinstance(part, str) and part.strip()
-                       for part in sc.unavailable_rule)):
+            or not (isinstance(sc.unavailable_rule[0], str)
+                    and sc.unavailable_rule[0].strip())
+            or not (callable(sc.unavailable_rule[1])
+                    or (isinstance(sc.unavailable_rule[1], str)
+                        and sc.unavailable_rule[1].strip()))):
         raise ValueError(
-            "unavailable_rule must be a (token, Summary note) pair of "
-            "non-empty strings")
+            "unavailable_rule must be a (token, Summary note) pair — a "
+            "non-empty token string, and a note that is either a non-empty "
+            "string or a callable returning one")
     warnings = [str(w) for w in warnings]
     structured_warnings = list(warnings)
     failure_items = tuple(str(item) for item in (failures or ()))
