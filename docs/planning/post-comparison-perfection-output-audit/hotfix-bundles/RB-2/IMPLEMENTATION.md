@@ -134,6 +134,37 @@ the finding demanded, on the real corpus rather than a fixture:
 | `.provenance.json` TSN `selection` | `…\AppData\Local\Temp\tsmis-tsn-consumer-…\tsn_ramp_summary_normalized.xlsx` | `…\tsn_library\ramp_summary\consolidated\tsn_ramp_summary_normalized.xlsx` — **exists and is readable after the run**, with `read_via: verified private copy of the selection` |
 | values twin `Summary!B3` read `data_only` | `None` | `✗ DIFFERENCES FOUND — 23 differing cell(s), 2 one-sided row(s) — details below.` |
 
+**Criterion 1 on real statewide workbooks.** The audit's own gate, run read-only
+over three committed workbooks from this run (no Excel, nothing written into the
+generated tree):
+
+| Workbook | Stage 2 recorded | This run |
+|---|---:|---:|
+| `ssor-prod_intersection_summary_tsn.xlsx` | **70** | **0** |
+| `ssor-prod_highway_sequence_tsn.xlsx` (the family whose PDF sibling recorded 82) | — | **0** |
+| `ssor-prod_intersection_detail_tsn.xlsx` (statewide detail, 29 MB) | — | **0** |
+
+**Criterion 3 — PCOA-FINAL-014's named test, on the real Highway Sequence vs TSN
+workbook.** The finding names `City`, `HG` and `Distance To Next Point`
+specifically; the *DIFFERENCES BY FIELD* table now reads:
+
+| Field | Col | # of cells differing |
+|---|---|---|
+| County | H | `0` |
+| **City** | I | **`not compared (context)`** |
+| **HG** | J | **`not compared (context)`** |
+| FT | K | `690` |
+| **Distance To Next Point** | L | **`not compared (context)`** |
+| Description | M | `4,883` |
+
+`County` is the control the finding demands: a genuinely COMPARED column with
+zero differences still reports a real `0`, so the two cases stay
+distinguishable. The compared counts also still reconcile —
+`690 + 4,883 = 5,573`, exactly the headline's differing-cell total, which the
+values twin now publishes as a stored literal:
+`✗ DIFFERENCES FOUND — 5,573 differing cell(s), 15,958 one-sided row(s)`
+(criterion 4).
+
 ## Method note — never measure the live output tree
 
 An early measurement pass ran installed Excel over a workbook **inside** the
