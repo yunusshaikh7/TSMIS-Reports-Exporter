@@ -13,7 +13,7 @@ Review 2's `RB1-R2-001` remedied and returned for re-review)
 | Review 1 remedy commit | `84b82de` — `fix: make the Clean Road skipped-source disclosure legible (RB-1 review 1)` (+ this SHA-recording follow-up) |
 | Review 1 re-review | Codex, `6d2a2ce…` — **APPROVED**; exact matrix and signature in `REVIEW.md` |
 | Review 2 | Codex, `d330312…` — **DENIED — RETURN TO IMPLEMENTATION** on `RB1-R2-001` (the four diagnostic source facts are absent from Summary and Notes) |
-| Review 2 remedy commit | see the branch head — `fix: itemize the Clean Road unassertable source facts in Summary and Notes (RB-1 review 2)` |
+| Review 2 remedy commit | `39c5dc3d15501a428a42b0eb0c3cbe0d499b09fd` — `fix: itemize the Clean Road unassertable source facts in Summary and Notes (RB-1 review 2)` |
 | Generated-output root | `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\` (bulk; each return's run in its own `r1-remedy\` / `r2-remedy\` subfolder, so every earlier reviewer's proof files stay untouched); committed machine-readable witnesses in `../HF-01/witness/` |
 
 ## Changes
