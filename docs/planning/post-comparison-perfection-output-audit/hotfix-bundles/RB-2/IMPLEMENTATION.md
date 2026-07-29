@@ -61,6 +61,7 @@ Both new check files were run against the **base commit's own `scripts/`** (junc
 | Ruff (gate-exact) | `ruff check scripts` in a throwaway scratch venv | **PASS — "All checks passed!"** |
 | Frozen self-test | `build\build.ps1 -SelfTest` | *(pending)* |
 | One-sided path | A route-bearing schema with rows on one side only, both flavors | **PASS** — the Only-in key columns fit; the empty-key case falls back to the declared minimum |
+| Neighbouring-family regression (checks) | Every check both contracts name, from the post-correction gate run | **PASS — 18/18 green**: `check_compare_audit`, `check_compare_build_freshness`, `check_comparison_artifact_schema`, `check_compare_equality_policy`, `check_compare_source_files`, `check_matrix`, `check_day_matrix`, `check_baseline_matrix`, `check_pdf_excel_matrix`, `check_matrix_tsn`, `check_tsn_highway_log_claims`, `check_tsn_canonical_consumer_identity`, `check_tsn_freshness`, `check_tsn_outcome`, `check_matrix_cache_adversarial`, `check_comparison_publication`, `check_artifact_store`, plus the merged HF-01 `check_clean_road` |
 | Acceptance run `RB2-A1` | *(in progress — see below)* | |
 
 ## The first measured pass FAILED — and set the constants
