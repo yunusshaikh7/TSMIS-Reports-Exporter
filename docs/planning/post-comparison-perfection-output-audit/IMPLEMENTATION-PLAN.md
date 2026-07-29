@@ -177,7 +177,7 @@ Two layers, because the owner wants **fewer branches, reviews and releases**
 
 | Order | Batch | Specs | Theme | Depends on | Branch | Status |
 |---:|---|---|---|---|---|---|
-| 1 | **RB-1** | HF-01 | Clean Road source truth — the owner's immediate need | None | `hotfix/rb-1-clean-road-source-truth` | **JOINTLY APPROVED** — merge pending |
+| 1 | **RB-1** | HF-01 | Clean Road source truth — the owner's immediate need | None | `hotfix/rb-1-clean-road-source-truth` | **MERGED** — `560ea5e501fdd76003985753ba7fc9ff0a551320` |
 | 2 | **RB-2** | HF-02 + HF-03 | The deliverable looks right and describes itself truthfully — **56 of the 68 denials** | None (RB-1 for the Clean Road witness) | `hotfix/rb-2-deliverable-presentation` | BLOCKED |
 | 3 | **RB-3** | HF-04 | Ramp Detail — restores 9 comparison placements that produce nothing today | None | `hotfix/rb-3-ramp-detail-layout` | BLOCKED |
 | 4 | **RB-4** | HF-05 + HF-10 | Evidence, end to end: eligibility, binding, panels, and the missing cross-environment lane | None | `hotfix/rb-4-evidence` | BLOCKED |
@@ -478,7 +478,7 @@ mapping also proves one primary implementation/review bundle per finding:
 
 | RB bundle | Work items | Canonical findings | Count | Queue status |
 |---|---|---|---:|---|
-| **RB-1** | HF-01 | 010 | 1 | **JOINTLY APPROVED** |
+| **RB-1** | HF-01 | 010 | 1 | **MERGED** — `560ea5e501fdd76003985753ba7fc9ff0a551320` |
 | **RB-2** | HF-02, HF-03 | 002, 003, 008, 009, 014, 016, 019 | 7 | BLOCKED |
 | **RB-3** | HF-04 | 001, 012 | 2 | BLOCKED |
 | **RB-4** | HF-05, HF-10 | 004, 005, 006, 007 | 4 | BLOCKED |
@@ -552,7 +552,7 @@ Two consequences the reviewer must plan for:
 | Implementer | Claude |
 | Review 1 | **Codex** (holds `clean-road-comparison-unlocatable-impact.json` and `CLEAN-ROAD-HIGHWAY-RAW-SOURCE-TRUTH-FINAL.md`) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-1: JOINTLY APPROVED** |
+| Status | **Inherits RB-1: MERGED — `560ea5e501fdd76003985753ba7fc9ff0a551320`** |
 
 **Review 1 return (Codex, 2026-07-27).** Values/source truth,
 formula-workbook generation, the real GUI path, full gate, and unaffected
@@ -2059,13 +2059,10 @@ blocked by this program.
 | Claude | First plan | **APPROVED — FIRST PLAN** | `4e34bee` | 2026-07-26 | 11 work-item specs, 22 findings mapped once, overlap map built from code inspection at `a29bdb6` |
 | Codex | Final challenge | **APPROVED — JOINT AGREEMENT** | this commit | 2026-07-26 | Independently checked code ownership and mapping; corrected four material acceptance/workflow ambiguities without changing any owner ruling |
 
-Stage 3 is complete and every finding remains mapped exactly once. RB-1 became
-`READY`, was implemented, Review 1 denied it on RB1-R1-001, that return was
-implemented, and Review 1 approved the remedied head. **Review 2 denied
-`d330312efc949523caf07f1fec4e867afed87cf7` on 2026-07-28** (`RB1-R2-001`):
-the four genuine raw-source disagreements are absent from Summary and Notes,
-although the retained witness itemizes them. Run
-[Prompt 04 — implement one hotfix bundle](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
-on the existing `hotfix/rb-1-clean-road-source-truth` branch with
-`<BUNDLE_ID>` = `RB-1` and `<IMPLEMENTER>` = `Claude`. Do not merge; after the
-bounded remedy is implemented and re-gated, run Prompt 05 again.
+Stage 3 is complete and every finding remains mapped exactly once. RB-1 passed
+both independent Codex reviews after its bounded remedies and merged to `main`
+as `560ea5e501fdd76003985753ba7fc9ff0a551320`. The post-merge gate passed
+157/157 and the frozen application self-test passed. RB-2 is the next eligible
+bundle; prepare its combined HF-02 + HF-03 readiness contract from this merged
+state before invoking Prompt 04, and do not begin implementation inside the
+RB-1 review closeout.

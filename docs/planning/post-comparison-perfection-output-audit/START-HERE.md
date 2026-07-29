@@ -1,8 +1,8 @@
 # Post-Comparison Output Program — Start Here
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
-RB-1 / Clean Road is JOINTLY APPROVED (Stage 5 complete);
-Review 1 and Review 2 APPROVED; merge pending**
+RB-1 / Clean Road is MERGED at
+`560ea5e501fdd76003985753ba7fc9ff0a551320`; RB-2 readiness is next**
 
 Last updated: 2026-07-28
 
@@ -14,11 +14,9 @@ first pass.
 
 ## Next action
 
-Complete Prompt 05's final-approval merge sequence for
-`hotfix/rb-1-clean-road-source-truth`: confirm remote `main`, merge without
-force, run the post-merge smoke gate on `main`, record the merge SHA, push
-`main`, clean up only RB-1's merged worktrees/branch, and prepare RB-2's
-readiness record.
+Prepare RB-2's combined HF-02 + HF-03 readiness contract from the updated
+`main`. Do not create its implementation branch or begin implementation or an
+expensive acceptance run inside the RB-1 review closeout.
 
 RB-1 (work item HF-01, branch `hotfix/rb-1-clean-road-source-truth`) was
 implemented, denied by Codex Review 1 on the clipped `ArcGIS Build` disclosure
@@ -34,7 +32,7 @@ committed witnesses `hotfix-bundles/HF-01/witness/` are the record. Bulk
 acceptance output is retained at
 `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\` (the
 remedy run in its `r1-remedy\` subfolder; Review 1's own proof files are
-untouched). The branch is NOT merged.
+untouched). That head remained unmerged pending Review 2.
 
 Codex Review 1 re-reviewed exact head
 `6d2a2ce2e70688bfaa20e8f2e11039165742d55e`, closed RB1-R1-001, and
@@ -63,7 +61,8 @@ itemization is SIX cells, not four — all four Review 2 named plus two the
 witness's reference-anchor rule masks; the `165 = 161 + 4 = 159 + 6`
 reconciliation is in
 [`hotfix-bundles/RB-1/IMPLEMENTATION.md`](hotfix-bundles/RB-1/IMPLEMENTATION.md).
-The branch is NOT merged.
+The jointly approved branch is now merged at
+560ea5e501fdd76003985753ba7fc9ff0a551320.
 
 **Read before starting Review 2 — owner ruling, 2026-07-28.** The bounded
 review model Review 1 wrote into Prompt 05 (`fa84016`) is **owner-approved**:
@@ -129,8 +128,9 @@ The other two point in opposite directions on purpose:
   the Description is the same label with `EQUATES TO ` prepended. The rule must be
   pair-aware, opt-in, and must not widen into the HF-09 class.
 
-Both planners signed the Stage 3 plan. **RB-1's RB1-R2-001 return is
-implemented and awaits Review 2's re-review; no other RB is authorized yet.**
+Both planners signed the Stage 3 plan. **RB-1 is merged. RB-2 is the next
+eligible bundle; only its readiness record is authorized during this closeout,
+not implementation.**
 
 Stage 2 is closed with no open conflict:
 
@@ -152,8 +152,8 @@ Stage 2 is closed with no open conflict:
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/RB-1/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-1 IMPLEMENTED — both returns remedied** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-1 JOINTLY APPROVED — MERGE PENDING** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-1 MERGED; RB-2 readiness next** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-1 COMPLETE — MERGED `560ea5e`** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

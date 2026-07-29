@@ -1,6 +1,6 @@
 # `RB-1` — Adversarial Review Record
 
-Status: **JOINTLY APPROVED**
+Status: **MERGED** — `560ea5e501fdd76003985753ba7fc9ff0a551320`
 
 ## Review identity
 
@@ -21,7 +21,8 @@ Status: **JOINTLY APPROVED**
 | Approving reviewer | Codex — independent; did not implement this bundle |
 | Review 2 | Codex — independent; did not implement this bundle; **DENIED — RETURN TO IMPLEMENTATION** |
 | Review 2 re-review | Codex — independent; did not implement this bundle; **DENIED — EVIDENCE GAP** |
-| Merge | BLOCKED — Review 2 re-review found one unbound acceptance artifact; branch remains unmerged |
+| Review 2 final re-review | Codex — independent; did not implement this bundle; **APPROVED** |
+| Merge | **MERGED** — `560ea5e501fdd76003985753ba7fc9ff0a551320` |
 
 ## Review 1 verdict
 
@@ -506,3 +507,15 @@ approve, and neither reviewer implemented the bundle. RB-1 is
 
 **Reviewer signature:** Codex, Review 2 final re-review — APPROVED —
 `2026-07-28T19:00:41.8114249-07:00`.
+
+## Merge and post-merge verification
+
+| Item | Result |
+|---|---|
+| Remote-main divergence check | **PASS** — fetched `origin/main`; local `main`, `origin/main`, `FETCH_HEAD`, and merge-base were all `9c774d4edacf6ae3b6e86d15b62e5d876a690a48` before merge |
+| Merge | **PASS** — non-forced `--no-ff` merge via `ort`; merge commit `560ea5e501fdd76003985753ba7fc9ff0a551320` |
+| Planned post-merge smoke gate | **PASS** — `build\.venv\Scripts\python.exe build\run_checks.py -j 4 -k`: **157 passed, 0 failed** in 260 seconds |
+| Frozen application self-test | **PASS** — `powershell -NoProfile -ExecutionPolicy Bypass -File .\build\build.ps1 -SelfTest`: exact shipped executable `SMOKE OK`; frozen self-test passed in 177.6 seconds |
+
+The merge and post-merge verification were performed on `main`. No force was
+used, and retained audit artifacts and unrelated branches were not modified.
