@@ -183,6 +183,22 @@ for the Direct lane, family by family:
 | Ramp Summary | `OTM22270` | `OTM22270 · Event 4843742 · reference 09/15/2025 · TRLBUGNI` |
 | Intersection Detail | *(none)* | identity-silent **by design** — the contract requires it gain the honest provenance path but **no invented identity line**, and it has |
 
+**HF-03 criterion 2, as written — the SAME LINE on all three lanes.** Not the
+report code: the entire identity string, compared character for character
+between the Direct-lane control and both matrix lanes.
+
+| Family | The line, identical on Direct · Everything · By Day |
+|---|---|
+| Ramp Summary | `TSN print identity: OTM22270 · Event 4843742 · reference 09/15/2025 · submitted by TRLBUGNI · generated 05:10 PM (STATEWIDE).` |
+| Intersection Summary | `TSN print identity: OTM22250 · Event 4843738 · reference 09/15/2025 · submitted by TRLBUGNI · generated 04:53 PM (STATEWIDE).` |
+| Highway Sequence | `TSN print identity: OTM22025 Highway Locations · report 15-SEP-25 · reference 15 SEP 2025 · 12 district print(s).` |
+| Highway Log | `TSN print identity: OTM52010 California State Highway Log · report 09/15/25 · cover year 2025 · 12 district print(s).` |
+
+`ALL 3 LANES IDENTICAL: True` for every one. Before the fix each matrix lane
+instead printed *"TSN print: no source-claims record beside this normalized
+workbook (older normalization) — rebuild the TSN library to capture the print
+identity."* — the categorically false instruction PCOA-FINAL-002 was raised on.
+
 **Criterion 3 — PCOA-FINAL-014's named test, on the real Highway Sequence vs TSN
 workbook.** The finding names `City`, `HG` and `Distance To Next Point`
 specifically; the *DIFFERENCES BY FIELD* table now reads:
