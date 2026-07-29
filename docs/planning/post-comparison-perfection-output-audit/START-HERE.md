@@ -1,8 +1,8 @@
 # Post-Comparison Output Program — Start Here
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
-RB-1 / Clean Road is IMPLEMENTED — AWAITING ADVERSARIAL REVIEW (Stage 5);
-Review 1 APPROVED, and Review 2's RB1-R2-001 is remedied and returned**
+RB-1 / Clean Road is JOINTLY APPROVED (Stage 5 complete);
+Review 1 and Review 2 APPROVED; merge pending**
 
 Last updated: 2026-07-28
 
@@ -14,15 +14,11 @@ first pass.
 
 ## Next action
 
-Run
-[`prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md)
-in a NEW, SEPARATE **Codex** chat — Review 2 of 2, against the current head of
-`hotfix/rb-1-clean-road-source-truth`:
-
-```text
-<BUNDLE_ID> = RB-1
-<REVIEWER> = Codex
-```
+Complete Prompt 05's final-approval merge sequence for
+`hotfix/rb-1-clean-road-source-truth`: confirm remote `main`, merge without
+force, run the post-merge smoke gate on `main`, record the merge SHA, push
+`main`, clean up only RB-1's merged worktrees/branch, and prepare RB-2's
+readiness record.
 
 RB-1 (work item HF-01, branch `hotfix/rb-1-clean-road-source-truth`) was
 implemented, denied by Codex Review 1 on the clipped `ArcGIS Build` disclosure
@@ -157,7 +153,7 @@ Stage 2 is closed with no open conflict:
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/RB-1/BUNDLE.md` |
 | 4 | Implement one bounded RB bundle | **RB-1 IMPLEMENTED — both returns remedied** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-1 REVIEW 1 APPROVED; REVIEW 2 RE-REVIEW REQUIRED** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 5 | Adversarially review and approve that bundle | **RB-1 JOINTLY APPROVED — MERGE PENDING** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

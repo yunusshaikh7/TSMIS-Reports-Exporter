@@ -177,7 +177,7 @@ Two layers, because the owner wants **fewer branches, reviews and releases**
 
 | Order | Batch | Specs | Theme | Depends on | Branch | Status |
 |---:|---|---|---|---|---|---|
-| 1 | **RB-1** | HF-01 | Clean Road source truth — the owner's immediate need | None | `hotfix/rb-1-clean-road-source-truth` | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (Review 1 approved; `RB1-R2-001` remedied) |
+| 1 | **RB-1** | HF-01 | Clean Road source truth — the owner's immediate need | None | `hotfix/rb-1-clean-road-source-truth` | **JOINTLY APPROVED** — merge pending |
 | 2 | **RB-2** | HF-02 + HF-03 | The deliverable looks right and describes itself truthfully — **56 of the 68 denials** | None (RB-1 for the Clean Road witness) | `hotfix/rb-2-deliverable-presentation` | BLOCKED |
 | 3 | **RB-3** | HF-04 | Ramp Detail — restores 9 comparison placements that produce nothing today | None | `hotfix/rb-3-ramp-detail-layout` | BLOCKED |
 | 4 | **RB-4** | HF-05 + HF-10 | Evidence, end to end: eligibility, binding, panels, and the missing cross-environment lane | None | `hotfix/rb-4-evidence` | BLOCKED |
@@ -478,7 +478,7 @@ mapping also proves one primary implementation/review bundle per finding:
 
 | RB bundle | Work items | Canonical findings | Count | Queue status |
 |---|---|---|---:|---|
-| **RB-1** | HF-01 | 010 | 1 | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| **RB-1** | HF-01 | 010 | 1 | **JOINTLY APPROVED** |
 | **RB-2** | HF-02, HF-03 | 002, 003, 008, 009, 014, 016, 019 | 7 | BLOCKED |
 | **RB-3** | HF-04 | 001, 012 | 2 | BLOCKED |
 | **RB-4** | HF-05, HF-10 | 004, 005, 006, 007 | 4 | BLOCKED |
@@ -552,7 +552,7 @@ Two consequences the reviewer must plan for:
 | Implementer | Claude |
 | Review 1 | **Codex** (holds `clean-road-comparison-unlocatable-impact.json` and `CLEAN-ROAD-HIGHWAY-RAW-SOURCE-TRUTH-FINAL.md`) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-1: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| Status | **Inherits RB-1: JOINTLY APPROVED** |
 
 **Review 1 return (Codex, 2026-07-27).** Values/source truth,
 formula-workbook generation, the real GUI path, full gate, and unaffected

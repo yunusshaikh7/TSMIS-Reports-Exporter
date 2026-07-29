@@ -1,7 +1,6 @@
 # `RB-1` — Implementation Record
 
-Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (Review 1 approved;
-Review 2's `RB1-R2-001` remedied and returned for re-review)
+Status: **JOINTLY APPROVED** (Review 1 and Review 2 approved; merge pending)
 
 | Field | Value |
 |---|---|

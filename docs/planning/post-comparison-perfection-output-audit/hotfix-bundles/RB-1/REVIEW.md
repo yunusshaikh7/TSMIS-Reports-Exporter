@@ -1,6 +1,6 @@
 # `RB-1` — Adversarial Review Record
 
-Status: **DENIED — EVIDENCE GAP**
+Status: **JOINTLY APPROVED**
 
 ## Review identity
 
@@ -409,3 +409,100 @@ post-recalculation result record and found the exact size/hash seam.
 
 Do not merge. Resume Prompt 04 only to supply `RB1-R2-EG-001`; no workbook
 regeneration or Excel recalculation is requested.
+
+## Review 2 final re-review — Codex, 2026-07-28
+
+### Verdict
+
+**APPROVED.** `RB1-R2-EG-001` is closed. The exact retained
+post-recalculation formulas twin is 581,854,795 bytes at SHA-256
+`1393164AAF50C7C4D2B7C54B33150C3D6BCDD5CB5BA8604557BC6A78EB8205F0`;
+an independent reviewer hash of both the working and retained copies matched
+the committed witness exactly. Runtime remains `39c5dc3`; the requested
+record head `6558b03` changes evidence/docs only.
+
+The bounded adversarial challenge found no remaining contradiction. The most
+plausible false pass was collapsing a co-anchored cell to one “nearest” source
+value, which would hide one of the facts the marker withholds. The focused
+hermetic test proved that every co-anchored value is retained and that the
+derived Summary/Notes itemization classifies the synthetic 1-agrees /
+1-differs case correctly. The retained app-free witness independently records
+174 markers = 159 agree + 6 differ + 9 unpaired, with all six facts itemized in
+both sheets, including the four route 036 / TEH / 40.15 and 40.352 facts
+required by criterion 7. The shared-schema `check_compare_ditto.py` gate also
+passed, challenging callable-note leakage into unrelated behavior.
+
+### Review identity and budget
+
+| Field | Value |
+|---|---|
+| Reviewer / pass | Codex / Review 2 final re-review |
+| Implemented bundle? | **No** |
+| Branch | `hotfix/rb-1-clean-road-source-truth` |
+| Recorded base | `9c774d4edacf6ae3b6e86d15b62e5d876a690a48` |
+| Runtime head | `39c5dc3d15501a428a42b0eb0c3cbe0d499b09fd` |
+| Review-record head reviewed | `6558b039ca84630e1fe55220527c2cd41f00e96c` |
+| Review 1 approval | `6d2a2ce2e70688bfaa20e8f2e11039165742d55e` / record `c90908d73e22bf945c4d85484465350ae2882c22` |
+| Elapsed active review | Approximately 9 minutes |
+| Resource budget | **RESPECTED** — no generation, recount, Excel recalculation, application build, or full gate; two focused tests and read-only artifact/doc probes only |
+
+The first PowerShell hash command failed at parse time and was replaced once
+with a smaller `certutil` check. The bundled PDF renderer wrapper failed before
+producing PNGs and was not retried. The spreadsheet Node kernel likewise
+failed on the Windows ACL helper and was not retried. These are
+reviewer-environment failures, not product failures. Visual acceptance rests
+on the retained zero-short/zero-narrow Excel metric oracle, implementation's
+signed native-scale inspection, and Review 1's signed render evidence, as the
+owner-approved bounded-review policy permits.
+
+### Evidence reused and commands newly run
+
+| Evidence / command | Result |
+|---|---|
+| `git diff --check/name-status 9c774d4..6558b03` and `39c5dc3..6558b03` | **PASS** — complete agreed scope; runtime unchanged after `39c5dc3`; later changes are canary/witness/implementation/review records only |
+| Independent SHA-256 of working and retained `RB1-R2-Remedy.xlsx` | **PASS** — both 581,854,795 bytes and `1393164A…`; exact committed binding |
+| `formulas-twin-recalc.json` | SHA-256 `D34A91CDFF23FCF2502F148F99B06C333A6A06BC65A6825C081BD58862C2B8BB`; 10/10 self-checks `OK`, zero cached errors, exact itemized disclosure, retained copy matches |
+| `r2-source-disagreement-disclosure.json` | SHA-256 `4314B37A97D764E3356E147BEDD60E7428A459A5B8E90C6016AF6B37B4ADE676`; exact 159/6/9 census, zero unrecorded/duplicated, all six itemized in Summary and Notes |
+| `r2-values-twin-diff.json` / `r2-build-additive.json` | SHA-256 `30D041AC638301E110DE0C3FC002A624E057CFD24D18B02881317C983C064BCD` / `E72C212B780D4D1AED63D072DF1D7DD1208A5A30FC02403D41EF70E8235F9E4A`; Comparison unchanged, zero build data-cell changes, same 174 tokens |
+| `r2-marked-sheet-excel-metrics.json` | SHA-256 `2AF50429F87FA8C80F65796E9E93938F24385F0F9959DD91B7F426A2CF49BD71`; zero narrow columns / short rows |
+| `r2-shipped-run.json` | SHA-256 `267F20AEA4D1CA21829127DA170F874E3D6FD9B44C642F2FB957175CC05A9DB1`; shipped GUI path `ok/partial`, 291,127 differing cells, zero evidence delta |
+| `build\.venv\Scripts\python.exe build\check_clean_road.py` | **PASS** — all checks, including marked-anchor table, co-anchored values, exact itemization, non-asserting counts, compatibility and stored geometry |
+| `build\.venv\Scripts\python.exe build\check_compare_ditto.py` | **PASS** — shared opt-in behavior remains inert/unchanged outside its schema |
+| Recorded full gate / neighboring family | **PASS (reused)** — 157/157 + compile/Ruff/frozen self-test; Intersection Summary zero semantic/state/count/typed changes |
+
+### Acceptance and artifact matrices
+
+| Criterion / gate | Final result | Exact evidence |
+|---|---|---|
+| 1. 161 false positives become zero | **PASS** | Review 1 signed recount; unchanged values/Comparison witnesses |
+| 2. All 165 paired cells show marker and `N` | **PASS** | Signed recount, formula witness, focused hermetic test |
+| 3. Summary and Notes state 102 / 174 / reason | **PASS** | Both disclosures in retained values/formulas witnesses |
+| 4. Both twins regenerate; formulas clean | **PASS** | Post-recalc artifact independently hash-bound; 10/10 checks `OK`; zero errors |
+| 5. Canary re-blessed | **PASS** | `CRH-SW-E3` binds build, TSN, values, pre-recalc formulas, and post-recalc formulas identities |
+| 6. Full gate; base-red/head-green | **PASS** | Recorded 12-failure remedy signature / 35 original-base failures; head focused tests green; retained full gate 157/157 |
+| 7. 291,127; no outside move; facts itemized | **PASS** | Comparison 0 changes; exact total; all six derived facts include the four controlling facts in Summary and Notes |
+| Values / source truth | **PASS** | 174 = 159 + 6 + 9; zero unrecorded/duplicated; exact 291,127 |
+| Formulas | **PASS** | SHA-bound post-recalc twin; ten `OK`; zero cached errors |
+| Visual | **PASS (retained evidence)** | Both disclosure sheets: zero narrow columns/short rows; signed native-scale inspections |
+| Evidence eligibility | **PASS** | Clean Road has no adapter; shipped-run evidence delta empty |
+| Neighbor regression | **PASS** | Retained same-input Intersection witness plus focused shared-schema gate |
+| Performance / publication / stale state | **PASS (retained evidence)** | Shipped transaction, generation binding, freshness/TOCTOU/publication gates and prior signed review |
+
+### Review 2 challenge to Review 1
+
+Review 1 proved source truth, counts, formula behavior, layout and neighboring
+invariance, but missed two seams: the controlling plan required itemization in
+Summary/Notes, and the later remedy's post-recalculation workbook initially
+lacked a hash. Review 2 challenged both. The first return made itemization
+source-derived and co-anchor complete; the second bound the exact recalculated
+bytes. Independent hashing and the focused multi-value test now close both
+without duplicating the expensive acceptance corpus.
+
+### Final decision
+
+No actionable failure or evidence gap remains. Review 1 and Review 2 both
+approve, and neither reviewer implemented the bundle. RB-1 is
+**JOINTLY APPROVED** and eligible to merge.
+
+**Reviewer signature:** Codex, Review 2 final re-review — APPROVED —
+`2026-07-28T19:00:41.8114249-07:00`.
