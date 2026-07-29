@@ -102,6 +102,26 @@ retained beside the passing one.
 *(in progress — the generation was restarted from scratch after the geometry
 correction so every measured workbook carries the final geometry)*
 
+### The Everything lane — 9 of 9 audited families, and why the other three are out
+
+| Family | Result |
+|---|---|
+| Ramp Summary · Highway Sequence · Highway Log · Intersection Summary · Intersection Detail · Highway Log (PDF) · Intersection Detail (PDF) · Highway Sequence (PDF) · Ramp Detail (PDF) | **ok — all 9**, both twins each |
+| Ramp Detail (Excel) | `error` — *"isn't a CONSOLIDATED Ramp Detail workbook (expected a leading 'Route' column)"*. This is **PCOA-FINAL-001 reproducing exactly**, the finding RB-3/HF-04 owns. It is a graceful, correct refusal, not a crash |
+| Highway Detail · Highway Detail (PDF) | `EXCEPTION` — *"the Highway Detail output folder doesn't exist yet"* / *"No TSMIS Highway Detail (PDF) files were found"* |
+
+The Highway Detail result is worth stating precisely, because it **independently
+corroborates the standing pre-release block from the frozen input itself**: the
+provisioning step copied the archive's own export folders into the store and
+reported `highway_detail_pdf: 0 files`. The 2026-07-23 archive carries no
+Highway Detail export at all — which is exactly what "the vendor greyed the
+exports out again" means on disk. Nothing was inferred about HD, no HD artifact
+was produced, and no HD canary was touched.
+
+These three are excluded from the harness's retry test by name: neither is
+RB-2's defect, and neither is fixable by retrying, so neither may stop the
+acceptance chain. Every other failure class still triggers a retry.
+
 ### What the base-code pass covers, and the one lane it deliberately omits
 
 The base tree (`main` @ `896083e`, its `scripts/` copied verbatim, reading the
