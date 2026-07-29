@@ -2,7 +2,9 @@
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
 RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
-RB-2 is READY and Stage 4 implementation has not started**
+RB-2 is IMPLEMENTING — the code, the checks and the full gate are done and
+committed at `da1d480` on `hotfix/rb-2-deliverable-presentation`, and the
+combined `RB2-A1` acceptance run is executing**
 
 Last updated: 2026-07-28
 
@@ -14,13 +16,14 @@ first pass.
 
 ## Next action
 
-In a new Stage 4 implementation task, run
-[`PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
-with `<BUNDLE_ID> = RB-2` and `<IMPLEMENTER> = Claude`. Create
-`hotfix/rb-2-deliverable-presentation` from the latest clean `main`, record its
-exact base SHA in the readiness contract, and execute the complete combined
-HF-02 + HF-03 acceptance run. Do not split or sample the bundle unless the
-mandatory size gate returns it to `BLOCKED`.
+Stage 4 for RB-2 is under way on `hotfix/rb-2-deliverable-presentation`, base
+`896083e014d0451d5b05e5b6b024339aebc84d74`, implementation commit `da1d480`.
+The code, the two red→green checks and the full gate (158/158, ruff clean) are
+done; the combined `RB2-A1` acceptance run is executing. Finish that run and
+its record before invoking
+[`PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md)
+with `<BUNDLE_ID> = RB-2` and `<REVIEWER> = Codex`. Do not split or sample the
+bundle unless the mandatory size gate returns it to `BLOCKED`.
 
 RB-1 (work item HF-01, branch `hotfix/rb-1-clean-road-source-truth`) was
 implemented, denied by Codex Review 1 on the clipped `ArcGIS Build` disclosure

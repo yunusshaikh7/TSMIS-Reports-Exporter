@@ -1,6 +1,8 @@
 # `RB-2` — Bundle Contract
 
-Status: **READY**
+Status: **IMPLEMENTING** — branch created from the base SHA below, implementation
+committed at `da1d480`, acceptance run `RB2-A1` executing. The record is
+[IMPLEMENTATION.md](IMPLEMENTATION.md).
 
 > This RB-level contract carries **HF-02 + HF-03** and transcribes both frozen
 > work-item sections from
