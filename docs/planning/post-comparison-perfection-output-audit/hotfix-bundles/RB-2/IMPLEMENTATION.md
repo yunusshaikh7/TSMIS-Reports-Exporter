@@ -115,6 +115,23 @@ the finding demanded, on the real corpus rather than a fixture:
 | `.provenance.json` TSN `selection` | `…\AppData\Local\Temp\tsmis-tsn-consumer-…\tsn_ramp_summary_normalized.xlsx` | `…\tsn_library\ramp_summary\consolidated\tsn_ramp_summary_normalized.xlsx` — **exists and is readable after the run**, with `read_via: verified private copy of the selection` |
 | values twin `Summary!B3` read `data_only` | `None` | `✗ DIFFERENCES FOUND — 23 differing cell(s), 2 one-sided row(s) — details below.` |
 
+## Method note — never measure the live output tree
+
+An early measurement pass ran installed Excel over a workbook **inside** the
+generated tree while the generation still held its `owned_dir` lease. Excel
+writes lock/temp files beside the workbook it opens, the comparisons directory's
+identity changed, and the very next cell refused to commit:
+
+> Refusing to write the comparison: destination ownership changed while …
+
+**The app was right and the measurement was wrong.** The refusal is exactly the
+transactional/ownership contract working — a partial refresh kept last-good, and
+the app's own identity-bound artifact temp (`…tmp-ed785a1adfa5.xlsx`) was left
+rather than a half-written deliverable. The harness now copies every workbook
+into a separate `excel-workspace` before any Excel call, and all installed-Excel
+legs run only after generation finishes. A reviewer re-running `RB2-A1` must do
+the same.
+
 ## Scope and residual risk
 
 - **Out-of-scope files changed: none.** The diff is exactly `compare_core.py`, `summary_layout.py`, `matrix_build.py`, `compare_tsn_common.py`, one new check, four existing checks, and this bundle's records.
