@@ -1977,6 +1977,19 @@ def set_safe_literal_cell(cell, value, *, exact_source_numeric=False):
 _MDW_PX = 7                    # Calibri 11 max digit width — Excel's width unit
 _CELL_PAD_PX = 4               # ~2 px of padding on each side of the text
 _ROW_LINE_PT = 15.0            # one line of Arial 10 / Calibri 11 in a row
+# MEASURED against installed Excel, not assumed: Excel reports a column we store
+# as N with ColumnWidth N - 0.71, so a width computed in characters and stored
+# raw is always that much short of what Excel itself says the text needs.
+_STORED_WIDTH_OFFSET = 0.71
+# Rasterize well above the real point size and scale back: at 13 px a 10 pt font
+# loses ~2.5 % per glyph to integer rounding, which is a whole character over a
+# 20-character label (installed Excel wanted 22.29 where the rounded measure
+# said 21).
+_MEASURE_SCALE = 4
+# Even oversampled, an unhinted glyph-advance sum runs 1.3-2.4 % under what
+# installed Excel's own AutoFit asks for (measured on real labels: 18.43 vs
+# 18.00, 22.29 vs 22.00, 46.00 vs 45.29). Carry a margin that covers it.
+_MEASURE_MARGIN = 1.05
 _WRAP_FONTS = ("arial.ttf", "calibri.ttf")
 _WRAP_FONTS_BOLD = ("arialbd.ttf", "calibrib.ttf")
 _FALLBACK_CHAR_PX = 8.0        # generous: wider than any Arial/Calibri glyph
@@ -1997,7 +2010,7 @@ def _fonts_for(bold, size_pt):
     except ImportError:      # silent-ok: no measuring library -> the wider
         ImageFont = None     # character estimate below, which never clips
     if ImageFont is not None:
-        px = max(1, int(round(float(size_pt) * 96.0 / 72.0)))
+        px = max(1, int(round(float(size_pt) * 96.0 / 72.0 * _MEASURE_SCALE)))
         for name in (_WRAP_FONTS_BOLD if bold else _WRAP_FONTS):
             try:
                 loaded.append(ImageFont.truetype(_FONT_DIR + name, px))
@@ -2016,7 +2029,8 @@ def _text_px(text, bold=False, size_pt=11.0):
     fonts = _fonts_for(bold, size_pt)
     if not fonts:
         return len(s) * _FALLBACK_CHAR_PX * (float(size_pt) / 11.0)
-    return max(f.getlength(s) for f in fonts)
+    return (max(f.getlength(s) for f in fonts)
+            / _MEASURE_SCALE * _MEASURE_MARGIN)
 
 
 def _width_to_px(width):
@@ -2024,9 +2038,17 @@ def _width_to_px(width):
     return round(float(width) * _MDW_PX) + 5
 
 
+def _usable_px(width):
+    """What a cell of that STORED width can actually render — the character
+    width Excel reports, not the stored number (see the offset above)."""
+    return _width_to_px(max(float(width) - _STORED_WIDTH_OFFSET, 0.0))
+
+
 def _px_to_width(px):
-    """The smallest stored width whose cell can render `px` of text."""
-    return math.ceil((float(px) + _CELL_PAD_PX - 5) / _MDW_PX)
+    """The smallest stored width whose cell can render `px` of text, in the
+    units Excel itself reports (hence the measured stored-width offset)."""
+    return (math.ceil((float(px) + _CELL_PAD_PX - 5) / _MDW_PX)
+            + _STORED_WIDTH_OFFSET)
 
 
 def fitted_width(texts, *, bold=False, size_pt=11.0, minimum=0.0, maximum=None):
@@ -2047,7 +2069,7 @@ def _wrapped_lines(text, width, bold=False, size_pt=11.0):
     s = "" if text is None else str(text)
     if not s:
         return 1
-    room_px = max(_width_to_px(width) - _CELL_PAD_PX, 1)
+    room_px = max(_usable_px(width) - _CELL_PAD_PX, 1)
     by_chars = len(textwrap.wrap(s, max(int(float(width)) - 1, 8))) or 1
     by_px = math.ceil(_text_px(s, bold, size_pt) / room_px)
     return max(1, by_chars, by_px)
@@ -2086,7 +2108,7 @@ def _grid_geometry(grid, base_widths, caps=None):
                                   minimum=widths.get(c, 0.0), maximum=caps.get(c))
     wrapped, heights = {}, {}
     for r, c, text, bold, size in blocked:
-        if _text_px(text, bold, size) + _CELL_PAD_PX <= _width_to_px(widths[c]):
+        if _text_px(text, bold, size) + _CELL_PAD_PX <= _usable_px(widths[c]):
             continue                        # the declared width already fits it
         lines = _wrapped_lines(text, widths[c], bold, size)
         wrapped[(r, c)] = lines
@@ -2193,15 +2215,17 @@ def _apply_field_widths(ws, widths, col_for, lay):
 
 
 def _auto_field_widths(sc, lay, rows_t, rows_n, off):
-    """Widths for the Comparison/Only-in FIELD columns the schema never sized.
+    """Widths for the Comparison/Only-in FIELD columns.
 
     A difference cell renders "<A value> ≠ <B value>", so a column left at
     Excel's 8.43 general default truncates ordinary content (PCOA-FINAL-008's
-    measured `1873 ≠ 1874`). Columns the schema DID size keep exactly the width
-    it chose; the rest are fitted to the widest pair their own data can produce,
-    bounded so one pathological value cannot make the sheet unusable. Computed
-    once per comparison so both twins carry identical geometry."""
-    fields = [f for f in lay.field_indices if sc.header[f] not in sc.cmp_widths]
+    measured `1873 ≠ 1874`, and the schema-declared 12 that installed Excel says
+    needs 12.57). A schema's declared width is therefore a FLOOR — never a
+    ceiling that clips its own content — and every column is fitted to the
+    widest pair its data can produce, bounded so one pathological value cannot
+    make the sheet unusable. Computed once per comparison so both twins carry
+    identical geometry."""
+    fields = list(lay.field_indices)
     if not fields:
         return {}
     longest = {f: ("", "") for f in fields}
@@ -2219,8 +2243,11 @@ def _auto_field_widths(sc, lay, rows_t, rows_n, off):
                     longest[f] = ((s, longest[f][1]) if slot == 0
                                   else (longest[f][0], s))
     return {f: fitted_width(
-        [(a + _DIFF_MARK + b) if a and b else (a or b)],
-        size_pt=10, minimum=_CMP_FIELD_MIN_WIDTH, maximum=_MAX_FITTED_WIDTH)
+        [(a + _DIFF_MARK + b) if a and b else (a or b)], size_pt=10,
+        minimum=max(_CMP_FIELD_MIN_WIDTH,
+                    float(sc.cmp_widths.get(sc.header[f], 0))),
+        maximum=max(_MAX_FITTED_WIDTH,
+                    float(sc.cmp_widths.get(sc.header[f], 0))))
         for f, (a, b) in longest.items()}
 
 
@@ -2424,9 +2451,9 @@ def _write_comparison(wb, union, lay, events, vals=None, helper_tokens=None,
         ("Both", lay.only_a, lay.only_b), size_pt=10, minimum=11,
         maximum=_MAX_FITTED_WIDTH)
     ws.column_dimensions[lay.c_diffs].width = 6
+    _apply_field_widths(ws, sc.cmp_widths, lay.field_col, lay)
     for f, width in (field_widths or {}).items():
         ws.column_dimensions[lay.field_col(f)].width = width
-    _apply_field_widths(ws, sc.cmp_widths, lay.field_col, lay)
 
     for chunk in lay.state_chunks:
         ws.column_dimensions[chunk["col"]].hidden = True
@@ -2963,9 +2990,9 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None,
         size_pt=10, minimum=12, maximum=_MAX_FITTED_WIDTH)
     ws.column_dimensions[c_occ].width = 4
     ws.column_dimensions[c_row].width = 9
+    _apply_field_widths(ws, sc.cmp_widths, fcol, lay)
     for f, width in (field_widths or {}).items():
         ws.column_dimensions[fcol(f)].width = width
-    _apply_field_widths(ws, sc.cmp_widths, fcol, lay)
     if lay.has_route and keys:
         # Whole-route gaps stand out; single-location gaps stay plain. Colors
         # mirror the Comparison sheet's one-sided row tints. (`keys` can be
