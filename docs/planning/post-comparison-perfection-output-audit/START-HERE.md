@@ -1,8 +1,8 @@
 # Post-Comparison Output Program — Start Here
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
-RB-1 / Clean Road is MERGED at
-`560ea5e501fdd76003985753ba7fc9ff0a551320`; RB-2 readiness is next**
+RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
+RB-2 is READY and Stage 4 implementation has not started**
 
 Last updated: 2026-07-28
 
@@ -14,9 +14,13 @@ first pass.
 
 ## Next action
 
-Prepare RB-2's combined HF-02 + HF-03 readiness contract from the updated
-`main`. Do not create its implementation branch or begin implementation or an
-expensive acceptance run inside the RB-1 review closeout.
+In a new Stage 4 implementation task, run
+[`PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
+with `<BUNDLE_ID> = RB-2` and `<IMPLEMENTER> = Claude`. Create
+`hotfix/rb-2-deliverable-presentation` from the latest clean `main`, record its
+exact base SHA in the readiness contract, and execute the complete combined
+HF-02 + HF-03 acceptance run. Do not split or sample the bundle unless the
+mandatory size gate returns it to `BLOCKED`.
 
 RB-1 (work item HF-01, branch `hotfix/rb-1-clean-road-source-truth`) was
 implemented, denied by Codex Review 1 on the clipped `ArcGIS Build` disclosure
@@ -128,9 +132,9 @@ The other two point in opposite directions on purpose:
   the Description is the same label with `EQUATES TO ` prepended. The rule must be
   pair-aware, opt-in, and must not widen into the HF-09 class.
 
-Both planners signed the Stage 3 plan. **RB-1 is merged. RB-2 is the next
-eligible bundle; only its readiness record is authorized during this closeout,
-not implementation.**
+Both planners signed the Stage 3 plan. **RB-1 is merged and RB-2 is READY.
+RB-2's combined contract exists; no implementation branch, code change, or
+acceptance generation has started.**
 
 Stage 2 is closed with no open conflict:
 
@@ -151,8 +155,8 @@ Stage 2 is closed with no open conflict:
 | 1A | Codex independent deliverable audit | **COMPLETE** | Historical user request, normalized in `AUDIT-SCOPE-AND-PROVENANCE.md` | `MASTER-VERIFICATION.md`, `CODEX-FINDINGS.md` |
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
-| 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/RB-1/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-1 MERGED; RB-2 readiness next** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
+| 4 | Implement one bounded RB bundle | **RB-2 READY — NOT STARTED** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
 | 5 | Adversarially review and approve that bundle | **RB-1 COMPLETE — MERGED `560ea5e`** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
