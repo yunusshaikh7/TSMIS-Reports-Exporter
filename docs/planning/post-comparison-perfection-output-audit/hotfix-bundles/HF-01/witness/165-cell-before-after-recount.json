@@ -1,0 +1,50 @@
+{
+ "old": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-output-audit-claude-independent-2026-07-23\\generated-comparisons\\arcgis\\clean_highway arcgis-vs-tsn (values).xlsx",
+ "new": "output\\comparisons\\arcgis\\ArcGIS_vs_TSN_CleanRoadHighway_Comparison 2026-07-28 (values).xlsx",
+ "token": "(unavailable: source span skipped)",
+ "comparison": {
+  "rows": 65164,
+  "old_differing_cells": 291292,
+  "new_differing_cells": 291127,
+  "old_differing_rows": 50012,
+  "new_differing_rows": 50012,
+  "status_counts_old": {
+   "Both": 52647,
+   "ArcGIS only": 5081,
+   "TSN only": 7436
+  },
+  "status_counts_new": {
+   "Both": 52647,
+   "ArcGIS only": 5081,
+   "TSN only": 7436
+  },
+  "verified_165_mask_flips": 165,
+  "verified_165_display_flips": 165,
+  "u_token_displays": 9,
+  "field_delta": {
+   "THY_LT_LANES_AMT": 81,
+   "THY_RT_O_SHD_TOT_WIDTH_AMT": 1,
+   "THY_LT_TRAV_WAY_WIDTH_AMT": 82,
+   "THY_RT_O_SHD_TRT_WIDTH_AMT": 1
+  },
+  "witness_rows": 83,
+  "unexpected": [],
+  "unexpected_count": 0
+ },
+ "arc_sheet": {
+  "sheet": "ArcGIS",
+  "unexpected": [],
+  "unexpected_count": 0,
+  "expected_tokens_found": 174,
+  "expected_tokens_missing": [],
+  "matched_cells_wrongly_touched": []
+ },
+ "tsn_sheet": {
+  "sheet": "TSN",
+  "unexpected": [],
+  "unexpected_count": 0,
+  "expected_tokens_found": 0,
+  "expected_tokens_missing": [],
+  "matched_cells_wrongly_touched": []
+ }
+}

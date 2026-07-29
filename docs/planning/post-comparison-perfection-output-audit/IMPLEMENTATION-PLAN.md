@@ -177,7 +177,7 @@ Two layers, because the owner wants **fewer branches, reviews and releases**
 
 | Order | Batch | Specs | Theme | Depends on | Branch | Status |
 |---:|---|---|---|---|---|---|
-| 1 | **RB-1** | HF-01 | Clean Road source truth — the owner's immediate need | None | `hotfix/rb-1-clean-road-source-truth` | **READY** |
+| 1 | **RB-1** | HF-01 | Clean Road source truth — the owner's immediate need | None | `hotfix/rb-1-clean-road-source-truth` | **JOINTLY APPROVED** — merge pending |
 | 2 | **RB-2** | HF-02 + HF-03 | The deliverable looks right and describes itself truthfully — **56 of the 68 denials** | None (RB-1 for the Clean Road witness) | `hotfix/rb-2-deliverable-presentation` | BLOCKED |
 | 3 | **RB-3** | HF-04 | Ramp Detail — restores 9 comparison placements that produce nothing today | None | `hotfix/rb-3-ramp-detail-layout` | BLOCKED |
 | 4 | **RB-4** | HF-05 + HF-10 | Evidence, end to end: eligibility, binding, panels, and the missing cross-environment lane | None | `hotfix/rb-4-evidence` | BLOCKED |
@@ -225,6 +225,32 @@ truncation fix and a brand-new lane, all with "inspect every retained image"
 acceptance. If Codex denies part of a batch, the whole batch stays unmerged. If
 that becomes a problem in practice, split RB-4 back into HF-05 and HF-10 — the
 specs are already separate and need no re-planning.
+
+**✅ Owner ruling — 2026-07-28: BOUNDED REVIEWS ARE APPROVED.** Codex Review 1
+rewrote Prompt 05 (`fa84016`) to cap a single review at 30 minutes of active
+work, 2 GB of reviewer working memory, 5-minute operations, 500 MB of new
+output, and no installed-Excel `CalculateFullRebuild` without prior owner
+approval — after two full-rebuild attempts blue-screened the reviewer's 16 GB
+host during RB-1 Review 1. The owner approves that model, including its two
+consequences, which a reviewer must therefore NOT treat as findings:
+
+1. **Review 2 may rely on Review 1's signed evidence** as one ranked source
+   rather than regenerating the acceptance corpus. `BUNDLE.md`'s "challenge
+   review 1 and re-derive from source, never copy it" continues to govern
+   REASONING and targeted probes; it is no longer read as a duty to repeat a
+   costly regeneration. Independent re-derivation of a *specific* contested
+   fact is still expected wherever the retained evidence leaves a concrete
+   uncertainty.
+2. **No independent reviewer performs the formulas-twin full rebuild.** For
+   RB-1 the installed-Excel recalculation therefore stands on the
+   implementation's own recorded run alone (witness
+   `hotfix-bundles/HF-01/witness/formulas-twin-recalc.json`; live verdict
+   291,127, all 165 positions live-`N`, every SELF-CHECK OK, zero error cells).
+   The owner accepts that single-source verification for this bundle.
+
+The prompt change itself is owner-sanctioned workflow support, not scope
+leakage. This ruling does not relax any other acceptance criterion, and it does
+not change the two-approval merge gate.
 
 **Second-planner size gate.** The six-bundle owner decision is accepted only
 with the original completeness bar intact. RB-2 and RB-4 may not trade fewer
@@ -452,7 +478,7 @@ mapping also proves one primary implementation/review bundle per finding:
 
 | RB bundle | Work items | Canonical findings | Count | Queue status |
 |---|---|---|---:|---|
-| **RB-1** | HF-01 | 010 | 1 | **READY** |
+| **RB-1** | HF-01 | 010 | 1 | **JOINTLY APPROVED** |
 | **RB-2** | HF-02, HF-03 | 002, 003, 008, 009, 014, 016, 019 | 7 | BLOCKED |
 | **RB-3** | HF-04 | 001, 012 | 2 | BLOCKED |
 | **RB-4** | HF-05, HF-10 | 004, 005, 006, 007 | 4 | BLOCKED |
@@ -526,7 +552,65 @@ Two consequences the reviewer must plan for:
 | Implementer | Claude |
 | Review 1 | **Codex** (holds `clean-road-comparison-unlocatable-impact.json` and `CLEAN-ROAD-HIGHWAY-RAW-SOURCE-TRUTH-FINAL.md`) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-1: READY** |
+| Status | **Inherits RB-1: JOINTLY APPROVED** |
+
+**Review 1 return (Codex, 2026-07-27).** Values/source truth,
+formula-workbook generation, the real GUI path, full gate, and unaffected
+Intersection Summary regression passed independently. Visual usability failed:
+the newly added
+`ArcGIS Build!A4:B108` labels, marker, and 102 itemized warnings are unwrapped
+in default-width/default-height cells and are clipped in native Excel. Resume
+Prompt 04 on `hotfix/rb-1-clean-road-source-truth`; make only RB-1's new marker
+sheet disclosure legible, regenerate the build and both twins, and rerun the
+complete acceptance matrix. Exact evidence and commands are in
+`hotfix-bundles/RB-1/REVIEW.md`.
+
+**Review 1 return IMPLEMENTED (Claude, 2026-07-28).** The marker sheet now
+declares purposeful stored column widths (measured against installed Excel's
+own font metrics), wraps whatever cannot fit in a row tall enough for every
+wrapped line, and states the 102 skips as an itemized 14-column table instead
+of 102 clipped sentences. The build and both twins were regenerated and the
+whole acceptance matrix re-run: the rebuilt workbook is byte-for-byte identical
+to the pre-remedy build in every data cell (0 differences across 57,729 rows),
+the comparison reproduces every CRH-SW-E3 figure (291,127 differing cells),
+installed Excel recalculates the formulas twin to the same truth, the
+neighbouring family stays identical to base code, and the full gate is 157/157
+plus the frozen self-test.
+
+**Review 1 APPROVED (Codex, 2026-07-28).** The independent re-review at
+`6d2a2ce2e70688bfaa20e8f2e11039165742d55e` closed RB1-R1-001 and passed
+the complete source, values, formulas, visual, evidence, regression, failure,
+and full-gate matrix. Status is
+`REVIEW 1 APPROVED — AWAITING REVIEW 2`.
+
+**Review 2 DENIED (Codex, 2026-07-28).** Exact requested head
+`d330312efc949523caf07f1fec4e867afed87cf7` failed `RB1-R2-001`: the retained
+witness itemizes the four genuine route 036 / TEH / 40.15 and 40.352 source
+facts, but Summary and Notes carry aggregate coverage only, contrary to this
+section's controlling criterion 7. Resume Prompt 04 on the existing branch;
+Review 1's marker-sheet remedy remains closed.
+
+**Review 2 return IMPLEMENTED (Claude, 2026-07-28).** The gap was that the
+build recorded HOW MANY anchors it marked but never WHAT any marker stood in
+front of, so the comparator had nothing to itemize. The build now writes an
+itemized `ArcGIS Marked Anchors` sheet (one row per marked cell × withholding
+span: the row's own identity, the column, the withheld value, the layer, the
+one postmile the source gave), and the comparison joins it to the TSN row each
+marker pairs with, classifies every marker, and names each one that withholds a
+value TSN does not show — in **both** Summary and Notes. Nothing is
+hard-coded: the hermetic test proves a different identity itemizes from a
+synthetic library, and the real corpus yields the four Review 2 named. It
+yields **six**, not four, because a cell agrees only when EVERY value withheld
+there is TSN's; the two extra are `036 / TEH / 39.72`, whose nearest anchor
+matches TSN but whose co-anchored sibling (`2 @ 40.105`) does not — the
+reconciliation `165 = 161 + 4 = 159 + 6` and why the reference-anchor rule was
+rejected are in
+[`hotfix-bundles/RB-1/IMPLEMENTATION.md`](hotfix-bundles/RB-1/IMPLEMENTATION.md).
+Every count is unchanged (**291,127**), the build diff is 0 data cells, the
+values twin differs only in Summary/Notes prose and run-identity Provenance,
+both disclosure sheets pass installed Excel's own metrics, the neighbouring
+family is cell-identical to base code, and the full gate is 157/157 plus the
+frozen self-test.
 
 **Exact scope.** Clean Road Highway only: the ArcGIS build
 (`clean_highway_built.xlsx`) and the ArcGIS-vs-TSN comparison in **both**
@@ -1975,7 +2059,13 @@ blocked by this program.
 | Claude | First plan | **APPROVED — FIRST PLAN** | `4e34bee` | 2026-07-26 | 11 work-item specs, 22 findings mapped once, overlap map built from code inspection at `a29bdb6` |
 | Codex | Final challenge | **APPROVED — JOINT AGREEMENT** | this commit | 2026-07-26 | Independently checked code ownership and mapping; corrected four material acceptance/workflow ambiguities without changing any owner ruling |
 
-Stage 3 is complete. Every finding is mapped exactly once and **RB-1 is READY**.
-Run
-[Prompt 04 — implement a hotfix bundle](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
-with `<BUNDLE_ID>` = `RB-1` and `<IMPLEMENTER>` = `Claude`.
+Stage 3 is complete and every finding remains mapped exactly once. RB-1 became
+`READY`, was implemented, Review 1 denied it on RB1-R1-001, that return was
+implemented, and Review 1 approved the remedied head. **Review 2 denied
+`d330312efc949523caf07f1fec4e867afed87cf7` on 2026-07-28** (`RB1-R2-001`):
+the four genuine raw-source disagreements are absent from Summary and Notes,
+although the retained witness itemizes them. Run
+[Prompt 04 — implement one hotfix bundle](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
+on the existing `hotfix/rb-1-clean-road-source-truth` branch with
+`<BUNDLE_ID>` = `RB-1` and `<IMPLEMENTER>` = `Claude`. Do not merge; after the
+bounded remedy is implemented and re-gated, run Prompt 05 again.

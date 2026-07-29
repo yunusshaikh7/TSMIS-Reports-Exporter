@@ -1715,3 +1715,112 @@ exactly (291,292 / 50,012 / 52,647·5,081·7,436); the values workbook's own
 cells sum to the same; the real-Excel COM full rebuild of the formulas
 edition equals the values twin cell-for-cell across all 65,164 rows. Oracle
 JSON beside `audit_v0290.py`. Gate 153/153 + ruff clean at the tag.
+
+### CRH-SW-E3 — the RB-1 / HF-01 re-bless (supersedes CRH-SW-E2's expected counts)
+
+Same recipe and the same raw inputs (the ArcGIS layer library and the
+`CA HIGHWAYS 09.08.2025` extract are byte-identical to E2's), one owner-ruled
+truth change (2026-07-26, PCOA-FINAL-010): the build RECORDS the 102 as-of
+source spans whose begin or end postmile is unreadable (`LocError=NO ERROR`,
+usable AR/odometer measures — the county+postmile contract never guesses from
+those calibrations), reports **PARTIAL** completion with `skipped_inputs=102`,
+itemizes every span on the `ArcGIS Build` sheet and in the
+`clean_road_build.skipped_source_spans` sidecar, and emits the reserved
+non-asserting marker `(unavailable: source span skipped)` into the **174**
+anchor cells whose painted value was not the skipped span's own (162 formerly
+blank + 3 formerly stale + 9 on rows that do not pair). The comparison schema
+declares the token non-asserting via the one opt-in
+`CompareSchema.unavailable_rule` field: those cells render state `N`, display
+the marker, and are excluded from every difference count; Summary and Notes
+state the span count, the marked-anchor count and the reason.
+
+Expected approved result: **52,647 paired / 5,081 ArcGIS-only / 7,436 TSN-only
+(UNCHANGED) / 50,012 differing rows (UNCHANGED — every affected row keeps at
+least one real difference) / 291,127 differing cells (was 291,292; −165 =
+exactly the Codex-witnessed skipped-anchor `D` cells, now explicit `N`) /
+2,635 fully identical (UNCHANGED)**. Per-field deltas, all four from the
+witness: `THY_LT_TRAV_WAY_WIDTH_AMT` −82 · `THY_LT_LANES_AMT` −81 ·
+`THY_RT_O_SHD_TOT_WIDTH_AMT` −1 · `THY_RT_O_SHD_TRT_WIDTH_AMT` −1. Typed
+outcome: asserted_cells 2,579,538 / context_cells 1,263,693 (the same 165-cell
+shift; 52,647 × 73 exactly). The comparison itself reports PARTIAL — the
+producer's truthful partial coverage propagated by `_merge_input_outcomes` —
+and can no longer read green while source rows are unplaceable.
+
+| Role | Exact file | Length | SHA-256 |
+|---|---|---:|---|
+| ArcGIS (built, RB-1 — review-1 remedy build) | `output\arcgis_cleanroad\clean_highway_built.xlsx` | 10,833,361 | `1ADB594425DD846AC93C8500834FBD24E9D8D497F6595FFCB30D496AE8AD360A` |
+| TSN (normalized, rebuilt from the same raw — sha differs per PCOA-FINAL-017; projected content proved identical cell-for-cell) | `tsn_library\clean_highway\consolidated\tsn_clean_highway_normalized.xlsx` | 14,864,394 | `7F1086FEAFE061531B682B12D0DDA161F5256DF50FCC89A954DF8B87A4656AAB` |
+
+Acceptance evidence (RB-1, 2026-07-27): (A) a build-level cell diff of the new
+built workbook against the frozen audit-approved E2-era build (SHA
+`8F9766AC…`) shows the SAME 57,728-row universe and ZERO cell changes outside
+exactly the 174 witnessed anchors; (B) an app-free lockstep recount of the old
+vs new values twins verifies the 165 witnessed `D`→`N` flips cell-for-cell
+(masks + displays), the 20 matched-at-anchor cells untouched, the 9 one-sided
+anchor displays carrying the marker at state `U`, totals 291,292 → 291,127
+with no other mask/display/status/key change anywhere, and the TSN data sheet
+identical (the rebuilt normalized input's projected content equals the old);
+(C) the real-Excel COM full rebuild of the formulas twin recomputes the same
+truth live (SELF-CHECK all OK, verdict 291,127, the witnessed positions
+live-`N` with the marker, no error cells). Witnesses:
+`hotfix-bundles/HF-01/witness/` (this repo) and
+`Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\`. The Phase-3
+decision gates are honored: the equality change is opt-in per-report schema
+(`unavailable_rule`), proved inert for every other family (Intersection
+Summary vs TSN regenerated identically, zero cells, on both code states), and
+the count move is exactly the owner-ruled 165-cell witness — nothing else.
+
+**Review-1 remedy rebuild (2026-07-28).** RB-1's first review denied the bundle
+on a PRESENTATION defect only (RB1-R1-001: the new `ArcGIS Build` disclosure was
+stored at Excel's default width/height and clipped). The remedy gives that sheet
+measured stored column widths, wrapped cells in tall-enough rows, and states the
+102 skips as an itemized 14-column table; the build was regenerated, so the
+ArcGIS input identity above moved from `8BDD9247…` (10,828,144) to
+`1ADB5944…` (10,833,361). **Nothing else in this canary moves**: a cell-level
+diff of the two builds shows **0** differences across all 57,729 data rows,
+Provenance identical, the same 174 marker tokens and the same `102 / 174`
+sidecar record, so every expected count above — 291,127 differing cells, the
+paired/one-sided/differing/identical row totals, the four per-field deltas and
+the typed asserted/context split — is re-verified unchanged on the regenerated
+twins. The TSN normalized input is the SAME cached artifact (`7F1086FE…`), not
+a rebuild.
+
+**Review-2 remedy rebuild (2026-07-28).** RB-1's second review denied the
+bundle on a DISCLOSURE gap only (RB1-R2-001: the genuine raw-source
+disagreements were itemized in the witness but not in the comparison's own
+Summary and Notes). The remedy makes the build record what each unavailable
+marker withholds — a new itemized `ArcGIS Marked Anchors` sheet — and the
+comparison itemize every marker that withholds a value TSN does not show. The
+build and both twins were regenerated, so the input identities move again:
+
+| Role | Exact file | Length | SHA-256 |
+|---|---|---:|---|
+| ArcGIS (built, RB-1 — review-2 remedy build) | `output\arcgis_cleanroad\clean_highway_built.xlsx` | 10,840,933 | `0D8575CA0C496594D2E47F51BC1BA39673384F4FDDE4A7995D497BE1959A6DDF` |
+| TSN (normalized, main-checkout copy of the same raw) | `tsn_library\clean_highway\consolidated\tsn_clean_highway_normalized.xlsx` | 14,864,396 | `30048451ED26917896CD001A9791F24C833FC6D3BAB3B90277CAE8F5BB794FED` |
+| Values twin (the canary's published artifact) | `RB1-R2-Remedy (values).xlsx` | 199,822,285 | `173E245248C4A26F06F523577DE41DF062D6433FE801FEFEA4D1EE2D8FE3FB99` |
+| Formulas twin, as generated | `RB1-R2-Remedy.xlsx` | 468,206,894 | `F75189D109D4007DDE3488CB18ADD970DD73AC4FDC5C5D9AE50FCFAA15C41165` |
+| Formulas twin, after the successful installed-Excel recalculation | same path, saved in place | 581,854,795 | `1393164AAF50C7C4D2B7C54B33150C3D6BCDD5CB5BA8604557BC6A78EB8205F0` |
+
+**Nothing else in this canary moves.** A cell-level diff of the review-2 build
+against the review-1 build shows **0** differences across all 57,728 data rows,
+Provenance identical, the same **174** marker tokens and the same `102 / 174`
+sidecar record; the new sheet is wholly additive (183 rows = 1 header + 174
+marked cells + the 8 extra records the co-anchored cells owe) and the marker
+sheet gains exactly one pointer row. A full-sheet lockstep diff of the two
+values twins shows the `Comparison` sheet **cell-identical over 65,165 rows**,
+`Spot Check` / `Routes` / both `Only in …` / both data sheets and BOTH
+very-hidden `__CMP_E2_SNAPSHOT_A/B` all at **0**; only `Summary` (1 cell — the
+disclosure bullet), `Notes` (the disclosure block) and `Provenance` (4 cells —
+input path + SHA) differ. So every expected count above is re-verified
+unchanged on the regenerated twins.
+
+The TSN normalized SHA differs from the review-1 row because the review-1 run
+executed from the `TSMIS-rb1-worktree` working tree and this one from the main
+checkout: `paths.DATA_ROOT` is per-tree, so each holds its own normalized copy
+independently built from the IDENTICAL raw extract
+(`CA HIGHWAYS 09.08.2025.xlsx`, `BBD1ACF9…`, 21,290,781 bytes). This is the
+PCOA-FINAL-017 byte non-determinism already noted above, and the content
+equality is proved directly: the `TSN` data sheet and `__CMP_E2_SNAPSHOT_B` are
+cell-identical across 60,085 and 60,084 rows respectively. **When re-verifying
+this canary, bind to the raw extract and the projected content, not to a
+normalized SHA — that byte image is per-tree.**

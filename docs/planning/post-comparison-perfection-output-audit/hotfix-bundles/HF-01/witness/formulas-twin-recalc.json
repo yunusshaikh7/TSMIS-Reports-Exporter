@@ -1,0 +1,60 @@
+{
+ "workbook": "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\output\\comparisons\\arcgis\\RB1-R2-Remedy.xlsx",
+ "size": 581854795,
+ "sha256": "1393164AAF50C7C4D2B7C54B33150C3D6BCDD5CB5BA8604557BC6A78EB8205F0",
+ "recalc_seconds": 4120.4,
+ "verdict_line": "\u2717 DIFFERENCES FOUND \u2014 291,127 differing cell(s), 12,517 one-sided row(s) \u2014 details below.",
+ "self_checks": [
+  [
+   "Every Comparison row has a status (Both + ArcGIS only + TSN only)",
+   "OK"
+  ],
+  [
+   "Every row with ArcGIS data found its ArcGIS sheet row",
+   "OK"
+  ],
+  [
+   "Every row with TSN data found its TSN sheet row",
+   "OK"
+  ],
+  [
+   "'Only in ArcGIS' sheet rows = ArcGIS-only rows in the Comparison",
+   "OK"
+  ],
+  [
+   "'Only in TSN' sheet rows = TSN-only rows in the Comparison",
+   "OK"
+  ],
+  [
+   "Per-field difference counts add up to the total differing cells",
+   "OK"
+  ],
+  [
+   "Build-time source identity and duplicate pairing snapshot is current",
+   "OK"
+  ],
+  [
+   "Routes sheet ArcGIS row counts add up to the ArcGIS sheet",
+   "OK"
+  ],
+  [
+   "Routes sheet TSN row counts add up to the TSN sheet",
+   "OK"
+  ],
+  [
+   "Routes sheet 'Segments compared' adds up to the Comparison",
+   "OK"
+  ]
+ ],
+ "self_checks_ok": 10,
+ "self_checks_not_ok": [],
+ "error_cells_by_sheet": {},
+ "disclosure_bullet": "\u2022 \u26a0 SOURCE COVERAGE \u2014 the ArcGIS build could not place 102 source span(s) whose begin or end postmile is unreadable (LocError=NO ERROR rows with a missing PM endpoint); 174 anchor cell(s) show '(unavailable: source span skipped)' and are never asserted or counted as differences. Of them 165 are paired with a TSN row: 159 withhold only the value TSN already shows, and 6 withhold at least one value TSN does not. 9 have no TSN counterpart at all. Those source facts, itemized because a marker would otherwise hide them: 036 / TEH / 39.72 \u00b7 THY_LT_LANES_AMT: ArcGIS source 1 @ 39.72, 2 @ 40.105, TSN 1; 036 / TEH / 39.72 \u00b7 THY_LT_TRAV_WAY_WIDTH_AMT: ArcGIS source 12 @ 39.72, 24 @ 40.105, TSN 12; 036 / TEH / 40.15 \u00b7 THY_LT_LANES_AMT: ArcGIS source 1 @ 40.18, 2 @ 40.298, TSN 2; 036 / TEH / 40.15 \u00b7 THY_LT_TRAV_WAY_WIDTH_AMT: ArcGIS source 12 @ 40.18, 24 @ 40.298, TSN 24; 036 / TEH / 40.352 \u00b7 THY_LT_LANES_AMT: ArcGIS source 1 @ 40.391, 2 @ 40.727, 1 @ 40.776, TSN 2; 036 / TEH / 40.352 \u00b7 THY_LT_TRAV_WAY_WIDTH_AMT: ArcGIS source 12 @ 40.391, 24 @ 40.727, 12 @ 40.776, TSN 24. The built workbook's 'ArcGIS Build' sheet lists every skipped span and 'ArcGIS Marked Anchors' every marked anchor; the Notes sheet explains the rule.",
+ "ok": true,
+ "retained_copy": {
+  "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-01\\r2-remedy\\RB1-R2-Remedy.xlsx",
+  "size": 581854795,
+  "sha256": "1393164AAF50C7C4D2B7C54B33150C3D6BCDD5CB5BA8604557BC6A78EB8205F0"
+ },
+ "retained_copy_matches": true
+}

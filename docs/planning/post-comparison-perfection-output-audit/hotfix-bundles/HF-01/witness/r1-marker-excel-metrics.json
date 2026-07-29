@@ -1,0 +1,29 @@
+{
+  "build": "output\\arcgis_cleanroad\\clean_highway_built.xlsx",
+  "sheet": "ArcGIS Build",
+  "used_rows": 111,
+  "used_cols": 14,
+  "stored_widths": {
+    "1": 23.29,
+    "2": 55.29,
+    "3": 7.29,
+    "4": 11.29,
+    "5": 8.29,
+    "6": 11.29,
+    "7": 16.29,
+    "8": 10.29,
+    "9": 10.29,
+    "10": 10.29,
+    "11": 10.29,
+    "12": 11.29,
+    "13": 11.29,
+    "14": 14.29
+  },
+  "wrapped_rows": [
+    3,
+    7
+  ],
+  "rows_too_short": [],
+  "columns_too_narrow": [],
+  "verdict": "PASS"
+}

@@ -28,7 +28,9 @@ decimals, landmark edge trim) are format-only and documented in the Notes.
 Console-free; engine in compare_core via compare_tsn_common.run_files_compare
 (mode="both" writes the live-formulas workbook plus its values twin).
 """
+import logging
 import re
+from dataclasses import replace
 from datetime import date, datetime
 from pathlib import Path
 
@@ -42,7 +44,10 @@ import clean_highway_columns as chc
 import compare_tsn_common as ctc
 import comparison_contract as cc
 from compare_core import CompareSchema
+from consolidate_clean_highway import UNAVAILABLE_TOKEN
 from paths import today_str
+
+log = logging.getLogger(__name__)
 
 REPORT_NAME = "Clean Road Highway"
 ARC_SHEET = chc.ARC_SHEET
@@ -102,9 +107,15 @@ def _provenance_table_lines():
     return tuple(out)
 
 
-_write_notes_sheet = ctc.make_notes_writer(
-    "Clean Road Highway — ArcGIS build vs TSN: comparison notes",
-    (
+# HF-01: how many raw-source disagreements each surface itemizes inline. The
+# Summary bullet is one sentence among many, so it stays short; the Notes
+# sheet is the itemized record. Neither ever truncates silently — over the
+# limit both say how many more there are and where to read them.
+_SUMMARY_ITEM_LIMIT = 10
+_NOTES_ITEM_LIMIT = 100
+
+_NOTES_TITLE = "Clean Road Highway — ArcGIS build vs TSN: comparison notes"
+_NOTES_LINES = (
         "Side A is OUR CA HIGHWAYS table, built from the owner's ArcGIS "
         "per-layer exports (arcgis_layers/) by the county+PM overlay "
         "consolidator; side B is the vendor's TSN CA HIGHWAYS extract. Both "
@@ -153,7 +164,9 @@ _write_notes_sheet = ctc.make_notes_writer(
         "whether it is COUNTED or shown as CONTEXT. The built workbook's "
         "Provenance sheet adds each layer's FeatureServer source + the per-column "
         "note:",
-    ) + _provenance_table_lines())
+    ) + _provenance_table_lines()
+
+_write_notes_sheet = ctc.make_notes_writer(_NOTES_TITLE, _NOTES_LINES)
 
 _SCHEMA = CompareSchema(
     report_name=REPORT_NAME,
@@ -381,15 +394,287 @@ def _load_pair(arc_path, tsn_path):
     return rows_a, rows_b, None
 
 
+def _withheld_values(wb):
+    """The build's itemized marked-anchor table as {(route, county, key
+    component, column): [(withheld source value, the span's known postmile),
+    ...]} — WHAT each unavailable marker stands in front of, keyed the way
+    THIS comparison keys a row. Several unplaceable spans can anchor at one
+    cell, so the value is a LIST: that cell's stretch genuinely carries more
+    than one source value and none of them can be placed. Empty for a build
+    that predates the table (its markers stay aggregate-only disclosure,
+    exactly as before)."""
+    if chc.ARC_MARKED_SHEET not in wb.sheetnames:
+        return {}
+    out = {}
+    try:
+        for r in wb[chc.ARC_MARKED_SHEET].iter_rows(min_row=2,
+                                                    values_only=True):
+            if not r or r[0] is None or len(r) < 7:
+                continue
+            route, county, prefix, begin_pm, roadbed, column, value = r[:7]
+            station = r[8] if len(r) > 8 else None
+            component = (_s(prefix).upper() + ctc.decimal_pm(begin_pm)
+                         + _s(roadbed).upper())
+            out.setdefault((_s(route).upper(), _s(county).upper(), component,
+                            _s(column)), []).append((value, _s(station)))
+    except Exception as e:      # silent-ok: an unreadable/malformed detail table costs the ITEMIZED disclosure only — the aggregate counts and the non-asserting rule still stand
+        log.info("clean-road marked-anchor detail unreadable (%s: %s)",
+                 type(e).__name__, str(e).splitlines()[0] if str(e) else "")
+        return {}
+    return out
+
+
+def _build_skip_facts(path):
+    """The built workbook's own skipped-source record from its marker sheet
+    (HF-01): (skipped span count, marked anchor cell count, the withheld-value
+    map). Zeroes and an empty map when the marker predates the record — an
+    older build carries no tokens, so the plain schema is exactly right for
+    it — or when nothing was skipped."""
+    try:
+        wb = load_workbook(path, read_only=True, data_only=True)
+    except Exception as e:      # silent-ok: the loader's role gate re-opens the file and surfaces the real failure with the actionable message
+        log.info("clean-road skip facts unreadable (%s: %s)",
+                 type(e).__name__, str(e).splitlines()[0] if str(e) else "")
+        return 0, 0, {}
+    try:
+        if chc.ARC_MARKER_SHEET not in wb.sheetnames:
+            return 0, 0, {}
+        facts = {}
+        for r in wb[chc.ARC_MARKER_SHEET].iter_rows(values_only=True):
+            if r and r[0] is not None:
+                facts[str(r[0]).strip()] = r[1] if len(r) > 1 else None
+
+        def _count(key):
+            try:
+                n = int(facts.get(key))
+            except (TypeError, ValueError):  # silent-ok: an absent/malformed marker count means an older or skip-free build — the plain schema is exactly right for it
+                return 0
+            return max(n, 0)
+
+        return (_count("Skipped source spans"), _count("Marked anchor cells"),
+                _withheld_values(wb))
+    finally:
+        wb.close()
+
+
+def _pm_order(pm):
+    """Sort anchors along the road, text-last so an unparseable one is stable."""
+    try:
+        return (0, float(pm), "")
+    except (TypeError, ValueError):
+        return (1, 0.0, str(pm))
+
+
+def _conflict_text(item):
+    """One raw-source disagreement as its disclosure sentence — every value
+    the marker stands in front of, at the postmile the source DID give."""
+    return (f"{item['route']} / {item['county']} / {item['location']} · "
+            f"{item['field']}: ArcGIS source {item['source']}, TSN "
+            f"{item['tsn']}")
+
+
+def _source_conflicts(rows_a, rows_b, withheld):
+    """Classify every unavailable marker against the TSN row this comparison
+    pairs it with (HF-01 criterion 7). A marker asserts nothing either way,
+    but a reader must still be told WHICH markers stand in front of a source
+    value the TSN extract does not show — those are real facts a bare marker
+    would otherwise hide. A cell agrees only when EVERY value withheld there
+    is the value TSN already shows; anything else is itemized, including the
+    stretch that genuinely carries two unplaceable values. Returns the
+    itemized facts plus the exact census of every other class, so nothing is
+    dropped silently."""
+    key_at = 1 + KEY_FIELD
+    county_at = 1 + SHARED_HEADER.index("THY_COUNTY_CODE")
+    by_key = {}
+    for r in rows_b:
+        by_key.setdefault((r[0], r[key_at]), []).append(r)
+    items = []
+    census = {"agreed": 0, "unpaired": 0, "unrecorded": 0, "duplicated": 0}
+    for r in rows_a:
+        if UNAVAILABLE_TOKEN not in r:
+            continue
+        peers = by_key.get((r[0], r[key_at])) or ()
+        route, county = _s(r[0]).upper(), _s(r[county_at]).upper()
+        location = str(r[key_at])
+        for i, v in enumerate(r):
+            if i == 0 or v != UNAVAILABLE_TOKEN:
+                continue
+            field = SHARED_HEADER[i - 1]
+            vals = withheld.get((route, county, location, field))
+            if not vals:
+                census["unrecorded"] += 1
+                continue
+            if not peers:
+                census["unpaired"] += 1       # one-sided: no TSN row to differ from
+                continue
+            if len(peers) > 1:
+                census["duplicated"] += 1     # duplicate keys: no single counterpart
+                continue
+            theirs = peers[0][i]
+            anchors = sorted(((_norm_cell(field, one), pm)
+                              for one, pm in vals),
+                             key=lambda a: (_pm_order(a[1]), a[0]))
+            if {one for one, _pm in anchors} == {theirs}:
+                census["agreed"] += 1
+                continue
+            items.append(
+                {"route": r[0], "county": county, "location": location,
+                 "field": field, "tsn": theirs,
+                 "source": ", ".join(f"{one} @ {pm}" if pm else str(one)
+                                     for one, pm in anchors)})
+    items.sort(key=lambda it: (it["route"], it["county"],
+                               _pm_order(it["location"]), it["location"],
+                               it["field"]))
+    return dict(census, items=items, differs=len(items))
+
+
+def _anomaly_text(census):
+    """The classes that cannot be classified against a single TSN cell, named
+    only when they exist — a duplicate key with no single counterpart, or a
+    marker the build recorded no source value for."""
+    parts = [(census["duplicated"], "sit on a key the TSN extract lists more "
+                                    "than once"),
+             (census["unrecorded"], "have no matching entry in the build's "
+                                    f"'{chc.ARC_MARKED_SHEET}' record")]
+    named = [f"{n} {why}" for n, why in parts if n]
+    return (" " + "; ".join(named) + ", so they are left unclassified."
+            if named else "")
+
+
+def _coverage_sentence(skipped, marked, census):
+    """The shared skipped-source facts: how many spans were unplaceable, how
+    many anchors that marked, and how the marked anchors classify against
+    TSN."""
+    head = (f"the ArcGIS build could not place {skipped} source span(s) whose "
+            f"begin or end postmile is unreadable (LocError=NO ERROR rows "
+            f"with a missing PM endpoint); {marked} anchor cell(s) show "
+            f"'{UNAVAILABLE_TOKEN}' and are never asserted or counted as "
+            f"differences.")
+    if census is None:
+        return head
+    compared = census["agreed"] + census["differs"]
+    return (head + f" Of them {compared} are paired with a TSN row: "
+            f"{census['agreed']} withhold only the value TSN already shows, "
+            f"and {census['differs']} withhold at least one value TSN does "
+            f"not."
+            + (f" {census['unpaired']} have no TSN counterpart at all."
+               if census["unpaired"] else "")
+            + _anomaly_text(census))
+
+
+def _itemized_text(items, limit):
+    """The disagreements as one sentence, capped — and the cap is always
+    stated, never a silent truncation."""
+    shown = "; ".join(_conflict_text(it) for it in items[:limit])
+    if len(items) <= limit:
+        return shown
+    return (f"{shown}; …and {len(items) - limit} more (the Notes sheet lists "
+            "every one)")
+
+
+def _summary_note(skipped, marked, census):
+    """The Summary-sheet disclosure line. Resolved at write time, because the
+    itemized disagreements are only knowable once BOTH sides are loaded — the
+    inputs are digested before the loader reads them, so they cannot be read
+    early just to compose this sentence."""
+    note = "SOURCE COVERAGE — " + _coverage_sentence(skipped, marked, census)
+    if census and census["items"]:
+        note += (" Those source facts, itemized because a marker would "
+                 "otherwise hide them: "
+                 + _itemized_text(census["items"], _SUMMARY_ITEM_LIMIT) + ".")
+    return (note + f" The built workbook's '{chc.ARC_MARKER_SHEET}' sheet "
+            f"lists every skipped span"
+            + (f" and '{chc.ARC_MARKED_SHEET}' every marked anchor"
+               if census else "")
+            + "; the Notes sheet explains the rule.")
+
+
+def _disclosure_lines(skipped, marked, census):
+    """The Notes-sheet disclosure block (HF-01): the skipped-source facts, the
+    non-asserting rule, and every raw-source disagreement itemized, ahead of
+    the standard notes so none of it can be buried under the 74-line column
+    table."""
+    lines = [
+        "⚠ SOURCE COVERAGE — " + _coverage_sentence(skipped, marked, census)
+        + " The raw rows carry usable AR/odometer measures, but the "
+        "county+postmile contract never guesses a position from those "
+        "calibrations, so each span's values are withheld at its one known "
+        "endpoint instead.",
+        f"Cells showing '{UNAVAILABLE_TOKEN}' are NON-ASSERTING (state N): "
+        "the ArcGIS side HAS a source row there whose exact placement is "
+        "unknowable, so the cell is neither '(blank)' (empty in the system) "
+        "nor a countable difference — it is excluded from every difference "
+        "count. The built workbook's '" + chc.ARC_MARKER_SHEET + "' sheet "
+        "lists every skipped span with the measures it did have"
+        + (f", and its '{chc.ARC_MARKED_SHEET}' sheet every marked anchor "
+           "with the value withheld there." if census else "."),
+    ]
+    items = (census or {}).get("items") or ()
+    if items:
+        lines.append(
+            f"The {len(items)} marked anchor(s) that withhold a value TSN "
+            "does not show are named below, each with the postmile the "
+            "source DID give. They stay non-asserting — an unplaceable span "
+            "cannot be asserted at a position it never gave — but they are "
+            "real source facts, so they are stated instead of hidden behind "
+            "the marker:")
+        lines.extend(f"     – {_conflict_text(it)}"
+                     for it in items[:_NOTES_ITEM_LIMIT])
+        if len(items) > _NOTES_ITEM_LIMIT:
+            lines.append(f"     – …and {len(items) - _NOTES_ITEM_LIMIT} more "
+                         f"(the build's '{chc.ARC_MARKED_SHEET}' sheet lists "
+                         "every marked anchor).")
+    return tuple(lines)
+
+
+def _schema_for(arc_path, facts):
+    """The per-run schema: when the built workbook records skipped source
+    spans, opt into the non-asserting unavailable token and carry the exact
+    counts — and the itemized raw-source disagreements — into the Summary note
+    and the Notes sheet. `facts` is the box the loader fills once both sides
+    are loaded; the Summary note and Notes sheet read it at write time. An
+    older or skip-free build gets the plain module schema — byte-identical
+    behavior."""
+    skipped, marked, withheld = _build_skip_facts(arc_path)
+    if not skipped and not marked:
+        return _SCHEMA
+    facts["withheld"] = withheld
+
+    def notes_writer(wb):
+        ctc.make_notes_writer(
+            _NOTES_TITLE,
+            _disclosure_lines(skipped, marked, facts.get("census"))
+            + _NOTES_LINES)(wb)
+
+    return replace(
+        _SCHEMA,
+        unavailable_rule=(UNAVAILABLE_TOKEN,
+                          lambda: _summary_note(skipped, marked,
+                                                facts.get("census"))),
+        legend_writer=notes_writer)
+
+
 def compare(arc_path, tsn_path, out_path, events=None, confirm_overwrite=None,
             mode="formulas", commit_guard=None):
     """Build the Clean Road Highway ArcGIS-vs-TSN comparison workbook(s).
     `arc_path` is the ArcGIS-built workbook; `tsn_path` the TSN extract (raw
     or normalized). Returns a ConsolidateResult."""
+    facts = {}
+
+    def loader(a_path, b_path):
+        rows_a, rows_b, warnings = _load_pair(a_path, b_path)
+        # HF-01: classify the markers HERE — after the substrate has digested
+        # both inputs, and off the rows it is about to compare, so the
+        # disclosure describes exactly the data in the workbook.
+        if facts.get("withheld"):
+            facts["census"] = _source_conflicts(rows_a, rows_b,
+                                                facts["withheld"])
+        return rows_a, rows_b, warnings
+
     return ctc.run_files_compare(
-        _SCHEMA, arc_path, tsn_path, out_path,
+        _schema_for(arc_path, facts), arc_path, tsn_path, out_path,
         banner="Clean Road Highway Comparison — ArcGIS build vs TSN",
-        has_route=True, loader=_load_pair, deps_ok=_DEPS_OK,
+        has_route=True, loader=loader, deps_ok=_DEPS_OK,
         deps_msg="Required components are missing (openpyxl).",
         side_a="ArcGIS", side_b="TSN",
         events=events, confirm_overwrite=confirm_overwrite, mode=mode,

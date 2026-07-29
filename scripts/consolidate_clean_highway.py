@@ -36,6 +36,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import textwrap
 from collections import defaultdict
 from pathlib import Path
 
@@ -52,10 +53,23 @@ log = logging.getLogger(__name__)
 REPORT_NAME = "Clean Road Highway (ArcGIS)"
 SHEET_NAME = chc.ARC_SHEET
 MARKER_SHEET = chc.ARC_MARKER_SHEET
+MARKED_SHEET = chc.ARC_MARKED_SHEET
 BUILD_VERSION = 1
 FILENAME = "clean_highway_built.xlsx"
 OUT_DIR = paths.OUTPUT_ROOT / "arcgis_cleanroad"
 OUT_PATH = OUT_DIR / FILENAME
+
+# HF-01 (PCOA-FINAL-010): the reserved marker written into an anchor cell
+# whose source span exists but cannot be placed (an unreadable begin or end
+# postmile). The comparison schema declares this token NON-ASSERTING, so the
+# anchor is never counted as a difference and never reads as "empty in the
+# system". compare_clean_highway_tsn imports it; never reuse the text as data.
+UNAVAILABLE_TOKEN = "(unavailable: source span skipped)"
+
+# Why a span is skipped — one wording for the marker sheet and the sidecar.
+SKIP_REASON = ("as-of spans whose begin or end postmile is unreadable cannot "
+               "be placed by the county+postmile rule; their known-endpoint "
+               "anchors are marked instead of guessed")
 
 # The 74-column THY header (clean_highway_columns is the shared contract).
 THY_HEADER = list(chc.HEADER)
@@ -72,6 +86,10 @@ _SPAN_ID = ["District", "RouteNum", "RouteSuffix", "Alignment", "BeginCounty",
             "InventoryItemStartDate", "LRSFromDate", "LRSToDate", "RouteID"]
 _POINT_ID = ["RouteNum", "RouteSuffix", "Alignment", "County", "PMPrefix",
              "PMMeasure", "LRSFromDate", "LRSToDate"]
+# Read (as optional columns) only to enrich a skipped-span record (HF-01) —
+# the AR measures and LocError document what the unplaceable row DID have;
+# they are never used to place anything.
+_SKIP_DETAIL_COLS = ["FromARMeasure", "ToARMeasure", "LocError"]
 
 # tag -> (layer name, attribute columns, family). Families: "whole" paints base
 # rows AND its own alignment's independent rows; "right"/"left" paint that
@@ -164,15 +182,21 @@ def _cancelled():
 # --------------------------------------------------------------------------- #
 # reading
 # --------------------------------------------------------------------------- #
-def _read_span_layer(lib, index, tag, *, asof, events, buckets, parked):
+def _read_span_layer(lib, index, tag, *, asof, events, buckets, parked, skips):
     """Stream one span layer's as-of slices into `buckets[(route, align,
-    county, prefix)][tag]`; cross-county/prefix spans park for the split pass."""
+    county, prefix)][tag]`; cross-county/prefix spans park for the split pass.
+    An as-of span with an unreadable begin or end postmile cannot be placed
+    (the contract keys on county + PM prefix + postmile and never guesses from
+    AR/odometer calibration) — it is RECORDED into `skips` (HF-01), never
+    silently dropped."""
     layer, attrs, family = SPAN_LAYERS[tag]
     entry = index.get(layer) or {}
-    n_asof = n_cross = 0
-    for r in crl.stream_layer(lib["present"][layer], _SPAN_ID + attrs,
+    n_asof = n_cross = n_skip = 0
+    for r in crl.stream_layer(lib["present"][layer],
+                              _SPAN_ID + attrs + _SKIP_DETAIL_COLS,
                               layer_name=layer, expected_rows=entry.get("rows"),
-                              optional=("InventoryItemStartDate",)):
+                              optional=("InventoryItemStartDate",
+                                        *_SKIP_DETAIL_COLS)):
         rid = r["RouteID"]
         if isinstance(rid, str) and rid and not rid.startswith("SHS_"):
             continue                     # all-roads layers: SHS routes only
@@ -181,6 +205,8 @@ def _read_span_layer(lib, index, tag, *, asof, events, buckets, parked):
             continue
         b, e = crl.pm_units(r["BeginPMMeasure"]), crl.pm_units(r["EndPMMeasure"])
         if b is None or e is None:
+            n_skip += 1
+            skips.append(_skipped_span_record(tag, r, b, e))
             continue
         n_asof += 1
         route = _route_token(r["RouteNum"], r["RouteSuffix"])
@@ -209,7 +235,86 @@ def _read_span_layer(lib, index, tag, *, asof, events, buckets, parked):
             n_cross += 1
             parked.append((tag, route, align, c1, p1, c2, p2, span))
     events.on_log(f"  {layer}: {n_asof:,} as-of spans"
-                  + (f" ({n_cross} cross-county)" if n_cross else ""))
+                  + (f" ({n_cross} cross-county)" if n_cross else "")
+                  + (f" ({n_skip} skipped: unreadable postmile)"
+                     if n_skip else ""))
+
+
+def _skipped_span_record(tag, r, b, e):
+    """One structured record for an as-of span the postmile-only contract
+    cannot place (HF-01 / PCOA-FINAL-010): the layer, route, county, prefix,
+    the one known PM endpoint (the anchor the unavailable marker lands on),
+    and every measure the row DID have — the AR/odometer measures stay
+    recorded but are never used to guess a position."""
+    layer, attrs, _family = SPAN_LAYERS[tag]
+    if b is not None:
+        known, station = "begin", b
+        county = crl.norm_county(r["BeginCounty"])
+        prefix = crl.dot_none(r["BeginPMPrefix"]).strip().upper()
+    elif e is not None:
+        known, station = "end", e
+        county = crl.norm_county(r["EndCounty"])
+        prefix = crl.dot_none(r["EndPMPrefix"]).strip().upper()
+    else:
+        known, station, county, prefix = None, None, "", ""
+    loc_error = r.get("LocError")
+    return {
+        "tag": tag, "layer": layer,
+        "route": _route_token(r["RouteNum"], r["RouteSuffix"]),
+        "alignment": crl.norm_alignment(r["Alignment"]) or "R",
+        "known_endpoint": known, "station": station,
+        "county": county, "prefix": prefix,
+        "begin_od": _num(r["BeginODMeasure"]),
+        "end_od": _num(r["EndODMeasure"]),
+        "from_ar": _num(r["FromARMeasure"]),
+        "to_ar": _num(r["ToARMeasure"]),
+        "loc_error": "" if loc_error is None else str(loc_error).strip(),
+        "values": [v if v is None or isinstance(v, (str, int, float, bool))
+                   else str(v) for v in (r[a] for a in attrs)],
+        "marked_cells": 0,
+    }
+
+
+def _skip_values_text(s):
+    """One skipped span's own attribute values as `NAME=value` text — the
+    unassertable source facts, stated in full for both the itemized marker
+    table and the warning line."""
+    attrs = SPAN_LAYERS[s["tag"]][1]
+    return ", ".join(f"{a}={'' if v is None else v}"
+                     for a, v in zip(attrs, s["values"]))
+
+
+def _skip_station_text(s):
+    """The one PM endpoint the span DID have, as postmile text ("" when the
+    row carries neither)."""
+    return "" if s["station"] is None else crl.pm_text(s["station"])
+
+
+def _skip_warning(s):
+    """The human-readable line one skipped span contributes to `warnings`
+    (the sidecar, the log and the result message ride on it) — itemizing the
+    span's own attribute values, so the record states the unassertable source
+    facts in full. The marker sheet states the same facts as a table."""
+    where = f"{s['route']} {s['county'] or '?'}/{s['prefix'] or '-'}"
+    if s["known_endpoint"] == "begin":
+        span_txt = f"begin {_skip_station_text(s)} → end unreadable"
+    elif s["known_endpoint"] == "end":
+        span_txt = f"begin unreadable → end {_skip_station_text(s)}"
+    else:
+        span_txt = "both postmiles unreadable"
+    loc = f", LocError={s['loc_error']}" if s["loc_error"] else ""
+    vals = _skip_values_text(s)
+    if s["marked_cells"]:
+        tail = (f" — its {s['marked_cells']} anchor cell(s) are marked "
+                f"'{UNAVAILABLE_TOKEN}'.")
+    elif s["known_endpoint"] is None:
+        tail = " — it has no usable anchor."
+    else:
+        tail = (" — no marked anchor cell (no built row covers its known "
+                "endpoint, or the built value already equals the span's own).")
+    return (f"{s['layer']}: an as-of span ({where} {span_txt}{loc}; {vals}) "
+            f"could not be placed by the county+postmile rule; its values are "
+            f"not asserted{tail}")
 
 
 def _read_point_layer(lib, index, tag, *, asof, events, points):
@@ -768,6 +873,185 @@ def _build_route(route, buckets, points, asof_date):
 
 
 # --------------------------------------------------------------------------- #
+# unavailable-anchor marking (HF-01 / PCOA-FINAL-010)
+# --------------------------------------------------------------------------- #
+# The THY columns each span layer paints DIRECTLY from its covering span (the
+# _paint_row _seg_code/_seg_num/city projections), with each column's
+# projection kind. A skipped span of one of these layers marks its anchor
+# cells with UNAVAILABLE_TOKEN. Layers whose output is structural (HG),
+# interpolated (TVS), presence-muxed (TOLL/FOR), defaulted (NON) or
+# date-derived (NET) stay record-only — their skips are still counted, warned
+# and disclosed, but no single output cell IS their value, so there is no
+# honest cell to mark. No such skip exists in the real corpus (the 102 are
+# all SHS Travel Way L / SHS O Shld Width R).
+_TAG_MARK_COLUMNS = {
+    "MED": (("THY_MEDIAN_TYPE_CODE", "code", 0),
+            ("THY_MEDIAN_WIDTH_AMT", "num", 1),
+            ("THY_MEDIAN_WIDTH_VAR_CODE", "code", 2)),
+    "BAR": (("THY_MEDIAN_BARRIER_CODE", "code", 0),),
+    "CURB": (("THY_CURB_LANDSCAPE_CODE", "code", 0),),
+    "ACC": (("THY_HIGHWAY_ACCESS_CODE", "code", 0),),
+    "TER": (("THY_TERRAIN_CODE", "code", 0),),
+    "DSP": (("THY_DESIGN_SPEED_AMT", "num", 0),),
+    "POP": (("THY_POPULATION_CODE", "code", 0),),
+    "CITY": (("THY_CITY_CODE", "city", 0),),
+    "TWR": (("THY_RT_TRAV_WAY_WIDTH_AMT", "num", 0),
+            ("THY_RT_LANES_AMT", "num", 1)),
+    "SUR": (("THY_RT_SURF_TYPE_CODE", "code", 0),),
+    "SPR": (("THY_RT_SPEC_FEATURES_CODE", "code", 0),),
+    "OSR": (("THY_RT_O_SHD_TOT_WIDTH_AMT", "num", 0),
+            ("THY_RT_O_SHD_TRT_WIDTH_AMT", "num", 1)),
+    "ISR": (("THY_RT_I_SHD_TOT_WIDTH_AMT", "num", 0),
+            ("THY_RT_I_SHD_TRT_WIDTH_AMT", "num", 1)),
+    "TWL": (("THY_LT_TRAV_WAY_WIDTH_AMT", "num", 0),
+            ("THY_LT_LANES_AMT", "num", 1)),
+    "SUL": (("THY_LT_SURF_TYPE_CODE", "code", 0),),
+    "SPL": (("THY_LT_SPEC_FEATURES_CODE", "code", 0),),
+    "OSL": (("THY_LT_O_SHD_TOT_WIDTH_AMT", "num", 0),
+            ("THY_LT_O_SHD_TRT_WIDTH_AMT", "num", 1)),
+    "ISL": (("THY_LT_I_SHD_TOT_WIDTH_AMT", "num", 0),
+            ("THY_LT_I_SHD_TRT_WIDTH_AMT", "num", 1)),
+}
+
+
+def _skip_kinds(family, alignment):
+    """The THY_PM_SUFFIX_CODE values of rows that would carry the skipped
+    span's columns — mirrors _paint_row's kind gating (left block on base/L,
+    right block on base/R, whole-road by the span's own alignment)."""
+    if family == "left":
+        return (None, "L")
+    if family == "right":
+        return (None, "R")
+    if family == "whole":
+        return ("L",) if alignment == "L" else (None, "R")
+    return ()
+
+
+def _skip_value(kind, v):
+    """The skipped span's own value projected the way _paint_row would have
+    painted it (_seg_code / _seg_num / the City translation), so painted-vs-raw
+    equality compares like with like."""
+    if kind == "code":
+        return crl.code_of(v)
+    if kind == "city":
+        return city_codes.norm_city(v)
+    if v is None or (isinstance(v, str) and not v.strip()):
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return str(v).strip()
+    return int(f) if f == int(f) else f
+
+
+def _blankish(v):
+    """Painted/raw comparison canon: None and blank text are the same absent
+    value (an empty string round-trips as an empty cell)."""
+    if v is None or (isinstance(v, str) and not v.strip()):
+        return None
+    return v
+
+
+def _marked_cell_records(row, col, route, county, prefix, kind, withheld):
+    """One record per (marked cell, span that could not assert it): WHERE the
+    marker sits — the built row's own identity, spelled the way the comparison
+    keys a row (route · county · PM prefix · begin PM · roadbed) — and WHAT
+    that span would have written there. The comparison reads these back to
+    itemize the markers whose withheld value the TSN extract disagrees with;
+    the values themselves are never published as our side's answer."""
+    return [{"route": route, "county": county, "prefix": prefix,
+             "begin_pm": row[_COL["THY_BEGIN_PM_AMT"]],
+             "roadbed": kind or "", "column": THY_HEADER[col],
+             "value": raw, "layer": s["layer"],
+             "known_pm": _skip_station_text(s)}
+            for s, raw in withheld]
+
+
+def _mark_unavailable_anchors(rows, skips):
+    """Write UNAVAILABLE_TOKEN into each skipped span's anchor cells: the
+    built row(s) whose postmile range contains the span's one known endpoint
+    (begin anchors: b <= s < e; end anchors: b < s <= e), on the roadbed
+    kinds that layer paints, in its direct value columns — and only where the
+    painted value is NOT already the span's own value (a value corroborated
+    by a placeable span is source truth, not an omission). Positions are
+    never inferred from AR/odometer measures. Mutates the freshly built rows
+    in place (they are this builder's own pre-write buffer) and returns
+    `(cells marked, one record per (marked cell, withholding span))`. Each
+    skip's `marked_cells` counts the anchor cells whose value IT could not
+    assert — a cell shared by co-anchored spans credits each of them, so the
+    per-span numbers (and the record count) can sum above the CELL count."""
+    by_cp = defaultdict(list)
+    for s in skips:
+        if s["known_endpoint"] is None or not s["county"]:
+            continue
+        if s["tag"] not in _TAG_MARK_COLUMNS:
+            continue
+        by_cp[(s["route"], s["county"], s["prefix"])].append(s)
+    if not by_cp:
+        return 0, []
+    marked, records = 0, []
+    for row in rows:
+        route = ((row[_COL["THY_ROUTE_NAME"]] or "")
+                 + (row[_COL["THY_ROUTE_SUFFIX_CODE"]] or ""))
+        county = row[_COL["THY_COUNTY_CODE"]] or ""
+        prefix = (row[_COL["THY_PM_PREFIX_CODE"]] or "").strip().upper()
+        cands = by_cp.get((route, county, prefix))
+        if not cands:
+            continue
+        rb = crl.pm_units(row[_COL["THY_BEGIN_PM_AMT"]])
+        re_units = crl.pm_units(row[_COL["THY_END_PM_AMT"]])
+        if rb is None or re_units is None:
+            continue
+        kind = row[_COL["THY_PM_SUFFIX_CODE"]]
+        # Cell-first: several spans can anchor into the SAME row (a chain of
+        # unreadable-end spans whose begins all land in one built stretch).
+        # Evaluate every anchoring span against the ORIGINAL painted value,
+        # write the token once, and credit EVERY span whose value it withheld
+        # — so no co-anchored span falsely reports "no marked anchor cell".
+        per_cell = defaultdict(list)         # col index -> [span, ...]
+        for s in cands:
+            if kind not in _skip_kinds(SPAN_LAYERS[s["tag"]][2],
+                                       s["alignment"]):
+                continue
+            station = s["station"]
+            if s["known_endpoint"] == "begin":
+                if not rb <= station < re_units:
+                    continue
+            elif not rb < station <= re_units:
+                continue
+            for name, proj, pos in _TAG_MARK_COLUMNS[s["tag"]]:
+                raw = (_skip_value(proj, s["values"][pos])
+                       if pos < len(s["values"]) else None)
+                per_cell[_COL[name]].append((s, raw))
+        for i, anchored in per_cell.items():
+            painted = _blankish(row[i])
+            withheld = [(s, raw) for s, raw in anchored
+                        if painted != _blankish(raw)]
+            if not withheld:
+                continue                 # corroborated — nothing was omitted
+            records.extend(_marked_cell_records(row, i, route, county, prefix,
+                                                kind, withheld))
+            row[i] = UNAVAILABLE_TOKEN
+            marked += 1
+            for s, _raw in withheld:
+                s["marked_cells"] += 1
+    return marked, records
+
+
+def _skip_sidecar_entries(skips):
+    """The sidecar's JSON-safe span records (postmiles as canonical text)."""
+    out = []
+    for s in skips:
+        entry = {k: s[k] for k in ("layer", "route", "county", "prefix",
+                                   "alignment", "known_endpoint", "loc_error",
+                                   "begin_od", "end_od", "from_ar", "to_ar",
+                                   "values", "marked_cells")}
+        entry["station_pm"] = crl.pm_text(s["station"])
+        out.append(entry)
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # provenance + workbook
 # --------------------------------------------------------------------------- #
 def _provenance_rows(index):
@@ -799,7 +1083,220 @@ _PROV_TIER_FILL = {
 }
 
 
-def _write_workbook(out_path, rows, index, asof_date, lib_root, warnings):
+# The marker sheet is part of the delivered workbook, so its presentation is
+# part of the record: Excel clips a label whose neighbour is occupied and cuts
+# any text at its column's edge. The sheet therefore declares purposeful
+# column widths, wraps whatever cannot fit in a row tall enough for every
+# wrapped line, and states the skipped spans as a TABLE — one short field per
+# column — rather than one long sentence per row (RB-1 review 1, RB1-R1-001).
+_MARKER_LABEL_WIDTH = 24
+_MARKER_VALUE_WIDTH = 56
+_MARKER_LINE_PT = 15              # one line of the default 11pt font
+_MARKER_PADDING = 2               # cell inset + a margin over Excel's metric
+_MARKER_HEADER_FILL = "D9D9D9"
+
+# (header, stored width) for the itemized skipped-span table. Its first two
+# columns are shared with the label/value block above, so those widths serve
+# both blocks. Widths were MEASURED against installed Excel's own font metrics
+# (bold headers included), not estimated.
+_SKIP_TABLE_COLUMNS = (
+    ("Source layer", _MARKER_LABEL_WIDTH),
+    ("Attribute values", _MARKER_VALUE_WIDTH),
+    ("Route", 8),
+    ("Alignment", 12),
+    ("County", 9),
+    ("PM prefix", 12),
+    ("Known endpoint", 17),
+    ("Known PM", 11),
+    ("LocError", 11),
+    ("Begin OD", 11),
+    ("End OD", 11),
+    ("From AR", 12),
+    ("To AR", 12),
+    ("Marked cells", 15),
+)
+
+
+# (header, stored width) for the itemized MARKED-ANCHOR table on its own sheet
+# — one row per (marked cell, span that could not assert it). It is a separate
+# sheet because its columns are nothing like the skipped-span table's, and one
+# shared width vector could not keep both legible. Widths were MEASURED the
+# same way as the skip table's: installed Excel's own font metrics over the
+# widest real THY column name, the widest layer name and a bold header. Excel
+# stores a width of N as N-0.71, so a column that merely "fits" by character
+# count still clips — the first measured pass rejected 30 for `Column`
+# (Excel needed 29.71 against a stored 29.29) and 15 for `Span known PM`.
+_MARKED_TABLE_COLUMNS = (
+    ("Route", 9),
+    ("County", 9),
+    ("PM prefix", 11),
+    ("Begin PM", 11),
+    ("Roadbed", 10),
+    ("Column", 32),
+    ("Withheld source value", 25),
+    ("Source layer", 26),
+    ("Span known PM", 17),
+)
+
+
+def _wrapped_lines(text, width):
+    """How many lines `text` needs at a column `width` characters wide (Excel
+    wraps on words and breaks a word longer than the column)."""
+    room = max(int(width) - _MARKER_PADDING, 8)
+    return len(textwrap.wrap(str(text), room)) or 1
+
+
+def _lines_for(value, width):
+    """Rows a value needs at that column width. A number always takes one:
+    General format rounds its display rather than clipping it."""
+    if value is None or isinstance(value, (int, float)):
+        return 1
+    return _wrapped_lines(value, width)
+
+
+def _skip_table_row(s):
+    """One skipped span as the itemized table's row — each field short enough
+    to read in its own column."""
+    return [s["layer"], _skip_values_text(s), s["route"], s["alignment"],
+            s["county"], s["prefix"], s["known_endpoint"] or "",
+            _skip_station_text(s), s["loc_error"], s["begin_od"], s["end_od"],
+            s["from_ar"], s["to_ar"], s["marked_cells"]]
+
+
+def _marked_table_row(m):
+    """One marked anchor cell as the itemized table's row: where the marker
+    sits, which column it covers, and what the skipped span would have put
+    there."""
+    return [m["route"], m["county"], m["prefix"], m["begin_pm"], m["roadbed"],
+            m["column"], "" if m["value"] is None else m["value"],
+            m["layer"], m["known_pm"]]
+
+
+def _disclosure_sheet(wb, name, widths):
+    """A new disclosure sheet carrying its measured column widths (Excel clips
+    at the stored width, so every disclosure declares its own)."""
+    from openpyxl.utils import get_column_letter
+
+    ws = wb.create_sheet(name)
+    for i, width in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = width
+    return ws
+
+
+def _sheet_pen(ws):
+    """Row helpers bound to one sheet: `put` appends a row (setting its height
+    BEFORE the append, which write-only mode requires) and `styled` decorates
+    one cell."""
+    from openpyxl.cell import WriteOnlyCell
+
+    state = {"row": 0}
+
+    def put(cells, height=None):
+        state["row"] += 1
+        if height:
+            ws.row_dimensions[state["row"]].height = height
+        ws.append(cells)
+
+    def styled(value, alignment):
+        c = WriteOnlyCell(ws, value=value)
+        c.alignment = alignment
+        return c
+
+    return put, styled
+
+
+def _put_table(ws, put, columns, table_rows):
+    """Write one itemized disclosure table: a bold, filled header row, then a
+    row per record whose every cell is legible — anything too wide for its
+    column wraps, in a row tall enough for the tallest wrapped cell."""
+    from openpyxl.cell import WriteOnlyCell
+    from openpyxl.styles import Alignment, Font, PatternFill
+
+    wrap_top = Alignment(vertical="top", wrap_text=True)
+    header_font = Font(bold=True)
+    header_fill = PatternFill("solid", fgColor=_MARKER_HEADER_FILL)
+    head = []
+    for name, _width in columns:
+        c = WriteOnlyCell(ws, value=name)
+        c.font, c.fill = header_font, header_fill
+        head.append(c)
+    put(head)
+    for row in table_rows:
+        lines = max(_lines_for(v, w) for v, (_name, w) in zip(row, columns))
+        if lines == 1:
+            put(row)
+            continue
+        cells = []
+        for v, (_name, w) in zip(row, columns):
+            if _lines_for(v, w) == 1:
+                cells.append(v)
+            else:
+                c = WriteOnlyCell(ws, value=v)
+                c.alignment = wrap_top
+                cells.append(c)
+        put(cells, height=lines * _MARKER_LINE_PT)
+
+
+def _write_marker_sheet(wb, asof_date, lib_root, warnings, skips, n_marked,
+                        marked_cells):
+    """The build's own record sheet: build identity, the HF-01 skipped-source
+    disclosure the comparator reads back, any warning, and — when spans were
+    skipped — the itemized table naming every one of them."""
+    from openpyxl.styles import Alignment
+
+    widths = ([w for _name, w in _SKIP_TABLE_COLUMNS] if skips
+              else [_MARKER_LABEL_WIDTH, _MARKER_VALUE_WIDTH])
+    ws = _disclosure_sheet(wb, MARKER_SHEET, widths)
+    put, styled = _sheet_pen(ws)
+    top = Alignment(vertical="top")
+    left_top = Alignment(horizontal="left", vertical="top")
+    wrap_left_top = Alignment(horizontal="left", vertical="top",
+                              wrap_text=True)
+
+    def pair(label, value):
+        """A label/value row of the header block. Values are left-aligned so
+        they read as a block beside their labels (counts included), and a
+        value too wide for its column wraps in a row tall enough for it."""
+        lines = _lines_for(value, _MARKER_VALUE_WIDTH)
+        put([styled(label, top),
+             styled(value, wrap_left_top if lines > 1 else left_top)],
+            height=lines * _MARKER_LINE_PT if lines > 1 else None)
+
+    pair("Build version", BUILD_VERSION)
+    pair("As-of date", asof_date.isoformat())
+    pair("Layer library", str(lib_root))
+    # HF-01: the build's own skipped-source record — the comparator reads
+    # these keys to disclose the condition in the comparison's Summary/Notes.
+    pair("Skipped source spans", len(skips))
+    pair("Marked anchor cells", n_marked)
+    pair("Unavailable marker", UNAVAILABLE_TOKEN)
+    pair("Skipped source reason", SKIP_REASON)
+    if marked_cells:
+        pair("Marked anchor detail", MARKED_SHEET)
+    for w in warnings:
+        pair("Warning", w)
+    if not skips:
+        return
+    put([])
+    _put_table(ws, put, _SKIP_TABLE_COLUMNS, [_skip_table_row(s) for s in skips])
+
+
+def _write_marked_sheet(wb, marked_cells):
+    """The itemized per-cell record behind the marker count: one row per
+    (marked anchor cell, span whose value it withholds). The comparison reads
+    it back to name the markers whose withheld value TSN disagrees with — the
+    facts a bare marker would otherwise hide."""
+    if not marked_cells:
+        return
+    ws = _disclosure_sheet(wb, MARKED_SHEET,
+                           [w for _name, w in _MARKED_TABLE_COLUMNS])
+    put, _styled = _sheet_pen(ws)
+    _put_table(ws, put, _MARKED_TABLE_COLUMNS,
+               [_marked_table_row(m) for m in marked_cells])
+
+
+def _write_workbook(out_path, rows, index, asof_date, lib_root, warnings,
+                    skips=(), n_marked=0, marked_cells=()):
     from openpyxl import Workbook
     from openpyxl.cell import WriteOnlyCell
     from openpyxl.styles import PatternFill
@@ -825,12 +1322,9 @@ def _write_workbook(out_path, rows, index, asof_date, lib_root, warnings):
                 c.fill = fill
                 cells.append(c)
             prov.append(cells)
-    marker = wb.create_sheet(MARKER_SHEET)
-    marker.append(["Build version", BUILD_VERSION])
-    marker.append(["As-of date", asof_date.isoformat()])
-    marker.append(["Layer library", str(lib_root)])
-    for w in warnings:
-        marker.append(["Warning", w])
+    _write_marker_sheet(wb, asof_date, lib_root, warnings, skips, n_marked,
+                        marked_cells)
+    _write_marked_sheet(wb, marked_cells)
     tmp = out_path.with_name(out_path.name + ".tmp")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -938,12 +1432,12 @@ def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes)
 
     buckets = defaultdict(lambda: defaultdict(list))
     points = defaultdict(dict)
-    parked, warnings = [], []
+    parked, warnings, skips = [], [], []
     for tag in SPAN_LAYERS:
         if events.is_cancelled():
             return _cancelled(events)
         _read_span_layer(lib, index, tag, asof=asof_serial, events=events,
-                         buckets=buckets, parked=parked)
+                         buckets=buckets, parked=parked, skips=skips)
     for tag in POINT_LAYERS:
         if events.is_cancelled():
             return _cancelled(events)
@@ -971,13 +1465,33 @@ def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes)
             events.on_log(f"  built {i}/{len(all_routes)} routes "
                           f"({len(rows):,} rows)")
 
-    _write_workbook(out_path, rows, index, asof_date, lib_root, warnings)
+    # HF-01: mark each skipped span's anchor cells, then surface every skip
+    # through the same warnings channel the split pass already uses (marker
+    # sheet, PARTIAL completion, skipped_inputs, sidecar, result message).
+    marked, marked_cells = _mark_unavailable_anchors(rows, skips)
+    if skips:
+        events.on_log(f"  {len(skips)} source span(s) have an unreadable "
+                      f"postmile endpoint — {marked} anchor cell(s) marked "
+                      f"'{UNAVAILABLE_TOKEN}'")
+    # The marker sheet states these same facts as its itemized skip table (one
+    # readable column per field), so it carries the other warnings as lines.
+    other_warnings = list(warnings)
+    for s in skips:
+        w = _skip_warning(s)
+        warnings.append(w)
+        events.on_log(f"  note: {w}")
+
+    _write_workbook(out_path, rows, index, asof_date, lib_root, other_warnings,
+                    skips=skips, n_marked=marked, marked_cells=marked_cells)
     result = ConsolidateResult(
         status="ok",
         message=(f"Built {len(rows):,} clean-road highway rows "
                  f"({len(all_routes)} routes) as of {asof_date.isoformat()}."
                  + (f" {len(warnings)} span(s) could not be placed — see the "
-                    f"{MARKER_SHEET} sheet." if warnings else "")),
+                    f"{MARKER_SHEET} sheet." if warnings else "")
+                 + (f" {marked} anchor cell(s) are marked "
+                    f"'{UNAVAILABLE_TOKEN}' (a source span exists there but "
+                    "its placement is unknowable)." if marked else "")),
         output_path=str(out_path),
         summary_lines=[f"Clean Road Highway (ArcGIS): {len(rows):,} rows, "
                        f"{len(all_routes)} routes -> {out_path.name}"],
@@ -991,6 +1505,14 @@ def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes)
                 "routes": len(all_routes),
                 "rows": len(rows),
                 "warnings": warnings,
+                "skipped_source_spans": {
+                    "count": len(skips),
+                    "marked_anchor_cells": marked,
+                    "marked_anchor_sheet": MARKED_SHEET if marked else "",
+                    "unavailable_marker": UNAVAILABLE_TOKEN,
+                    "reason": SKIP_REASON,
+                    "spans": _skip_sidecar_entries(skips),
+                },
             }}):
         return ConsolidateResult(
             status="error",

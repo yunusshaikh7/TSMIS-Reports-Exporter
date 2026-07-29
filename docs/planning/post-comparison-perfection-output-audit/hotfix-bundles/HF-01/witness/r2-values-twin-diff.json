@@ -1,0 +1,229 @@
+{
+ "old": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-01\\r1-remedy\\ArcGIS_vs_TSN_CleanRoadHighway_Comparison 2026-07-28 (values).xlsx",
+ "new": "output\\comparisons\\arcgis\\RB1-R2-Remedy (values).xlsx",
+ "sheets_old": [
+  "Summary",
+  "Spot Check",
+  "Comparison",
+  "Routes",
+  "Only in ArcGIS",
+  "Only in TSN",
+  "ArcGIS",
+  "TSN",
+  "Notes",
+  "__CMP_E2_SNAPSHOT_A",
+  "__CMP_E2_SNAPSHOT_B",
+  "Provenance"
+ ],
+ "sheets_new": [
+  "Summary",
+  "Spot Check",
+  "Comparison",
+  "Routes",
+  "Only in ArcGIS",
+  "Only in TSN",
+  "ArcGIS",
+  "TSN",
+  "Notes",
+  "__CMP_E2_SNAPSHOT_A",
+  "__CMP_E2_SNAPSHOT_B",
+  "Provenance"
+ ],
+ "sheets": {
+  "Summary": {
+   "rows": 127,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 1,
+   "samples": [
+    [
+     121,
+     2,
+     "\u2022 \u26a0 SOURCE COVERAGE \u2014 the ArcGIS build could not place 102 source span(s) whose begin or end postmile is unreadable (LocError=NO ERROR rows with a missing PM en",
+     "\u2022 \u26a0 SOURCE COVERAGE \u2014 the ArcGIS build could not place 102 source span(s) whose begin or end postmile is unreadable (LocError=NO ERROR rows with a missing PM en"
+    ]
+   ]
+  },
+  "Spot Check": {
+   "rows": 93,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
+  },
+  "Comparison": {
+   "rows": 65165,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
+  },
+  "Routes": {
+   "rows": 274,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
+  },
+  "Only in ArcGIS": {
+   "rows": 5082,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
+  },
+  "Only in TSN": {
+   "rows": 7437,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
+  },
+  "ArcGIS": {
+   "rows": 57730,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
+  },
+  "TSN": {
+   "rows": 60085,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
+  },
+  "Notes": {
+   "rows": 85,
+   "extra_rows_old": 0,
+   "extra_rows_new": 7,
+   "cell_differences": 84,
+   "samples": [
+    [
+     2,
+     1,
+     "\u26a0 SOURCE COVERAGE \u2014 102 ArcGIS source span(s) could not be placed: rows whose begin or end postmile is unreadable (the raw rows carry LocError=NO ERROR and usab",
+     "\u26a0 SOURCE COVERAGE \u2014 the ArcGIS build could not place 102 source span(s) whose begin or end postmile is unreadable (LocError=NO ERROR rows with a missing PM endp"
+    ],
+    [
+     3,
+     1,
+     "Cells showing '(unavailable: source span skipped)' are NON-ASSERTING (state N): the ArcGIS side HAS a source row there whose exact placement is unknowable, so t",
+     "Cells showing '(unavailable: source span skipped)' are NON-ASSERTING (state N): the ArcGIS side HAS a source row there whose exact placement is unknowable, so t"
+    ],
+    [
+     4,
+     1,
+     "Side A is OUR CA HIGHWAYS table, built from the owner's ArcGIS per-layer exports (arcgis_layers/) by the county+PM overlay consolidator; side B is the vendor's ",
+     "The 6 marked anchor(s) that withhold a value TSN does not show are named below, each with the postmile the source DID give. They stay non-asserting \u2014 an unplace"
+    ],
+    [
+     5,
+     1,
+     "Rows are keyed on Route + County + PM prefix + begin postmile (decimal-canonical) + roadbed (the R/L/X PM suffix). The END postmile is deliberately not key mate",
+     "     \u2013 036 / TEH / 39.72 \u00b7 THY_LT_LANES_AMT: ArcGIS source 1 @ 39.72, 2 @ 40.105, TSN 1"
+    ],
+    [
+     6,
+     1,
+     "Dates are compared as ISO dates (format never counts); amount columns compare as canonical numbers ('02' = '2', '9.60' = '9.6'); the landmark text is edge-trimm",
+     "     \u2013 036 / TEH / 39.72 \u00b7 THY_LT_TRAV_WAY_WIDTH_AMT: ArcGIS source 12 @ 39.72, 24 @ 40.105, TSN 12"
+    ],
+    [
+     7,
+     1,
+     "The ADT profile family (Profile / ADT / Change-per-mile) IS compared and counted (owner decision 2026-07-22 \u2014 a wholesale column difference is exactly the signa",
+     "     \u2013 036 / TEH / 40.15 \u00b7 THY_LT_LANES_AMT: ArcGIS source 1 @ 40.18, 2 @ 40.298, TSN 2"
+    ],
+    [
+     8,
+     1,
+     "THY_CITY_CODE is compared: the City layer carries city NAMES, and they are normalized to the TASAS letter codes via the built-in table (derived from statewide c",
+     "     \u2013 036 / TEH / 40.15 \u00b7 THY_LT_TRAV_WAY_WIDTH_AMT: ArcGIS source 12 @ 40.18, 24 @ 40.298, TSN 24"
+    ],
+    [
+     9,
+     1,
+     "CONTEXT columns (shown for reference, never counted as a difference): the TSN bookkeeping columns (id/element/lifecycle/create/update), the TASAS change-trackin",
+     "     \u2013 036 / TEH / 40.352 \u00b7 THY_LT_LANES_AMT: ArcGIS source 1 @ 40.391, 2 @ 40.727, 1 @ 40.776, TSN 2"
+    ],
+    [
+     10,
+     1,
+     "One-sided rows are stretches one side carries at a physical location (route + county + prefix + begin PM + roadbed) the other doesn't \u2014 segmentation differences",
+     "     \u2013 036 / TEH / 40.352 \u00b7 THY_LT_TRAV_WAY_WIDTH_AMT: ArcGIS source 12 @ 40.391, 24 @ 40.727, 12 @ 40.776, TSN 24"
+    ],
+    [
+     11,
+     1,
+     "Column match table \u2014 each THY column (the SAME name on the TSN extract and our build) \u00b7 the ArcGIS layer (source column) it is painted from \u00b7 whether it is COUN",
+     "Side A is OUR CA HIGHWAYS table, built from the owner's ArcGIS per-layer exports (arcgis_layers/) by the county+PM overlay consolidator; side B is the vendor's "
+    ],
+    [
+     12,
+     1,
+     "    THY_ID  \u00b7  built from no ArcGIS source  \u00b7  context",
+     "Rows are keyed on Route + County + PM prefix + begin postmile (decimal-canonical) + roadbed (the R/L/X PM suffix). The END postmile is deliberately not key mate"
+    ],
+    [
+     13,
+     1,
+     "    THY_ELEMENT_ID  \u00b7  built from no ArcGIS source  \u00b7  context",
+     "Dates are compared as ISO dates (format never counts); amount columns compare as canonical numbers ('02' = '2', '9.60' = '9.6'); the landmark text is edge-trimm"
+    ]
+   ]
+  },
+  "__CMP_E2_SNAPSHOT_A": {
+   "rows": 57729,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
+  },
+  "__CMP_E2_SNAPSHOT_B": {
+   "rows": 60084,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 0,
+   "samples": []
+  },
+  "Provenance": {
+   "rows": 15,
+   "extra_rows_old": 0,
+   "extra_rows_new": 0,
+   "cell_differences": 4,
+   "samples": [
+    [
+     7,
+     2,
+     "C:\\Users\\Yunus\\Projects\\TSMIS-rb1-worktree\\output\\arcgis_cleanroad\\clean_highway_built.xlsx",
+     "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\output\\arcgis_cleanroad\\clean_highway_built.xlsx"
+    ],
+    [
+     8,
+     2,
+     "sha256 1adb594425dd846ac93c8500834fbd24e9d8d497f6595ffcb30d496ae8ad360a",
+     "sha256 0d8575ca0c496594d2e47f51bc1ba39673384f4fdde4a7995d497be1959a6ddf"
+    ],
+    [
+     11,
+     2,
+     "C:\\Users\\Yunus\\Projects\\TSMIS-rb1-worktree\\tsn_library\\clean_highway\\consolidated\\tsn_clean_highway_normalized.xlsx",
+     "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\tsn_library\\clean_highway\\consolidated\\tsn_clean_highway_normalized.xlsx"
+    ],
+    [
+     12,
+     2,
+     "sha256 7f1086feafe061531b682b12d0dda161f5256df50fcc89a954df8b87a4656aab",
+     "sha256 30048451ed26917896cd001a9791f24c833fc6d3bab3b90277cae8f5bb794fed"
+    ]
+   ]
+  }
+ },
+ "sheets_with_changes": {
+  "Summary": 1,
+  "Notes": 84,
+  "Provenance": 4
+ },
+ "ok": false
+}

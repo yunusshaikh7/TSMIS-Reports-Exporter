@@ -212,6 +212,21 @@ class CompareSchema:
     # veryHidden snapshot sheets are untouched. Default "" -> every existing
     # comparison's headers are byte-identical.
     context_header_fill: str = ""
+    # Optional UNAVAILABLE-anchor rule (opt-in, HF-01 / PCOA-FINAL-010): a
+    # ("<token>", "<Summary note>") pair. When set, a cell whose ASCII-TRIMmed
+    # value EXACTLY equals the reserved token is NON-ASSERTING — state "N",
+    # excluded from every difference count, displayed like a ditto cell (the
+    # token itself shows) — and the Summary notes carry the supplied
+    # disclosure line. The producer writes the token where a source row's
+    # value exists but could not be placed (the Clean Road Highway build's
+    # skipped-span anchors), so the comparison must neither count the anchor
+    # as a difference nor present the blank/stale cell as source truth.
+    # The note may instead be a CALLABLE resolved when the Summary is written,
+    # for facts only knowable once both sides are loaded (Clean Road itemizes
+    # the markers whose withheld source value TSN disagrees with).
+    # Default () -> every other comparison (and the regression-locked
+    # canaries) is byte-identical.
+    unavailable_rule: tuple = ()
     # Optional EXTRA sheet writer: callable(wb, ctx) run after the standard sheets,
     # before save — like legend_writer but with a context dict ({rows_a, rows_b,
     # has_route, sc, side_a, side_b}) so a report can append a FAMILIAR-LAYOUT sheet
@@ -247,6 +262,11 @@ class CompareSchema:
         in display order. key_field == 0 gives [1, 2, …, n] (the original
         behavior, so the default path is byte-identical)."""
         return [i for i in range(len(self.header)) if i != self.key_field]
+
+    @property
+    def unavailable_token(self):
+        """The reserved non-asserting anchor token; "" when the rule is unset."""
+        return self.unavailable_rule[0] if self.unavailable_rule else ""
 
     def is_medwid(self, field_idx):
         return self.header[field_idx] in self.medwid_fields
@@ -705,10 +725,15 @@ def compared_cell(sc, f, rt, rn, off):
     is_context = sc.is_context(f)
     is_ditto = (sc.ditto_nonasserting
                 and (_is_plus_run(display_a) or _is_plus_run(display_b)))
-    asserting = not (is_context or is_ditto)
+    # HF-01: a reserved unavailable-anchor token on either side is
+    # non-asserting like a ditto — the source has a row there whose placement
+    # is unknowable, so neither equality nor difference may be asserted.
+    tok = sc.unavailable_token
+    is_unavailable = bool(tok) and tok in (display_a, display_b)
+    asserting = not (is_context or is_ditto or is_unavailable)
     if is_context:
         display = display_a if display_a else display_b
-    elif is_ditto or equal:
+    elif is_ditto or is_unavailable or equal:
         display = display_a
     else:
         display = (f"{display_a or '(blank)'}{_DIFF_MARK}"
@@ -1646,10 +1671,17 @@ def _matched_state_expr(sc, field_idx, eq, trim_t, trim_n):
     """Live formula expression for one matched compared-cell state code."""
     if sc.is_context(field_idx):
         return '"N"'
+    expr = f'IF({eq},"E","D")'
     if sc.ditto_nonasserting:
-        return (f'IF(OR({_isditto_xl(trim_t)},{_isditto_xl(trim_n)}),"N",'
-                f'IF({eq},"E","D"))')
-    return f'IF({eq},"E","D")'
+        expr = (f'IF(OR({_isditto_xl(trim_t)},{_isditto_xl(trim_n)}),"N",'
+                f'{expr})')
+    if sc.unavailable_token:
+        # HF-01: the reserved unavailable-anchor token is "N" on either side —
+        # the formula twin of compared_cell's is_unavailable.
+        tok = _formula_text(sc.unavailable_token)
+        expr = (f'IF(OR(EXACT({trim_t},{tok}),EXACT({trim_n},{tok})),"N",'
+                f'{expr})')
+    return expr
 
 
 def _field_state_expr(lay, r, field_idx):
@@ -3288,6 +3320,16 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None, warnings=(),
         "helper cells. The Summary freshness check turns non-certifying after any "
         "source edit, row insertion/deletion/reorder, or helper change.",
     ]
+    if sc.unavailable_rule:
+        # HF-01: the schema's resolved disclosure line — the skipped-source
+        # count, the marked-anchor count and the reason, supplied by the
+        # comparator from the producer's own build record. A CALLABLE note is
+        # resolved here, so a report may state facts that are only knowable
+        # once both sides are loaded (the Clean Road markers whose withheld
+        # source value TSN disagrees with) without reading its inputs ahead of
+        # the substrate's digest-before-read contract.
+        note = sc.unavailable_rule[1]
+        notes.append(f"• ⚠ {note() if callable(note) else note}")
     if warnings:
         shown = warnings[:20]
         notes.append(
@@ -3433,6 +3475,18 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
     Phase-2 bridge for loaders that already own structured coverage truth.
     Their defaults preserve the legacy ``skipped_inputs == len(warnings)``
     behavior; exact counts are never derived from display prose."""
+    if sc.unavailable_rule and (
+            not isinstance(sc.unavailable_rule, tuple)
+            or len(sc.unavailable_rule) != 2
+            or not (isinstance(sc.unavailable_rule[0], str)
+                    and sc.unavailable_rule[0].strip())
+            or not (callable(sc.unavailable_rule[1])
+                    or (isinstance(sc.unavailable_rule[1], str)
+                        and sc.unavailable_rule[1].strip()))):
+        raise ValueError(
+            "unavailable_rule must be a (token, Summary note) pair — a "
+            "non-empty token string, and a note that is either a non-empty "
+            "string or a callable returning one")
     warnings = [str(w) for w in warnings]
     structured_warnings = list(warnings)
     failure_items = tuple(str(item) for item in (failures or ()))

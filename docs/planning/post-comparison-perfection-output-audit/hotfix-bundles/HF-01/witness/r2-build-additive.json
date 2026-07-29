@@ -1,0 +1,33 @@
+{
+ "old": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-01\\r1-remedy\\clean_highway_built.xlsx",
+ "new": "output\\arcgis_cleanroad\\clean_highway_built.xlsx",
+ "data_rows_compared": 57728,
+ "rows_only_in_old": 0,
+ "rows_only_in_new": 0,
+ "data_cell_differences": 0,
+ "first_differences": [],
+ "tokens_old": 174,
+ "tokens_new": 174,
+ "provenance_identical": true,
+ "marker_rows_old": 111,
+ "marker_rows_new": 112,
+ "marker_added_labels": [
+  "Marked anchor detail"
+ ],
+ "marker_removed_labels": [],
+ "marked_sheet_in_old": false,
+ "marked_sheet_in_new": true,
+ "marked_sheet_rows": 183,
+ "sheets_old": [
+  "Clean Road Highway",
+  "Provenance",
+  "ArcGIS Build"
+ ],
+ "sheets_new": [
+  "Clean Road Highway",
+  "Provenance",
+  "ArcGIS Build",
+  "ArcGIS Marked Anchors"
+ ],
+ "ok": true
+}

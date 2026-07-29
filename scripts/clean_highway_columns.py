@@ -12,6 +12,11 @@ the TSN normalizer (`tsn_load_clean_road`), and the comparator
 # sides' sheet names.
 ARC_SHEET = "Clean Road Highway"
 ARC_MARKER_SHEET = "ArcGIS Build"
+# HF-01: the itemized per-cell record behind the marker sheet's "Marked anchor
+# cells" count — WHERE each unavailable marker sits and WHAT the skipped span
+# would have written there. The comparison reads it back to itemize the
+# markers whose withheld source value disagrees with the TSN extract.
+ARC_MARKED_SHEET = "ArcGIS Marked Anchors"
 TSN_RAW_SHEET = "Sheet 1"
 NORMALIZED_SHEET = "Clean Road Highway (TSN)"
 

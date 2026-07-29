@@ -23,17 +23,21 @@ Read:
 5. `docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/<BUNDLE_ID>/BUNDLE.md`
 6. Any prior `IMPLEMENTATION.md` or `REVIEW.md` in that bundle directory.
 
-If `<BUNDLE_ID>` was not replaced, the bundle is absent, its status is not
-`READY`, a dependency is unmerged, or its acceptance contract is incomplete,
-stop and report the blocker. Do not infer a different bundle.
+If `<BUNDLE_ID>` was not replaced, the bundle is absent, its status is neither
+`READY` nor `DENIED — RETURN TO IMPLEMENTATION`, a dependency is unmerged, or
+its acceptance contract is incomplete, stop and report the blocker. Do not
+infer a different bundle. A denied bundle is a Prompt 05 return: read its
+`REVIEW.md` and resume the recorded branch rather than creating a new one.
 
 Branch/worktree setup:
 
 1. Fetch without force and verify `main` is clean and current.
 2. Prefer a separate worktree so the user's normal app checkout remains
    available. Never switch or clean a dirty user worktree.
-3. Create the exact RB branch recorded in `IMPLEMENTATION-PLAN.md`
-   (`hotfix/<rb-id>-<slug>`) from the latest `main`.
+3. For a `READY` bundle, create the exact RB branch recorded in
+   `IMPLEMENTATION-PLAN.md` (`hotfix/<rb-id>-<slug>`) from the latest `main`.
+   For `DENIED — RETURN TO IMPLEMENTATION`, resume that existing branch at the
+   reviewed head plus its denial record.
 4. If the branch already exists, verify it belongs to this bundle and resume
    it rather than creating a duplicate.
 5. Do not branch from another hotfix.

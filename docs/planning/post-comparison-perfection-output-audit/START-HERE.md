@@ -1,9 +1,10 @@
 # Post-Comparison Output Program — Start Here
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
-RB-1 / Clean Road is READY for Stage 4**
+RB-1 / Clean Road is JOINTLY APPROVED (Stage 5 complete);
+Review 1 and Review 2 APPROVED; merge pending**
 
-Last updated: 2026-07-26
+Last updated: 2026-07-28
 
 This is the entry point for every new Codex or Claude chat. Read this file
 before opening the other audit documents. The project deliberately separates
@@ -13,18 +14,69 @@ first pass.
 
 ## Next action
 
-Run
-[`prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
-in a new **Claude** chat with:
+Complete Prompt 05's final-approval merge sequence for
+`hotfix/rb-1-clean-road-source-truth`: confirm remote `main`, merge without
+force, run the post-merge smoke gate on `main`, record the merge SHA, push
+`main`, clean up only RB-1's merged worktrees/branch, and prepare RB-2's
+readiness record.
 
-```text
-<BUNDLE_ID> = RB-1
-<IMPLEMENTER> = Claude
-```
+RB-1 (work item HF-01, branch `hotfix/rb-1-clean-road-source-truth`) was
+implemented, denied by Codex Review 1 on the clipped `ArcGIS Build` disclosure
+(RB1-R1-001), and that return is now implemented: the marker sheet carries
+measured stored column widths, wrapped cells in tall-enough rows, and the 102
+skips as an itemized 14-column table. The build and both twins were
+regenerated and the whole acceptance matrix re-run — the review's own
+`REVIEW.md` findings table, the new "Review 1 remedy" section of
+[`hotfix-bundles/RB-1/IMPLEMENTATION.md`](hotfix-bundles/RB-1/IMPLEMENTATION.md),
+the frozen contract
+[`hotfix-bundles/RB-1/BUNDLE.md`](hotfix-bundles/RB-1/BUNDLE.md) and the
+committed witnesses `hotfix-bundles/HF-01/witness/` are the record. Bulk
+acceptance output is retained at
+`C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\` (the
+remedy run in its `r1-remedy\` subfolder; Review 1's own proof files are
+untouched). The branch is NOT merged.
 
-RB-1 carries work item HF-01 only and uses the exact branch
-`hotfix/rb-1-clean-road-source-truth`. Its frozen contract is
-[`hotfix-bundles/RB-1/BUNDLE.md`](hotfix-bundles/RB-1/BUNDLE.md).
+Codex Review 1 re-reviewed exact head
+`6d2a2ce2e70688bfaa20e8f2e11039165742d55e`, closed RB1-R1-001, and
+approved the complete matrix. Reviewer-owned re-review artifacts are retained
+in the same HF-01 root under `r1-codex-rereview\`.
+Review 2 then denied exact requested head
+`d330312efc949523caf07f1fec4e867afed87cf7` on `RB1-R2-001`: the
+controlling plan requires the four genuine route 036 / TEH / 40.15 and 40.352
+lane/width source facts to be itemized in Summary and Notes as well as the
+retained witness, but both sheets contain aggregate coverage only. Exact probe,
+evidence bindings, and signature are in `hotfix-bundles/RB-1/REVIEW.md`.
+
+**That return is now implemented (Claude, 2026-07-28).** The build records what
+each unavailable marker withholds on a new itemized `ArcGIS Marked Anchors`
+sheet; the comparison joins it to the TSN row each marker pairs with and names
+every marker that withholds a value TSN does not show, in BOTH Summary and
+Notes — derived from source, never hard-coded. The build and both twins were
+regenerated through the shipped GUI path and the whole acceptance matrix
+re-run: `Comparison` is cell-identical to the Review-1-approved twin over
+65,165 rows (the only moves are the Summary bullet, the Notes block and
+run-identity Provenance), the build diff is 0 data cells, every CRH-SW-E3
+figure reproduces (291,127 differing cells), both disclosure sheets pass
+installed Excel's own font metrics, the neighbouring family is cell-identical
+to base code, and the full gate is 157/157 plus the frozen self-test. The
+itemization is SIX cells, not four — all four Review 2 named plus two the
+witness's reference-anchor rule masks; the `165 = 161 + 4 = 159 + 6`
+reconciliation is in
+[`hotfix-bundles/RB-1/IMPLEMENTATION.md`](hotfix-bundles/RB-1/IMPLEMENTATION.md).
+The branch is NOT merged.
+
+**Read before starting Review 2 — owner ruling, 2026-07-28.** The bounded
+review model Review 1 wrote into Prompt 05 (`fa84016`) is **owner-approved**:
+the 30-minute / 2 GB / 5-minute-operation / 500 MB caps stand, and no reviewer
+performs the installed-Excel `CalculateFullRebuild`. Two consequences are
+owner-accepted and **must not be raised as findings**: Review 2 may rely on
+Review 1's signed evidence as a ranked source instead of regenerating the
+acceptance corpus, and RB-1's formulas-twin recalculation stands on the
+implementation's own recorded run alone. The prompt change is sanctioned
+workflow support, not scope leakage. Everything else — the two-approval merge
+gate, every acceptance criterion, and Review 2's duty to reason independently
+and probe anything the retained evidence leaves uncertain — is unchanged. Full
+text: [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md) § bounded reviews.
 
 Claude drafted the plan as first planner (both sign-off rows read `NOT STARTED`
 when Prompt 03 was invoked, so the prompt's own first-planner rule applied — the
@@ -77,7 +129,8 @@ The other two point in opposite directions on purpose:
   the Description is the same label with `EQUATES TO ` prepended. The rule must be
   pair-aware, opt-in, and must not widen into the HF-09 class.
 
-Both planners have signed. **RB-1 is READY; no other RB is authorized yet.**
+Both planners signed the Stage 3 plan. **RB-1's RB1-R2-001 return is
+implemented and awaits Review 2's re-review; no other RB is authorized yet.**
 
 Stage 2 is closed with no open conflict:
 
@@ -99,8 +152,8 @@ Stage 2 is closed with no open conflict:
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/RB-1/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-1 READY** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **LOOP after each Stage 4** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-1 IMPLEMENTED — both returns remedied** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-1 JOINTLY APPROVED — MERGE PENDING** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

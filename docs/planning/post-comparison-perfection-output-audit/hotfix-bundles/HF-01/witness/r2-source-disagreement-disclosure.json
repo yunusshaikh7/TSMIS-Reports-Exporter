@@ -1,0 +1,100 @@
+{
+  "built": "output\\arcgis_cleanroad\\clean_highway_built.xlsx",
+  "tsn": "tsn_library\\clean_highway\\raw\\CA HIGHWAYS 09.08.2025.xlsx",
+  "values": "output\\comparisons\\arcgis\\RB1-R2-Remedy (values).xlsx",
+  "markers": 174,
+  "agreed": 159,
+  "differs": 6,
+  "unpaired": 9,
+  "unrecorded": 0,
+  "duplicated": 0,
+  "conflicts": [
+    {
+      "route": "036",
+      "county": "TEH",
+      "location": "39.72",
+      "field": "THY_LT_LANES_AMT",
+      "tsn": "1",
+      "anchors": [
+        "1 @ 39.72",
+        "2 @ 40.105"
+      ]
+    },
+    {
+      "route": "036",
+      "county": "TEH",
+      "location": "39.72",
+      "field": "THY_LT_TRAV_WAY_WIDTH_AMT",
+      "tsn": "12",
+      "anchors": [
+        "12 @ 39.72",
+        "24 @ 40.105"
+      ]
+    },
+    {
+      "route": "036",
+      "county": "TEH",
+      "location": "40.15",
+      "field": "THY_LT_LANES_AMT",
+      "tsn": "2",
+      "anchors": [
+        "1 @ 40.18",
+        "2 @ 40.298"
+      ]
+    },
+    {
+      "route": "036",
+      "county": "TEH",
+      "location": "40.15",
+      "field": "THY_LT_TRAV_WAY_WIDTH_AMT",
+      "tsn": "24",
+      "anchors": [
+        "12 @ 40.18",
+        "24 @ 40.298"
+      ]
+    },
+    {
+      "route": "036",
+      "county": "TEH",
+      "location": "40.352",
+      "field": "THY_LT_LANES_AMT",
+      "tsn": "2",
+      "anchors": [
+        "1 @ 40.391",
+        "2 @ 40.727",
+        "1 @ 40.776"
+      ]
+    },
+    {
+      "route": "036",
+      "county": "TEH",
+      "location": "40.352",
+      "field": "THY_LT_TRAV_WAY_WIDTH_AMT",
+      "tsn": "24",
+      "anchors": [
+        "12 @ 40.391",
+        "24 @ 40.727",
+        "12 @ 40.776"
+      ]
+    }
+  ],
+  "summary_itemizes": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+  ],
+  "notes_itemizes": [
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
+  ],
+  "summary_states_classification": true,
+  "notes_states_classification": true,
+  "ok": true
+}

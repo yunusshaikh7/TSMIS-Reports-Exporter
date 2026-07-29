@@ -1,0 +1,55 @@
+{
+  "build": "output/arcgis_cleanroad/clean_highway_built.xlsx",
+  "pre_remedy_build": "C:/Users/Yunus/Downloads/TSMIS/_scratch/post-comparison-hotfixes/HF-01/clean_highway_built.xlsx",
+  "marker_stored_columns": {
+    "1": 24.0,
+    "2": 56.0,
+    "3": 8.0,
+    "4": 12.0,
+    "5": 9.0,
+    "6": 12.0,
+    "7": 17.0,
+    "8": 11.0,
+    "9": 11.0,
+    "10": 11.0,
+    "11": 11.0,
+    "12": 12.0,
+    "13": 12.0,
+    "14": 15.0
+  },
+  "marker_rows": 111,
+  "marker_illegible_cells": [],
+  "skipped_source_spans": [
+    "102"
+  ],
+  "marked_anchor_cells": [
+    "174"
+  ],
+  "unavailable_marker": [
+    "(unavailable: source span skipped)"
+  ],
+  "reason_present": true,
+  "skip_table_header": [
+    "Source layer",
+    "Attribute values",
+    "Route",
+    "Alignment",
+    "County",
+    "PM prefix",
+    "Known endpoint",
+    "Known PM",
+    "LocError",
+    "Begin OD",
+    "End OD",
+    "From AR",
+    "To AR",
+    "Marked cells"
+  ],
+  "skip_table_rows": 102,
+  "data_rows_compared": 57729,
+  "data_cell_differences": 0,
+  "first_differences": [],
+  "provenance_row_differences": 0,
+  "unavailable_tokens_in_data": 174,
+  "verdict": "PASS"
+}
