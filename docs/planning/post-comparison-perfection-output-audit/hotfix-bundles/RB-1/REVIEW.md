@@ -1,6 +1,6 @@
 # `RB-1` — Adversarial Review Record
 
-Status: **DENIED — RETURN TO IMPLEMENTATION**
+Status: **DENIED — EVIDENCE GAP**
 
 ## Review identity
 
@@ -15,10 +15,13 @@ Status: **DENIED — RETURN TO IMPLEMENTATION**
 | Review 1 record head | `c90908d73e22bf945c4d85484465350ae2882c22` |
 | Review 2 requested / record head | `d330312efc949523caf07f1fec4e867afed87cf7` |
 | Runtime code head | `84b82de2873f733864b1da3cad037738e898be8d` (no runtime/test/witness change through `d330312`) |
+| Review 2 remedy runtime head | `39c5dc3d15501a428a42b0eb0c3cbe0d499b09fd` |
+| Review 2 re-review requested / record head | `12d43d86fda19813c688305f2435cda840fa11c9` |
 | Implementer | Claude |
 | Approving reviewer | Codex — independent; did not implement this bundle |
 | Review 2 | Codex — independent; did not implement this bundle; **DENIED — RETURN TO IMPLEMENTATION** |
-| Merge | BLOCKED — Review 2 denied; branch remains unmerged |
+| Review 2 re-review | Codex — independent; did not implement this bundle; **DENIED — EVIDENCE GAP** |
+| Merge | BLOCKED — Review 2 re-review found one unbound acceptance artifact; branch remains unmerged |
 
 ## Review 1 verdict
 
@@ -302,3 +305,107 @@ Do not merge. Resume Prompt 04 on the existing
 <BUNDLE_ID> = RB-1
 <IMPLEMENTER> = Claude
 ```
+
+## Review 2 re-review — Codex, 2026-07-28
+
+### Verdict
+
+**DENIED — EVIDENCE GAP.** Prompt 05 requires every expensive acceptance
+operation to be represented by a retained, hash-bound result before review.
+The Review-2 remedy's installed-Excel `CalculateFullRebuild` result is retained
+and its checks are recorded, but the accepted post-recalculation workbook is
+not bound by SHA-256.
+
+This is the one exact missing item:
+
+> A committed SHA-256 binding for the retained, post-Excel-recalculation
+> `RB1-R2-Remedy.xlsx` file of **581,854,795 bytes**, tied to remedy runtime
+> head `39c5dc3d15501a428a42b0eb0c3cbe0d499b09fd`.
+
+The retained workbook's existing `.outcome.json` and `.provenance.json`
+sidecars bind only the **pre-recalculation** 468,206,894-byte workbook at
+SHA-256
+`F75189D109D4007DDE3488CB18ADD970DD73AC4FDC5C5D9AE50FCFAA15C41165`.
+Installed Excel then changed the workbook to 581,854,795 bytes. The committed
+`formulas-twin-recalc.json` records that later size, 4,120.4-second
+recalculation, 10/10 `OK` self-checks, zero cached error cells, and the
+itemized disclosure, but contains no SHA-256 for that later byte image.
+Consequently the successful result cannot be proved to describe the exact
+retained workbook now offered for approval.
+
+No recalculation, regeneration, whole-corpus recount, replacement manifest, or
+reviewer-created hash was performed. Prompt 05 requires stopping on this
+precondition failure and returning the bounded item to implementation.
+
+### Review identity and budget
+
+| Field | Value |
+|---|---|
+| Reviewer / pass | Codex / Review 2 re-review |
+| Implemented bundle? | **No** |
+| Branch | `hotfix/rb-1-clean-road-source-truth` |
+| Recorded base | `9c774d4edacf6ae3b6e86d15b62e5d876a690a48` |
+| Remedy runtime head | `39c5dc3d15501a428a42b0eb0c3cbe0d499b09fd` |
+| Requested review-record head | `12d43d86fda19813c688305f2435cda840fa11c9` |
+| Review 1 approved head / record | `6d2a2ce2e70688bfaa20e8f2e11039165742d55e` / `c90908d73e22bf945c4d85484465350ae2882c22` |
+| Prior Review 2 denied head | `d330312efc949523caf07f1fec4e867afed87cf7` |
+| Elapsed active review | Approximately 24 minutes |
+| Resource budget | **RESPECTED** — no generation, Excel invocation, application build, full gate, full recount, or new output; only Git/doc/witness inspection and small JSON/sidecar reads |
+
+The Windows sandbox ACL helper failed before the first repository read, so the
+same read-only checks were run through the approved host shell. One broad
+small-file reference search timed out and was not retried. These are
+reviewer-environment events, not product failures; the exact retained formula
+sidecars were subsequently read directly.
+
+### Evidence reused and bounded commands
+
+| Evidence / command | Binding / result |
+|---|---|
+| Complete branch diff | `git diff --name-status --stat --check 9c774d4..12d43d8`; clean, with the remedy runtime at `39c5dc3` and the later implementation-record-only commit at `12d43d8` |
+| Remedy diff | `git diff d330312..39c5dc3`; producer detail sheet, comparator itemization, one callable-note resolution, focused test/canary/records/witnesses |
+| Review 1 signed record | Approval at `6d2a2ce…`, recorded by `c90908d…`; prior source/count/visual/regression evidence remains available |
+| Review-2 shipped path | `r2-shipped-run.json`, SHA-256 `267F20AEA4D1CA21829127DA170F874E3D6FD9B44C642F2FB957175CC05A9DB1`; build `ok/partial`, comparison `ok/partial`, 291,127 differing cells, no evidence delta |
+| Source-disagreement disclosure | `r2-source-disagreement-disclosure.json`, SHA-256 `4314B37A97D764E3356E147BEDD60E7428A459A5B8E90C6016AF6B37B4ADE676`; 174 = 159 agree + 6 differ + 9 unpaired, zero unrecorded/duplicated, all six itemized in Summary and Notes |
+| Build additive witness | `r2-build-additive.json`, SHA-256 `E72C212B780D4D1AED63D072DF1D7DD1208A5A30FC02403D41EF70E8235F9E4A`; zero data-cell changes, same 174 tokens, additive 183-row marked-anchor sheet |
+| Values-twin diff | `r2-values-twin-diff.json`, SHA-256 `30D041AC638301E110DE0C3FC002A624E057CFD24D18B02881317C983C064BCD`; Comparison and all non-disclosure/non-Provenance sheets unchanged |
+| Marked-sheet geometry | `r2-marked-sheet-excel-metrics.json`, SHA-256 `2AF50429F87FA8C80F65796E9E93938F24385F0F9959DD91B7F426A2CF49BD71`; zero narrow columns / short rows |
+| Formula result record | `formulas-twin-recalc.json`, SHA-256 `6D02F0A8D5E4B19FB2F01880A719BF6133064998A4833116ADDF2879EC3D7D32`; result fields present, but the 581,854,795-byte workbook SHA is absent |
+| Retained formula sidecars | Direct read of `r2-remedy\RB1-R2-Remedy.xlsx.outcome.json` and `.provenance.json`; both bind only pre-recalc SHA `F75189D1…` / 468,206,894 bytes |
+
+No targeted product test was started because the failed evidence precondition
+requires the reviewer to stop before substantive adjudication.
+
+### Review 2 challenge to Review 1
+
+Review 1 could not cover this remedy artifact because the itemized-disclosure
+workbook and its new Excel rebuild did not yet exist. The remedy retained the
+original publication sidecars after Excel changed the formulas workbook, so
+their member hash became historical rather than a binding for the accepted
+cached results. The bounded challenge compared the sidecar identity to the
+post-recalculation result record and found the exact size/hash seam.
+
+### Acceptance and artifact matrices
+
+| Criterion / gate | Re-review result | Exact evidence |
+|---|---|---|
+| Criteria 1–3 | **NOT RE-ADJUDICATED** | Retained witnesses were located, but Prompt 05 requires stopping on the failed precondition |
+| Criterion 4 — formulas twin recalculates clean | **DENIED — EVIDENCE GAP** | Successful checks are recorded, but no SHA binds them to the retained 581,854,795-byte workbook |
+| Criteria 5–7 | **NOT RE-ADJUDICATED** | No contradiction adjudicated before the required stop |
+| Values / source truth | **RETAINED EVIDENCE LOCATED; NOT FINALLY ADJUDICATED** | `r2-source-disagreement-disclosure.json`, `r2-values-twin-diff.json`, and prior signed evidence |
+| Formulas | **EVIDENCE GAP** | Post-recalc workbook hash missing |
+| Visual | **RETAINED EVIDENCE LOCATED; NOT FINALLY ADJUDICATED** | Metric witness and retained PDFs exist |
+| Evidence eligibility | **RETAINED EVIDENCE LOCATED; NOT FINALLY ADJUDICATED** | Shipped-run witness records an empty evidence delta |
+| Neighbor regression | **RETAINED EVIDENCE LOCATED; NOT FINALLY ADJUDICATED** | `is-regression.json` is present |
+
+### Actionable evidence gap
+
+| ID | Priority | Missing item | Required return |
+|---|---|---|---|
+| `RB1-R2-EG-001` | P1 / blocking | The retained post-Excel-recalculation formulas twin (581,854,795 bytes) has no committed SHA-256 binding. Its sidecars still identify the pre-recalculation file. | Without rerunning Excel, calculate the SHA-256 of the existing retained post-recalculation `RB1-R2-Remedy.xlsx`; add that hash, exact path, size, remedy runtime head `39c5dc3…`, and generation/source binding to the committed formula result record; then return Prompt 05 for Review 2 re-review. Preserve all retained workbooks and prior evidence. |
+
+**Reviewer signature:** Codex, Review 2 re-review — DENIED — EVIDENCE GAP —
+`2026-07-28T18:29:39.4201856-07:00`.
+
+Do not merge. Resume Prompt 04 only to supply `RB1-R2-EG-001`; no workbook
+regeneration or Excel recalculation is requested.
