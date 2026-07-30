@@ -1,6 +1,6 @@
 # `RB-2` — Implementation Record
 
-Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW**
+Status: **DENIED — RETURN TO IMPLEMENTATION**
 
 | Field | Value |
 |---|---|

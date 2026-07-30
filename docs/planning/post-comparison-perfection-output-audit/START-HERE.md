@@ -2,9 +2,8 @@
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
 RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
-RB-2 is IMPLEMENTED — AWAITING ADVERSARIAL REVIEW on
-`hotfix/rb-2-deliverable-presentation`, with the complete combined `RB2-A1`
-acceptance run executed in one pass**
+RB-2 Review 1 is DENIED — EVIDENCE GAP on
+`hotfix/rb-2-deliverable-presentation`**
 
 Last updated: 2026-07-30
 
@@ -16,16 +15,20 @@ first pass.
 
 ## Next action
 
-Stage 4 for RB-2 is COMPLETE on `hotfix/rb-2-deliverable-presentation`, base
-`896083e014d0451d5b05e5b6b024339aebc84d74`. The code, the two red→green checks,
-the full gate (158/158), ruff, the frozen self-test and the entire combined
-`RB2-A1` acceptance run are done — the mandatory split trigger was never
-reached. Every measured result is in
-[`hotfix-bundles/RB-2/IMPLEMENTATION.md`](hotfix-bundles/RB-2/IMPLEMENTATION.md).
-Next, invoke
-[`PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md)
-with `<BUNDLE_ID> = RB-2` and `<REVIEWER> = Codex`. Do not split or sample the
-bundle unless the mandatory size gate returns it to `BLOCKED`.
+Resume
+[`PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
+on the existing `hotfix/rb-2-deliverable-presentation` branch with
+`<BUNDLE_ID> = RB-2` and `<IMPLEMENTER> = Claude`.
+
+Codex Review 1 stopped at one Prompt-05 precondition gap,
+`RB2-R1-EG-001`: the complete retained `RB2-A1` acceptance set is not bound by
+path, size, SHA-256, frozen-source identity, and generation metadata to one exact
+final runtime head. Most retained workbooks predate final shared-writer commit
+`1a9418339e1c0df1cc16eddcaedb22dc1e4135d0`; only four classic-environment
+workbooks were recorded as regenerated afterwards. The exact evidence and
+bounded return are in
+[`hotfix-bundles/RB-2/REVIEW.md`](hotfix-bundles/RB-2/REVIEW.md).
+Do not merge or begin Review 2.
 
 RB-1 (work item HF-01, branch `hotfix/rb-1-clean-road-source-truth`) was
 implemented, denied by Codex Review 1 on the clipped `ArcGIS Build` disclosure
@@ -137,9 +140,9 @@ The other two point in opposite directions on purpose:
   the Description is the same label with `EQUATES TO ` prepended. The rule must be
   pair-aware, opt-in, and must not widen into the HF-09 class.
 
-Both planners signed the Stage 3 plan. **RB-1 is merged and RB-2 is READY.
-RB-2's combined contract exists; no implementation branch, code change, or
-acceptance generation has started.**
+Both planners signed the Stage 3 plan. **RB-1 is merged. RB-2 was implemented,
+but Review 1 denied it on one same-head evidence gap and returned it to Stage
+4 on its existing branch.**
 
 Stage 2 is closed with no open conflict:
 
@@ -161,8 +164,8 @@ Stage 2 is closed with no open conflict:
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-2 IMPLEMENTED — AWAITING REVIEW** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-1 COMPLETE — MERGED `560ea5e`** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-2 DENIED — RETURN TO IMPLEMENTATION** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-2 REVIEW 1 DENIED — EVIDENCE GAP** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.
