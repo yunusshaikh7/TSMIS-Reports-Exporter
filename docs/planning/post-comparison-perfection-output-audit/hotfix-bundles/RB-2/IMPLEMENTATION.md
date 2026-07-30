@@ -151,6 +151,34 @@ needed to see them:
 2. Recorded inputs were tested with `is_file()`, which is False for the classic
    lane's **folder** inputs. Testing existence gives **0 missing**.
 
+### What installed Excel's own AutoFit found that RC-1 could not
+
+Excel's metrics are stricter than the audit's gate, because the gate reads a
+workbook data-only and therefore cannot see what a FORMULA renders. Run over the
+final workbooks it reported six cells in two classes. Both are stated here; one
+is fixed, one is a declared boundary.
+
+**FIXED — `Provenance!A`, a hard-coded 12.** On a cross-environment comparison
+the input's *role* is the side's own name (`SSOR-PROD 2026-07-23`), which needs
+20.86. Column A's right neighbour is always populated, so it can never spill.
+This is exactly the defect class HF-02 exists to remove, on a sheet this bundle
+already modifies (the `read via` line), and it was a genuine miss in the first
+pass: `_write_provenance_sheet` now fits column A to the real role labels. The
+two classic environment pairs were regenerated and re-measured — **Excel
+`columns_too_narrow: 0`, RC-1 `0 clipped`** on all four workbooks — and the full
+gate re-run clean afterwards.
+
+**DECLARED BOUNDARY — `Spot Check` value columns.** Four cells
+(`Spot Check!r37c3/c4`, `r22c4/c6`) hold the values of whichever Comparison row
+the reader types into the input cell at RUNTIME. Their content is not knowable
+when the workbook is written, so no stored width can be fitted to it; the column
+holds a fixed width and a longer value truncates visually, as in any
+spreadsheet. This class is unchanged from base code, the audit did not flag it,
+and the Spot Check cell the audit DID flag — the `B6` instruction — is fixed and
+measures clean. Widening these to the widest value any field could contain would
+push two columns to ~60 characters on every family for a runtime-only gain, so
+the width is left as the schema's and the limitation recorded here instead.
+
 ### Installed-Excel recalculation — the twins agree, live
 
 `CalculateFullRebuild` + Save in installed Excel, on COPIES, then an app-free

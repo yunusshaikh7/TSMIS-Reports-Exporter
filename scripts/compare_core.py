@@ -3716,7 +3716,16 @@ def _write_provenance_sheet(wb, provenance):
     sidecar beside the workbook; this sheet is its concise display."""
     ws = wb.create_sheet("Provenance")
     ws.sheet_properties.tabColor = "808080"
-    for col, w in (("A", 12), ("B", 110)):
+    # Column A is the input's ROLE, and a role is an identity: on a
+    # cross-environment comparison it is the side's own name ("SSOR-PROD
+    # 2026-07-23"), which a hard-coded 12 cannot hold. Its right neighbour is
+    # always populated, so it can never spill — fit it (PCOA-FINAL-008's rule,
+    # applied to the sheet this bundle also gives a `read via` line).
+    roles = [str(rec.get("role", ""))
+             for rec in provenance.get("inputs") or ()] + ["Report", "Run", "Note"]
+    for col, w in (("A", fitted_width(roles, bold=False, size_pt=11,
+                                      minimum=12, maximum=_MAX_FITTED_WIDTH)),
+                   ("B", 110)):
         ws.column_dimensions[col].width = w
     recipe = provenance.get("recipe") or {}
     ws.append(["Comparison Provenance"])
