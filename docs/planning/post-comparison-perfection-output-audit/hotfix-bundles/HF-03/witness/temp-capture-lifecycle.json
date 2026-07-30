@@ -1,4 +1,13 @@
 {
  "before_run": {},
- "after_run": null
+ "after_run": {
+  "C:\\Users\\Yunus\\AppData\\Local\\Temp\\tsmis-tsn-consumer-cvzbqzqw": {
+   "is_dir": true,
+   "mtime": 1785323551.5006552,
+   "members": [
+    "tsn_intersection_detail_normalized.xlsx",
+    "tsn_intersection_detail_normalized.xlsx.outcome.json"
+   ]
+  }
+ }
 }

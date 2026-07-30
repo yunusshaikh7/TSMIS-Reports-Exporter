@@ -151,6 +151,54 @@ needed to see them:
 2. Recorded inputs were tested with `is_file()`, which is False for the classic
    lane's **folder** inputs. Testing existence gives **0 missing**.
 
+### Criterion 5 — nothing else moved, proved per family
+
+Base code and head code generated the same corpus from the same frozen inputs on
+the same day, and every deliverable pair was then compared cell for cell:
+
+```
+deliverable pairs compared                          : 42
+pairs with ANY truth-sheet change or outcome change : 0
+only in base: 0        only in head: 0
+typed outcomes NOT equal                            : 0
+```
+
+"Truth-sheet" means everything except this bundle's own surface: the
+`Comparison` sheet INCLUDING its hidden `E`/`D`/`N`/`U` state-mask columns, both
+`Only in …` sheets, both data sheets, `Routes`, both very-hidden
+`__CMP_E2_SNAPSHOT_A/B` sheets, and any extra rollup. Zero differing rows across
+all 42 pairs, and every typed `ComparisonOutcome` — counts, verdict,
+pairing_quality — identical. That satisfies HF-02 criterion 5 and HF-03
+criterion 5 together, including "Direct-lane workbooks unchanged".
+
+### Criterion 4 — the capture lifecycle, and the one directory that remained
+
+36 matrix-lane cells ran, each taking a private TSN capture. After the run,
+**one** `tsmis-tsn-consumer-*` directory remained, and its provenance is exact
+rather than mysterious: it was created **2026-07-29 04:12:31**, the moment a
+session crash HARD-KILLED the run mid `byday|tsn|intersection_detail`. No
+`finally` clause survives a kill — which is the entire reason
+`_sweep_stale_tsn_captures` exists.
+
+It was not swept during this run for a reason that is the age bound working
+correctly, not failing: the head pass's captures all ran 04:58–07:51, when that
+directory was 0.8–3.6 h old — INSIDE the 6 h bound that stops the sweep from
+racing a capture another process may still be holding. The base pass (07:52–
+13:30) runs pre-fix code, which has no sweep at all.
+
+`matrix_build._sweep_stale_tsn_captures` — the same call `captured_tsn_workbook`
+makes at every capture — was then run against that real 20-hour-old orphan:
+
+```
+before sweep: 1  tsmis-tsn-consumer-cvzbqzqw  age 20.0 h
+after sweep : 0
+```
+
+A genuine orphan left by a killed process, removed by the shipped code. The
+success, failure and cancellation paths are proved separately and hermetically
+by `check_tsn_canonical_consumer_identity`. Witness:
+`HF-03/witness/temp-capture-lifecycle.json`.
+
 ### The Everything lane — 9 of 9 audited families, and why the other three are out
 
 | Family | Result |
