@@ -1,6 +1,6 @@
 # `RB-2` — Implementation Record
 
-Status: **IMPLEMENTING — acceptance run `RB2-A1` in progress**
+Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW**
 
 | Field | Value |
 |---|---|
@@ -8,7 +8,7 @@ Status: **IMPLEMENTING — acceptance run `RB2-A1` in progress**
 | Implementer | Claude (owner decision 2026-07-26: Claude implements every bundle) |
 | Branch | `hotfix/rb-2-deliverable-presentation` (worktree `C:\Users\Yunus\Projects\TSMIS-rb2-worktree`; the user's `main` checkout is untouched and still clean) |
 | Base `main` commit | `896083e014d0451d5b05e5b6b024339aebc84d74` — clean, identical to `origin/main`, fetched without force before branching |
-| Implementation commits | `da1d480ede1f79671f4573b311ac2e402cd16eaf` (the change), `eb54b96` (the Excel-measured geometry correction below) |
+| Implementation commits | `da1d480` (the change), `eb54b96` (the Excel-measured geometry correction), `1a94183` (the Provenance role column, found by installed Excel's own AutoFit) |
 | Pushed | `origin/hotfix/rb-2-deliverable-presentation` |
 | Canonical findings | PCOA-FINAL-002, -003, -008, -009, -014, -016, -019 |
 | Generated-output root | `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-02\` (workbooks + measurements) and `…\HF-03\` (TSN rebuild + capture lifecycle); committed machine-readable witnesses under `hotfix-bundles/HF-02/witness/` and `hotfix-bundles/HF-03/witness/` |
@@ -97,10 +97,31 @@ Stage-2-validated 45.75 pt wrapped header band are excluded as out of scope.
 Witness: `HF-02\excel-metrics-ramp-summary{,2,3}.json` — the failing pass is
 retained beside the passing one.
 
-## Acceptance run `RB2-A1`
+## Acceptance run `RB2-A1` — COMPLETE
 
-*(in progress — the generation was restarted from scratch after the geometry
-correction so every measured workbook carries the final geometry)*
+One run, one head, executed end to end. 758 minutes of generation compute plus
+the measurement, Excel and gate legs. Bulk output under
+`…\_scratch\post-comparison-hotfixes\HF-02\` and `…\HF-03\`, with the whole
+harness retained beside it so a reviewer can re-run any leg.
+
+| Leg | Result |
+|---|---|
+| TSN library force rebuild | **8/8 datasets** current, through `build_consolidated(force=True)` |
+| Head generation | **30 comparisons** — 18 By Day + 18 Everything matrix-lane workbooks, 18 Direct-lane controls, 6 classic environment twins |
+| Base generation | **27 comparisons** — the same lanes minus By Day (see the scope note) |
+| RC-1 clipping, deliverables | **2,036 → 0** |
+| False rebuild instruction | **12 → 0** |
+| `%TEMP%` in workbook / sidecar | **18 / 18 → 0 / 0**, both RC-3 methods agreeing |
+| Recorded inputs that no longer exist | **18 → 0** |
+| `(values)` twins with a blank headline | **12 → 0** |
+| Invariance, 42 deliverable pairs | **0 changed**, **0 typed-outcome differences** |
+| Installed-Excel recalculation, 8 workbooks | every SELF-CHECK **OK**, **0** error cells, twins agree live |
+| Installed-Excel AutoFit | `columns_too_narrow: 0` after the Provenance fix; the Spot Check runtime class is a declared boundary |
+| Capture directories left | **0** (the one crash orphan swept by the shipped code) |
+| Evidence | unchanged — proved four ways, byte-identical under a pinned seed |
+| Full gate | **158 passed, 0 failed of 158** |
+| Ruff (gate-exact) | **All checks passed!** |
+| Frozen self-test | **PASSED** — `SMOKE OK`, the EXACT shipped exe runs every code path (173 MB onefolder) |
 
 ### The measured before/after — base code vs head code, same frozen inputs
 

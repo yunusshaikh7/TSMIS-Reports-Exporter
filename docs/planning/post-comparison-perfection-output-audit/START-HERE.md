@@ -2,11 +2,11 @@
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
 RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
-RB-2 is IMPLEMENTING — the code, the checks and the full gate are done and
-committed at `da1d480` on `hotfix/rb-2-deliverable-presentation`, and the
-combined `RB2-A1` acceptance run is executing**
+RB-2 is IMPLEMENTED — AWAITING ADVERSARIAL REVIEW on
+`hotfix/rb-2-deliverable-presentation`, with the complete combined `RB2-A1`
+acceptance run executed in one pass**
 
-Last updated: 2026-07-28
+Last updated: 2026-07-30
 
 This is the entry point for every new Codex or Claude chat. Read this file
 before opening the other audit documents. The project deliberately separates
@@ -16,11 +16,13 @@ first pass.
 
 ## Next action
 
-Stage 4 for RB-2 is under way on `hotfix/rb-2-deliverable-presentation`, base
-`896083e014d0451d5b05e5b6b024339aebc84d74`, implementation commit `da1d480`.
-The code, the two red→green checks and the full gate (158/158, ruff clean) are
-done; the combined `RB2-A1` acceptance run is executing. Finish that run and
-its record before invoking
+Stage 4 for RB-2 is COMPLETE on `hotfix/rb-2-deliverable-presentation`, base
+`896083e014d0451d5b05e5b6b024339aebc84d74`. The code, the two red→green checks,
+the full gate (158/158), ruff, the frozen self-test and the entire combined
+`RB2-A1` acceptance run are done — the mandatory split trigger was never
+reached. Every measured result is in
+[`hotfix-bundles/RB-2/IMPLEMENTATION.md`](hotfix-bundles/RB-2/IMPLEMENTATION.md).
+Next, invoke
 [`PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md)
 with `<BUNDLE_ID> = RB-2` and `<REVIEWER> = Codex`. Do not split or sample the
 bundle unless the mandatory size gate returns it to `BLOCKED`.
@@ -159,7 +161,7 @@ Stage 2 is closed with no open conflict:
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-2 READY — NOT STARTED** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 4 | Implement one bounded RB bundle | **RB-2 IMPLEMENTED — AWAITING REVIEW** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
 | 5 | Adversarially review and approve that bundle | **RB-1 COMPLETE — MERGED `560ea5e`** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
