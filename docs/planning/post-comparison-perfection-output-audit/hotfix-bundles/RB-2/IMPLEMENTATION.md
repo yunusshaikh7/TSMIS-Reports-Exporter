@@ -102,6 +102,43 @@ retained beside the passing one.
 *(in progress — the generation was restarted from scratch after the geometry
 correction so every measured workbook carries the final geometry)*
 
+### The measured before/after — base code vs head code, same frozen inputs
+
+Both trees generated the same corpus from the same frozen archive and the same
+TSN library on the same day, and every workbook was then measured by the audit's
+own gate plus BOTH of RC-3's methods. Provisioned per-route source exports are
+excluded (they are inputs, untouched by this bundle); in-flight `.tmp-`
+artifacts and evidence workbooks are excluded for the reasons given elsewhere in
+this record.
+
+| Oracle, over the comparison DELIVERABLES | BASE `896083e` | HEAD |
+|---|---:|---:|
+| materially clipped cells (RC-1's own gate) | **2,036** | **0** |
+| workbooks printing "rebuild the TSN library" | **12** | **0** |
+| workbooks naming a `%TEMP%` path — zip probe / cell walk | **18 / 18** | **0 / 0** |
+| `.provenance.json` naming a `%TEMP%` path | **18** | **0** |
+| recorded input paths that no longer exist | **18** | **0** |
+| deliverables carrying a stored literal headline | 15 | **52** |
+| …of which readable `data_only` | 15 | **52** |
+| workbooks named `(values)` with a BLANK `data_only` headline | **12** | **0** |
+
+RC-3's two independent methods agree exactly on both trees (`zip == walk`), which
+is what the contract requires of the re-derivation. The 18 base inputs that "no
+longer exist" are PCOA-FINAL-003's harm stated numerically: the recorded TSN path
+was a private capture directory that is deleted when the run ends.
+
+**Two corrections to the tally, both mine and both in the summary logic rather
+than the product** — the raw measurement witness already contained what was
+needed to see them:
+
+1. A values twin was first identified by FILENAME. The classic and Direct lanes
+   name the PRIMARY file the **formulas** workbook and `(values)` the twin — the
+   inverse of the matrix lanes — so four formulas workbooks were misread as
+   values twins with "blank" headlines. Identifying by whether stored `B3` is a
+   formula gives **0 blank of 52**.
+2. Recorded inputs were tested with `is_file()`, which is False for the classic
+   lane's **folder** inputs. Testing existence gives **0 missing**.
+
 ### The Everything lane — 9 of 9 audited families, and why the other three are out
 
 | Family | Result |
