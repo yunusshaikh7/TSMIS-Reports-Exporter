@@ -1,0 +1,750 @@
+{
+ "methods": [
+  "zip/sheet-XML probe (no openpyxl object model)",
+  "openpyxl cell walk over every sheet"
+ ],
+ "stage2_recorded": {
+  "EVERYTHING-tsn": {
+   "n": 18,
+   "warned": 12,
+   "temp_path": 18
+  },
+  "EVERYTHING-self": {
+   "n": 8,
+   "warned": 0,
+   "temp_path": 0
+  },
+  "EVERYTHING-env": {
+   "n": 20,
+   "warned": 0,
+   "temp_path": 0
+  },
+  "DIRECT-tsn": {
+   "n": 18,
+   "warned": 0,
+   "temp_path": 0
+  },
+  "BYDAY-tsn": {
+   "n": 18,
+   "warned": 12,
+   "temp_path": 18
+  }
+ },
+ "this_run": {
+  "CLASSIC-env": {
+   "n": 6,
+   "false_rebuild": 0,
+   "temp_path": 0,
+   "methods_agree": true
+  },
+  "DIRECT-tsn": {
+   "n": 18,
+   "false_rebuild": 0,
+   "temp_path": 0,
+   "methods_agree": true
+  },
+  "EVERYTHING-tsn": {
+   "n": 18,
+   "false_rebuild": 0,
+   "temp_path": 0,
+   "methods_agree": true
+  },
+  "BYDAY-tsn": {
+   "n": 18,
+   "false_rebuild": 0,
+   "temp_path": 0,
+   "methods_agree": true
+  }
+ },
+ "rows": {
+  "CLASSIC-env": [
+   {
+    "file": "intersection_summary new-vs-prior-ssor (values).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "intersection_summary new-vs-prior-ssor.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [
+     "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\output\\2026-07-23 ssor-prod",
+     "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\output\\2026-07-09 ssor-prod"
+    ],
+    "identities": []
+   },
+   {
+    "file": "ramp_detail_pdf new-vs-prior-ssor (values).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "ramp_detail_pdf new-vs-prior-ssor.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [
+     "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\output\\2026-07-23 ssor-prod",
+     "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\output\\2026-07-09 ssor-prod"
+    ],
+    "identities": []
+   },
+   {
+    "file": "ramp_summary new-vs-prior-ssor (values).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "ramp_summary new-vs-prior-ssor.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [
+     "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\output\\2026-07-23 ssor-prod",
+     "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\output\\2026-07-09 ssor-prod"
+    ],
+    "identities": []
+   }
+  ],
+  "DIRECT-tsn": [
+   {
+    "file": "highway_log vs tsn (values).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM52010"
+    ]
+   },
+   {
+    "file": "highway_log vs tsn.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM52010"
+    ]
+   },
+   {
+    "file": "highway_log_pdf vs tsn (values).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM52010"
+    ]
+   },
+   {
+    "file": "highway_log_pdf vs tsn.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM52010"
+    ]
+   },
+   {
+    "file": "highway_sequence vs tsn (values).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22025"
+    ]
+   },
+   {
+    "file": "highway_sequence vs tsn.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22025"
+    ]
+   },
+   {
+    "file": "highway_sequence_pdf vs tsn (values).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22025"
+    ]
+   },
+   {
+    "file": "highway_sequence_pdf vs tsn.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22025"
+    ]
+   },
+   {
+    "file": "intersection_detail vs tsn (values).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "intersection_detail vs tsn.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "intersection_detail_pdf vs tsn (values).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "intersection_detail_pdf vs tsn.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "intersection_summary vs tsn (values).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22250"
+    ]
+   },
+   {
+    "file": "intersection_summary vs tsn.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22250"
+    ]
+   },
+   {
+    "file": "ramp_detail_pdf vs tsn (values).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "ramp_detail_pdf vs tsn.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "ramp_summary vs tsn (values).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22270"
+    ]
+   },
+   {
+    "file": "ramp_summary vs tsn.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22270"
+    ]
+   }
+  ],
+  "EVERYTHING-tsn": [
+   {
+    "file": "ssor-prod_highway_log_pdf_tsn (formulas).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM52010"
+    ]
+   },
+   {
+    "file": "ssor-prod_highway_log_pdf_tsn.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM52010"
+    ]
+   },
+   {
+    "file": "ssor-prod_highway_log_tsn (formulas).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM52010"
+    ]
+   },
+   {
+    "file": "ssor-prod_highway_log_tsn.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM52010"
+    ]
+   },
+   {
+    "file": "ssor-prod_highway_sequence_pdf_tsn (formulas).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22025"
+    ]
+   },
+   {
+    "file": "ssor-prod_highway_sequence_pdf_tsn.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22025"
+    ]
+   },
+   {
+    "file": "ssor-prod_highway_sequence_tsn (formulas).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22025"
+    ]
+   },
+   {
+    "file": "ssor-prod_highway_sequence_tsn.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22025"
+    ]
+   },
+   {
+    "file": "ssor-prod_intersection_detail_pdf_tsn (formulas).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "ssor-prod_intersection_detail_pdf_tsn.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "ssor-prod_intersection_detail_tsn (formulas).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "ssor-prod_intersection_detail_tsn.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "ssor-prod_intersection_summary_tsn (formulas).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22250"
+    ]
+   },
+   {
+    "file": "ssor-prod_intersection_summary_tsn.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22250"
+    ]
+   },
+   {
+    "file": "ssor-prod_ramp_detail_pdf_tsn (formulas).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "ssor-prod_ramp_detail_pdf_tsn.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "ssor-prod_ramp_summary_tsn (formulas).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22270"
+    ]
+   },
+   {
+    "file": "ssor-prod_ramp_summary_tsn.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22270"
+    ]
+   }
+  ],
+  "BYDAY-tsn": [
+   {
+    "file": "highway_log_pdf_vs_tsn 2026-07-23 ssor-prod (formulas).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM52010"
+    ]
+   },
+   {
+    "file": "highway_log_pdf_vs_tsn 2026-07-23 ssor-prod.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM52010"
+    ]
+   },
+   {
+    "file": "highway_log_vs_tsn 2026-07-23 ssor-prod (formulas).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM52010"
+    ]
+   },
+   {
+    "file": "highway_log_vs_tsn 2026-07-23 ssor-prod.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM52010"
+    ]
+   },
+   {
+    "file": "highway_sequence_pdf_vs_tsn 2026-07-23 ssor-prod (formulas).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22025"
+    ]
+   },
+   {
+    "file": "highway_sequence_pdf_vs_tsn 2026-07-23 ssor-prod.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22025"
+    ]
+   },
+   {
+    "file": "highway_sequence_vs_tsn 2026-07-23 ssor-prod (formulas).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22025"
+    ]
+   },
+   {
+    "file": "highway_sequence_vs_tsn 2026-07-23 ssor-prod.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22025"
+    ]
+   },
+   {
+    "file": "intersection_detail_pdf_vs_tsn 2026-07-23 ssor-prod (formulas).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "intersection_detail_pdf_vs_tsn 2026-07-23 ssor-prod.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "intersection_detail_vs_tsn 2026-07-23 ssor-prod (formulas).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "intersection_detail_vs_tsn 2026-07-23 ssor-prod.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "intersection_summary_vs_tsn 2026-07-23 ssor-prod (formulas).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22250"
+    ]
+   },
+   {
+    "file": "intersection_summary_vs_tsn 2026-07-23 ssor-prod.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22250"
+    ]
+   },
+   {
+    "file": "ramp_detail_pdf_vs_tsn 2026-07-23 ssor-prod (formulas).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "ramp_detail_pdf_vs_tsn 2026-07-23 ssor-prod.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": []
+   },
+   {
+    "file": "ramp_summary_vs_tsn 2026-07-23 ssor-prod (formulas).xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22270"
+    ]
+   },
+   {
+    "file": "ramp_summary_vs_tsn 2026-07-23 ssor-prod.xlsx",
+    "false_rebuild_zip": false,
+    "false_rebuild_walk": false,
+    "temp_path_zip": false,
+    "temp_path_walk": false,
+    "provenance_temp": false,
+    "provenance_missing_input": [],
+    "identities": [
+     "OTM22270"
+    ]
+   }
+  ]
+ }
+}
