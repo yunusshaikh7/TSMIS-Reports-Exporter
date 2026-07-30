@@ -127,6 +127,18 @@ is what the contract requires of the re-derivation. The 18 base inputs that "no
 longer exist" are PCOA-FINAL-003's harm stated numerically: the recorded TSN path
 was a private capture directory that is deleted when the run ends.
 
+**Disclosed, not buried — the evidence workbook has its own clipping, and this
+bundle did not change it.** Running RC-1 over the WHOLE generated tree returns
+64 (base) and 127 (head) rather than 0, and every one of those hits is inside an
+EVIDENCE workbook. Per evidence SET the counts are identical in both trees —
+Highway Log 63, Highway Sequence 1 — and head only shows more because it has an
+extra set (the base pass deliberately skips the By Day lane). Evidence
+presentation is written by `visual_evidence.py`, which this bundle does not
+touch and which HF-02 places explicitly out of scope, so the pre-existing
+evidence-workbook clipping is left exactly as found. It is recorded here and in
+`clipping-before-after.json` (`non_deliverable_detail`) so a reviewer who
+measures the whole tree sees the number explained rather than unexplained.
+
 **Two corrections to the tally, both mine and both in the summary logic rather
 than the product** — the raw measurement witness already contained what was
 needed to see them:
