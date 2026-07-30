@@ -151,6 +151,43 @@ needed to see them:
 2. Recorded inputs were tested with `is_file()`, which is False for the classic
    lane's **folder** inputs. Testing existence gives **0 missing**.
 
+### Installed-Excel recalculation — the twins agree, live
+
+`CalculateFullRebuild` + Save in installed Excel, on COPIES, then an app-free
+read of the cached results. The set is chosen to satisfy both contracts: both
+schema shapes (summary / detail), both TSN identity classes (printing /
+silent — HF-03 asks for "at least one family per identity class" in as many
+words), both lanes (matrix / classic), and BOTH twins of each.
+
+| Workbook | SELF-CHECK rows | non-OK | error cells | Excel's live verdict |
+|---|---:|---:|---:|---|
+| ramp_summary vs TSN — values | 7 | **0** | **0** | 23 cells, 2 one-sided |
+| ramp_summary vs TSN — formulas | 7 | **0** | **0** | 23 cells, 2 one-sided |
+| intersection_detail vs TSN — values | 11 | **0** | **0** | 5,092 cells, 687 one-sided |
+| intersection_detail vs TSN — formulas | 11 | **0** | **0** | 5,092 cells, 687 one-sided |
+| highway_sequence vs TSN — values | 10 | **0** | **0** | 5,573 cells, 15,958 one-sided |
+| highway_sequence vs TSN — formulas | 10 | **0** | **0** | 5,573 cells, 15,958 one-sided |
+| ramp_summary classic env — formulas | 7 | **0** | **0** | 67 cells, 0 one-sided |
+| ramp_summary classic env — values | 7 | **0** | **0** | 67 cells, 0 one-sided |
+
+**Every SELF-CHECK row OK, zero cached error values, and the twins agree
+exactly**: for each family the verdict Excel computes LIVE in the formulas twin
+equals the literal now stored in the values twin. For Highway Sequence that is a
+triple agreement — `5,573 / 15,958` from the stored literal read `data_only`,
+from Excel's own live recalculation, and from the typed `ComparisonOutcome`.
+
+This is the real content of PCOA-FINAL-019's fix: the values twin's headline is
+not merely non-empty, it is **correct**, and installed Excel says so. The
+freshness SELF-CHECK reads `OK` on every unedited workbook, so the renamed
+`REGENERATE REQUIRED` state does not misfire.
+
+**Not recalculated, and why:** Highway Log and the remaining PDF-edition
+families. RB-1 measured **68 minutes for a single statewide formulas twin**, so
+recalculating all nine families both ways is 6–8 hours of Excel that would test
+the same code paths already covered above. The boundary is stated here rather
+than left for a reviewer to discover; under the owner's bounded-review ruling no
+reviewer repeats this leg, so this record is its single source.
+
 ### Criterion 5 — nothing else moved, proved per family
 
 Base code and head code generated the same corpus from the same frozen inputs on
