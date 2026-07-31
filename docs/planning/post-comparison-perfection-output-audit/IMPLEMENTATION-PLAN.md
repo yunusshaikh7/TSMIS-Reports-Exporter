@@ -479,7 +479,7 @@ mapping also proves one primary implementation/review bundle per finding:
 | RB bundle | Work items | Canonical findings | Count | Queue status |
 |---|---|---|---:|---|
 | **RB-1** | HF-01 | 010 | 1 | **MERGED** — `560ea5e501fdd76003985753ba7fc9ff0a551320` |
-| **RB-2** | HF-02, HF-03 | 002, 003, 008, 009, 014, 016, 019 | 7 | **DENIED — RETURN TO IMPLEMENTATION** |
+| **RB-2** | HF-02, HF-03 | 002, 003, 008, 009, 014, 016, 019 | 7 | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
 | **RB-3** | HF-04 | 001, 012 | 2 | BLOCKED |
 | **RB-4** | HF-05, HF-10 | 004, 005, 006, 007 | 4 | BLOCKED |
 | **RB-5** | HF-06, HF-09 | 011, 013 | 2 | BLOCKED |
