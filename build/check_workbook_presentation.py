@@ -25,8 +25,10 @@ from _checklib import Checker, ROOT, scripts_path, temp_dir
 
 scripts_path()
 
-from compare_core import CompareSchema, run_compare  # noqa: E402
+from compare_core import CompareSchema, _text_px, run_compare  # noqa: E402
 from openpyxl import load_workbook  # noqa: E402
+from summary_layout import (Cat, Section, SummarySpec,  # noqa: E402
+                            make_extra_sheet_writer)
 
 GATE = (ROOT / "docs" / "planning" / "post-comparison-perfection-output-audit"
         / "stage2-measure-clipping.py")
@@ -59,6 +61,74 @@ DETAIL_A = [[f"00{i} / ORA / R000.{i:03d}", f"DESCRIPTION OF LOCATION {i}",
              f"CITY {i}", f"{i}.5"] for i in range(1, 25)]
 DETAIL_B = [[k, d + ("X" if i % 5 == 0 else ""), "A DIFFERENT CITY", pm]
             for i, (k, d, _c, pm) in enumerate(DETAIL_A)]
+
+# ---- RB2-R2-001: the widest string is not the longest one -------------------
+# Character count and rendered width are not order-equivalent: `WWWWWWWWWW` is
+# 10 characters and 135.25 px where `iiiiiiiiiii` is 11 characters and 38.65 px.
+# Any width heuristic that shortlists candidates by `len` before measuring can
+# therefore discard the one value that needed the room. Every shape above has
+# its widest string as its longest, which cannot catch that; each set below
+# inverts the order on purpose, for the field values, the identity keys, the
+# route, the one-sided keys, and the summary category labels.
+WIDE_PROBE = ("WWWWWWWWWW", "iiiiiiiiiii")     # the exact strings in the return
+
+
+def _wide(n):
+    """`n` characters of the widest Calibri/Arial glyph."""
+    return "W" * n
+
+
+def _narrow(n):
+    """`n` characters of the narrowest Calibri/Arial glyph."""
+    return "i" * n
+
+
+WIDE_SCHEMA = CompareSchema(
+    report_name="Presentation Wide Glyph", header=["Key", "Value", "Tail"],
+    side_a="TSMIS (PDF)", side_b="TSMIS (Excel)",
+    id_noun="location", id_noun_plural="locations")
+# In each of these key sets the pixel-widest member is the SHORTEST, so a
+# "longest 1" or "longest 3" shortlist provably never measures it. The one-sided
+# sets give each "Only in ..." sheet its own four-key column with the same trap.
+WIDE_BOTH = (_wide(10), _narrow(11), _narrow(12), _narrow(13))
+WIDE_ONLY_A = (_wide(9), _narrow(14), _narrow(15), _narrow(16))
+WIDE_ONLY_B = (_wide(8), _narrow(17), _narrow(18), _narrow(19))
+WIDE_ROUTE, NARROW_ROUTE = _wide(6), _narrow(9)
+
+
+def _wide_row(key, value):
+    """`[route, key, value, tail]` — the wide route rides the wide key, and the
+    populated tail stops the value cell from legally spilling."""
+    return [WIDE_ROUTE if key.startswith("W") else NARROW_ROUTE,
+            key, value, "t"]
+
+
+# Every paired row differs, so each renders an "<A> ≠ <B>" pair. Side A's widest
+# value is `WWWWWWWWWW` and side B's is `MMMMMMMMMM`, while BOTH sides' longest
+# values are narrow — so a character-count shortlist sizes the field for a pair
+# that is far narrower than the pair actually written into it.
+WIDE_A = ([_wide_row(k, k) for k in WIDE_BOTH]
+          + [_wide_row(k, k) for k in WIDE_ONLY_A])
+WIDE_B = ([_wide_row(k, "M" * 10 if k.startswith("W") else _narrow(len(k) + 4))
+           for k in WIDE_BOTH]
+          + [_wide_row(k, k) for k in WIDE_ONLY_B])
+
+# The same inversion for summary_layout's Category column, reached through the
+# production extra-sheet writer rather than by calling the renderer directly.
+WIDE_CATS = (_wide(24), _narrow(40), _narrow(44), _narrow(48))
+WIDE_SPEC = SummarySpec(
+    report="Presentation Wide Glyph", sheet_name="Wide Categories",
+    title="Wide-glyph category labels",
+    sections=(Section(name=_wide(20),
+                      cats=tuple(Cat(slug=f"c{i}", label=label, key=label)
+                                 for i, label in enumerate(WIDE_CATS))),))
+WIDE_CAT_SCHEMA = CompareSchema(
+    report_name="Presentation Wide Categories", header=["Category", "Count"],
+    side_a="TSMIS", side_b="TSN", id_noun="category",
+    id_noun_plural="categories",
+    extra_sheet_writer=make_extra_sheet_writer(WIDE_SPEC))
+WIDE_CAT_A = [[label, str(10 + i)] for i, label in enumerate(WIDE_CATS)]
+WIDE_CAT_B = [[label, str(11 + i)] for i, label in enumerate(WIDE_CATS)]
 
 FRESHNESS_LABEL = ("Build-time source identity and duplicate pairing snapshot "
                    "is current")
@@ -134,6 +204,51 @@ def main():
                     not (key_cell.alignment and key_cell.alignment.wrap_text))
         finally:
             wb.close()
+
+        # ---- RB2-R2-001: sizing measures pixels, not characters -------------
+        # Guard the fixture itself first. Without a readable font file the
+        # product falls back to a per-character estimate, which would make
+        # width and length order-equivalent and quietly rob every assertion
+        # below of its teeth.
+        px_wide, px_narrow = (_text_px(t, False, 10.0) for t in WIDE_PROBE)
+        c.check("the fixture's shorter string really is the pixel-wider one",
+                len(WIDE_PROBE[0]) < len(WIDE_PROBE[1]) and px_wide > px_narrow,
+                f"{px_wide:.2f}px for {len(WIDE_PROBE[0])} chars vs "
+                f"{px_narrow:.2f}px for {len(WIDE_PROBE[1])} chars")
+
+        wide = {}
+        for mode in ("values", "formulas"):
+            for label, sc, ra, rb, has_route in (
+                    (f"field/{mode}", WIDE_SCHEMA, WIDE_A, WIDE_B, True),
+                    (f"category/{mode}", WIDE_CAT_SCHEMA, WIDE_CAT_A,
+                     WIDE_CAT_B, False)):
+                path = Path(tmp) / f"wide-{label.replace('/', '-')}.xlsx"
+                result = run_compare(sc, ra, rb, has_route, path, mode=mode,
+                                     name_a="a.xlsx", name_b="b.xlsx")
+                c.check(f"wide {label} builds", result.status == "ok",
+                        repr(result))
+                wide[label] = path
+
+        # The committed oracle scans Summary / Spot Check / Comparison. The
+        # one-sided and category sheets are measured with the oracle's OWN
+        # sheet function, so the fix is never proved against a private ruler.
+        for label, path in wide.items():
+            hits = list(gate.audit_workbook(path))
+            wb = load_workbook(path, read_only=False, data_only=True)
+            try:
+                extra = [s for s in wb.sheetnames
+                         if s.startswith("Only in") or s == WIDE_SPEC.sheet_name]
+                for sheet in extra:
+                    hits.extend(gate.audit_sheet(wb[sheet], path.name, sheet))
+            finally:
+                wb.close()
+            c.check(f"wide {label}: no cell is clipped because a shorter value "
+                    f"was measured in place of the wider one (+{len(extra)} "
+                    "one-sided/category sheets)",
+                    not hits,
+                    "; ".join(f"{h['sheet']}!{h['cell']} short "
+                              f"{h['short_by_px']}px {h['text'][:40]!r}"
+                              for h in hits[:6]))
 
         # ---- PCOA-FINAL-014: a wholly-context column says so ----------------
         for mode in ("values", "formulas"):

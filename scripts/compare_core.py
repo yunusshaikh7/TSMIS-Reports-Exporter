@@ -94,6 +94,10 @@ _SPOT_LABEL_MAX_WIDTH = 34.0
 # A Comparison field cell shows "<side A value> ≠ <side B value>", so it needs
 # more room than Excel's 8.43 general default. Schema-declared widths still win.
 _CMP_FIELD_MIN_WIDTH = 13.0
+# The point size the Comparison/Only-in body is written at. Sizing a column
+# MEASURES at this size, so the constant is shared rather than repeated: a
+# candidate chosen at one size and fitted at another is not a fit at all.
+_CMP_FIELD_PT = 10
 # Identity and unsized columns are WIDENED to fit rather than wrapped — a key
 # has to read on one line — but a pathological value stops here.
 _MAX_FITTED_WIDTH = 60.0
@@ -1997,6 +2001,8 @@ _FALLBACK_CHAR_PX = 8.0        # generous: wider than any Arial/Calibri glyph
                                # font file is readable
 _FONT_CACHE = {}
 _FONT_DIR = "C:/Windows/Fonts/"
+_PX_CACHE = {}
+_PX_CACHE_MAX = 200_000        # distinct measured strings held before resetting
 
 
 def _fonts_for(bold, size_pt):
@@ -2022,15 +2028,28 @@ def _fonts_for(bold, size_pt):
 
 
 def _text_px(text, bold=False, size_pt=11.0):
-    """Rendered width of `text` in pixels, measured in the widest candidate font."""
+    """Rendered width of `text` in pixels, measured in the widest candidate font.
+
+    Memoized because sizing a column measures EVERY candidate (see
+    `_auto_field_widths`), and a statewide field sweep repeats the same handful
+    of distinct values millions of times."""
     s = "" if text is None else str(text)
     if not s:
         return 0.0
+    key = (s, bool(bold), float(size_pt))
+    hit = _PX_CACHE.get(key)
+    if hit is not None:
+        return hit
     fonts = _fonts_for(bold, size_pt)
     if not fonts:
-        return len(s) * _FALLBACK_CHAR_PX * (float(size_pt) / 11.0)
-    return (max(f.getlength(s) for f in fonts)
-            / _MEASURE_SCALE * _MEASURE_MARGIN)
+        px = len(s) * _FALLBACK_CHAR_PX * (float(size_pt) / 11.0)
+    else:
+        px = (max(f.getlength(s) for f in fonts)
+              / _MEASURE_SCALE * _MEASURE_MARGIN)
+    if len(_PX_CACHE) >= _PX_CACHE_MAX:
+        _PX_CACHE.clear()        # bounded: a corpus run must not grow this
+    _PX_CACHE[key] = px          # without limit
+    return px
 
 
 def _width_to_px(width):
@@ -2224,11 +2243,18 @@ def _auto_field_widths(sc, lay, rows_t, rows_n, off):
     ceiling that clips its own content — and every column is fitted to the
     widest pair its data can produce, bounded so one pathological value cannot
     make the sheet unusable. Computed once per comparison so both twins carry
-    identical geometry."""
+    identical geometry.
+
+    The winning value per field and side is the RENDERED-WIDEST one, never the
+    longest (RB2-R2-001). Character count and pixel width do not order the same
+    way — `WWWWWWWWWW` is one character shorter than `iiiiiiiiiii` and three
+    and a half times wider — so choosing by `len` and measuring afterwards can
+    discard the only candidate that needed the room and publish it clipped."""
     fields = list(lay.field_indices)
     if not fields:
         return {}
-    longest = {f: ("", "") for f in fields}
+    widest = {f: ["", ""] for f in fields}
+    widest_px = {f: [0.0, 0.0] for f in fields}
     for rows, slot in ((rows_t, 0), (rows_n, 1)):
         for row in rows:
             for f in fields:
@@ -2239,16 +2265,17 @@ def _auto_field_widths(sc, lay, rows_t, rows_n, off):
                 if v is None:
                     continue
                 s = str(v)
-                if len(s) > len(longest[f][slot]):
-                    longest[f] = ((s, longest[f][1]) if slot == 0
-                                  else (longest[f][0], s))
+                px = _text_px(s, False, _CMP_FIELD_PT)
+                if px > widest_px[f][slot]:
+                    widest_px[f][slot] = px
+                    widest[f][slot] = s
     return {f: fitted_width(
-        [(a + _DIFF_MARK + b) if a and b else (a or b)], size_pt=10,
+        [(a + _DIFF_MARK + b) if a and b else (a or b)], size_pt=_CMP_FIELD_PT,
         minimum=max(_CMP_FIELD_MIN_WIDTH,
                     float(sc.cmp_widths.get(sc.header[f], 0))),
         maximum=max(_MAX_FITTED_WIDTH,
                     float(sc.cmp_widths.get(sc.header[f], 0))))
-        for f, (a, b) in longest.items()}
+        for f, (a, b) in widest.items()}
 
 
 def _write_data_sheet(wb, name, tab_color, rows, lay, events, cmp_rows,
@@ -2434,17 +2461,19 @@ def _write_comparison(wb, union, lay, events, vals=None, helper_tokens=None,
     ws.auto_filter.ref = f"A1:{lay.last_field_col}{last}"
     # PCOA-FINAL-008: the key/category column is the row's IDENTITY and its
     # right neighbour is always populated, so it can never spill — a stored
-    # width that does not fit the longest key makes two different rows read the
+    # width that does not fit the widest key makes two different rows read the
     # same ("Ramp Type: C", "Highway Group: R"). Measure the real keys and the
     # real status labels, and give every field column enough room for a
-    # "<A> ≠ <B>" pair unless the schema declared its own.
+    # "<A> ≠ <B>" pair unless the schema declared its own. EVERY key is
+    # measured, never a `len`-shortlist of them: a shorter key can render wider
+    # (RB2-R2-001), and the one left out is exactly the one that gets clipped.
     if lay.has_route:
         ws.column_dimensions["A"].width = fitted_width(
-            sorted({str(route) for route, _l, _o in union}, key=len)[-1:],
-            size_pt=10, minimum=8, maximum=_MAX_FITTED_WIDTH)
+            {str(route) for route, _l, _o in union},
+            size_pt=_CMP_FIELD_PT, minimum=8, maximum=_MAX_FITTED_WIDTH)
     ws.column_dimensions[lay.c_loc].width = fitted_width(
-        sorted({str(_visible_key(loc)) for _r, loc, _o in union}, key=len)[-3:],
-        size_pt=10, minimum=12, maximum=_MAX_FITTED_WIDTH)
+        {str(_visible_key(loc)) for _r, loc, _o in union},
+        size_pt=_CMP_FIELD_PT, minimum=12, maximum=_MAX_FITTED_WIDTH)
     ws.column_dimensions[lay.c_occ].width = 4
     ws.column_dimensions[lay.c_trow].width = 7
     ws.column_dimensions[lay.c_status].width = fitted_width(
@@ -2981,13 +3010,23 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None,
     ws.freeze_panes = f"{first_field}2"
     ws.auto_filter.ref = f"A1:{last_field}{last}"
     if lay.has_route:
-        ws.column_dimensions[c_route].width = 8
-        ws.column_dimensions[c_why].width = 18
-    # Same identity rule as the Comparison sheet: these are the SAME keys,
-    # repeated in one place (PCOA-FINAL-008 / -009).
+        # The route is part of the row's identity on this sheet too, and the
+        # "Missing from" header and phrases are both schema-derived, so neither
+        # width can be assumed (RB2-R2-001 — the Comparison sheet measured its
+        # route while this one kept a fixed 8). The header is bold and the two
+        # phrases are not; measuring them all bold only ever over-reserves.
+        ws.column_dimensions[c_route].width = fitted_width(
+            {str(route) for route, _l, _o in keys} | {id_headers[0]},
+            size_pt=_CMP_FIELD_PT, minimum=8, maximum=_MAX_FITTED_WIDTH)
+        ws.column_dimensions[c_why].width = fitted_width(
+            (id_headers[-1], "entire route", f"this {sc.id_noun} only"),
+            bold=True, size_pt=_CMP_FIELD_PT, minimum=18,
+            maximum=_MAX_FITTED_WIDTH)
+    # Same identity rule as the Comparison sheet, measured the same way: these
+    # are the SAME keys, repeated in one place (PCOA-FINAL-008 / -009).
     ws.column_dimensions[c_loc].width = fitted_width(
-        sorted({str(_visible_key(loc)) for _r, loc, _o in keys}, key=len)[-3:],
-        size_pt=10, minimum=12, maximum=_MAX_FITTED_WIDTH)
+        {str(_visible_key(loc)) for _r, loc, _o in keys},
+        size_pt=_CMP_FIELD_PT, minimum=12, maximum=_MAX_FITTED_WIDTH)
     ws.column_dimensions[c_occ].width = 4
     ws.column_dimensions[c_row].width = 9
     _apply_field_widths(ws, sc.cmp_widths, fcol, lay)

@@ -633,11 +633,12 @@ def _render(wb, ctx, spec, footnote_values=None, extra_notes=None):
 
     # PCOA-FINAL-008: the Category column IS each row's identity and its right
     # neighbour is always a count, so it can never spill — measure the real
-    # labels instead of hoping 34 characters is enough.
+    # labels instead of hoping 34 characters is enough. ALL of them, not the
+    # longest few: a shorter label can render wider (RB2-R2-001).
     from compare_core import fitted_width
     labels = [c.label for sec in spec.sections for c in sec.cats]
     labels += [sec.name for sec in spec.sections] + ["Category"]
-    for col, w in (("A", fitted_width(sorted(labels, key=len)[-3:], size_pt=10,
+    for col, w in (("A", fitted_width(labels, size_pt=10,
                                       minimum=34, maximum=60)),
                    ("B", 13), ("C", 13), ("D", 10)):
         ws.column_dimensions[col].width = w
