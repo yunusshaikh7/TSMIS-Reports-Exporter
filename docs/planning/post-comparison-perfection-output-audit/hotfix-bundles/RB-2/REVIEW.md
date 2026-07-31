@@ -1,6 +1,6 @@
 # `RB-2` — Adversarial Review Record
 
-Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
+Status: **REVIEW 2 DENIED — RETURN TO IMPLEMENTATION** (`RB2-R2-001`)
 
 ## Initial Review 1 verdict — 2026-07-30
 
@@ -351,3 +351,111 @@ also approves.
 
 **Reviewer signature:** Codex, Review 1 re-review — **APPROVED** —
 `2026-07-31T08:06:40.8787498-07:00`.
+
+---
+
+## Review 2 — Codex, 2026-07-31
+
+### Verdict
+
+**DENIED — RETURN TO IMPLEMENTATION.** `RB2-R2-001` is a concrete product
+failure in HF-02 criterion 1, not an evidence gap. Merge and cleanup remain
+blocked.
+
+### Review identity and bounded execution
+
+| Field | Value |
+|---|---|
+| Reviewer / pass | Codex / Review 2 |
+| Implemented this bundle? | **No** |
+| Branch | `hotfix/rb-2-deliverable-presentation` |
+| Recorded base / independently re-derived merge-base | `896083e014d0451d5b05e5b6b024339aebc84d74` / exact match |
+| Acceptance runtime head | `c483bda1716e03d0e013b25e975bd9a41c58b2c8` |
+| Manifest-build head | `a38ad214932069c8bd928b078011a0964d06182b` |
+| Review 1 record / Review 2 entry head | `abaade5ce4fe592a7cf74867d9133f192d539fc4` |
+| Remote branch head on entry | `c5740b9e03d28afb8b295eb02182e7b106b1027d` (local was one commit ahead) |
+| Worktree / branch diff on entry | Clean / branch diff check clean |
+| Active review time | Approximately 27 minutes, excluding approval and sandbox waiting |
+| Resource cap | Respected: no corpus generation, installed-Excel run, or full-gate repeat; one tiny product-function probe and one non-retried follow-up attempt |
+
+### Preconditions, scope, and retained evidence
+
+| Check | Review 2 result |
+|---|---|
+| Recorded-base ancestry and merge-base | **PASS** — independently re-derived as the exact recorded base |
+| Changed-path scope | **PASS** — 21 paths from base; product changes remain limited to `scripts/compare_core.py`, `scripts/summary_layout.py`, `scripts/matrix_build.py`, and `scripts/compare_tsn_common.py`, with focused checks/docs/witness/verifier changes beside them |
+| Acceptance manifest identity | **PASS** — `RB2-A1-manifest.json`, 1,803,195 bytes, SHA-256 `3BF96B3B248082AA3C0C2C767908E23054A61C3CDAE4ABD1B56CD3380D0F82E8` |
+| Source manifest identity | **PASS** — `RB2-A1-sources.json`, 962,858 bytes, SHA-256 `44634BB6DDCD18AA8680B19DD99281CB8703C06DD302C73C9097309DC44A5798` |
+| Signed Review 1 evidence reused | 18/18 claimed results bind the exact acceptance head; the verifier matched 418 runtime files and four witnesses and rejected injected missing/mismatched heads |
+| Retained gates reused | Focused presentation, TSN-capture, freshness, and failure checks green; retained full implementation gate 158/158 |
+| Expensive work repeated | None; the signed exact-head evidence was valid to reuse under Prompt 05 |
+
+Review 2 did not copy Review 1's conclusion. It challenged the boundary between
+the candidate-selection metric and the claimed clipping oracle in the new
+shared writer.
+
+### Independent adversarial challenge and exact discrepancy
+
+`scripts/compare_core.py::_auto_field_widths` says it sizes for the pixel-widest
+pair, but its implementation first stores only the longest string per field and
+side using `len(s) > len(longest[f][slot])`. It calls `fitted_width` and the
+Calibri pixel measurement only after every shorter candidate has already been
+discarded. Character count and rendered pixel width are not order-equivalent.
+
+A tiny in-memory probe called the actual product functions with one `Value`
+field and these side-A candidates; side B was blank:
+
+| Candidate | Python length | Product pixel measurement | Selection |
+|---|---:|---:|---|
+| `WWWWWWWWWW` | 10 | 135.25 px | Discarded |
+| `iiiiiiiiiii` | 11 | 38.65 px | Selected |
+
+The resulting stored width was `13.0`, providing 91 usable pixels. The discarded
+wide-glyph value requires 135.25 pixels, so it is materially clipped by 44.25
+pixels. This is an exact false-pass in the new auto-width logic, and the new
+golden check contains no fixture where a shorter string is wider in pixels than
+a longer string.
+
+### Criterion disposition after the blocking failure
+
+| Work item / criterion | Review 2 disposition | Basis |
+|---|---|---|
+| HF-02.1 — zero materially clipped cells | **FAIL** | Exact product-function probe above; the selection algorithm can publish a clipped identity value |
+| HF-02.2 — native category-label disambiguation | Not re-adjudicated | Review 1 evidence remains retained; one blocking criterion already denies the bundle |
+| HF-02.3 — context/not-compared rendering | Not re-adjudicated | No new contradiction found in source inspection |
+| HF-02.4 — values `Summary!B3` | Not re-adjudicated | No new contradiction found in source inspection |
+| HF-02.5 — counts, masks, typed outcomes unchanged | Not re-adjudicated | Retained Review 1 evidence reused; finding is presentation-only |
+| HF-02.6 — full gate and pre-fix failure | **FAIL (coverage gap)** | Existing check does not exercise inverse character-count/pixel-width ordering |
+| HF-03.1–6 | No new contradiction; not repeated | Retained Review 1 evidence remains valid, but cannot override HF-02's blocking failure |
+
+| Review domain | Disposition |
+|---|---|
+| Source truth / count and mask invariance | Not implicated by this finding; retained evidence reused |
+| Values and formulas | **FAIL for the shared presentation writer** — affected cell text can be clipped in either twin |
+| Visual / presentation | **FAIL** — HF-02.1's zero-clipping guarantee is false |
+| Evidence and exact-head binding | **PASS, reused** — Review 1's same-head remedy remains closed |
+| Regression coverage | **FAIL** — no wide-glyph/shorter-string adversarial fixture |
+| Failure behavior | No new contradiction found |
+
+### Bounded environment failure
+
+The one permitted generated-workbook/oracle follow-up reached result
+serialization, then the Windows console's `cp1252` codec rejected the `≠`
+character. This is a reviewer-environment failure, not a product failure. Prompt
+05 forbids repeated failed expensive operations, so it was not retried. The
+successful in-memory probe already used the product's own selection and pixel
+measurement functions and is sufficient to establish the defect.
+
+### Actionable finding and exact return
+
+| ID | Priority | Failure | Required return |
+|---|---|---|---|
+| `RB2-R2-001` | P1 / blocking | `_auto_field_widths` preselects candidates by Python character count before pixel measurement. A shorter pixel-wider identity can be discarded, making HF-02 criterion 1 and the new golden gate false. | Select the maximum by rendered pixel width (measure every candidate pair before choosing); add a deterministic fixture in which a shorter wide-glyph value beats a longer narrow-glyph value; generate both twins and prove the written Comparison/Only-in cells pass the committed clipping oracle. Because this changes the shared writer runtime, establish a new exact acceptance head and refresh/rebind all dependent `RB2-A1` result, manifest, verifier, and witness identities without deleting prior corpus/review history. Run the scoped checks and full implementation gate, then return Prompt 05 for a fresh Review 2 re-review. |
+
+Review 1's evidence-binding remedies remain closed and preserved as history;
+they do not make the current product failure acceptable. Do not merge, clean up,
+or begin RB-3. Resume Prompt 04 on the existing RB-2 branch with Claude as
+implementer.
+
+**Reviewer signature:** Codex, Review 2 — **DENIED — RETURN TO IMPLEMENTATION** —
+`2026-07-31T09:50:49.5577999-07:00`.

@@ -2,9 +2,9 @@
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
 RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
-RB-2 Review 1 is APPROVED — AWAITING REVIEW 2 on
+RB-2 Review 2 is DENIED — RETURN TO IMPLEMENTATION on
 `hotfix/rb-2-deliverable-presentation`, reviewed through
-`c5740b9e03d28afb8b295eb02182e7b106b1027d`**
+`abaade5ce4fe592a7cf74867d9133f192d539fc4`**
 
 Last updated: 2026-07-31
 
@@ -16,21 +16,22 @@ first pass.
 
 ## Next action
 
-Invoke
-[`PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md)
-with `<BUNDLE_ID> = RB-2` and `<REVIEWER> = Codex` for **Review 2** in a
-separate fresh task.
+Resume
+[`PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
+on the existing `hotfix/rb-2-deliverable-presentation` branch with
+`<BUNDLE_ID> = RB-2` and `<IMPLEMENTER> = Claude`.
 
-Codex Review 1 approved the full RB-2 acceptance set after the bounded returns
-`RB2-R1-EG-001` and `RB2-R1-EG-002`. All 18 claimed results are retained,
-hash-bound, and name the one acceptance head
-`c483bda1716e03d0e013b25e975bd9a41c58b2c8`; the independent verifier matched
-all 418 runtime files and rejected an injected missing and mismatched head. The
-focused presentation, TSN-capture, and freshness checks passed. The signed
-criterion-by-criterion approval is in
+Codex Review 2 denied one concrete HF-02 acceptance failure as
+`RB2-R2-001`. `compare_core._auto_field_widths` claims to fit the pixel-widest
+value but first chooses one candidate per side by Python character count. A
+shorter wide-glyph value can therefore be discarded in favor of a longer
+narrow-glyph value and published in a materially narrow Comparison/Only-in
+column. The exact source probe measured a stored width of `13.0` / 91 usable
+pixels for `WWWWWWWWWW`, whose own product measurement requires 135.25 pixels.
+The signed denial and bounded return are in
 [`hotfix-bundles/RB-2/REVIEW.md`](hotfix-bundles/RB-2/REVIEW.md).
 
-Review 2 must independently challenge Review 1. Do not merge before it approves.
+Do not merge or begin another Review 2 until the return is implemented.
 
 RB-1 (work item HF-01, branch `hotfix/rb-1-clean-road-source-truth`) was
 implemented, denied by Codex Review 1 on the clipped `ArcGIS Build` disclosure
@@ -142,9 +143,10 @@ The other two point in opposite directions on purpose:
   the Description is the same label with `EQUATES TO ` prepended. The rule must be
   pair-aware, opt-in, and must not widen into the HF-09 class.
 
-Both planners signed the Stage 3 plan. **RB-1 is merged. RB-2 Review 1
-re-review denied the returned acceptance evidence because it is not bound to
-one exact Git head; RB-2 is back in Stage 4 on its existing branch.**
+Both planners signed the Stage 3 plan. **RB-1 is merged. RB-2 Review 1 approved
+the same-head evidence remedies; Review 2 then found `RB2-R2-001`, a concrete
+pixel-width selection failure in the new presentation logic. RB-2 is back in
+Stage 4 on its existing branch.**
 
 Stage 2 is closed with no open conflict:
 
@@ -166,8 +168,8 @@ Stage 2 is closed with no open conflict:
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-2 IMPLEMENTED** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-2 REVIEW 1 APPROVED — AWAITING REVIEW 2** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-2 DENIED — RETURN TO IMPLEMENTATION** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-2 REVIEW 2 DENIED — RETURN TO IMPLEMENTATION** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.
