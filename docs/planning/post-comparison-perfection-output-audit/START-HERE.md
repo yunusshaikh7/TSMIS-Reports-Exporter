@@ -2,9 +2,9 @@
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
 RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
-RB-2 is IMPLEMENTED — AWAITING ADVERSARIAL REVIEW on
-`hotfix/rb-2-deliverable-presentation`, with the Review 1 re-review return
-`RB2-R1-EG-002` implemented and awaiting re-review**
+RB-2 Review 1 is APPROVED — AWAITING REVIEW 2 on
+`hotfix/rb-2-deliverable-presentation`, reviewed through
+`c5740b9e03d28afb8b295eb02182e7b106b1027d`**
 
 Last updated: 2026-07-31
 
@@ -18,22 +18,19 @@ first pass.
 
 Invoke
 [`PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md)
-with `<BUNDLE_ID> = RB-2` and `<REVIEWER> = Codex` for the Review 1
-**re-review**.
+with `<BUNDLE_ID> = RB-2` and `<REVIEWER> = Codex` for **Review 2** in a
+separate fresh task.
 
-The re-review's bounded return `RB2-R1-EG-002` is implemented. It found the
-claimed set runtime-digest-equivalent but spanning two Git heads — 14 results at
-`c483bda…`, three at `b37c1fe…`, and `generation-equivalence.json` naming none —
-with the verifier not rejecting that. All 18 claimed results now name the one
-acceptance head `c483bda1716e03d0e013b25e975bd9a41c58b2c8`: the three off-head
-results were re-run at that clean checkout and `generation-equivalence.json` was
-rebuilt to carry an exact head, its conclusions unchanged. The manifest records
-the acceptance head explicitly and separately from its own later build head, and
-the verifier now fails on any missing or mismatched result head while
-re-deriving the intervening commits from git. No bulk regeneration was needed —
-the corpus, Excel outputs, prior evidence and runtime digest are untouched.
+Codex Review 1 approved the full RB-2 acceptance set after the bounded returns
+`RB2-R1-EG-001` and `RB2-R1-EG-002`. All 18 claimed results are retained,
+hash-bound, and name the one acceptance head
+`c483bda1716e03d0e013b25e975bd9a41c58b2c8`; the independent verifier matched
+all 418 runtime files and rejected an injected missing and mismatched head. The
+focused presentation, TSN-capture, and freshness checks passed. The signed
+criterion-by-criterion approval is in
+[`hotfix-bundles/RB-2/REVIEW.md`](hotfix-bundles/RB-2/REVIEW.md).
 
-Do not merge or begin Review 2 until that re-review lands.
+Review 2 must independently challenge Review 1. Do not merge before it approves.
 
 RB-1 (work item HF-01, branch `hotfix/rb-1-clean-road-source-truth`) was
 implemented, denied by Codex Review 1 on the clipped `ArcGIS Build` disclosure
@@ -169,8 +166,8 @@ Stage 2 is closed with no open conflict:
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-2 DENIED — RETURN TO IMPLEMENTATION** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-2 REVIEW 1 RE-REVIEW DENIED — EVIDENCE GAP** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-2 IMPLEMENTED** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-2 REVIEW 1 APPROVED — AWAITING REVIEW 2** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

@@ -1,8 +1,8 @@
 # `RB-2` — Adversarial Review Record
 
-Status: **DENIED — EVIDENCE GAP**
+Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
 
-## Verdict
+## Initial Review 1 verdict — 2026-07-30
 
 **DENIED — EVIDENCE GAP.** Prompt 05 requires the implementation record to
 identify an exact base and acceptance runtime head, and requires every expensive
@@ -231,3 +231,123 @@ started.
 
 Do not merge and do not begin Review 2. Resume Prompt 04 only to supply
 `RB2-R1-EG-002`.
+
+## Review 1 re-review approval — Codex, 2026-07-31
+
+### Verdict
+
+**APPROVED.** The current branch closes both bounded returns in the Review 1
+chain. `RB2-R1-EG-001` is closed by the regenerated, path/size/SHA-256/source/
+generation-bound `RB2-A1` corpus. `RB2-R1-EG-002` is closed because all 18
+claimed result files now name the one exact acceptance head
+`c483bda1716e03d0e013b25e975bd9a41c58b2c8`, all 18 retained bytes match the
+manifest, and the verifier rejects missing or differing exact heads rather than
+accepting runtime-digest equivalence alone.
+
+The user invocation names the re-review of `RB2-R1-EG-001`; the branch also
+contains the later `RB2-R1-EG-002` remedy created by the first re-review. This
+approval therefore adjudicates the complete current remedy chain rather than
+silently ignoring the later controlling return.
+
+### Review identity and budget
+
+| Field | Value |
+|---|---|
+| Reviewer / pass | Codex / Review 1 re-review approval |
+| Implemented bundle? | **No** — implementer is Claude |
+| Bundle / work items | `RB-2` / `HF-02 + HF-03` |
+| Branch | `hotfix/rb-2-deliverable-presentation` |
+| Recorded base | `896083e014d0451d5b05e5b6b024339aebc84d74` |
+| Acceptance runtime head | `c483bda1716e03d0e013b25e975bd9a41c58b2c8` |
+| Manifest build head | `a38ad214932069c8bd928b078011a0964d06182b` |
+| Review-record head reviewed | `c5740b9e03d28afb8b295eb02182e7b106b1027d` |
+| Remote branch head on entry | `c5740b9e03d28afb8b295eb02182e7b106b1027d` |
+| Elapsed active review | Approximately 18 minutes |
+| Resource budget | **RESPECTED** — no generation, Excel invocation, build, full gate, corpus recount, corpus re-hash, or new bulk output |
+| Review 2 | **ELIGIBLE — separate fresh task required** |
+| Merge | **BLOCKED pending Review 2** |
+
+### Preconditions and return closure
+
+| Prompt 05 precondition / return | Result | Evidence |
+|---|---|---|
+| Review-1 status is `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW` | **PASS on entry** | Controlling bundle, implementation, plan queue, and START-HERE header agreed; the stale workflow-table rows are synchronized by this record |
+| Hotfix branch and retained outputs exist | **PASS** | Clean local branch and remote both at `c5740b9…`; every one of the 18 claimed result paths exists |
+| Exact base and implementation head are recorded | **PASS** | Merge-base re-derived as `896083e…`; acceptance head is `c483bda…` |
+| Expensive acceptance operations are retained and hash-bound | **PASS** | `RB2-A1-manifest.json` and its source listing bind the complete classified result/output/input set |
+| `RB2-R1-EG-001` | **CLOSED** | Regenerated corpus is bound by exact path, bytes, SHA-256, frozen-source identity, generation metadata, runtime digest, and exact acceptance head |
+| `RB2-R1-EG-002` | **CLOSED** | 18/18 claimed files contain `c483bda…`; 0/18 contain the former off-head `b37c1fe…`; a missing plus mismatched injected head yields two verifier failures |
+
+### Evidence reused and bounded commands
+
+| Evidence / challenge | Result |
+|---|---|
+| Complete branch boundary | Merge-base agrees; `git diff --check` clean; 21 changed paths from base through `c5740b9…`; product edits remain inside the frozen four-file surface, with focused checks, witnesses, records, and verifier alongside them |
+| Remedy boundary | Three commits after the prior review record change only six evidence/status/verifier files; no product runtime file changed after `1a94183…` |
+| `RB2-A1-manifest.json` | 1,803,195 bytes; SHA-256 `3BF96B3B248082AA3C0C2C767908E23054A61C3CDAE4ABD1B56CD3380D0F82E8` |
+| `RB2-A1-sources.json` | 962,858 bytes; SHA-256 `44634BB6DDCD18AA8680B19DD99281CB8703C06DD302C73C9097309DC44A5798` |
+| Committed verifier, one run at `--at c483bda…` | **VERIFIED — 0 problems**; 418 runtime files matched; last runtime change `1a94183…`; four committed witnesses re-hashed; no runtime changes through manifest build |
+| Independent retained-result check | All 18 actual files match manifest byte size and SHA-256; all 18 contain the exact acceptance head; none contains the former off-head commit |
+| Negative exact-head challenge | One claimed entry changed to `b37c1fe…` and one head removed in memory; verifier returned the two expected named failures |
+| `check_workbook_presentation.py` | **PASS** — four fixture twins build, audit clipping oracle clean, identity/category/context/headline/freshness assertions green |
+| `check_tsn_canonical_consumer_identity.py` | **PASS** — canonical identity, carried claims, lane parity, durable provenance, success/failure/cancellation cleanup, and bounded stale sweep all green |
+| `check_compare_build_freshness.py` | **PASS** — immutable snapshots, exact chunks, fail-closed Summary, and explicit freshness row green |
+
+The first independent census attempted to locate a non-existent literal
+`runtime_head_commit` key in each retained JSON and therefore reported false
+schema failures. It was not retried as a product harness. Direct schema
+inspection showed the stamp at `runtime.git.head` (and `runtime_head` in the
+equivalence side record); the already-computed 18/18 size and SHA-256 matches
+remained valid. This reviewer-tool mistake and the known Windows sandbox ACL
+helper failure are reviewer-environment events, not product failures.
+
+### HF-02 acceptance matrix
+
+| Criterion | Verdict | Exact evidence |
+|---:|---|---|
+| 1. Zero material clipping, both twins | **PASS** | Retained RC-1 witness reports 2,036 cells across 42 base deliverables → 0 across 60 head deliverables; focused golden check independently reports no clipped cells |
+| 2. Native-Excel labels unambiguous | **PASS** | Hash-bound native-Excel renders and AutoFit record report `columns_too_narrow: 0`; category identities are widened, not wrapped |
+| 3. Context fields distinguishable from compared zeroes | **PASS** | Highway Sequence `City`, `HG`, and `Distance To Next Point` say `not compared (context)` while compared `County` remains numeric `0`; both flavors challenged by the focused check |
+| 4. Values headline is readable and typed | **PASS** | 52/52 values deliverables have a non-empty cached headline; eight retained Excel-recalculated workbooks agree with typed outcomes; focused check validates both schemas |
+| 5. Counts, masks, outcomes invariant | **PASS** | 42 base/head deliverable pairs: zero truth-sheet changes and zero typed-outcome differences |
+| 6. Gate green and test red pre-fix | **PASS** | Retained red proof records 17 presentation failures at base and green at head; full gate 158/158; frozen self-test `SMOKE OK` |
+
+### HF-03 acceptance matrix
+
+| Criterion | Verdict | Exact evidence |
+|---:|---|---|
+| 1. False rebuild instruction absent | **PASS** | Retained dual RC-3 methods report 12 base → 0 head occurrences across the matrix corpus |
+| 2. Matrix identity equals Direct identity | **PASS** | Exact full-line parity is retained for Ramp Summary, Intersection Summary, Highway Sequence, and Highway Log across Direct, Everything, and By Day; targeted check challenges the carried claims path |
+| 3. Durable readable provenance | **PASS** | Workbook and sidecar `%TEMP%` counts are 18/18 base → 0/0 head; recorded canonical selections exist/read; unverifiable-origin fallback is covered by the focused check |
+| 4. Capture lifecycle leaves no owned temp directory | **PASS** | Retained lifecycle witness reports zero after success/failure/cancellation and removal of the real stale orphan; targeted check covers live-age and unrecognized-directory safety |
+| 5. Direct lane and semantic truth invariant | **PASS** | Same 42-pair semantic/state/count/typed-outcome witness reports zero changes, including Direct controls |
+| 6. Gate green and assertions red pre-fix | **PASS** | Retained red proof records four canonical-consumer failures at base; focused test passes at head; full gate 158/158 |
+
+### Artifact and regression matrix
+
+| Area | Verdict | Binding |
+|---|---|---|
+| Source truth | **PASS** | No recount required; 42-pair cell/state/count/outcome invariance is hash-bound |
+| Values / formulas | **PASS** | Both twins retained; eight installed-Excel recalculations have every SELF-CHECK `OK`, zero cached errors, and matching live/literal outcomes |
+| Visual | **PASS** | Native-Excel summary/detail and provenance renders are path/size/SHA-256 bound; deliverable clipping is zero |
+| Evidence | **PASS** | No evidence code changed; pinned-seed comparison has 12/12 rendered images byte-identical and matching content identities |
+| Neighboring families | **PASS** | All 18 named neighboring checks and merged HF-01 check are retained green; focused freshness check is green |
+| Failure / atomic behavior | **PASS** | TSN capture refuses identity drift and cleans success, failure, and cancellation; publication and ownership checks remain in the retained full gate |
+
+### Adversarial conclusion
+
+The likeliest false-pass mechanism was the one exposed by the first re-review:
+content-equivalent results spanning different Git commits. The rebuilt manifest
+separates acceptance head from later manifest-build head, actual retained files
+carry the acceptance head, Git proves the intervening commits are non-runtime,
+and the verifier now fails the precise missing/mismatch mutation. Independent
+inspection of the product diff found no contradictory count, mask, provenance,
+cleanup, freshness, or presentation path, and the focused tests challenge the
+two highest-risk code paths without duplicating `RB2-A1`.
+
+No actionable failure or evidence gap remains. Review 1 is approved; Review 2
+must be performed in a separate fresh task and merge remains blocked until it
+also approves.
+
+**Reviewer signature:** Codex, Review 1 re-review — **APPROVED** —
+`2026-07-31T08:06:40.8787498-07:00`.
