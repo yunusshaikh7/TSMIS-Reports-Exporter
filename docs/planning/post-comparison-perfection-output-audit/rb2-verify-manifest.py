@@ -145,6 +145,49 @@ def check_runtime(manifest, tree, commit, fail):
         print(f"    {rel}")
 
 
+def check_lineage(manifest, tree, commit, fail):
+    """Re-derive the manifest's central claim instead of believing it.
+
+    The manifest asserts that the last commit touching any runtime file is the
+    final production commit, and that nothing runtime-affecting happened after
+    it — which is what makes a corpus generated at a LATER head still
+    same-final-head. Taken from the manifest that is worth nothing, so it is
+    computed here from Git independently.
+    """
+    lineage = manifest["runtime"].get("lineage") or {}
+    print("\nLINEAGE — re-derived from git")
+    if not lineage:
+        fail("the manifest records no runtime lineage")
+        return
+    roots = [r for group in GROUP_ROOTS.values() for r in group]
+    head = commit or "HEAD"
+
+    def text(*args):
+        # git() returns BYTES here; decode explicitly as UTF-8 rather than the
+        # locale codepage, which mangles the em dashes in this repo's subjects.
+        return git(tree, *args).decode("utf-8", "replace")
+
+    last = text("log", "-1", "--format=%H", head, "--", *roots).strip()
+    recorded = str(lineage.get("runtime_last_changed_at") or "")
+    if last != recorded:
+        fail(f"last runtime commit is {last[:12]}, manifest says "
+             f"{recorded[:12] or '(none)'}")
+        return
+    print(f"  last runtime change                {last[:12]}")
+    changed = [f for f in text("diff", "--name-only", f"{last}..{head}",
+                               "--", *roots).splitlines() if f.strip()]
+    if changed:
+        fail(f"runtime files changed after {last[:12]}: {changed[:10]}")
+        return
+    if not lineage.get("runtime_unchanged_since_last_product_commit"):
+        fail("the manifest does not assert the runtime is unchanged since its "
+             "last product commit, though it is")
+        return
+    since = lineage.get("commits_since_on_head") or []
+    print(f"  runtime files changed since        0")
+    print(f"  non-runtime commits since          {len(since)}")
+
+
 def check_witnesses(manifest, tree, fail):
     head_digest = manifest["runtime"]["head"]["runtime_digest"]
     entries = [rec for rec in manifest["results"]["entries"]
@@ -167,11 +210,17 @@ def check_witnesses(manifest, tree, fail):
             fail(f"{name}: sha256 {got} != recorded {rec['sha256']}")
             continue
         stamp = rec.get("runtime_digest")
-        if stamp and stamp != head_digest:
+        # An UNSTAMPED committed witness must fail. Accepting one as "distilled"
+        # is exactly the condition Review 1 denied RB-2 for, so a verifier that
+        # waved it through would certify the gap it exists to catch.
+        if not stamp:
+            fail(f"{name}: carries no runtime stamp — a committed witness must "
+                 f"record which runtime produced it")
+            continue
+        if stamp != head_digest:
             fail(f"{name}: produced under runtime {stamp}, not the head runtime")
             continue
-        note = "same-head" if stamp else "no embedded stamp (distilled)"
-        print(f"  ok  {name:<34} {rec['sha256'][:16]}…  {note}")
+        print(f"  ok  {name:<34} {rec['sha256'][:16]}…  same-head")
 
 
 def check_corpus(manifest, sources_path, fail):
@@ -255,15 +304,27 @@ def main():
           f"{manifest['runtime']['head']['runtime_digest']}")
 
     check_runtime(manifest, tree, commit, fail)
+    check_lineage(manifest, tree, commit, fail)
     check_witnesses(manifest, tree, fail)
     if corpus:
         check_corpus(manifest, sources, fail)
     else:
         print("\nCORPUS — not requested (pass --corpus to re-hash it)")
 
-    if manifest["results"]["off_head"]:
-        for path in manifest["results"]["off_head"]:
-            fail(f"result produced under a different runtime: {path}")
+    results = manifest["results"]
+    for path in results.get("off_head") or ():
+        fail(f"result produced under a different runtime: {path}")
+    # A CLAIMED result with no stamp at all is the same defect as an off-head
+    # one, and was previously unchecked.
+    for path in results.get("unstamped") or ():
+        fail(f"claimed result carries no runtime stamp: {path}")
+    for path in results.get("base_side_mislabelled") or ():
+        fail(f"base-side result not produced by the base runtime: {path}")
+    # Require the claim to be MADE. Without this, a manifest that simply omitted
+    # the field would verify clean by saying nothing.
+    if not results.get("all_claimed_same_head", False):
+        fail("the manifest does not assert that every claimed result is "
+             "same-head")
     print(f"\n{'FAILED' if failures else 'VERIFIED'} — "
           f"{len(failures)} problem(s)")
     sys.exit(1 if failures else 0)

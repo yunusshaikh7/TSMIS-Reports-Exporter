@@ -1,6 +1,6 @@
 # `RB-2` — Implementation Record
 
-Status: **DENIED — RETURN TO IMPLEMENTATION**
+Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW**
 
 | Field | Value |
 |---|---|
@@ -96,6 +96,465 @@ that width. Deliberately hidden columns (the state-mask chunks) and the
 Stage-2-validated 45.75 pt wrapped header band are excluded as out of scope.
 Witness: `HF-02\excel-metrics-ramp-summary{,2,3}.json` — the failing pass is
 retained beside the passing one.
+
+## Review 1 remedy — `RB2-R1-EG-001`, the acceptance set bound to one runtime head
+
+Codex Review 1 denied RB-2 on one bounded precondition, and the denial was
+correct. The first `RB2-A1` corpus was built across two different runtimes:
+generation finished at `2026-07-29T07:51`, but the final production commit
+`1a94183` — which changes the Provenance sheet written into **every** comparison
+workbook — landed at `2026-07-30T00:43`, and only the four classic-environment
+workbooks were regenerated after it. Nothing in any retained result said which
+runtime had produced it, so the two passes could not be told apart from the
+evidence. The full gate and the frozen self-test were also run at `00:25`/`00:28`,
+before that commit.
+
+The remedy is not a manifest bolted onto the old corpus. Review 1 explicitly
+required the stale corpus to be regenerated rather than merely hashed, so the
+whole acceptance chain was re-executed end to end against one frozen head.
+
+### The runtime binding
+
+`RB2-A1` now records what it ran on, in a form a reviewer can re-derive:
+
+| Field | Value |
+|---|---|
+| Runtime head | `c483bda1716e03d0e013b25e975bd9a41c58b2c8`, working tree **clean** |
+| Runtime digest | `1EFA63FD9EE6355008AD49BE6342E79DCE486A1BFF9FE1E9202F471600162279` |
+| Runtime set | 152 `product` + 265 `gate` + 1 `oracle` = 418 tracked files |
+| Base runtime | the base checkout, proved file-for-file identical to `896083e` |
+
+The digest is taken over the **line-ending-normalised content** of every tracked
+file that can change what the product writes. That choice is deliberate: this
+repository runs `core.autocrlf=true`, so one commit checks out as different bytes
+on different platforms while the content that decides behaviour is identical.
+Because the digest is content-derived rather than commit-derived, a later
+documentation-only commit provably cannot move it — which is what lets the
+records, the manifest and the witnesses be committed *after* the run without
+breaking the binding they describe. Committing the verifier demonstrated exactly
+that: `e7a9a1a` → `c483bda` changed the head, and the runtime digest did not move.
+
+Every acceptance result now carries this stamp inside it. A result produced under
+a different runtime is visible as a mismatched digest instead of being
+indistinguishable, which is precisely what Review 1 could not check.
+
+### The denial answered by derivation, not assertion
+
+Review 1's substantive point was that the corpus predated
+`1a9418339e1c0df1cc16eddcaedb22dc1e4135d0`, the commit that changes the
+Provenance sheet written into every comparison workbook. The manifest now
+answers that mechanically, in `runtime.lineage`, computed from the same group
+roots the digest uses:
+
+| Derived fact | Value |
+|---|---|
+| Last commit touching ANY runtime file | `1a9418339e1c0df1cc16eddcaedb22dc1e4135d0` |
+| …its subject | `fix: fit the Provenance role column to its real labels (RB-2)` |
+| Runtime files changed between it and the acceptance head | **none** |
+| Commits between it and the acceptance head | 3, all documentation/records |
+
+The acceptance head is later than `1a94183`, and that is exactly the point: no
+tracked runtime file changed in between, so the head's product behaviour **is**
+that commit's behaviour and the regenerated corpus is same-final-head by
+construction rather than by promise. The manifest derives this from Git rather
+than restating it, and the verifier re-derives it independently — a manifest
+that merely claimed the runtime had not moved would be worth nothing.
+
+This is also what makes the ordering safe. The records, witnesses and manifest
+are committed AFTER the corpus was generated; because none of them is a runtime
+file, they cannot move the digest, and the same derivation stays true at
+whatever head the reviewer checks out.
+
+### The same fact, observed in the bytes
+
+A structural argument can be wrong on its own, so the claim is also checked
+where it would show: `1a94183` replaced Provenance column A's hard-coded width
+of 12 with a fitted one, because on a cross-environment comparison the role is
+the side's own name and 12 could never hold it. Both corpora were read back:
+
+| Corpus | Provenance column A |
+|---|---|
+| base (code `896083e`) | **12.0** — the hard-coded value |
+| head (regenerated) | **fitted wider on every workbook that has the sheet** |
+
+Column A's value on those rows is literally `SSOR-PROD 2026-07-23` — the exact
+case the commit describes. Witness: `HF-02\provenance-final-commit.json`, which
+fails closed if any base workbook is not 12 or any head workbook is not wider.
+
+Structural and observed agree, so "the corpus predates the final shared-writer
+commit" is answered twice, by independent means.
+
+### The defect is now structurally impossible
+
+The first pass mixed runtimes because the generator's resume logic carried
+`status=ok` records forward across a code change. It now refuses:
+
+```
+REFUSING TO RESUME: the existing witness was built by runtime DEADBEEFDEADBEEF…,
+this run is 1EFA63FD9EE63550… — rebuilding every step
+```
+
+A witness with no runtime stamp at all is refused on the same grounds. Both
+branches were exercised directly, not reasoned about.
+
+### The prior pass is preserved, not overwritten
+
+Every file of the superseded pass was hashed **before** being moved — 3,022 files
+across the head corpus, the By Day publish root, the renders, the evidence probe
+and the Excel workspace, plus 10 result files — and retained under
+`…\HF-02\prior-A0\` with a `prior-run-record.json` binding each by path, size and
+SHA-256. Nothing was deleted. The base corpus was not archived: base code has not
+changed since the recorded base SHA, so it is re-used and re-bound rather than
+rebuilt.
+
+### The inputs are frozen — the same bytes, not the same paths
+
+Before the re-run consumed anything:
+
+| Check | Result |
+|---|---|
+| Normalised TSN datasets still hashing to the library's own rebuild record | **8 / 8** |
+| Per-route exports byte-identical to what the superseded pass provisioned | **2,380 / 2,380**, 0 changed |
+
+The second row is the strong form: the new run did not merely read files with the
+same names, it read the same bytes the earlier pass read, so any base-vs-head
+difference can only be the code. (31 further files under the store are producer
+output — the consolidator's own workbooks and `owned_dir`'s ownership marker —
+and are excluded as outputs rather than compared against an input archive.)
+
+Witness: `HF-02\frozen-inputs.json`.
+
+### The re-run is step-for-step equivalent
+
+| | Prior pass | Same-head re-run |
+|---|---|---|
+| Steps | 40 | 40 |
+| `ok` | 31 | 31 |
+| Regressed | — | **0** |
+| Newly ok | — | **0** |
+| Refusals | 9 | **9, identical in kind** |
+| Runtime recorded | **none — unstamped** | `1EFA63FD…` |
+
+The nine refusals are the three families the audit itself excluded — Ramp Detail
+(PCOA-FINAL-001, refused at the header gate until HF-04) and both Highway Detail
+editions (the standing pre-release block; the frozen archive carries no HD
+export) — across the Everything, By Day and Direct lanes. Witness:
+`HF-02\generation-equivalence.json`.
+
+### Nothing but presentation moved
+
+The bundle's whole claim is that a workbook looks different and says different
+things about itself, while every count, mask and typed outcome stays exactly
+where it was. Every published cell of every truth-bearing sheet was compared
+cell for cell across all 42 shared deliverable pairs, together with the typed
+outcome sidecar:
+
+| | Result |
+|---|---:|
+| Pairs compared | 42 |
+| Pairs **changed** | **0** |
+| Deliverables present on only one side | 0 / 0 |
+| **Truth-bearing sheets with any differing row** | **0** |
+| **Typed outcome sidecars unequal** | **0** |
+| Presentation sheets that moved (the bundle's own surface) | 72 |
+
+Truth-bearing here means everything except the five sheets this bundle is
+allowed to touch: the Comparison sheet including its hidden `E`/`D`/`N`/`U`
+state-mask columns, both Only-in sheets, both data sheets, Routes, and both
+very-hidden `__CMP_E2_SNAPSHOT` sheets. The result carries both runtime digests
+— head `1EFA63FD…`, base `54873CE5…` — so the record states exactly which two
+runtimes it contrasted rather than leaving it to be assumed.
+
+### The declared Spot Check boundary, now quantified against base code
+
+The section above ("What installed Excel's own AutoFit found that RC-1 could
+not") already declares four `Spot Check` cells as a boundary rather than a fix,
+on the grounds that they display whichever Comparison row the reader types in at
+runtime, so no stored width can be fitted to content that does not exist when
+the workbook is written. That assessment stands, and re-measuring confirmed the
+mechanism independently.
+
+What it asserted without numbers was "this class is unchanged from base code".
+That is now measured on both sides, because an unquantified "unchanged" is the
+kind of claim this return exists to remove:
+
+| Excel-measured cells narrower than their displayed content | Base | Head |
+|---|---:|---:|
+| `ssor-prod_intersection_detail_tsn.xlsx` | 96 | **2** |
+| `ssor-prod_highway_sequence_tsn.xlsx` | 96 | **2** |
+| Ramp Summary (both measured workbooks) | 0 | **0** |
+
+So "unchanged from base code" was true of the four boundary cells but
+understated the bundle: base code left **192** measured occurrences across these
+two workbooks and head code leaves **4** — every occurrence on the Summary and
+Comparison sheets removed, and all but four on Spot Check. The four that remain
+are the declared boundary, and each is a cell holding a FORMULA:
+
+| Cell | Stored | Needed | Displayed text |
+|---|---:|---:|---|
+| ID `Spot Check!r37c3`, `r37c4` | 23.29 | 25.00 | `VISTA DEL SOL/3 ARCH BY` |
+| HSL `Spot Check!r22c4` | 23.29 | 25.14 | `JCT 5 CAMINO L RMBLS UC` |
+| HSL `Spot Check!r22c6` | 38.00 | 47.00 | `COUNTY BEGIN: ORA ≠ JCT 5 CAMINO L RMBLS UC` |
+
+Two details worth adding to the declaration. First, the neighbours of all four
+are populated, so they cannot spill and are genuinely truncated on screen —
+checked cell by cell rather than assumed. Second, the bundle did move one of
+them: HSL `r22c6` was stored 29.29 under base code and is 38.00 under head, on
+content needing 47.00. So the fitted-width logic reached it and improved it, and
+still cannot finish the job, which is precisely the boundary's point. It is not
+the 60.0 `_MAX_FITTED_WIDTH` cap — that is never reached here.
+
+The reason the audit's own gate reports `0 clipped` while Excel reports these
+four is not a contradiction but the stated limitation: the Stage 2 oracle reads
+the workbook through openpyxl and sees a formula, never the string Excel
+displays after calculating it. **Clipping figures from that oracle should
+therefore never be restated as a bare "0" without this qualification.**
+
+Witnesses: `HF-02\excel-metrics-final.json` (head) and
+`HF-02\excel-metrics-base-spotcheck.json` (base, the same two workbooks).
+
+### Installed Excel agrees with the cached headline, twin for twin
+
+The formulas twin's whole purpose is that a real Excel recalculation reproduces
+what the values twin already says. Eight workbooks were copied into a clean
+workspace, opened in installed Excel, recalculated and read back:
+
+| Comparison | Values twin headline | Formulas twin, after Excel recalculated it |
+|---|---|---|
+| Ramp Summary vs TSN | 23 differing cells, 2 one-sided rows | **identical** |
+| Intersection Detail vs TSN | 5,092 differing cells, 687 one-sided rows | **identical** |
+| Highway Sequence vs TSN | 5,573 differing cells, 15,958 one-sided rows | **identical** |
+| Ramp Summary, classic environment | 67 differing cells, 0 one-sided rows | **identical** |
+
+Across the eight: **70 workbook self-checks, 0 failing, 0 errors**, freshness
+`OK` on every one. Each entry also records `source_sha256` beside the
+workspace copy's `sha256_before`, and they are equal on all eight — the copy
+Excel opened provably IS the current deliverable, which is what the
+always-re-copy fix exists to guarantee. The previous behaviour skipped the copy
+when file sizes matched, so a stale workbook could have been recalculated and
+reported as current: the same staleness class as the denial itself.
+
+### The evidence is unchanged, and now there is a record saying so
+
+The evidence was rendered twice under a pinned sampling seed — once from the
+base checkout, once from the head — producing 14 hashed artifacts per side.
+Nothing compared them. Two hashed side files and no retained conclusion is the
+same shape this return exists to fix, so the comparison is now computed, bound
+and fail-closed:
+
+| | Result |
+|---|---|
+| Pinned seed identical | yes (11223344 both sides) |
+| Artifacts | 14 / 14, none one-sided |
+| **Rendered images byte-identical** | **yes — 0 of 12 differ** |
+| Evidence workbook | 1 differing row, on `Summary` |
+| Evidence workbook after normalising the run's own location | **0 differing rows** |
+| Ledger and all four evidence data sheets | **0 differing rows** |
+
+The one moving row records where the run was launched: the base-side evidence
+run executes from the base checkout, so it writes that checkout's path for its
+TSN input. Both sides read the same bytes — the TSN library is proved frozen —
+by different routes. Erase the tree prefix and the row is identical. The JSON
+sidecar follows for the same reason: it records the workbook's digest and the
+run's input paths.
+
+Every row of every sheet is compared, not a sample, because a sampled claim
+cannot support "no evidence content moved". Images are treated as the hard
+requirement — if a rendered image had moved, the bundle would have changed what
+the evidence SHOWS, and the leg fails. A differing evidence *workbook* is judged
+on content instead of bytes, since that workbook is itself written by the shared
+writer this bundle deliberately changes.
+
+### Harness changes, and why they are trustworthy
+
+Re-running the chain serially would have taken about 19½ hours, most of it in two
+legs that were slow for accidental reasons. Both were fixed, and neither fix is
+taken on faith:
+
+| Leg | Change | How it was proved faithful |
+|---|---|---|
+| `acc_measure` | one process pool over independent workbooks | re-measured the **unchanged** base corpus and compared to the retained serial result — identical entry for entry |
+| `acc_invariance` | the workbook was being re-opened once per sheet per side; now each pair is opened once and the two sides streamed in lockstep, over a pool | A/B'd against the **original** implementation on 9 pairs spanning all three lanes and both twins — 9/9 identical, field for field |
+| `acc_excel` | always re-copies into the Excel workspace | it previously skipped the copy when the file size matched, which would have measured a stale workbook and called it current — the same staleness class as the denial |
+
+Pool workers are spawned from the venv interpreter explicitly and each worker's
+loaded `openpyxl` is recorded in the result. That is not ceremony: the bare base
+interpreter on this machine resolves a *different* `openpyxl` install, so "which
+library measured this" is a real question and is now answered by the record
+rather than by assumption.
+
+### The Visual row had a real root cause, and it was silent
+
+Review 1 recorded that the render record "lacks complete artifact
+hashes/runtime binding". Re-reading that leg found why, and it was worse than a
+missing field: `render()` returned a LIST while its caller merged the result
+with `{**origin, **render(...)}`. Unpacking a list there raises `TypeError`,
+which the surrounding `except` swallowed into an entry with no renders **and no
+error**. The retained record is two empty objects, and the leg exited 0.
+
+Precisely: the PDFs themselves WERE exported — the archived prior run holds 10
+of them — because the export happens before the return value is used. What was
+lost was the record of them. Not one path, byte count or hash reached the
+witness, so a reviewer had artifacts on disk that no result file referred to and
+no manifest could bind. That is exactly the gap Review 1 named, and it was
+invisible from the record alone because the record looked merely empty rather
+than broken.
+
+Three changes, because the missing hash was the least of it:
+
+| Change | Why |
+|---|---|
+| `render()` returns a dict | the actual defect; the list could never merge |
+| every rendered PDF carries its SHA-256 | Review 1's stated Visual gap — a render nobody can bind is a render nobody can check |
+| the mode **exits non-zero** on any empty or errored entry, and on zero renders | a leg that produced nothing looked identical to a leg that succeeded, which is how this survived a whole acceptance pass |
+| the output directory is `resolve()`d before it reaches COM | Excel resolves a relative path against ITS OWN default directory and fails with a bare "Document not saved" naming nothing — found by hitting it |
+
+This was found before the step re-ran, and the fix was then proved out of band
+on a real deliverable rather than assumed: four sheets exported, four PDFs on
+disk, each carrying its byte size and SHA-256, the record runtime-stamped, zero
+failures. The re-run is the first render result that is actually bound.
+
+### Two measurement bugs found and fixed during the re-run
+
+Re-measuring the corpus surfaced two defects in the acceptance harness itself.
+Neither is a product defect, and both were putting wrong numbers into the
+committed evidence, so both were fixed and BOTH measures were re-run:
+
+| Bug | Effect | Fix |
+|---|---|---|
+| `missing_input` asked `is_file()` of every recorded selection | the classic lane compares **folders**, so three existing directories counted as **6 missing inputs** | ask `exists()`, and record each input's `kind` |
+| twin flavor inferred from the file name (`"(formulas)" not in name` ⇒ values) | the matrix lane names the values twin `X.xlsx`, while the Direct and classic lanes name *that* file the FORMULAS twin — so **4** formulas workbooks were reported as values twins with a blank headline | decide flavor from the PAIR on disk, not the name |
+
+The second one matters beyond the count: a formulas cell read through
+`data_only` is *supposed* to be blank, because openpyxl writes a formula cell
+with an empty `<v>`. Counting those as failures of PCOA-FINAL-019 would have
+understated the fix while looking like a defect.
+
+The totals are now scoped to what each finding is actually about — deliverables,
+and the values twin specifically — with the unscoped figures kept alongside so
+nothing is hidden. Every residual non-zero is accountable:
+
+Measured at the frozen head over all 1,264 workbooks (60 of them deliverables,
+30 per twin — a balanced split is itself the evidence that the flavor bug is
+gone; the buggy pass reported 4 formulas twins as values):
+
+**The headline, base code versus head code on the same frozen inputs:**
+
+| | Base (`896083e`) | Head |
+|---|---:|---:|
+| Deliverables measured | 42 | 60 |
+| **Clipped cells in deliverables** | **2,036** | **0** |
+| Deliverables with at least one clipped cell | **42 of 42** | **0 of 60** |
+
+Every deliverable the base code produced clipped something. None of the head's
+do. (Head measures 60 to base's 42 because the base pass deliberately skips the
+By Day lane; the extra lane is additional coverage, not a changed denominator —
+the head figure is zero across all of them.)
+
+> **Why `measure-base.json` carries the HEAD runtime digest, and why that is
+> correct.** A runtime stamp records which code produced *that result*. Both
+> measurements were taken by the head-side harness — that is the point, since
+> measuring the two corpora with different measuring code would make the
+> comparison meaningless. What differs is the code that GENERATED each corpus,
+> and that is recorded separately: `base-identity.json` proves the base tree is
+> the recorded base commit, and `invariance.json` carries `runtime_base`
+> alongside `runtime_head`. Neither file claims the base corpus was built by
+> head code.
+
+| Figure | Value | Why |
+|---|---|---|
+| clipped cells, deliverables | **0** (base: 2,036) | the fix |
+| clipped cells, evidence workbooks | 127 at head (63 + 63 + 1), 64 at base (63 + 1) | written by `visual_evidence.py`, which RB-2 does not touch and HF-02 puts out of scope. Identical **per evidence set** in both trees — head simply has one more set, because the base pass skips the By Day lane |
+| `missing_input` across every deliverable | **0** | was 6, all of them the harness asking `is_file()` of a folder |
+| `false_rebuild` / `temp_path` (HF-03) | **0 / 0** | by both independent methods, zip-XML probe and openpyxl walk |
+| values twins with a real cached headline | **30 of 30** | PCOA-FINAL-019: the values twin must read correctly through `data_only` |
+| formulas twins reading blank | **8 of 30** | correct — a formula cell has no cached value until Excel calculates it |
+| formulas twins carrying `▶ PRESS F9 TO CALCULATE …` | **22 of 30** | also correct — the large-workbook path stores that literal instead of a formula |
+| formulas twins with a real cached headline | **0 of 30** | correct — there is nothing to cache before calculation |
+
+Every one of the 60 deliverable twins falls into exactly one accounted-for row,
+and no residual is left as "expected" without a reason.
+
+### The manifest — the item Review 1 asked for
+
+`RB2-A1-manifest.json`, with the per-file listing of the two large input
+archives in the companion `RB2-A1-sources.json` whose own SHA-256 the manifest
+records. Together they bind, for the one runtime head:
+
+| Required binding | Where |
+|---|---|
+| exact path | every entry, relative to a named and absolute root |
+| byte size | every entry |
+| SHA-256 | every entry, plus a root digest over each corpus |
+| frozen-source identity | `frozen_sources`, per file, for the export archives and the normalised TSN library |
+| generation metadata | per comparison workbook: generation id, completion, content digests, member count, and the provenance recipe with each input's kind, selection and `read_via` |
+
+Nothing is sampled and nothing is summarised away.
+
+### Retained is not the same as claimed
+
+A manifest that swept up every JSON beside the corpus would have reported the
+superseded pass's own record and several exploratory probes as unstamped gaps —
+noise indistinguishable from the defect being fixed. Every retained file is
+still bound by content; what changed is that each is CLASSIFIED:
+
+| Class | Meaning | Same-head required |
+|---|---|---|
+| `acceptance` | a result RB2-A1 stands behind | **yes** — off-head or unstamped is a failure |
+| `base_side` | describes the BASE checkout, so it carries the base runtime and says which | no; it must match the base digest instead |
+| `source_record` | describes how a frozen INPUT was built | no; a head-stamped result vouches for it |
+| `history` | the superseded pass's record and superseded probes, retained deliberately | no; claims nothing |
+
+`source_record` has exactly one member, and it is the one Review 1 named:
+`tsn_rebuild.json` "records dataset hashes but no `RB2-A1` runtime identity."
+That is true, and it must stay true. Re-running it under the head would rebuild
+the normalised TSN library — destroying the frozen-input identity the whole
+acceptance set rests on. The correct answer is not to stamp it but to say what
+it is, and to have a head-stamped result vouch for it: `frozen-inputs.json`
+proves all 8 datasets still hash to exactly what that record wrote.
+
+### One result was reporting itself unstamped when it was not
+
+`generation-equivalence.json` compares the superseded pass to the same-head
+re-run, so it records a runtime digest for each SIDE (`prior`, `current`) rather
+than one for the file. The manifest reader looked only at the top level and
+would have listed it as an unstamped gap — inventing a defect out of a
+comparison-shaped schema. It now reads the current side's digest and records
+that it did so.
+
+The default is `acceptance`, deliberately: an unclassified result is treated as
+claimed, so a future off-head result fails the manifest loudly rather than being
+absorbed as history. The builder exits non-zero when any claimed result is
+off-head, unstamped, or mislabelled — a manifest that quietly reported its own
+gap is how the first pass shipped.
+
+### What code produced the evidence
+
+The acceptance harness is not product runtime, so it is deliberately outside the
+runtime digest — but "which code produced this result" is a fair question, and
+pointing at a temporary directory is not an answer. The manifest binds all 14
+harness scripts by size and SHA-256, alongside the two committed pieces they
+lean on: the Stage 2 clipping oracle (imported, never reimplemented, so the
+product check and the acceptance oracle cannot diverge) and the verifier (which
+deliberately shares no code with the manifest builder). The exact harness can
+therefore be identified, supplied on request, and checked against these digests.
+
+### Checked by re-derivation, not by assertion
+
+`rb2-verify-manifest.py` is committed beside the audit and re-implements the
+runtime digest from first principles — walking the same tracked groups,
+normalising line endings and re-hashing — so a reviewer checks the claim rather
+than the claimant. It has three levels: RUNTIME (re-derive the digest over all
+418 files), WITNESSES (re-hash every committed record and require each to carry
+the head runtime), and CORPUS (`--corpus`, re-hash the bulk output where it is
+available, skipping cleanly where it is not).
+
+Its failure paths were exercised rather than assumed: a tampered runtime file,
+an off-head result, and a wrong witness hash each produce exit 1 naming the
+offender. Reviewing it against this manifest also found that it PASSED a witness
+carrying no runtime stamp at all — the exact condition Review 1 denied for — so
+that path now fails, as does a claimed result with no stamp and a base-side
+result not produced by the base runtime.
 
 ## Acceptance run `RB2-A1` — COMPLETE
 

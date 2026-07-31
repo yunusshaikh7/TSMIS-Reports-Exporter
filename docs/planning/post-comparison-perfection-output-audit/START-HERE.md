@@ -2,8 +2,9 @@
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
 RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
-RB-2 Review 1 is DENIED — EVIDENCE GAP on
-`hotfix/rb-2-deliverable-presentation`**
+RB-2 is IMPLEMENTED — AWAITING ADVERSARIAL REVIEW on
+`hotfix/rb-2-deliverable-presentation`, with Review 1's evidence gap
+(`RB2-R1-EG-001`) implemented and awaiting re-review**
 
 Last updated: 2026-07-30
 
@@ -141,8 +142,9 @@ The other two point in opposite directions on purpose:
   pair-aware, opt-in, and must not widen into the HF-09 class.
 
 Both planners signed the Stage 3 plan. **RB-1 is merged. RB-2 was implemented,
-but Review 1 denied it on one same-head evidence gap and returned it to Stage
-4 on its existing branch.**
+denied by Review 1 on one same-head evidence gap, and re-implemented on its
+existing branch: the acceptance corpus is regenerated at one frozen runtime head
+and bound by a committed manifest. It awaits Review 1 re-review.**
 
 Stage 2 is closed with no open conflict:
 
@@ -164,8 +166,8 @@ Stage 2 is closed with no open conflict:
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-2 DENIED — RETURN TO IMPLEMENTATION** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-2 REVIEW 1 DENIED — EVIDENCE GAP** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-2 IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-2 REVIEW 1 RE-REVIEW PENDING** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

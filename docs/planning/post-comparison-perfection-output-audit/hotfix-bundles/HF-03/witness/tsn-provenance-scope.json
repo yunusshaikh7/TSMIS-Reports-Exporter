@@ -75,10 +75,7 @@
     "temp_path_zip": false,
     "temp_path_walk": false,
     "provenance_temp": false,
-    "provenance_missing_input": [
-     "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\output\\2026-07-23 ssor-prod",
-     "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\output\\2026-07-09 ssor-prod"
-    ],
+    "provenance_missing_input": [],
     "identities": []
    },
    {
@@ -98,10 +95,7 @@
     "temp_path_zip": false,
     "temp_path_walk": false,
     "provenance_temp": false,
-    "provenance_missing_input": [
-     "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\output\\2026-07-23 ssor-prod",
-     "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\output\\2026-07-09 ssor-prod"
-    ],
+    "provenance_missing_input": [],
     "identities": []
    },
    {
@@ -121,10 +115,7 @@
     "temp_path_zip": false,
     "temp_path_walk": false,
     "provenance_temp": false,
-    "provenance_missing_input": [
-     "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\output\\2026-07-23 ssor-prod",
-     "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\output\\2026-07-09 ssor-prod"
-    ],
+    "provenance_missing_input": [],
     "identities": []
    }
   ],
@@ -746,5 +737,47 @@
     ]
    }
   ]
+ },
+ "runtime": {
+  "tree": "C:\\Users\\Yunus\\Projects\\TSMIS-rb2-worktree",
+  "git": {
+   "head": "c483bda1716e03d0e013b25e975bd9a41c58b2c8",
+   "head_tree": "25ffb31b13d27d1aafd70a514e6d4c8970498422",
+   "branch": "hotfix/rb-2-deliverable-presentation",
+   "clean": false,
+   "dirty_paths": [
+    "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-02/witness/clipping-before-after.json",
+    "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-02/witness/count-invariance.json",
+    "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-03/witness/temp-capture-lifecycle.json",
+    "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-03/witness/tsn-provenance-scope.json"
+   ],
+   "runtime_dirty_paths": [],
+   "runtime_clean": true,
+   "clean_note": "`clean` covers the whole worktree; `runtime_clean` covers only the files the runtime digest is taken over. A result written into the worktree necessarily observes clean=false."
+  },
+  "stamped_utc": "2026-07-31T09:41:58.565358+00:00",
+  "file_counts": {
+   "product": 152,
+   "gate": 265,
+   "oracle": 1
+  },
+  "group_digests": {
+   "product": "8D545B220C0E3E3388FB015C4898A2104079C8A42B2DFB0F17440FD90FDB3544",
+   "gate": "056388E33ECECC4F10682263E950BF5B4B8FEEBCF6346CA7AA64D17AFEFB778D",
+   "oracle": "343A2FEA11B9E551963F9C4E18425355C7850ED6473E256433589726EB03D114"
+  },
+  "runtime_digest": "1EFA63FD9EE6355008AD49BE6342E79DCE486A1BFF9FE1E9202F471600162279",
+  "python": {
+   "version": "3.11.0",
+   "executable": "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\build\\.venv\\Scripts\\python.exe"
+  },
+  "packages": {
+   "openpyxl": "3.1.5",
+   "pdfplumber": "0.11.9",
+   "pdfminer.six": "20251230",
+   "pillow": "12.2.0",
+   "pypdfium2": "5.9.0"
+  },
+  "files_note": "per-file digests omitted here by design; the full listing is in RB2-A1-manifest.json and is re-derivable from the tree by rb2-verify-manifest.py"
  }
 }
