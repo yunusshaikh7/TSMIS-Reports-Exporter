@@ -2,11 +2,11 @@
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
 RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
-RB-2 is IMPLEMENTED — AWAITING ADVERSARIAL REVIEW on
-`hotfix/rb-2-deliverable-presentation`, with Review 1's evidence gap
-(`RB2-R1-EG-001`) implemented and awaiting re-review**
+RB-2 Review 1 re-review is DENIED — EVIDENCE GAP on
+`hotfix/rb-2-deliverable-presentation`, returned as
+`RB2-R1-EG-002`**
 
-Last updated: 2026-07-30
+Last updated: 2026-07-31
 
 This is the entry point for every new Codex or Claude chat. Read this file
 before opening the other audit documents. The project deliberately separates
@@ -21,15 +21,18 @@ Resume
 on the existing `hotfix/rb-2-deliverable-presentation` branch with
 `<BUNDLE_ID> = RB-2` and `<IMPLEMENTER> = Claude`.
 
-Codex Review 1 stopped at one Prompt-05 precondition gap,
-`RB2-R1-EG-001`: the complete retained `RB2-A1` acceptance set is not bound by
-path, size, SHA-256, frozen-source identity, and generation metadata to one exact
-final runtime head. Most retained workbooks predate final shared-writer commit
-`1a9418339e1c0df1cc16eddcaedb22dc1e4135d0`; only four classic-environment
-workbooks were recorded as regenerated afterwards. The exact evidence and
-bounded return are in
+Codex Review 1 re-review stopped at one Prompt-05 precondition gap,
+`RB2-R1-EG-002`. The implementation record names acceptance runtime head
+`c483bda1716e03d0e013b25e975bd9a41c58b2c8`, while the committed manifest
+names `b37c1fe8f3dc2b56fad204312b0a2cbbc335a4b5`. Of the 18 claimed
+acceptance results, 14 name `c483bda…`, three name `b37c1fe…`, and
+`generation-equivalence.json` names no exact head. Their runtime-content
+digest agrees, but Prompt 05 and `RB2-A1` require one exact Git head. The
+verifier does not reject that mismatch. The exact evidence and bounded return
+are in
 [`hotfix-bundles/RB-2/REVIEW.md`](hotfix-bundles/RB-2/REVIEW.md).
-Do not merge or begin Review 2.
+Preserve the regenerated corpus; only the inconsistent result/head binding and
+verifier need correction. Do not merge or begin Review 2.
 
 RB-1 (work item HF-01, branch `hotfix/rb-1-clean-road-source-truth`) was
 implemented, denied by Codex Review 1 on the clipped `ArcGIS Build` disclosure
@@ -141,10 +144,9 @@ The other two point in opposite directions on purpose:
   the Description is the same label with `EQUATES TO ` prepended. The rule must be
   pair-aware, opt-in, and must not widen into the HF-09 class.
 
-Both planners signed the Stage 3 plan. **RB-1 is merged. RB-2 was implemented,
-denied by Review 1 on one same-head evidence gap, and re-implemented on its
-existing branch: the acceptance corpus is regenerated at one frozen runtime head
-and bound by a committed manifest. It awaits Review 1 re-review.**
+Both planners signed the Stage 3 plan. **RB-1 is merged. RB-2 Review 1
+re-review denied the returned acceptance evidence because it is not bound to
+one exact Git head; RB-2 is back in Stage 4 on its existing branch.**
 
 Stage 2 is closed with no open conflict:
 
@@ -166,8 +168,8 @@ Stage 2 is closed with no open conflict:
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-2 IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-2 REVIEW 1 RE-REVIEW PENDING** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-2 DENIED — RETURN TO IMPLEMENTATION** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-2 REVIEW 1 RE-REVIEW DENIED — EVIDENCE GAP** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

@@ -111,3 +111,123 @@ artifacts, and one exact implementation runtime.
 Do not merge and do not begin Review 2. Resume Prompt 04 on the existing
 `hotfix/rb-2-deliverable-presentation` branch only to supply
 `RB2-R1-EG-001`.
+
+## Review 1 re-review — Codex, 2026-07-31
+
+### Verdict
+
+**DENIED — EVIDENCE GAP.** The regenerated corpus and the retained results share
+one content-derived runtime digest, but the returned item required one exact Git
+runtime head. The implementation record names
+`c483bda1716e03d0e013b25e975bd9a41c58b2c8`; the committed manifest names
+`b37c1fe8f3dc2b56fad204312b0a2cbbc335a4b5`; and the 18 results classified as
+claimed acceptance evidence contain three different exact-head states:
+
+- 14 name `c483bda1716e03d0e013b25e975bd9a41c58b2c8`;
+- `frozen-inputs.json`, `evidence-determinism.json`, and
+  `provenance-final-commit.json` name
+  `b37c1fe8f3dc2b56fad204312b0a2cbbc335a4b5`;
+- `generation-equivalence.json` names no exact head at all.
+
+All 18 carry or resolve to runtime digest
+`1EFA63FD9EE6355008AD49BE6342E79DCE486A1BFF9FE1E9202F471600162279`.
+That proves runtime-content equivalence, not the stronger one-execution-head
+claim made by `RB2-A1`, Prompt 05, and the implementation record.
+
+This is the one exact missing item:
+
+> A corrected `RB2-A1` manifest/result set and verifier that bind all 18
+> claimed acceptance results to the same exact Git runtime head, with no missing
+> or differing `runtime_head_commit`.
+
+The committed verifier does not detect the mismatch. Run against
+`--at c483bda…`, it prints the manifest's different `b37c1fe…` head and still
+returns `VERIFIED — 0 problem(s)`. It compares the 418-file runtime digest and
+trusts `results.all_claimed_same_head`; it never requires each claimed result's
+exact commit to equal the manifest/implementation head. Its “non-runtime commits
+since” figure is the length of the manifest-supplied list rather than a
+re-derived commit list, which is why it reports four while checking the earlier
+`c483bda…` commit.
+
+Git independently confirms that no runtime file changed after
+`1a9418339e1c0df1cc16eddcaedb22dc1e4135d0`. This is therefore an evidence
+identity gap, not a corroborated product failure, and it does not require another
+bulk generation, installed-Excel rebuild, full gate, or whole-corpus recount.
+Prompt 05 requires stopping before substantive acceptance adjudication.
+
+### Review identity and budget
+
+| Field | Value |
+|---|---|
+| Reviewer / pass | Codex / Review 1 re-review |
+| Implemented bundle? | **No** — implementer is Claude |
+| Bundle / work items | `RB-2` / `HF-02 + HF-03` |
+| Branch | `hotfix/rb-2-deliverable-presentation` |
+| Recorded base | `896083e014d0451d5b05e5b6b024339aebc84d74` |
+| Implementation-record runtime head | `c483bda1716e03d0e013b25e975bd9a41c58b2c8` |
+| Manifest runtime head | `b37c1fe8f3dc2b56fad204312b0a2cbbc335a4b5` |
+| Review-record head reviewed | `0b2ad693c07221b5a9de984610f4e0ebaad12f6f` |
+| Remote branch head before this record | `0b2ad693c07221b5a9de984610f4e0ebaad12f6f` |
+| Review 2 | **BLOCKED** |
+| Merge | **BLOCKED** |
+| Elapsed active review | Approximately 29 minutes |
+| Resource budget | **RESPECTED** — no generation, Excel invocation, application build, full gate, full recount, corpus re-hash, or new bulk output; only Git/doc/manifest inspection and one 22-second committed-verifier run |
+
+The Windows sandbox ACL helper failed on ordinary repository reads and on the
+normal patch editor. Read-only checks were moved to the approved host shell; the
+record was applied as a narrow UTF-8 Git patch. One PowerShell inventory command
+had a syntax error and one manifest-summary query encountered null timestamp
+fields; neither was retried as a product probe. These are reviewer-environment
+events, not product failures.
+
+### Precondition audit
+
+| Prompt 05 precondition | Result | Evidence |
+|---|---|---|
+| Review-1 status is `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW` | **PASS on entry** | `START-HERE.md`, `IMPLEMENTATION-PLAN.md`, `BUNDLE.md`, and `IMPLEMENTATION.md` agreed before this verdict |
+| Hotfix branch and retained outputs exist | **PASS** | Local/remote branch both resolved to `0b2ad693…`; retained `generation-equivalence.json` was read and hash-checked |
+| Exact base SHA is recorded | **PASS** | `896083e014d0451d5b05e5b6b024339aebc84d74`; merge-base agrees |
+| Implementation document identifies an exact acceptance head | **PASS in isolation** | It names `c483bda1716e03d0e013b25e975bd9a41c58b2c8` |
+| Complete acceptance set is bound to that one exact head | **FAIL** | Manifest head is `b37c1fe…`; claimed results split 14 / 3 / 1 across `c483bda…`, `b37c1fe…`, and missing |
+| Every expensive acceptance result is usable as same-head evidence | **FAIL** | The verifier accepts digest equivalence without enforcing exact result-head equality |
+
+Because the returned precondition still fails, no HF-02 or HF-03 acceptance
+criterion was substantively adjudicated and no targeted product test was
+started.
+
+### Evidence reused and bounded commands
+
+| Evidence / command | Binding / result |
+|---|---|
+| Branch identity and complete diff boundary | `git merge-base`, `git diff --check`, `--name-status`, and `--stat` from `896083e…` through `0b2ad693…`; clean boundary, 21 changed files |
+| Remedy commit sequence | `c483bda…` adds the verifier; `b37c1fe…` updates records/witnesses; `0b2ad693…` commits the manifest/source listing |
+| Manifest | 1,801,981 bytes; SHA-256 `19E5C58CC1AF22AE2A869D7680E9A9454FEFFE5417DB1C8C66D3B22D53BC74C5` |
+| Frozen-source listing | 962,858 bytes; SHA-256 `44634BB6DDCD18AA8680B19DD99281CB8703C06DD302C73C9097309DC44A5798`; agrees with the manifest |
+| Exact-head census | 18 claimed entries: 14 `c483bda…`, 3 `b37c1fe…`, 1 missing |
+| Missing-head result | `generation-equivalence.json`, 3,426 bytes, SHA-256 `BA639FA20B47A9CDAA5A8E49F6D1710FB1EE6FADE1EF497A349F26783D0DB7A7`; `current` records only the runtime digest |
+| Committed verifier | One run at `--at c483bda…`: 418 runtime files matched, four committed witnesses matched, corpus not requested, final result incorrectly `VERIFIED — 0 problem(s)` despite the exact-head census |
+| Runtime lineage | Last runtime change re-derived as `1a9418339e1c…`; zero runtime files changed afterwards |
+
+### Acceptance and artifact matrices
+
+| Criterion / gate | Re-review result | Exact reason |
+|---|---|---|
+| HF-02 criteria 1–6 | **NOT ADJUDICATED** | Prompt 05 requires stopping at the failed evidence precondition |
+| HF-03 criteria 1–6 | **NOT ADJUDICATED** | Prompt 05 requires stopping at the failed evidence precondition |
+| Values / source truth | **RETAINED RESULTS LOCATED; NOT FINALLY ADJUDICATED** | Claimed records are not all bound to one exact head |
+| Formulas | **RETAINED RESULTS LOCATED; NOT FINALLY ADJUDICATED** | No Excel work was repeated; exact-head precondition failed first |
+| Visual | **RETAINED RESULTS LOCATED; NOT FINALLY ADJUDICATED** | Render hashes are retained, but the complete claim is not one-head-bound |
+| Evidence eligibility / parity | **RETAINED RESULTS LOCATED; NOT FINALLY ADJUDICATED** | `evidence-determinism.json` is one of the three `b37c1fe…` results |
+| Neighbor regression / full gate / frozen self-test | **RECORDED; NOT FINALLY ADJUDICATED** | Exact-head precondition failed |
+
+### Actionable evidence gap
+
+| ID | Priority | Missing item | Required return |
+|---|---|---|---|
+| `RB2-R1-EG-002` | P1 / blocking | The claimed `RB2-A1` set is runtime-digest-equivalent but not bound to one exact Git head: implementation = `c483bda…`, manifest = `b37c1fe…`, results = 14 / 3 / 1 across `c483bda…` / `b37c1fe…` / missing. | Use `c483bda1716e03d0e013b25e975bd9a41c58b2c8` as the one acceptance head; at that clean checkout re-run only the three small results currently stamped `b37c1fe…` and ensure `generation-equivalence.json` names the same exact head. Rebuild the committed manifest so its acceptance head and all 18 claimed entries agree, and make the verifier fail on any missing/mismatched result head while re-deriving the intervening commit list. Preserve the bulk corpus, Excel outputs, prior evidence, and runtime digest; no bulk regeneration is requested. Then return Prompt 05 for Review 1 re-review. |
+
+**Reviewer signature:** Codex, Review 1 re-review — DENIED — EVIDENCE GAP —
+`2026-07-31T07:21:39.4945627-07:00`.
+
+Do not merge and do not begin Review 2. Resume Prompt 04 only to supply
+`RB2-R1-EG-002`.
