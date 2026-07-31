@@ -2,9 +2,9 @@
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
 RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
-RB-2 Review 1 re-review is DENIED — EVIDENCE GAP on
-`hotfix/rb-2-deliverable-presentation`, returned as
-`RB2-R1-EG-002`**
+RB-2 is IMPLEMENTED — AWAITING ADVERSARIAL REVIEW on
+`hotfix/rb-2-deliverable-presentation`, with the Review 1 re-review return
+`RB2-R1-EG-002` implemented and awaiting re-review**
 
 Last updated: 2026-07-31
 
@@ -16,23 +16,24 @@ first pass.
 
 ## Next action
 
-Resume
-[`PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
-on the existing `hotfix/rb-2-deliverable-presentation` branch with
-`<BUNDLE_ID> = RB-2` and `<IMPLEMENTER> = Claude`.
+Invoke
+[`PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md)
+with `<BUNDLE_ID> = RB-2` and `<REVIEWER> = Codex` for the Review 1
+**re-review**.
 
-Codex Review 1 re-review stopped at one Prompt-05 precondition gap,
-`RB2-R1-EG-002`. The implementation record names acceptance runtime head
-`c483bda1716e03d0e013b25e975bd9a41c58b2c8`, while the committed manifest
-names `b37c1fe8f3dc2b56fad204312b0a2cbbc335a4b5`. Of the 18 claimed
-acceptance results, 14 name `c483bda…`, three name `b37c1fe…`, and
-`generation-equivalence.json` names no exact head. Their runtime-content
-digest agrees, but Prompt 05 and `RB2-A1` require one exact Git head. The
-verifier does not reject that mismatch. The exact evidence and bounded return
-are in
-[`hotfix-bundles/RB-2/REVIEW.md`](hotfix-bundles/RB-2/REVIEW.md).
-Preserve the regenerated corpus; only the inconsistent result/head binding and
-verifier need correction. Do not merge or begin Review 2.
+The re-review's bounded return `RB2-R1-EG-002` is implemented. It found the
+claimed set runtime-digest-equivalent but spanning two Git heads — 14 results at
+`c483bda…`, three at `b37c1fe…`, and `generation-equivalence.json` naming none —
+with the verifier not rejecting that. All 18 claimed results now name the one
+acceptance head `c483bda1716e03d0e013b25e975bd9a41c58b2c8`: the three off-head
+results were re-run at that clean checkout and `generation-equivalence.json` was
+rebuilt to carry an exact head, its conclusions unchanged. The manifest records
+the acceptance head explicitly and separately from its own later build head, and
+the verifier now fails on any missing or mismatched result head while
+re-deriving the intervening commits from git. No bulk regeneration was needed —
+the corpus, Excel outputs, prior evidence and runtime digest are untouched.
+
+Do not merge or begin Review 2 until that re-review lands.
 
 RB-1 (work item HF-01, branch `hotfix/rb-1-clean-road-source-truth`) was
 implemented, denied by Codex Review 1 on the clipped `ArcGIS Build` disclosure

@@ -1,6 +1,6 @@
 # `RB-2` — Implementation Record
 
-Status: **DENIED — RETURN TO IMPLEMENTATION**
+Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW**
 
 | Field | Value |
 |---|---|
@@ -96,6 +96,62 @@ that width. Deliberately hidden columns (the state-mask chunks) and the
 Stage-2-validated 45.75 pt wrapped header band are excluded as out of scope.
 Witness: `HF-02\excel-metrics-ramp-summary{,2,3}.json` — the failing pass is
 retained beside the passing one.
+
+## Review 1 re-review remedy — `RB2-R1-EG-002`, one exact Git head
+
+The re-review denied RB-2 again, and again correctly. The `RB2-R1-EG-001` remedy
+bound the acceptance set by runtime **digest**, and the digest is content-derived
+on purpose — so that a documentation-only commit provably cannot move it. That
+property is real and still holds, but it is not the property Prompt 05 and
+`RB2-A1` require. They require one exact **Git head**, and digest equality is not
+head identity: a set split across two commits with byte-identical runtime content
+digests the same while still spanning two heads.
+
+It did. Of the 18 claimed results, 14 named `c483bda…`, three named `b37c1fe…`
+(the small legs re-run after the records commit) and `generation-equivalence.json`
+named no exact head at all — it recorded a digest per side and no commit. The
+first verifier compared digests only, so it reported success over a two-head set.
+A check that cannot fail on the defect it is meant to catch is not a check.
+
+### What changed, and what deliberately did not
+
+No bulk regeneration. The corpus, the Excel outputs, the prior evidence and the
+runtime digest are exactly as they were; only the head binding and the verifier
+were wrong.
+
+| | |
+|---|---|
+| **The one acceptance head** | `c483bda1716e03d0e013b25e975bd9a41c58b2c8` |
+| Re-run at that clean checkout | `frozen-inputs`, `evidence-determinism`, `provenance-final-commit` — the three that named `b37c1fe…` |
+| Rebuilt to name an exact head | `generation-equivalence.json`, which previously carried digests but no commit |
+| Claimed results now naming that head | **18 of 18** |
+
+The four were re-run by checking the worktree out at `c483bda` and executing
+them there, so each records the head it genuinely ran at rather than being
+relabelled. They are cheap reads over the preserved corpus — the whole re-stamp
+took under two minutes — which is why this required no regeneration.
+
+`generation-equivalence.json` was rebuilt by
+`acc_generation_equivalence.py`, retained beside the rest of the harness. It
+re-derives the same comparison from the two generation records: 40 steps each,
+31 `ok` each, 0 regressed, 0 newly ok, 9 refusals identical in kind, verdict
+`EQUIVALENT` — unchanged conclusions, now with an exact head.
+
+### The manifest no longer conflates two different facts
+
+`acceptance_head` is now an explicit input rather than whatever the tree happens
+to be at when the manifest is built. Those are different facts: the manifest and
+the records are committed **after** the run they describe, so the build head is
+legitimately later. The manifest records both, states which is which, and
+requires every claimed entry to match the acceptance head.
+
+### The verifier now fails where it passed
+
+A new `EXACT HEAD` level rejects any claimed result that names no head or a
+different one, and re-derives from git the commits between the acceptance head
+and the manifest's build head — confirming none of them touches a runtime file
+rather than accepting the manifest's word for it. The digest check remains, as a
+necessary condition that is no longer mistaken for a sufficient one.
 
 ## Review 1 remedy — `RB2-R1-EG-001`, the acceptance set bound to one runtime head
 

@@ -188,6 +188,63 @@ def check_lineage(manifest, tree, commit, fail):
     print(f"  non-runtime commits since          {len(since)}")
 
 
+def check_exact_head(manifest, tree, fail):
+    """Every claimed result must name ONE EXACT Git head — not merely an equal
+    runtime digest.
+
+    This check exists because its absence was the finding. The first verifier
+    compared only runtime digests, and a digest is content-derived: a set split
+    across two commits with byte-identical runtime content produced equal
+    digests and passed, while actually spanning two heads. Digest equality is
+    necessary and NOT sufficient.
+
+    The intervening commits are re-derived from git here rather than read from
+    the manifest, so the explanation for any gap between the acceptance head and
+    the manifest's own build head is checked, not accepted.
+    """
+    block = manifest.get("acceptance_head") or {}
+    head = block.get("commit")
+    print("\nEXACT HEAD — one acceptance head for every claimed result")
+    if not head:
+        fail("the manifest names no acceptance head")
+        return
+    claimed = [r for r in manifest["results"]["entries"]
+               if r.get("class", "acceptance") == "acceptance"]
+    missing = [r["path"] for r in claimed if not r.get("runtime_head_commit")]
+    mismatched = [(r["path"], r["runtime_head_commit"]) for r in claimed
+                  if r.get("runtime_head_commit")
+                  and r["runtime_head_commit"] != head]
+    print(f"  acceptance head                    {head[:12]}")
+    print(f"  claimed results                    {len(claimed)}")
+    for path in missing:
+        fail(f"claimed result names no exact head: {path}")
+    for path, got in mismatched:
+        fail(f"claimed result names {got[:12]}, not the acceptance head "
+             f"{head[:12]}: {path}")
+    if not missing and not mismatched:
+        print(f"  all name the acceptance head       yes")
+
+    # The manifest is committed after the run it describes, so its own build
+    # head may legitimately be later. Re-derive what came between and confirm
+    # none of it is a runtime file.
+    build = block.get("manifest_built_at")
+    if build and build != head:
+        roots = [r for group in GROUP_ROOTS.values() for r in group]
+        between = [ln for ln in git(tree, "log", "--format=%h %s",
+                                    f"{head}..{build}").decode("utf-8", "replace"
+                                                               ).splitlines() if ln]
+        touched = [f for f in git(tree, "diff", "--name-only", f"{head}..{build}",
+                                  "--", *roots).decode("utf-8", "replace"
+                                                       ).splitlines() if f.strip()]
+        print(f"  manifest built at                  {build[:12]}")
+        print(f"  commits in between                 {len(between)}")
+        if touched:
+            fail(f"runtime files changed between the acceptance head and the "
+                 f"manifest build head: {touched[:10]}")
+        else:
+            print(f"  runtime files changed in between   0")
+
+
 def check_witnesses(manifest, tree, fail):
     head_digest = manifest["runtime"]["head"]["runtime_digest"]
     entries = [rec for rec in manifest["results"]["entries"]
@@ -305,6 +362,7 @@ def main():
 
     check_runtime(manifest, tree, commit, fail)
     check_lineage(manifest, tree, commit, fail)
+    check_exact_head(manifest, tree, fail)
     check_witnesses(manifest, tree, fail)
     if corpus:
         check_corpus(manifest, sources, fail)

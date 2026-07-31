@@ -1,8 +1,12 @@
 # `RB-2` — Bundle Contract
 
-Status: **DENIED — RETURN TO IMPLEMENTATION** — Codex Review 1 re-review found
-that the `RB2-R1-EG-001` remedy is still not bound to one exact Git runtime
-head. The bounded return `RB2-R1-EG-002` is in [REVIEW.md](REVIEW.md).
+Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** — the bounded return
+`RB2-R1-EG-002` is implemented: all 18 claimed `RB2-A1` results now name the one
+exact acceptance head `c483bda1716e03d0e013b25e975bd9a41c58b2c8`, the manifest
+records that head explicitly, and the verifier fails on any missing or
+mismatched result head. No bulk regeneration was needed. The returns are in
+[REVIEW.md](REVIEW.md); the remedies are the two "Review 1" sections of
+[IMPLEMENTATION.md](IMPLEMENTATION.md).
 
 > This RB-level contract carries **HF-02 + HF-03** and transcribes both frozen
 > work-item sections from
@@ -101,7 +105,7 @@ weakened oracle, or rush ship may not replace that split.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to its own `statewide-summary-visible-text-clipping.json`, `large-detail-no-render-visual-adjudication.json` and native-Excel renders, plus the committed `stage2-measure-clipping.py` / `stage2-clipping-recheck.json` |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-2: DENIED — RETURN TO IMPLEMENTATION** |
+| Status | **Inherits RB-2: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
 
 **Exact scope.** Stored presentation and self-description of the generated
 comparison workbook, **all families, both twins**: the `Comparison` category/key
@@ -224,7 +228,7 @@ and the per-family count-invariance table.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to `run-ledgers/tsn-library-rebuild.json`, `source-audit/all-completed-workflow-note-audit.json`, the committed `stage2-tsn-provenance-scope.json`, and Claude's `witness\temp_captures.txt` (readable since the firewall ended) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-2: DENIED — RETURN TO IMPLEMENTATION** |
+| Status | **Inherits RB-2: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
 
 **Exact scope.** The matrix lanes' private TSN capture step and what the
 resulting workbooks say about their own TSN input: all 12 vs-TSN families × the
