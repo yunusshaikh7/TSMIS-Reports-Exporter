@@ -130,6 +130,44 @@ WIDE_CAT_SCHEMA = CompareSchema(
 WIDE_CAT_A = [[label, str(10 + i)] for i, label in enumerate(WIDE_CATS)]
 WIDE_CAT_B = [[label, str(11 + i)] for i, label in enumerate(WIDE_CATS)]
 
+# ---- RB2-R2-002: a real value is wider than any product cap -----------------
+# RB-2 briefly bounded identity columns at this stored width. It gave them 425
+# usable pixels and clipped 4,978 actual cells across the corpus, because a cap
+# is only safe where the caller WRAPS what it cannot fit and an identity column
+# never wraps. The number survives HERE, and only here, so the fixture can prove
+# the cap would have clipped: nothing in the product reads it any more.
+RETIRED_CAP_WIDTH = 60.0
+
+# Two real-shaped Highway Log descriptions differing by one word, so the cell
+# renders the "<A> ≠ <B>" pair that the corpus showed reaching 1,069 px.
+LONG_A = ("NB LNS RTE 1 OVR RTE 17 AND WBD LNS RTE 17 CONNECTOR OVERCROSSING "
+          "AT PM 42.706")
+LONG_B = ("NB LNS RTE 1 OVR RTE 17 AND WBD LNS RTE 17 CONNECTOR UNDERCROSSING "
+          "AT PM 42.706")
+# An identity that is itself past the cap, so the key column is tested too.
+LONG_KEY = "LOCATION IDENTITY WIDER THAN ANY CAPPED COLUMN CAN SHOW / 000.421"
+LONG_KEY_ONLY_A = "IDENTITY PRESENT ON SIDE A ONLY, ALSO PAST THE RETIRED CAP"
+
+# Four leading fields push Description past the committed oracle's eighth
+# column, which is the blind spot this fixture exists to stand in: the failing
+# corpus cell was `Comparison!AI2`.
+LONG_SCHEMA = CompareSchema(
+    report_name="Presentation Long Value",
+    header=["Key", "Near", "Mid", "Far", "Description", "Tail"],
+    side_a="TSMIS", side_b="TSN",
+    id_noun="location", id_noun_plural="locations")
+
+
+def _long_row(key, description):
+    """`[route, key, near, mid, far, description, tail]` — the populated tail
+    stops the description from legally spilling into empty space."""
+    return ["001", key, "n", "m", "f", description, "t"]
+
+
+LONG_A_ROWS = [_long_row(LONG_KEY, LONG_A),
+               _long_row(LONG_KEY_ONLY_A, LONG_A)]
+LONG_B_ROWS = [_long_row(LONG_KEY, LONG_B)]
+
 FRESHNESS_LABEL = ("Build-time source identity and duplicate pairing snapshot "
                    "is current")
 CONTEXT_TEXT = "not compared (context)"
@@ -141,6 +179,78 @@ def _load_gate():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _audit_everything(gate, path):
+    """`(hits, excluded, visible_sheets)` — the oracle's judgement WITHOUT its
+    scan window: every visible sheet, every column, every row.
+
+    The window is not a detail. The committed oracle scans three sheets, the
+    first eight columns and the first 80 rows, and a Comparison field column
+    sits far past column 8 — which is how RB2-R2-002's 4,978 clipped cells sat
+    inside workbooks the oracle had just certified. Fixtures are small, so the
+    permanent gate can afford to look everywhere, and looking everywhere is
+    exactly what it was missing.
+
+    Two exclusions, both because the cell is NEVER RENDERED to anyone, both
+    applied AFTER the oracle judges rather than inside it, and both counted and
+    named rather than quietly dropped:
+
+      * hidden columns and rows — the versioned E/D/N/U state-mask and Med-Wid
+        helper columns the workbook deliberately hides;
+      * hidden and VERY-hidden sheets — `__CMP_E2_SNAPSHOT_*`, the build-time
+        identity binding, which Excel will not display even on Unhide.
+
+    Nothing else is excluded: a visible cell is in scope wherever it sits."""
+    from openpyxl.utils.cell import coordinate_from_string
+
+    rows, cols = gate.SCAN_ROWS, gate.MAX_LABEL_COL
+    wb = load_workbook(path, read_only=False, data_only=True)
+    hits, excluded, visible = [], [], []
+    try:
+        gate.SCAN_ROWS, gate.MAX_LABEL_COL = 10 ** 9, 10 ** 9
+        for sheet in wb.sheetnames:
+            ws = wb[sheet]
+            if ws.sheet_state != "visible":
+                excluded.append({"sheet": sheet, "why": ws.sheet_state})
+                continue
+            visible.append(sheet)
+            for hit in gate.audit_sheet(ws, path.name, sheet):
+                letter, row = coordinate_from_string(hit["cell"])
+                col_dim = ws.column_dimensions.get(letter)
+                row_dim = ws.row_dimensions.get(row)
+                if (getattr(col_dim, "hidden", False)
+                        or getattr(row_dim, "hidden", False)):
+                    hit["why"] = "hidden column/row"
+                    excluded.append(hit)
+                else:
+                    hits.append(hit)
+        return hits, excluded, visible
+    finally:
+        gate.SCAN_ROWS, gate.MAX_LABEL_COL = rows, cols
+        wb.close()
+
+
+def _column_of(path, sheet, header):
+    """1-based index of `header` on `sheet`, or None."""
+    wb = load_workbook(path, read_only=True)
+    try:
+        for row in wb[sheet].iter_rows(min_row=1, max_row=1, values_only=True):
+            for i, value in enumerate(row, start=1):
+                if value == header:
+                    return i
+        return None
+    finally:
+        wb.close()
+
+
+def _stored_width(path, sheet, letter):
+    wb = load_workbook(path, read_only=False)
+    try:
+        dim = wb[sheet].column_dimensions.get(letter)
+        return None if dim is None else dim.width
+    finally:
+        wb.close()
 
 
 def _summary_grid(path, data_only):
@@ -182,9 +292,14 @@ def main():
                 built[(name, mode)] = (path, result)
 
         # ---- PCOA-FINAL-008 / -009: nothing the reader needs is clipped -----
+        # Measured across EVERY sheet, column and row — not the oracle's
+        # three-sheet / eight-column / 80-row window, which is what let
+        # RB2-R2-002 through.
         for (name, mode), (path, _result) in built.items():
-            hits = gate.audit_workbook(path)
-            c.check(f"{name}/{mode} has no materially clipped cell",
+            hits, skipped, sheets = _audit_everything(gate, path)
+            c.check(f"{name}/{mode} has no materially clipped cell in any of "
+                    f"its {len(sheets)} visible sheets ({len(skipped)} "
+                    "never-rendered cells/sheets excluded)",
                     not hits,
                     "; ".join(f"{h['sheet']}!{h['cell']} short "
                               f"{h['short_by_px']}px {h['text'][:40]!r}"
@@ -233,22 +348,61 @@ def main():
         # one-sided and category sheets are measured with the oracle's OWN
         # sheet function, so the fix is never proved against a private ruler.
         for label, path in wide.items():
-            hits = list(gate.audit_workbook(path))
-            wb = load_workbook(path, read_only=False, data_only=True)
-            try:
-                extra = [s for s in wb.sheetnames
-                         if s.startswith("Only in") or s == WIDE_SPEC.sheet_name]
-                for sheet in extra:
-                    hits.extend(gate.audit_sheet(wb[sheet], path.name, sheet))
-            finally:
-                wb.close()
+            hits, skipped, sheets = _audit_everything(gate, path)
             c.check(f"wide {label}: no cell is clipped because a shorter value "
-                    f"was measured in place of the wider one (+{len(extra)} "
-                    "one-sided/category sheets)",
+                    f"was measured in place of the wider one (all {len(sheets)} "
+                    f"visible sheets, {len(skipped)} never-rendered excluded)",
                     not hits,
                     "; ".join(f"{h['sheet']}!{h['cell']} short "
                               f"{h['short_by_px']}px {h['text'][:40]!r}"
                               for h in hits[:6]))
+
+        # ---- RB2-R2-002: no product cap clips a value -----------------------
+        # The wide-glyph fixture above proves the right candidate is MEASURED.
+        # It cannot prove the measurement is honoured, because none of its
+        # values is long enough to reach a cap. These are: the pair below needs
+        # more pixels than the retired 60.0 cap could ever have given it, and
+        # it is checked in the field, key and one-sided columns.
+        long_pair = LONG_A + " ≠ " + LONG_B
+        need_px = _text_px(long_pair, False, 10.0) + 4
+        cap_px = round(RETIRED_CAP_WIDTH * 7) + 5
+        c.check("the fixture's value really is wider than the retired cap",
+                need_px > cap_px,
+                f"{need_px:.0f}px needed vs {cap_px:.0f}px the {RETIRED_CAP_WIDTH} "
+                "cap allowed")
+
+        for mode in ("values", "formulas"):
+            path = Path(tmp) / f"long-{mode}.xlsx"
+            result = run_compare(LONG_SCHEMA, LONG_A_ROWS, LONG_B_ROWS, True,
+                                 path, mode=mode, name_a="a.xlsx",
+                                 name_b="b.xlsx")
+            c.check(f"long/{mode} builds", result.status == "ok", repr(result))
+
+            # The blind spot, asserted rather than described: this column is
+            # past where the committed oracle stops looking, which is why the
+            # unwindowed scan above is the thing that makes this check real.
+            col = _column_of(path, "Comparison", "Description")
+            c.check(f"long/{mode}: the failing column is past the oracle's "
+                    f"{gate.MAX_LABEL_COL}-column window",
+                    col is not None and col > gate.MAX_LABEL_COL,
+                    f"Description at column {col}")
+
+            hits, skipped, sheets = _audit_everything(gate, path)
+            c.check(f"long/{mode}: no cell is clipped by a width cap (all "
+                    f"{len(sheets)} visible sheets, {len(skipped)} "
+                    "never-rendered excluded)",
+                    not hits,
+                    "; ".join(f"{h['sheet']}!{h['cell']} short "
+                              f"{h['short_by_px']}px {h['text'][:40]!r}"
+                              for h in hits[:6]))
+
+            if col is not None:
+                from openpyxl.utils import get_column_letter
+                width = _stored_width(path, "Comparison", get_column_letter(col))
+                c.check(f"long/{mode}: the column was widened past the retired "
+                        "cap rather than clipped at it",
+                        width is not None and width > RETIRED_CAP_WIDTH,
+                        f"stored width {width}")
 
         # ---- PCOA-FINAL-014: a wholly-context column says so ----------------
         for mode in ("values", "formulas"):

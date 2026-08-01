@@ -63,7 +63,7 @@ try:
     from openpyxl.comments import Comment
     from openpyxl.formatting.rule import CellIsRule, FormulaRule
     from openpyxl.styles import Alignment, Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.utils import column_index_from_string, get_column_letter
     _DEPS_OK = True
 except ImportError:
     _DEPS_OK = False
@@ -99,8 +99,12 @@ _CMP_FIELD_MIN_WIDTH = 13.0
 # candidate chosen at one size and fitted at another is not a fit at all.
 _CMP_FIELD_PT = 10
 # Identity and unsized columns are WIDENED to fit rather than wrapped — a key
-# has to read on one line — but a pathological value stops here.
-_MAX_FITTED_WIDTH = 60.0
+# has to read on one line. The only bound is Excel's own: a stored width past
+# this is rejected by the format, so it is a FILE-FORMAT limit, not a
+# presentation choice. RB2-R2-002: an earlier 60.0 product cap lived here and
+# clipped 4,978 real cells, because a cap is only safe where the caller WRAPS
+# what it cannot fit, and an identity column never wraps.
+_EXCEL_MAX_COL_WIDTH = 255.0
 # What a wholly-context column reports instead of a bare 0 (PCOA-FINAL-014).
 _CONTEXT_FIELD_TEXT = "not compared (context)"
 
@@ -2075,10 +2079,18 @@ def fitted_width(texts, *, bold=False, size_pt=11.0, minimum=0.0, maximum=None):
 
     `maximum` caps a runaway instruction string: the caller wraps whatever the
     cap cannot fit (see `_wrap_overflow`), which is what a long sentence wants
-    anyway. An identity cell passes no cap and is always widened to fit."""
+    anyway — so a cap is only ever passed by a caller that WRAPS. An identity
+    cell passes none and is always widened to fit, because nothing downstream
+    will wrap it and a clipped identity reads as a different value (RB2-R2-002).
+
+    Excel's own ceiling is applied unconditionally and last. It bounds the
+    format, not the presentation: a wider stored width is rejected on open, so
+    honouring it is not the kind of cap this function's callers get to make."""
     need = max((_text_px(t, bold, size_pt) for t in texts), default=0.0)
     width = max(float(minimum), float(_px_to_width(need)))
-    return width if maximum is None else min(width, float(maximum))
+    if maximum is not None:
+        width = min(width, float(maximum))
+    return min(width, _EXCEL_MAX_COL_WIDTH)
 
 
 def _wrapped_lines(text, width, bold=False, size_pt=11.0):
@@ -2149,6 +2161,32 @@ def _apply_grid_geometry(ws, widths, heights):
         ws.column_dimensions[get_column_letter(col)].width = width
     for row, height in sorted(heights.items()):
         ws.row_dimensions[row].height = height
+
+
+def _ceiling_wrapped_columns(ws):
+    """Zero-based positions of the columns stored AT Excel's width ceiling.
+
+    Every other column was sized to fit its widest value, so it fits. A column
+    that lands on the ceiling is the one case a width cannot settle: the format
+    has nothing wider to store, so fitting can no longer be proved. Those cells
+    wrap instead — several auto-height lines, all of the text — rather than
+    being cut off (RB2-R2-002). It is deliberately an over-approximation: a
+    column that happens to fit exactly at the ceiling wraps too, which costs a
+    little vertical space and hides nothing.
+
+    On the real corpus this set is EMPTY — the widest column measures 251.85 of
+    255 — so it is the format's own edge, not a routine path."""
+    return {column_index_from_string(letter) - 1
+            for letter, dim in ws.column_dimensions.items()
+            if dim.width is not None
+            and float(dim.width) >= _EXCEL_MAX_COL_WIDTH}
+
+
+def _ceiling_wrap_align():
+    """How a ceiling-wrapped cell sits: top-anchored so its first line reads
+    against its neighbours, and left to Excel's automatic row height so every
+    wrapped line is shown."""
+    return Alignment(vertical="top", wrap_text=True)
 
 
 def _styled(ws, value, font, fill=None, align=None, guard=False,
@@ -2233,6 +2271,38 @@ def _apply_field_widths(ws, widths, col_for, lay):
             ws.column_dimensions[col].width = width
 
 
+def _fit_data_columns(ws, rows, lay):
+    """Widen each data-sheet field column to its own widest value.
+
+    Every cell on a data sheet is blocked from spilling: the next field sits
+    beside it, and the Key(helper) column sits after the last one. So a column
+    left at Excel's 8.43 default — or at a schema `data_widths` entry chosen
+    for a different corpus — truncates ordinary content exactly the way the
+    Comparison sheet's columns did (RB2-R2-002; these are what the gate found
+    once it stopped scanning only the first eight columns).
+
+    Declared widths stay a FLOOR, never a ceiling: a schema that asked for a
+    roomier column still gets it. Values are measured, headers are not — the
+    header band wraps in a tall row and is legible regardless."""
+    off = 1 if lay.has_route else 0
+    widest = {}
+    for row in rows:
+        for idx in range(len(lay.sc.header)):
+            i = idx + off
+            if i >= len(row) or row[i] is None:
+                continue
+            s = str(row[i])
+            px = _text_px(s, False, 10)
+            if px > widest.get(idx, (0.0, ""))[0]:
+                widest[idx] = (px, s)
+    for idx, (_px, text) in widest.items():
+        # Unlike the Comparison sheet's field_col, data_col places EVERY header
+        # index (including the key), so there is no unplaceable column to skip.
+        dim = ws.column_dimensions[lay.data_col(idx)]
+        floor = float(dim.width) if dim.width is not None else 0.0
+        dim.width = fitted_width([text], size_pt=10, minimum=floor)
+
+
 def _auto_field_widths(sc, lay, rows_t, rows_n, off):
     """Widths for the Comparison/Only-in FIELD columns.
 
@@ -2272,8 +2342,6 @@ def _auto_field_widths(sc, lay, rows_t, rows_n, off):
     return {f: fitted_width(
         [(a + _DIFF_MARK + b) if a and b else (a or b)], size_pt=_CMP_FIELD_PT,
         minimum=max(_CMP_FIELD_MIN_WIDTH,
-                    float(sc.cmp_widths.get(sc.header[f], 0))),
-        maximum=max(_MAX_FITTED_WIDTH,
                     float(sc.cmp_widths.get(sc.header[f], 0))))
         for f, (a, b) in widest.items()}
 
@@ -2303,18 +2371,24 @@ def _write_data_sheet(wb, name, tab_color, rows, lay, events, cmp_rows,
     # spilling by their populated neighbours (PCOA-FINAL-009's ownership site).
     ws.column_dimensions[lay.key_col].width = fitted_width(
         ["Key (helper)"] + [str(k) for k in list(helper_keys or ())[:1]],
-        size_pt=10, minimum=14, maximum=_MAX_FITTED_WIDTH)
+        size_pt=10, minimum=14)
     ws.column_dimensions[lay.back_col].width = fitted_width(
-        ("Comparison row",), bold=True, size_pt=10, minimum=13,
-        maximum=_MAX_FITTED_WIDTH)
+        ("Comparison row",), bold=True, size_pt=10, minimum=13)
     for f in lay.medwid_field_indices:
         for stage in _MEDWID_HELPER_STAGES:
             ws.column_dimensions[lay.medwid_helper_col(f, stage)].hidden = True
     for column in lay.build_fresh_cols:
         ws.column_dimensions[column].hidden = True
     if lay.has_route:
-        ws.column_dimensions[lay.route_data_col].width = 8
+        # Measured, not assumed: the route is this row's identity here too and
+        # the first data field always sits beside it, so a hard-coded 8 clipped
+        # any route that did not fit (RB2-R2-002 — this was the last fixed
+        # identity width left in the writers).
+        ws.column_dimensions[lay.route_data_col].width = fitted_width(
+            {str(r[0]) for r in rows if r and r[0] is not None} | {"Route"},
+            size_pt=10, minimum=8)
     _apply_field_widths(ws, lay.sc.data_widths, lay.data_col, lay)
+    _fit_data_columns(ws, rows, lay)
 
     ws.append(_header_row(
         ws,
@@ -2470,19 +2544,21 @@ def _write_comparison(wb, union, lay, events, vals=None, helper_tokens=None,
     if lay.has_route:
         ws.column_dimensions["A"].width = fitted_width(
             {str(route) for route, _l, _o in union},
-            size_pt=_CMP_FIELD_PT, minimum=8, maximum=_MAX_FITTED_WIDTH)
+            size_pt=_CMP_FIELD_PT, minimum=8)
     ws.column_dimensions[lay.c_loc].width = fitted_width(
         {str(_visible_key(loc)) for _r, loc, _o in union},
-        size_pt=_CMP_FIELD_PT, minimum=12, maximum=_MAX_FITTED_WIDTH)
+        size_pt=_CMP_FIELD_PT, minimum=12)
     ws.column_dimensions[lay.c_occ].width = 4
     ws.column_dimensions[lay.c_trow].width = 7
     ws.column_dimensions[lay.c_status].width = fitted_width(
-        ("Both", lay.only_a, lay.only_b), size_pt=10, minimum=11,
-        maximum=_MAX_FITTED_WIDTH)
+        ("Both", lay.only_a, lay.only_b), size_pt=10, minimum=11)
     ws.column_dimensions[lay.c_diffs].width = 6
     _apply_field_widths(ws, sc.cmp_widths, lay.field_col, lay)
     for f, width in (field_widths or {}).items():
         ws.column_dimensions[lay.field_col(f)].width = width
+
+    ceiling_cols = _ceiling_wrapped_columns(ws)
+    wrap_align = _ceiling_wrap_align() if ceiling_cols else None
 
     for chunk in lay.state_chunks:
         ws.column_dimensions[chunk["col"]].hidden = True
@@ -2590,6 +2666,7 @@ def _write_comparison(wb, union, lay, events, vals=None, helper_tokens=None,
         else:
             guard_set = set(range(len(row))) - link_cols
         ws.append([_styled(ws, v, link_font if j in link_cols else body_font,
+                           align=wrap_align if j in ceiling_cols else None,
                            guard=(j in guard_set))
                    for j, v in enumerate(row)])
         if (i + 1) % _PROGRESS_EVERY == 0:
@@ -3017,16 +3094,15 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None,
         # phrases are not; measuring them all bold only ever over-reserves.
         ws.column_dimensions[c_route].width = fitted_width(
             {str(route) for route, _l, _o in keys} | {id_headers[0]},
-            size_pt=_CMP_FIELD_PT, minimum=8, maximum=_MAX_FITTED_WIDTH)
+            size_pt=_CMP_FIELD_PT, minimum=8)
         ws.column_dimensions[c_why].width = fitted_width(
             (id_headers[-1], "entire route", f"this {sc.id_noun} only"),
-            bold=True, size_pt=_CMP_FIELD_PT, minimum=18,
-            maximum=_MAX_FITTED_WIDTH)
+            bold=True, size_pt=_CMP_FIELD_PT, minimum=18)
     # Same identity rule as the Comparison sheet, measured the same way: these
     # are the SAME keys, repeated in one place (PCOA-FINAL-008 / -009).
     ws.column_dimensions[c_loc].width = fitted_width(
         {str(_visible_key(loc)) for _r, loc, _o in keys},
-        size_pt=_CMP_FIELD_PT, minimum=12, maximum=_MAX_FITTED_WIDTH)
+        size_pt=_CMP_FIELD_PT, minimum=12)
     ws.column_dimensions[c_occ].width = 4
     ws.column_dimensions[c_row].width = 9
     _apply_field_widths(ws, sc.cmp_widths, fcol, lay)
@@ -3040,6 +3116,9 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None,
         tint = "FFE699" if side == sc.side_a else "BDD7EE"
         ws.conditional_formatting.add(f"A2:{last_field}{last}", FormulaRule(
             formula=[f'${c_why}2="entire route"'], fill=PatternFill(bgColor=tint)))
+
+    ceiling_cols = _ceiling_wrapped_columns(ws)
+    wrap_align = _ceiling_wrap_align() if ceiling_cols else None
 
     link_font = _link_font()
     link_col = 3 if lay.has_route else 2              # the "<side> Row" position
@@ -3092,6 +3171,7 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None,
         else:
             guard_set = set(range(len(row))) - {link_col}
         ws.append([_styled(ws, v, link_font if j == link_col else body_font,
+                           align=wrap_align if j in ceiling_cols else None,
                            guard=(j in guard_set))
                    for j, v in enumerate(row)])
         if (i + 1) % _PROGRESS_EVERY == 0:
@@ -3236,7 +3316,15 @@ def _write_routes(wb, all_routes, lay, vals=None):
 
     ws.freeze_panes = "B2"
     ws.auto_filter.ref = f"A1:H{last}"
-    for col, w in (("A", 8), ("B", 12), ("C", 12), ("D", 12),
+    # A is the route — this sheet's identity — and B its status; both are text
+    # blocked by a populated neighbour, so both are measured rather than
+    # assumed (RB2-R2-002). C–H carry counts, which render rounded rather than
+    # clipped, under a header band that wraps in its own tall row.
+    for col, w in (("A", fitted_width([str(r) for r in all_routes] + ["Route"],
+                                      size_pt=10, minimum=8)),
+                   ("B", fitted_width(("Both", lay.only_a, lay.only_b),
+                                      size_pt=10, minimum=12)),
+                   ("C", 12), ("D", 12),
                    ("E", 16), ("F", 16), ("G", 18), ("H", 14)):
         ws.column_dimensions[col].width = w
     ws.row_dimensions[1].height = 30
@@ -3763,7 +3851,7 @@ def _write_provenance_sheet(wb, provenance):
     roles = [str(rec.get("role", ""))
              for rec in provenance.get("inputs") or ()] + ["Report", "Run", "Note"]
     for col, w in (("A", fitted_width(roles, bold=False, size_pt=11,
-                                      minimum=12, maximum=_MAX_FITTED_WIDTH)),
+                                      minimum=12)),
                    ("B", 110)):
         ws.column_dimensions[col].width = w
     recipe = provenance.get("recipe") or {}
