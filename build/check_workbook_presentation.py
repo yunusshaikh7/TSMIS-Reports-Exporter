@@ -239,6 +239,18 @@ BLANK_SCHEMA = CompareSchema(
 BLANK_A = [["k1", "W" * 20, "t"]]
 BLANK_B = [["k1", "", "t"]]
 
+# The same defect one level subtler, and the shape the first fixture missed: a
+# side that holds BOTH a short value and an empty one. Keeping a single widest
+# raw value per side loses the fact that side A can also render the marker, and
+# the marker is wider than "x". Row k3 adds the TRIM case -- whitespace-only is
+# stored non-empty but RENDERS blank, because both flavors apply Excel TRIM.
+MIXED_SCHEMA = CompareSchema(
+    report_name="Presentation Mixed Blank", header=["Key", "Value", "Tail"],
+    side_a="TSMIS", side_b="TSN",
+    id_noun="location", id_noun_plural="locations")
+MIXED_A = [["k1", "x", "t"], ["k2", "", "t"], ["k3", "   ", "t"]]
+MIXED_B = [["k1", "W" * 7, "t"], ["k2", "W" * 7, "t"], ["k3", "W" * 7, "t"]]
+
 FRESHNESS_LABEL = ("Build-time source identity and duplicate pairing snapshot "
                    "is current")
 CONTEXT_TEXT = "not compared (context)"
@@ -807,14 +819,17 @@ def main():
 
         # ---- RB2-R2-002 round 5: sizing must measure the (blank) marker -----
         blank_widths = {}
+        shapes = (("blank", BLANK_SCHEMA, BLANK_A, BLANK_B),
+                  ("mixed", MIXED_SCHEMA, MIXED_A, MIXED_B))
         for mode in ("values", "formulas"):
-            path = Path(tmp) / f"blank-{mode}.xlsx"
-            result = run_compare(BLANK_SCHEMA, BLANK_A, BLANK_B, False, path,
+          for tag, schema, ra, rb in shapes:
+            path = Path(tmp) / f"{tag}-{mode}.xlsx"
+            result = run_compare(schema, ra, rb, False, path,
                                  mode=mode, name_a="a.xlsx", name_b="b.xlsx")
-            c.check(f"blank/{mode} builds", result.status == "ok", repr(result))
+            c.check(f"{tag}/{mode} builds", result.status == "ok", repr(result))
             hits, _skipped, _sheets = _audit_everything(gate, path)
             run_hits = _clipped_run_spill(gate, path)
-            c.check(f"blank/{mode}: the field is sized for the text the cell "
+            c.check(f"{tag}/{mode}: the field is sized for the text the cell "
                     "actually renders, marker included",
                     not hits and not run_hits,
                     "; ".join(f"{h['sheet']}!{h['cell']} short "
@@ -823,16 +838,20 @@ def main():
                                 for s, coord, short, _x in run_hits[:4]))
             vcol = _column_of(path, "Comparison", "Value")
             from openpyxl.utils import get_column_letter as _gcl
-            blank_widths[mode] = _stored_width(path, "Comparison", _gcl(vcol))
+            blank_widths[(tag, mode)] = _stored_width(
+                path, "Comparison", _gcl(vcol))
 
         # The formulas twin writes this cell as a FORMULA, which `data_only`
         # reads as None — so the scan above can only see the values twin. The
         # two flavors are built to identical physical geometry, so asserting the
         # stored widths are equal carries the values-twin proof across to it.
-        c.check("blank: both flavors store the same field width, so the "
-                "values-twin measurement covers the formulas twin too",
-                blank_widths.get("values") == blank_widths.get("formulas"),
-                repr(blank_widths))
+        for tag, _s, _a, _b in shapes:
+            c.check(f"{tag}: both flavors store the same field width, so "
+                    "the values-twin measurement covers the formulas twin",
+                    blank_widths.get((tag, "values"))
+                    == blank_widths.get((tag, "formulas")),
+                    repr({k: v for k, v in blank_widths.items()
+                          if k[0] == tag}))
 
         # ---- PCOA-FINAL-014: a wholly-context column says so ----------------
         for mode in ("values", "formulas"):

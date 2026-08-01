@@ -2415,27 +2415,43 @@ def _auto_field_widths(sc, lay, rows_t, rows_n, off):
     fields = list(lay.field_indices)
     if not fields:
         return {}
+    # A side contributes TWO display candidates, not one: its pixel-widest
+    # value, and — if any of its rows renders empty — the literal blank marker.
+    # Keeping only the widest raw value loses the second: a side holding
+    # ["x", ""] would be measured at "x" and never learn it can also render
+    # "(blank)", which is wider (RB2-R2-002 round 6). Values are normalized the
+    # way the workbook normalizes them, because both flavors apply Excel TRIM —
+    # a whitespace-only cell RENDERS as blank however it was stored.
     widest = {f: ["", ""] for f in fields}
     widest_px = {f: [0.0, 0.0] for f in fields}
+    can_blank = {f: [False, False] for f in fields}
     for rows, slot in ((rows_t, 0), (rows_n, 1)):
         for row in rows:
             for f in fields:
                 i = f + off
-                if i >= len(row):
+                s = _xl_trim(row[i]) if i < len(row) else ""
+                if not s:
+                    can_blank[f][slot] = True      # a short row renders blank too
                     continue
-                v = row[i]
-                if v is None:
-                    continue
-                s = str(v)
                 px = _text_px(s, False, _CMP_FIELD_PT)
                 if px > widest_px[f][slot]:
                     widest_px[f][slot] = px
                     widest[f][slot] = s
+
+    blank_px = _text_px(_BLANK_MARK, False, _CMP_FIELD_PT)
+
+    def side_display(f, slot):
+        """The widest text this side can put in the cell."""
+        if can_blank[f][slot] and blank_px > widest_px[f][slot]:
+            return _BLANK_MARK
+        return widest[f][slot]
+
     return {f: fitted_width(
-        [_pair_display(a, b)], size_pt=_CMP_FIELD_PT,
+        [_pair_display(side_display(f, 0), side_display(f, 1))],
+        size_pt=_CMP_FIELD_PT,
         minimum=max(_CMP_FIELD_MIN_WIDTH,
                     float(sc.cmp_widths.get(sc.header[f], 0))))
-        for f, (a, b) in widest.items()}
+        for f in fields}
 
 
 def _write_data_sheet(wb, name, tab_color, rows, lay, events, cmp_rows,
