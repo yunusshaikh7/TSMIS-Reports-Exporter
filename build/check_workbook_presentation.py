@@ -291,20 +291,31 @@ def _audit_everything(gate, path):
         wb.close()
 
 
-def _ceiling_evidence(path):
-    """`{sheet -> n}` — populated, spill-blocked, WRAPPED cells sitting in a
-    column stored at Excel's ceiling.
+def _ceiling_evidence(gate, path):
+    """`{sheet -> [coordinates]}` — cells that PROVE a writer took the ceiling
+    path, by being cells that would have been clipped had it not.
 
-    Presence of a sheet proves nothing: a fixture whose two sides pair perfectly
-    leaves both "Only in …" sheets header-only, and one whose category rows have
-    an empty neighbour lets a long label legally spill. In both cases the
-    writer's ceiling path never runs, no clipping is reported, and the gate goes
-    green over an untested branch — which is exactly what happened.
+    A witness has to satisfy all of these, and each condition rules out a way
+    the check could pass for the wrong reason:
 
-    So the check is POSITIVE and per-writer: each sheet must be shown to have
-    actually written a wrapped ceiling cell. Neutering `_ceiling_wrapper` for
-    any one writer drops its count to zero and fails, which a
-    scan-for-absence-of-clipping check cannot do."""
+      * in a column stored at Excel's ceiling, and that column is VISIBLE, and
+        the row is visible — a hidden cell is never rendered, so wrapping it
+        proves nothing;
+      * a literal string, not a formula and not a number — a formula's
+        displayed text is not knowable here, and a number renders rounded
+        rather than clipped;
+      * blocked from spilling by a populated right neighbour;
+      * WRAPPED; and
+      * genuinely too wide — the oracle's own measurement of the text exceeds
+        the ceiling column's usable width plus its tolerance.
+
+    That last condition is the one that matters most. Without it "Report",
+    "Run" and "Note" on the Provenance sheet counted as witnesses: 51 px of
+    text in a 1,790 px column, wrapped only because the whole column is, and
+    incapable of clipping under any circumstances. The huge role has to be the
+    witness, so the check demands a cell that could actually have failed.
+
+    Coordinates are returned rather than a count so a failure names the cell."""
     from openpyxl.utils import get_column_letter
 
     wb = load_workbook(path, read_only=False)
@@ -314,28 +325,77 @@ def _ceiling_evidence(path):
             ws = wb[name]
             if ws.sheet_state != "visible":
                 continue
-            ceiling = {c for c, dim in
-                       ((get_column_letter(i), ws.column_dimensions.get(
-                           get_column_letter(i)))
-                        for i in range(1, ws.max_column + 1))
-                       if dim is not None and dim.width is not None
-                       and float(dim.width) >= EXCEL_MAX_COL_WIDTH}
+            ceiling = {}
+            for i in range(1, ws.max_column + 1):
+                letter = get_column_letter(i)
+                dim = ws.column_dimensions.get(letter)
+                if (dim is not None and dim.width is not None
+                        and float(dim.width) >= EXCEL_MAX_COL_WIDTH
+                        and not getattr(dim, "hidden", False)):
+                    ceiling[letter] = gate.width_to_px(float(dim.width))
             if not ceiling:
                 continue
-            n = 0
+            witnesses = []
             for row in ws.iter_rows(min_row=2):
                 for cell in row:
-                    if cell.column_letter not in ceiling:
+                    avail = ceiling.get(cell.column_letter)
+                    if avail is None:
                         continue
-                    if cell.value is None or not str(cell.value).strip():
+                    row_dim = ws.row_dimensions.get(cell.row)
+                    if getattr(row_dim, "hidden", False):
                         continue
+                    value = cell.value
+                    if not isinstance(value, str) or not value.strip():
+                        continue          # numbers render rounded, not clipped
+                    if value.startswith("="):
+                        continue          # displayed text unknowable here
                     nxt = ws.cell(row=cell.row, column=cell.column + 1).value
                     if nxt is None or not str(nxt).strip():
                         continue          # free to spill; proves nothing
-                    if cell.alignment and cell.alignment.wrap_text:
-                        n += 1
-            found[name] = n
+                    if not (cell.alignment and cell.alignment.wrap_text):
+                        continue
+                    font = cell.font
+                    need = gate.text_px(
+                        value, bool(font and font.bold),
+                        float(font.size or 11) if font else 11.0) + 4
+                    if need > avail + gate.TOLERANCE_PX:
+                        witnesses.append(cell.coordinate)
+            found[name] = witnesses
         return found
+    finally:
+        wb.close()
+
+
+def _unwrapped_blocked_formulas(path, sheets):
+    """`[(sheet, coord)]` for blocked FORMULA cells that are not wrapped.
+
+    `_audit_everything` reads `data_only=True`, so an uncached formula reads as
+    `None` and its rendered text is invisible to the oracle — which is how Spot
+    Check's live cells clipped past every check here while displaying the full
+    source values after recalculation. Their width cannot be measured at build
+    time, so the contract is that they WRAP; this asserts it directly, on the
+    formulas as written, with no recalculation needed.
+
+    Only the grid sheets are asked. The Comparison and Only-in sheets are full
+    of blocked formulas that correctly do NOT wrap: their columns were sized
+    from the literal source values those formulas reproduce."""
+    wb = load_workbook(path, read_only=False)
+    bad = []
+    try:
+        for name in sheets:
+            if name not in wb.sheetnames:
+                continue
+            ws = wb[name]
+            for row in ws.iter_rows():
+                for cell in row:
+                    if not isinstance(cell.value, str) or not cell.value.startswith("="):
+                        continue
+                    nxt = ws.cell(row=cell.row, column=cell.column + 1).value
+                    if nxt is None or not str(nxt).strip():
+                        continue
+                    if not (cell.alignment and cell.alignment.wrap_text):
+                        bad.append((name, cell.coordinate))
+        return bad
     finally:
         wb.close()
 
@@ -543,8 +603,8 @@ def main():
             # A sheet-name check would pass on an empty Only-in sheet and on a
             # category row whose neighbour is blank — both of which leave the
             # ceiling path unexecuted.
-            evidence = _ceiling_evidence(path)
-            evidence.update(_ceiling_evidence(cat_path))
+            evidence = _ceiling_evidence(gate, path)
+            evidence.update(_ceiling_evidence(gate, cat_path))
             only_in = sorted(s for s in evidence if s.startswith("Only in"))
             # The per-side DATA sheets belong here too: the category fixture
             # reaches the ceiling on their B column, so they are a writer that
@@ -553,11 +613,25 @@ def main():
                      HUGE_SPEC.sheet_name, HUGE_SIDE_A, HUGE_SIDE_B] + only_in)
             c.check(f"ceiling/{mode}: both one-sided sheets carry a body row",
                     len(only_in) == 2, f"one-sided sheets seen: {only_in}")
-            missing = [s for s in want if evidence.get(s, 0) < 1]
-            c.check(f"ceiling/{mode}: every writer actually wrote a wrapped "
-                    f"ceiling cell ({len(want)} sheets checked)",
+            missing = [s for s in want if not evidence.get(s)]
+            c.check(f"ceiling/{mode}: every writer wrote a wrapped ceiling cell "
+                    f"that would otherwise have clipped ({len(want)} sheets)",
                     not missing,
-                    f"no wrapped ceiling cell on {missing}; counts {evidence}")
+                    f"no qualifying witness on {missing}; witnesses "
+                    + "; ".join(f"{s}:{v[:2]}" for s, v in sorted(evidence.items())))
+
+            # Spot Check renders its values through FORMULAS, so no build-time
+            # width can fit them and `data_only=True` hides them from the
+            # oracle entirely. Their contract is to wrap; asserted here on the
+            # formulas as written (RB2-R2-002 round 4).
+            for label, target in ((f"ceiling/{mode}", path),
+                                  (f"ceiling-cat/{mode}", cat_path)):
+                live = _unwrapped_blocked_formulas(target,
+                                                   ("Summary", "Spot Check"))
+                c.check(f"{label}: every live grid formula that cannot spill "
+                        "is wrapped, since its result cannot be measured",
+                        not live,
+                        "; ".join(f"{s}!{coord}" for s, coord in live[:8]))
 
             col = _column_of(path, "Comparison", "Description")
             from openpyxl.utils import get_column_letter

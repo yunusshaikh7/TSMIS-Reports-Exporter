@@ -2125,12 +2125,22 @@ def _grid_geometry(grid, base_widths, caps=None):
     occupied = {rc for rc, cell in grid.items()
                 if cell[0] is not None and str(cell[0]).strip() != ""}
     blocked = []                            # (row, col, text, bold, size_pt)
+    live = set()                            # blocked cells holding a FORMULA
     for (r, c), cell in grid.items():
         value, font = cell[0], cell[1]
-        if not isinstance(value, str) or not value.strip() or value.startswith("="):
+        if not isinstance(value, str) or not value.strip():
             continue
         if (r, c + 1) not in occupied:
             continue                        # free to spill; Excel shows it all
+        if value.startswith("="):
+            # A formula's DISPLAYED text is not knowable at build time — Spot
+            # Check's live cells show whatever the source values turn out to be
+            # — so no width can be proved to fit it. It cannot be measured, so
+            # it is wrapped, which is this module's rule wherever fitting is
+            # impossible (RB2-R2-002). Its row height is left automatic:
+            # Excel grows the row for the lines it actually renders.
+            live.add((r, c))
+            continue
         blocked.append((r, c, value, bool(font and font.bold),
                         float(font.size if font is not None and font.size else 11)))
     widths = dict(base_widths)
@@ -2144,6 +2154,8 @@ def _grid_geometry(grid, base_widths, caps=None):
         lines = _wrapped_lines(text, widths[c], bold, size)
         wrapped[(r, c)] = lines
         heights[r] = max(heights.get(r, 0.0), lines * _ROW_LINE_PT)
+    for rc in live:
+        wrapped.setdefault(rc, 1)           # wrap; leave the height automatic
     return widths, wrapped, heights
 
 
