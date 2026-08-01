@@ -178,7 +178,7 @@ Two layers, because the owner wants **fewer branches, reviews and releases**
 | Order | Batch | Specs | Theme | Depends on | Branch | Status |
 |---:|---|---|---|---|---|---|
 | 1 | **RB-1** | HF-01 | Clean Road source truth — the owner's immediate need | None | `hotfix/rb-1-clean-road-source-truth` | **MERGED** — `560ea5e501fdd76003985753ba7fc9ff0a551320` |
-| 2 | **RB-2** | HF-02 + HF-03 | The deliverable looks right and describes itself truthfully — **56 of the 68 denials** | None (RB-1 for the Clean Road witness) | `hotfix/rb-2-deliverable-presentation` | **DENIED — RETURN TO IMPLEMENTATION** |
+| 2 | **RB-2** | HF-02 + HF-03 | The deliverable looks right and describes itself truthfully — **56 of the 68 denials** | None (RB-1 for the Clean Road witness) | `hotfix/rb-2-deliverable-presentation` | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
 | 3 | **RB-3** | HF-04 | Ramp Detail — restores 9 comparison placements that produce nothing today | None | `hotfix/rb-3-ramp-detail-layout` | BLOCKED |
 | 4 | **RB-4** | HF-05 + HF-10 | Evidence, end to end: eligibility, binding, panels, and the missing cross-environment lane | None | `hotfix/rb-4-evidence` | BLOCKED |
 | 5 | **RB-5** | HF-06 + HF-09 | Difference classification — the two opposite rulings applied to the right classes | RB-1, RB-2 | `hotfix/rb-5-difference-classification` | BLOCKED |
@@ -479,7 +479,7 @@ mapping also proves one primary implementation/review bundle per finding:
 | RB bundle | Work items | Canonical findings | Count | Queue status |
 |---|---|---|---:|---|
 | **RB-1** | HF-01 | 010 | 1 | **MERGED** — `560ea5e501fdd76003985753ba7fc9ff0a551320` |
-| **RB-2** | HF-02, HF-03 | 002, 003, 008, 009, 014, 016, 019 | 7 | **DENIED — RETURN TO IMPLEMENTATION** |
+| **RB-2** | HF-02, HF-03 | 002, 003, 008, 009, 014, 016, 019 | 7 | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
 | **RB-3** | HF-04 | 001, 012 | 2 | BLOCKED |
 | **RB-4** | HF-05, HF-10 | 004, 005, 006, 007 | 4 | BLOCKED |
 | **RB-5** | HF-06, HF-09 | 011, 013 | 2 | BLOCKED |
@@ -781,7 +781,7 @@ join, the recount totals) →
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to its own `statewide-summary-visible-text-clipping.json`, `large-detail-no-render-visual-adjudication.json` and native-Excel renders, plus the committed `stage2-measure-clipping.py` / `stage2-clipping-recheck.json` |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-2: DENIED — RETURN TO IMPLEMENTATION** |
+| Status | **Inherits RB-2: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
 
 **Exact scope.** Stored presentation and self-description of the generated
 comparison workbook, **all families, both twins**: the `Comparison` category/key
@@ -904,7 +904,7 @@ and the per-family count-invariance table.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to `run-ledgers/tsn-library-rebuild.json`, `source-audit/all-completed-workflow-note-audit.json`, the committed `stage2-tsn-provenance-scope.json`, and Claude's `witness\temp_captures.txt` (readable since the firewall ended) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-2: DENIED — RETURN TO IMPLEMENTATION** |
+| Status | **Inherits RB-2: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
 
 **Exact scope.** The matrix lanes' private TSN capture step and what the
 resulting workbooks say about their own TSN input: all 12 vs-TSN families × the
@@ -2068,6 +2068,9 @@ approved the bounded remedy at `c5740b9e03d28afb8b295eb02182e7b106b1027d`:
 all 18 claimed results are hash-bound to acceptance head `c483bda…`, and the
 verifier rejects missing or mismatched exact heads. Codex Review 2 then denied
 `RB2-R2-001` at entry head `abaade5ce4fe592a7cf74867d9133f192d539fc4`:
-the auto-width routine discards shorter candidates before measuring pixel width,
-so a shorter wide-glyph value can still be materially clipped. Resume Prompt 04
-on the existing branch; do not merge before a fresh Review 2 re-review approves.
+the auto-width routine discarded shorter candidates before measuring pixel width,
+so a shorter wide-glyph value could still be materially clipped. That is now
+REMEDIED at acceptance head `81d5bca69b9c` — every width candidate is chosen
+by rendered width, the same class was fixed at six sites, and a golden fixture
+inverts length against width for each affected column. Do not merge before a
+fresh Review 2 re-review approves.

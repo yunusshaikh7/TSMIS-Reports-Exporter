@@ -4,32 +4,31 @@
  "runtime": {
   "tree": "C:\\Users\\Yunus\\Projects\\TSMIS-rb2-worktree",
   "git": {
-   "head": "c483bda1716e03d0e013b25e975bd9a41c58b2c8",
-   "head_tree": "25ffb31b13d27d1aafd70a514e6d4c8970498422",
+   "head": "81d5bca69b9c7d2e065db24c537c5a305be4815c",
+   "head_tree": "56168ce36e02a2ce6fe6ea4228c08c0e1328d7ee",
    "branch": "hotfix/rb-2-deliverable-presentation",
    "clean": false,
    "dirty_paths": [
     "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-02/witness/clipping-before-after.json",
     "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-02/witness/count-invariance.json",
-    "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-03/witness/temp-capture-lifecycle.json",
     "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-03/witness/tsn-provenance-scope.json"
    ],
    "runtime_dirty_paths": [],
    "runtime_clean": true,
    "clean_note": "`clean` covers the whole worktree; `runtime_clean` covers only the files the runtime digest is taken over. A result written into the worktree necessarily observes clean=false."
   },
-  "stamped_utc": "2026-07-31T09:41:58.920924+00:00",
+  "stamped_utc": "2026-08-01T08:48:34.783280+00:00",
   "file_counts": {
    "product": 152,
    "gate": 265,
    "oracle": 1
   },
   "group_digests": {
-   "product": "8D545B220C0E3E3388FB015C4898A2104079C8A42B2DFB0F17440FD90FDB3544",
-   "gate": "056388E33ECECC4F10682263E950BF5B4B8FEEBCF6346CA7AA64D17AFEFB778D",
+   "product": "1FBE12177CBDD1A76700B41AE0A6B4E848516CCBAB90F5A2B4FDCEEC847EB22D",
+   "gate": "9083DB9EBC8AA350F648FACA19B46CF6CA056CD0571138A1E4F5E399B54CC3E4",
    "oracle": "343A2FEA11B9E551963F9C4E18425355C7850ED6473E256433589726EB03D114"
   },
-  "runtime_digest": "1EFA63FD9EE6355008AD49BE6342E79DCE486A1BFF9FE1E9202F471600162279",
+  "runtime_digest": "1CC46D40C871ABDB728DEBBB0354F8BA7A54F23A07BF382AEB6F5B945BA9A2D9",
   "python": {
    "version": "3.11.0",
    "executable": "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\build\\.venv\\Scripts\\python.exe"

@@ -1,6 +1,6 @@
 # `RB-2` — Implementation Record
 
-Status: **DENIED — RETURN TO IMPLEMENTATION** (`RB2-R2-001`)
+Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (Review 2's `RB2-R2-001` remedied; Review 1's `EG-001`/`EG-002` remain closed)
 
 | Field | Value |
 |---|---|
@@ -28,6 +28,9 @@ Status: **DENIED — RETURN TO IMPLEMENTATION** (`RB2-R2-001`)
 | `build/check_workbook_presentation.py` | **New golden check.** Builds a summary-schema and a detail-schema comparison in both flavors and measures them with the audit's OWN gate, imported from the committed `stage2-measure-clipping.py` so the product check and the oracle cannot diverge; plus the identity-widened-not-wrapped rule, the context rendering (and that a compared column with zero differences still reports a real `0`), the values headline read `data_only`, its agreement with the typed outcome, and the live freshness guard in both twins. | 008, 009, 014, 019 |
 | `build/check_tsn_canonical_consumer_identity.py` | Adds `test_capture_carries_its_source_record`: the carried claim fields, a matrix-lane comparison printing the SAME identity line as the Direct lane, provenance naming the durable selection with no `%TEMP%`, an unverifiable origin record keeping the literal path, zero capture directories after success / failure / cancellation, and the sweep's three bounded outcomes. Reads the new constants through `getattr` so it degrades to semantic FAILs on a pre-fix tree instead of crashing. | 002, 003, 016 |
 | `build/check_compare_skipwarn.py`, `build/check_compare_pairing_policy.py`, `build/check_compare_build_freshness.py` | Re-point the three policy assertions that locked the values twin's headline as a formula: they now require the stored literal AND the live freshness row carrying `REGENERATE REQUIRED`. Same guarantee, asserted on the cell that now carries it. | 019 |
+| `scripts/compare_core.py` | **Width candidates are chosen by RENDERED WIDTH, never character count** (`RB2-R2-001`). `_auto_field_widths` measures every candidate per field and side and keeps the pixel-widest; the Comparison route and key columns, the Only-in key column and `summary_layout`'s Category column stop shortlisting by `len` and hand `fitted_width` their whole candidate set. `_text_px` gains a bounded memo so measuring everything stays affordable on a statewide sweep, and `_CMP_FIELD_PT` replaces the repeated literal `10` — a candidate chosen at one point size and fitted at another is not a fit. | R2-001 |
+| `scripts/compare_core.py` | The Only-in sheet's own route column and its schema-derived `Missing from <side>` header were fixed at `8` and `18`; both are now measured. Not introduced by this bundle, but the return requires Only-in cells to pass the clipping oracle and the new fixture proved they did not. | R2-001 |
+| `build/check_workbook_presentation.py` | **Wide-glyph fixture.** A shape whose pixel-widest string is deliberately one of the shortest, for the paired keys, the one-sided keys on each side, the route, both sides' field values and the summary category labels. Both twins are built through `run_compare` and measured with the committed oracle's own `audit_sheet`, including the Only-in and category sheets it does not scan by default. It also asserts its own strings really are inverted, so a missing font file cannot silently rob every assertion of its teeth. | R2-001 |
 | `hotfix-bundles/RB-2/BUNDLE.md` | Base `main` SHA filled in before any code change. | — |
 
 ## Root causes confirmed
@@ -96,6 +99,219 @@ that width. Deliberately hidden columns (the state-mask chunks) and the
 Stage-2-validated 45.75 pt wrapped header band are excluded as out of scope.
 Witness: `HF-02\excel-metrics-ramp-summary{,2,3}.json` — the failing pass is
 retained beside the passing one.
+
+## Review 2 remedy — `RB2-R2-001`, columns sized by rendered width
+
+Review 2 denied the bundle on a product failure, not an evidence gap:
+`_auto_field_widths` said it sized for the pixel-widest pair while its
+implementation kept only the longest string per field and side, calling
+`fitted_width` and the Calibri measurement afterwards — by which point every
+shorter candidate had already been discarded. Character count and rendered
+width do not order the same way, so the value that needed the room could be the
+one thrown away.
+
+The finding is accepted in full. It is correct, it is a real false-pass in
+HF-02 criterion 1, and the golden check contained no fixture that could have
+caught it.
+
+### The defect, reproduced exactly
+
+The same probe, through the same product functions, at the new head:
+
+| | Review 2 (pre-fix) | Head `81d5bca` |
+|---|---|---|
+| `WWWWWWWWWW` — 10 chars | 135.25 px, **discarded** | 135.25 px, **selected** |
+| `iiiiiiiiiii` — 11 chars | 38.65 px, selected | 38.65 px, not selected |
+| Stored width | `13.0` | `19.71` |
+| Usable | 91 px | 138 px |
+| Verdict | short by **44.25 px** | **fits** |
+
+The two reports reconcile exactly. `_text_px` returns 131.25 px and 34.65 px;
+Review 2's figures are those plus the 4 px `_CELL_PAD_PX` a cell reserves, which
+is also why its `135.25 − 91 = 44.25` short-by is reproduced to the hundredth.
+`_usable_px(13.0)` is 91 px on this tree as well.
+
+### Six sites, not one
+
+Review 2 named one. A sweep for the same class found five more, and every one of
+the first five was introduced by THIS bundle:
+
+| Site | Column | Old rule |
+|---|---|---|
+| `compare_core._auto_field_widths` | Comparison field pair | longest 1 per side, by `len` |
+| `compare_core._write_comparison` | Route | longest 1, by `len` |
+| `compare_core._write_comparison` | Key / category | longest 3, by `len` |
+| `compare_core._write_only_sheet` | Key / category | longest 3, by `len` |
+| `summary_layout._render` | Category | longest 3, by `len` |
+| `compare_core._write_only_sheet` | Route, and the `Missing from` header | fixed `8` / fixed `18` |
+
+The sixth is not this bundle's: the Only-in sheet's route column has always been
+a hard-coded `8`. It is fixed here because the return requires Only-in cells to
+pass the clipping oracle, and the new fixture proves they did not — the bundle
+measured the Comparison sheet's route while leaving the Only-in sheet's asserted.
+The `Missing from <side>` header beside it is schema-derived and was likewise
+fixed at 18; both are measured now. The header is bold and the two phrases under
+it are not, so all three are measured bold, which can only over-reserve.
+
+`fitted_width` was already correct — it takes a pixel maximum over everything it
+is given. Four of the six sites are fixed by deleting the shortlist and handing
+it the whole candidate set, which removes the defect rather than replacing one
+heuristic with another. `_text_px` is now memoized (bounded, cleared wholesale
+at `_PX_CACHE_MAX`) so measuring every candidate on a statewide sweep stays
+affordable. `_CMP_FIELD_PT` replaces the repeated literal `10`, because a
+candidate chosen at one point size and fitted at another is not a fit at all.
+
+### The sweep, and what it cleared
+
+Grepping for `key=len` finds five of the six. That is not a sweep — it finds the
+spelling, not the class. The class is "a width decided from fewer texts than the
+column will hold", so the real sweep is over every `fitted_width` caller. There
+are fourteen. Six were defective; the other eight are correct, each for a reason
+worth stating so a reader need not re-derive it:
+
+| Caller | Why it is already correct |
+|---|---|
+| `_grid_geometry` | Accumulates: it feeds the running width back in as `minimum` for every blocked cell, so the width grows to fit all of them |
+| `_write_data_sheet` key column | Samples `helper_keys[:1]`, but the tokens are fixed-format `__CMP_E2_KEY_V1_%08d`; ordinals 1, 9, 12345678 and 99999999 all measure **198.45 px**, so one sample is the set |
+| `_write_data_sheet` back-link | One fixed literal |
+| Comparison status column | The complete set of the three status texts |
+| Stale-verdict / context-field widths | Fixed literals |
+| Provenance column A | Every input's role plus the three fixed labels |
+
+`fitted_width` itself never needed changing. It takes a pixel maximum over
+everything handed to it; the defect was always in what the callers handed over.
+
+### The fixture that would have caught it
+
+`build/check_workbook_presentation.py` gains a wide-glyph shape in which the
+pixel-widest string is deliberately one of the shortest, for every column above:
+paired keys, one-sided keys on each side, the route, both sides' field values,
+and the summary category labels. Both twins are built through `run_compare` —
+the public path — and measured with the committed `stage2-measure-clipping.py`.
+The oracle scans Summary / Spot Check / Comparison, so the one-sided and
+category sheets are measured by calling the oracle's OWN `audit_sheet`, never a
+private ruler.
+
+It also asserts that its own strings really are inverted. Without a readable
+font file `_text_px` falls back to a per-character estimate, under which length
+and width order identically and every assertion below would silently pass for
+the wrong reason.
+
+| | At `237e365` (denied head) | At `81d5bca` |
+|---|---|---|
+| `check_workbook_presentation.py` | **4 FAILs** | **all good** |
+
+The four name the exact cells: `Comparison!H2` short 110 px on
+`WWWWWWWWWW ≠ MMMMMMMMMM` (the finding), `Comparison!B2` short 35 px (key),
+`Comparison!A2` short 15 px (route), `Wide Categories!A8` short 49 px
+(`summary_layout`), and the Only-in route at `A2`.
+
+### Declared boundaries
+
+Four more hard-coded widths remain in these writers, deliberately: `c_occ` (4),
+`c_trow` (7), `c_diffs` (6) and the Only-in `c_row` (9). Each holds a bounded
+small integer under a short header, all four are inside the oracle's scan
+window, and the corpus measurement below reports zero clipped cells across them.
+They are named here so a reader can see they were examined rather than missed.
+
+The data sheets' own route column is also still a fixed `8`. It is outside both
+the return's named scope and the committed oracle's scan set, so changing it
+could not be proved by this acceptance — and shipping an unproven change into a
+bundle denied twice for unproven claims is the wrong trade. Disclosed, not
+resolved.
+
+### The acceptance set, re-established at one exact head
+
+The fix changes the shared presentation writer, so every head-side measurement
+taken under the previous runtime is stale — including `measure-base.json`, which
+classifies as `acceptance` rather than `base_side` because it is the head
+harness observing the base corpus. The whole measured set was re-run at
+
+    81d5bca69b9c7d2e065db24c537c5a305be4815c
+    runtime digest 1CC46D40C871ABDB728DEBBB0354F8BA7A54F23A07BF382AEB6F5B945BA9A2D9
+
+The BASE CORPUS itself was not rebuilt: base code and the committed clipping
+oracle are both untouched, so the base deliverables were re-used and re-measured.
+That its totals came back with **zero** differences is a check on the re-run, not
+a foregone conclusion. The pass Review 1 approved is retained whole as
+`prior-A1` (3,064 files, hashed file-for-file before being moved), beside the
+older `prior-A0`.
+
+| Leg | Result | vs the approved pass |
+|---|---|---|
+| Generation | 40 steps, 31 ok, 9 refusals | **0 status differences** |
+| Measure head | 1,264 workbooks, 60 deliverables, **0 clipped** | identical but one explained item |
+| Measure base | 1,244 workbooks, 42 deliverables, 2,036 clipped | **0 differences** |
+| Invariance | 42 pairs, **0 changed**, 0 typed-outcome differences | 72 presentation sheets moved — **also 72 before** |
+| Side ledgers | **0** owned temp directories | same |
+| Evidence determinism | 14 artifacts each side | same |
+| Excel recalculation | **70/70** SELF-CHECK `OK`, 0 cached errors | 0 headline differences |
+| Excel AutoFit metrics | **4** narrow cells | the same 4 cells, same measurements |
+| Native-Excel renders | 10 PDFs, 0 failed, each SHA-256 bound | same |
+| Width rule carried | 42 deliverables, **38 columns wider, 0 narrower** | new leg |
+
+Two entries deserve their exact wording rather than a tick.
+
+**The one head-side movement is evidence sampling, not clipping.** Evidence
+workbook clipping reads 127 → 128: two Highway Sequence EVIDENCE workbooks
+(by-day 0 → 2, everything 1 → 0). `visual_evidence` reseeds per run, and the
+same workbook carries `sample seed: 1482dfdc` in the prior pass and `46ace222`
+now, so different rows were sampled and different snippet text measured.
+`clipped_cells_deliverables` — the number HF-02 criterion 1 is actually about —
+is **0 in both**.
+
+**Nothing moved that was not already moving.** Invariance compares cell values
+and the typed outcome sidecar through `read_only=True`, which never reads
+`column_dimensions`. Column geometry is invisible to it, and the prediction that
+it must therefore report zero was written down BEFORE the leg ran. It did: 0
+changed of 42, and the presentation-sheet count is 72 against the approved pass's
+72. This remedy altered geometry across every deliverable and added no cell
+movement at all.
+
+### The corpus carries THIS commit, observed rather than argued
+
+`runtime.lineage` proves structurally that no runtime file changed between the
+final production commit and the acceptance head; `provenance-final-commit` proves
+observably that the corpus is not the base. Neither can show the corpus carries
+this commit, because both predate it. `widths-carry.json` does, by diffing
+`prior-A1`'s stored widths — written by the character-count rule Review 2 denied
+— against the new corpus across all 44 shared deliverables (42 examined; the 2
+skipped are evidence workbooks with no Comparison sheet, named in the witness):
+
+* **38 columns strictly wider, 0 narrower.** Zero-narrower is the safety
+  property: the new rule maxes over a superset of what the old shortlist could
+  see, so a narrower column would mean the fix had LOST a candidate.
+* The widenings are explained by real inversions, and they are subtler than the
+  fixture's. `ramp_detail_pdf` column M: the widest text and the longest text are
+  both **13 characters**, at 88.70 px and 87.94 px. The old test was
+  `len(s) > len(longest)` — STRICT — so among equal-length candidates it kept
+  whichever arrived first, not the widest. On this corpus the defect bites
+  through TIES more often than through shorter-but-wider.
+
+### What was attempted and abandoned
+
+The committed oracle scans three sheets, the first 8 columns, the first 80 rows.
+That is how a mis-sized field column could sit inside a deliverable it had just
+certified: a Comparison field column lives far past column 8. A corpus-wide
+re-measurement past that window was built, run, and then abandoned, because
+reading a stored width through openpyxl needs the FULL object model, which parses
+every sheet in the book — including the statewide data sheets it never examines.
+Measured: 621 MB resident and over ten minutes for ONE 11 MB deliverable, with 44
+to do per side. Restricting the scan cannot recover it; the parse happens at open.
+
+It is recorded as a limitation rather than quietly dropped. What stands in its
+place is stronger on the point that matters: the golden gate now carries a
+fixture built specifically to expose that blind spot, driving both twins through
+`run_compare` and measuring them with the oracle's OWN `audit_sheet`, including
+the Only-in and category sheets it does not scan by default. A real corpus
+contains only the inversions it happens to contain; the fixture guarantees one.
+
+The same obstacle was solved rather than accepted for `widths-carry`, which needs
+only stored widths: it reads the `<cols>` element straight from the sheet XML and
+stops at `<sheetData>`. Verified identical to openpyxl's own numbers, it reads a
+256 MB workbook in **0.004 s** against more than ten minutes through the object
+model — which is why that leg covers all 44 deliverables rather than the 16 a
+size cap would have allowed.
 
 ## Review 1 re-review remedy — `RB2-R1-EG-002`, one exact Git head
 
