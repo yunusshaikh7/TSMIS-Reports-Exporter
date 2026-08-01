@@ -187,25 +187,46 @@ HUGE_ROUTE = "ROUTE " + HUGE_VALUE
 HUGE_ROLE = "ROLE " + HUGE_VALUE
 HUGE_CATEGORY = "CATEGORY " + HUGE_VALUE
 HUGE_SIDE_A, HUGE_SIDE_B = "SSOR-PROD 2026-07-23", "SSOR-PROD 2026-07-09"
+# One key on each side only, so BOTH "Only in …" sheets get a populated body
+# row. Identical identities on the two sides pair perfectly and leave those
+# sheets header-only, which would let their writer skip the ceiling entirely
+# while the gate stayed green.
+HUGE_KEY_BOTH = "KEY BOTH " + HUGE_VALUE
+HUGE_KEY_ONLY_A = "KEY ONLY A " + HUGE_VALUE
+HUGE_KEY_ONLY_B = "KEY ONLY B " + HUGE_VALUE
 
+HUGE_SCHEMA = CompareSchema(
+    report_name="Presentation Ceiling", header=["Key", "Description", "Tail"],
+    side_a=HUGE_SIDE_A, side_b=HUGE_SIDE_B,
+    id_noun="location", id_noun_plural="locations")
+HUGE_A = [[HUGE_ROUTE, HUGE_KEY_BOTH, HUGE_VALUE, "t"],
+          [HUGE_ROUTE, HUGE_KEY_ONLY_A, HUGE_VALUE, "t"]]
+HUGE_B = [[HUGE_ROUTE, HUGE_KEY_BOTH, HUGE_VALUE + " AND THEN SOME MORE", "t"],
+          [HUGE_ROUTE, HUGE_KEY_ONLY_B, HUGE_VALUE, "t"]]
+HUGE_PROVENANCE = {
+    "recipe": {"report": "Presentation Ceiling", "banner": "ceiling fixture"},
+    "inputs": [{"role": HUGE_ROLE, "selection": "a.xlsx", "kind": "file",
+                "sha256": "0" * 64}],
+}
+
+# The category sheet reads CONSOLIDATED rows as `[category, count]`, so it needs
+# its own shape: fed the detail rows above it produced `[label, None, None,
+# None]`, whose empty neighbour let the long label legally spill — no clipping,
+# no wrap required, and the writer's ceiling path never executed.
 HUGE_SPEC = SummarySpec(
     report="Presentation Ceiling", sheet_name="Ceiling Categories",
     title="Ceiling-width category labels",
     sections=(Section(name="Section",
                       cats=(Cat(slug="c0", label=HUGE_CATEGORY,
                                 key=HUGE_CATEGORY),)),))
-HUGE_SCHEMA = CompareSchema(
-    report_name="Presentation Ceiling", header=["Key", "Description", "Tail"],
+HUGE_CAT_SCHEMA = CompareSchema(
+    report_name="Presentation Ceiling Categories",
+    header=["Category", "Count"],
     side_a=HUGE_SIDE_A, side_b=HUGE_SIDE_B,
-    id_noun="location", id_noun_plural="locations",
+    id_noun="category", id_noun_plural="categories",
     extra_sheet_writer=make_extra_sheet_writer(HUGE_SPEC))
-HUGE_A = [[HUGE_ROUTE, HUGE_CATEGORY, HUGE_VALUE, "t"]]
-HUGE_B = [[HUGE_ROUTE, HUGE_CATEGORY, HUGE_VALUE + " AND THEN SOME MORE", "t"]]
-HUGE_PROVENANCE = {
-    "recipe": {"report": "Presentation Ceiling", "banner": "ceiling fixture"},
-    "inputs": [{"role": HUGE_ROLE, "selection": "a.xlsx", "kind": "file",
-                "sha256": "0" * 64}],
-}
+HUGE_CAT_A = [[HUGE_CATEGORY, "10"]]
+HUGE_CAT_B = [[HUGE_CATEGORY, "11"]]
 
 FRESHNESS_LABEL = ("Build-time source identity and duplicate pairing snapshot "
                    "is current")
@@ -267,6 +288,55 @@ def _audit_everything(gate, path):
         return hits, excluded, visible
     finally:
         gate.SCAN_ROWS, gate.MAX_LABEL_COL = rows, cols
+        wb.close()
+
+
+def _ceiling_evidence(path):
+    """`{sheet -> n}` — populated, spill-blocked, WRAPPED cells sitting in a
+    column stored at Excel's ceiling.
+
+    Presence of a sheet proves nothing: a fixture whose two sides pair perfectly
+    leaves both "Only in …" sheets header-only, and one whose category rows have
+    an empty neighbour lets a long label legally spill. In both cases the
+    writer's ceiling path never runs, no clipping is reported, and the gate goes
+    green over an untested branch — which is exactly what happened.
+
+    So the check is POSITIVE and per-writer: each sheet must be shown to have
+    actually written a wrapped ceiling cell. Neutering `_ceiling_wrapper` for
+    any one writer drops its count to zero and fails, which a
+    scan-for-absence-of-clipping check cannot do."""
+    from openpyxl.utils import get_column_letter
+
+    wb = load_workbook(path, read_only=False)
+    found = {}
+    try:
+        for name in wb.sheetnames:
+            ws = wb[name]
+            if ws.sheet_state != "visible":
+                continue
+            ceiling = {c for c, dim in
+                       ((get_column_letter(i), ws.column_dimensions.get(
+                           get_column_letter(i)))
+                        for i in range(1, ws.max_column + 1))
+                       if dim is not None and dim.width is not None
+                       and float(dim.width) >= EXCEL_MAX_COL_WIDTH}
+            if not ceiling:
+                continue
+            n = 0
+            for row in ws.iter_rows(min_row=2):
+                for cell in row:
+                    if cell.column_letter not in ceiling:
+                        continue
+                    if cell.value is None or not str(cell.value).strip():
+                        continue
+                    nxt = ws.cell(row=cell.row, column=cell.column + 1).value
+                    if nxt is None or not str(nxt).strip():
+                        continue          # free to spill; proves nothing
+                    if cell.alignment and cell.alignment.wrap_text:
+                        n += 1
+            found[name] = n
+        return found
+    finally:
         wb.close()
 
 
@@ -462,16 +532,32 @@ def main():
                                  provenance=HUGE_PROVENANCE)
             c.check(f"ceiling/{mode} builds", result.status == "ok", repr(result))
 
-            # Every writer that can reach the ceiling is actually present, so a
-            # green result cannot come from a sheet quietly not being built.
-            wb = load_workbook(path, read_only=True)
-            try:
-                names = set(wb.sheetnames)
-            finally:
-                wb.close()
-            want = {"Comparison", "Routes", "Provenance", HUGE_SPEC.sheet_name}
-            c.check(f"ceiling/{mode}: every ceiling-capable writer ran",
-                    want <= names, f"missing {sorted(want - names)}")
+            cat_path = Path(tmp) / f"ceiling-cat-{mode}.xlsx"
+            cat_result = run_compare(HUGE_CAT_SCHEMA, HUGE_CAT_A, HUGE_CAT_B,
+                                     False, cat_path, mode=mode,
+                                     name_a="a.xlsx", name_b="b.xlsx")
+            c.check(f"ceiling-cat/{mode} builds", cat_result.status == "ok",
+                    repr(cat_result))
+
+            # Each writer must be SHOWN to have written a wrapped ceiling cell.
+            # A sheet-name check would pass on an empty Only-in sheet and on a
+            # category row whose neighbour is blank — both of which leave the
+            # ceiling path unexecuted.
+            evidence = _ceiling_evidence(path)
+            evidence.update(_ceiling_evidence(cat_path))
+            only_in = sorted(s for s in evidence if s.startswith("Only in"))
+            # The per-side DATA sheets belong here too: the category fixture
+            # reaches the ceiling on their B column, so they are a writer that
+            # can clip, not just a copy of the inputs.
+            want = (["Comparison", "Routes", "Provenance",
+                     HUGE_SPEC.sheet_name, HUGE_SIDE_A, HUGE_SIDE_B] + only_in)
+            c.check(f"ceiling/{mode}: both one-sided sheets carry a body row",
+                    len(only_in) == 2, f"one-sided sheets seen: {only_in}")
+            missing = [s for s in want if evidence.get(s, 0) < 1]
+            c.check(f"ceiling/{mode}: every writer actually wrote a wrapped "
+                    f"ceiling cell ({len(want)} sheets checked)",
+                    not missing,
+                    f"no wrapped ceiling cell on {missing}; counts {evidence}")
 
             col = _column_of(path, "Comparison", "Description")
             from openpyxl.utils import get_column_letter
@@ -492,14 +578,16 @@ def main():
             finally:
                 wb.close()
 
-            hits, skipped, sheets = _audit_everything(gate, path)
-            c.check(f"ceiling/{mode}: nothing is reported clipped (all "
-                    f"{len(sheets)} visible sheets, {len(skipped)} "
-                    "never-rendered excluded)",
-                    not hits,
-                    "; ".join(f"{h['sheet']}!{h['cell']} short "
-                              f"{h['short_by_px']}px {h['text'][:40]!r}"
-                              for h in hits[:6]))
+            for label, target in ((f"ceiling/{mode}", path),
+                                  (f"ceiling-cat/{mode}", cat_path)):
+                hits, skipped, sheets = _audit_everything(gate, target)
+                c.check(f"{label}: nothing is reported clipped (all "
+                        f"{len(sheets)} visible sheets, {len(skipped)} "
+                        "never-rendered excluded)",
+                        not hits,
+                        "; ".join(f"{h['sheet']}!{h['cell']} short "
+                                  f"{h['short_by_px']}px {h['text'][:40]!r}"
+                                  for h in hits[:6]))
 
         # ---- PCOA-FINAL-014: a wholly-context column says so ----------------
         for mode in ("values", "formulas"):
