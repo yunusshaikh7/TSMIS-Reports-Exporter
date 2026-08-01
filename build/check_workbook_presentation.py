@@ -168,6 +168,22 @@ LONG_A_ROWS = [_long_row(LONG_KEY, LONG_A),
                _long_row(LONG_KEY_ONLY_A, LONG_A)]
 LONG_B_ROWS = [_long_row(LONG_KEY, LONG_B)]
 
+# ---- RB2-R2-002: the one bound that is NOT a product choice ------------------
+# Excel rejects a stored width above this, so it is where fitting stops being
+# possible rather than where the product decides to stop. A column that lands
+# here has its cells WRAPPED, so all of the text still shows. No real corpus
+# value reaches it — the widest measured 251.85 of 255 — which is exactly why
+# the path needs a fixture: an untested branch is not a remedy.
+EXCEL_MAX_COL_WIDTH = 255.0
+HUGE_VALUE = (" ".join(f"SEGMENT {i:03d} OF A PATHOLOGICALLY LONG DESCRIPTION"
+                       for i in range(1, 12)))
+HUGE_SCHEMA = CompareSchema(
+    report_name="Presentation Ceiling", header=["Key", "Description", "Tail"],
+    side_a="TSMIS", side_b="TSN",
+    id_noun="location", id_noun_plural="locations")
+HUGE_A = [["k1", HUGE_VALUE, "t"]]
+HUGE_B = [["k1", HUGE_VALUE + " AND THEN SOME MORE", "t"]]
+
 FRESHNESS_LABEL = ("Build-time source identity and duplicate pairing snapshot "
                    "is current")
 CONTEXT_TEXT = "not compared (context)"
@@ -403,6 +419,52 @@ def main():
                         "cap rather than clipped at it",
                         width is not None and width > RETIRED_CAP_WIDTH,
                         f"stored width {width}")
+
+        # ---- RB2-R2-002: what happens AT Excel's ceiling --------------------
+        # The remedy leaves exactly one bound in place, and a bound that clips
+        # is the defect this return is about. So the ceiling wraps instead, and
+        # that branch is proved here rather than asserted — no corpus value
+        # reaches 255, so nothing else would ever execute it.
+        huge_pair = HUGE_VALUE + " ≠ " + HUGE_VALUE + " AND THEN SOME MORE"
+        ceiling_usable = round(EXCEL_MAX_COL_WIDTH * 7) + 5
+        c.check("the ceiling fixture really does exceed what Excel can store",
+                _text_px(huge_pair, False, 10.0) + 4 > ceiling_usable,
+                f"{_text_px(huge_pair, False, 10.0) + 4:.0f}px needed vs "
+                f"{ceiling_usable}px at the {EXCEL_MAX_COL_WIDTH} ceiling")
+
+        for mode in ("values", "formulas"):
+            path = Path(tmp) / f"ceiling-{mode}.xlsx"
+            result = run_compare(HUGE_SCHEMA, HUGE_A, HUGE_B, False, path,
+                                 mode=mode, name_a="a.xlsx", name_b="b.xlsx")
+            c.check(f"ceiling/{mode} builds", result.status == "ok", repr(result))
+
+            col = _column_of(path, "Comparison", "Description")
+            from openpyxl.utils import get_column_letter
+            letter = get_column_letter(col) if col else None
+            width = _stored_width(path, "Comparison", letter) if letter else None
+            c.check(f"ceiling/{mode}: the column stops at Excel's own limit, "
+                    "not below it",
+                    width is not None and abs(width - EXCEL_MAX_COL_WIDTH) < 1e-6,
+                    f"stored width {width} in column {letter}")
+
+            wb = load_workbook(path, read_only=False)
+            try:
+                cell = wb["Comparison"][f"{letter}2"]
+                c.check(f"ceiling/{mode}: the cell WRAPS rather than being cut "
+                        "off, so every line still shows",
+                        bool(cell.alignment and cell.alignment.wrap_text),
+                        repr(cell.alignment))
+            finally:
+                wb.close()
+
+            hits, skipped, sheets = _audit_everything(gate, path)
+            c.check(f"ceiling/{mode}: nothing is reported clipped (all "
+                    f"{len(sheets)} visible sheets, {len(skipped)} "
+                    "never-rendered excluded)",
+                    not hits,
+                    "; ".join(f"{h['sheet']}!{h['cell']} short "
+                              f"{h['short_by_px']}px {h['text'][:40]!r}"
+                              for h in hits[:6]))
 
         # ---- PCOA-FINAL-014: a wholly-context column says so ----------------
         for mode in ("values", "formulas"):

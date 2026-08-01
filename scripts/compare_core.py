@@ -2389,6 +2389,8 @@ def _write_data_sheet(wb, name, tab_color, rows, lay, events, cmp_rows,
             size_pt=10, minimum=8)
     _apply_field_widths(ws, lay.sc.data_widths, lay.data_col, lay)
     _fit_data_columns(ws, rows, lay)
+    ceiling_cols = _ceiling_wrapped_columns(ws)
+    wrap_align = _ceiling_wrap_align() if ceiling_cols else None
 
     ws.append(_header_row(
         ws,
@@ -2412,8 +2414,10 @@ def _write_data_sheet(wb, name, tab_color, rows, lay, events, cmp_rows,
         # Raw input values are guarded: a Description like "=cmd…" stays text,
         # never a live formula (the field FORMULAS read these via TRIM/INDEX, so
         # guarding here protects both flavors at the source).
-        cells += [_styled(ws, v, body_font, guard=True,
-                          exact_source_numeric=True) for v in row]
+        cells += [_styled(ws, v, body_font,
+                          align=wrap_align if j + 1 in ceiling_cols else None,
+                          guard=True, exact_source_numeric=True)
+                  for j, v in enumerate(row)]
         row_fills = fills.get(r - 2) if fills else None
         if row_fills:                        # mark each dittoed cell in this row
             for col_in_row, resolved in row_fills.items():
