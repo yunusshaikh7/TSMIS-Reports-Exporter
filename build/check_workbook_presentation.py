@@ -177,12 +177,35 @@ LONG_B_ROWS = [_long_row(LONG_KEY, LONG_B)]
 EXCEL_MAX_COL_WIDTH = 255.0
 HUGE_VALUE = (" ".join(f"SEGMENT {i:03d} OF A PATHOLOGICALLY LONG DESCRIPTION"
                        for i in range(1, 12)))
+# Every writer that can put text in a ceiling-width column gets driven here, not
+# just the first ones that were fixed: the Comparison and Only-in sheets, the
+# per-side data sheets, Routes (a huge ROUTE id), the category sheet (a huge
+# CATEGORY label plus side names long enough to burst the old fixed 13), and
+# Provenance (a huge ROLE). Hand-wiring the wrap into three of these left the
+# other three clipping, so the fixture covers all of them.
+HUGE_ROUTE = "ROUTE " + HUGE_VALUE
+HUGE_ROLE = "ROLE " + HUGE_VALUE
+HUGE_CATEGORY = "CATEGORY " + HUGE_VALUE
+HUGE_SIDE_A, HUGE_SIDE_B = "SSOR-PROD 2026-07-23", "SSOR-PROD 2026-07-09"
+
+HUGE_SPEC = SummarySpec(
+    report="Presentation Ceiling", sheet_name="Ceiling Categories",
+    title="Ceiling-width category labels",
+    sections=(Section(name="Section",
+                      cats=(Cat(slug="c0", label=HUGE_CATEGORY,
+                                key=HUGE_CATEGORY),)),))
 HUGE_SCHEMA = CompareSchema(
     report_name="Presentation Ceiling", header=["Key", "Description", "Tail"],
-    side_a="TSMIS", side_b="TSN",
-    id_noun="location", id_noun_plural="locations")
-HUGE_A = [["k1", HUGE_VALUE, "t"]]
-HUGE_B = [["k1", HUGE_VALUE + " AND THEN SOME MORE", "t"]]
+    side_a=HUGE_SIDE_A, side_b=HUGE_SIDE_B,
+    id_noun="location", id_noun_plural="locations",
+    extra_sheet_writer=make_extra_sheet_writer(HUGE_SPEC))
+HUGE_A = [[HUGE_ROUTE, HUGE_CATEGORY, HUGE_VALUE, "t"]]
+HUGE_B = [[HUGE_ROUTE, HUGE_CATEGORY, HUGE_VALUE + " AND THEN SOME MORE", "t"]]
+HUGE_PROVENANCE = {
+    "recipe": {"report": "Presentation Ceiling", "banner": "ceiling fixture"},
+    "inputs": [{"role": HUGE_ROLE, "selection": "a.xlsx", "kind": "file",
+                "sha256": "0" * 64}],
+}
 
 FRESHNESS_LABEL = ("Build-time source identity and duplicate pairing snapshot "
                    "is current")
@@ -434,9 +457,21 @@ def main():
 
         for mode in ("values", "formulas"):
             path = Path(tmp) / f"ceiling-{mode}.xlsx"
-            result = run_compare(HUGE_SCHEMA, HUGE_A, HUGE_B, False, path,
-                                 mode=mode, name_a="a.xlsx", name_b="b.xlsx")
+            result = run_compare(HUGE_SCHEMA, HUGE_A, HUGE_B, True, path,
+                                 mode=mode, name_a="a.xlsx", name_b="b.xlsx",
+                                 provenance=HUGE_PROVENANCE)
             c.check(f"ceiling/{mode} builds", result.status == "ok", repr(result))
+
+            # Every writer that can reach the ceiling is actually present, so a
+            # green result cannot come from a sheet quietly not being built.
+            wb = load_workbook(path, read_only=True)
+            try:
+                names = set(wb.sheetnames)
+            finally:
+                wb.close()
+            want = {"Comparison", "Routes", "Provenance", HUGE_SPEC.sheet_name}
+            c.check(f"ceiling/{mode}: every ceiling-capable writer ran",
+                    want <= names, f"missing {sorted(want - names)}")
 
             col = _column_of(path, "Comparison", "Description")
             from openpyxl.utils import get_column_letter

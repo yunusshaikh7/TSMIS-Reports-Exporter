@@ -2182,11 +2182,34 @@ def _ceiling_wrapped_columns(ws):
             and float(dim.width) >= _EXCEL_MAX_COL_WIDTH}
 
 
-def _ceiling_wrap_align():
+def _ceiling_wrap_align(align=None):
     """How a ceiling-wrapped cell sits: top-anchored so its first line reads
     against its neighbours, and left to Excel's automatic row height so every
-    wrapped line is shown."""
-    return Alignment(vertical="top", wrap_text=True)
+    wrapped line is shown. Any horizontal alignment the caller already wanted
+    is preserved."""
+    return Alignment(horizontal=(align.horizontal if align is not None else None),
+                     vertical="top", wrap_text=True)
+
+
+def _ceiling_wrapper(ws):
+    """`align_for(position, align=None)` for a sheet whose widths are declared.
+
+    Returns the wrap alignment for any column stored AT Excel's ceiling and the
+    caller's own alignment everywhere else, so every body writer applies the
+    rule identically and a NEW writer has one call to make instead of three
+    lines to remember.
+
+    That is the point of it. RB2-R2-002 was first fixed by hand-wiring the wrap
+    into three writers, which left Routes, Provenance and the category sheet
+    still clipping at the ceiling — the rule is cross-cutting, so it needs one
+    place to live. `check_workbook_presentation` drives every one of these
+    writers with ceiling-width content, so a writer that forgets this call
+    fails the gate rather than a review."""
+    ceiling = _ceiling_wrapped_columns(ws)
+    if not ceiling:
+        return lambda _position, align=None: align
+    return lambda position, align=None: (
+        _ceiling_wrap_align(align) if position in ceiling else align)
 
 
 def _styled(ws, value, font, fill=None, align=None, guard=False,
@@ -2389,8 +2412,7 @@ def _write_data_sheet(wb, name, tab_color, rows, lay, events, cmp_rows,
             size_pt=10, minimum=8)
     _apply_field_widths(ws, lay.sc.data_widths, lay.data_col, lay)
     _fit_data_columns(ws, rows, lay)
-    ceiling_cols = _ceiling_wrapped_columns(ws)
-    wrap_align = _ceiling_wrap_align() if ceiling_cols else None
+    align_for = _ceiling_wrapper(ws)
 
     ws.append(_header_row(
         ws,
@@ -2415,7 +2437,7 @@ def _write_data_sheet(wb, name, tab_color, rows, lay, events, cmp_rows,
         # never a live formula (the field FORMULAS read these via TRIM/INDEX, so
         # guarding here protects both flavors at the source).
         cells += [_styled(ws, v, body_font,
-                          align=wrap_align if j + 1 in ceiling_cols else None,
+                          align=align_for(j + 1),
                           guard=True, exact_source_numeric=True)
                   for j, v in enumerate(row)]
         row_fills = fills.get(r - 2) if fills else None
@@ -2561,8 +2583,7 @@ def _write_comparison(wb, union, lay, events, vals=None, helper_tokens=None,
     for f, width in (field_widths or {}).items():
         ws.column_dimensions[lay.field_col(f)].width = width
 
-    ceiling_cols = _ceiling_wrapped_columns(ws)
-    wrap_align = _ceiling_wrap_align() if ceiling_cols else None
+    align_for = _ceiling_wrapper(ws)
 
     for chunk in lay.state_chunks:
         ws.column_dimensions[chunk["col"]].hidden = True
@@ -2670,7 +2691,7 @@ def _write_comparison(wb, union, lay, events, vals=None, helper_tokens=None,
         else:
             guard_set = set(range(len(row))) - link_cols
         ws.append([_styled(ws, v, link_font if j in link_cols else body_font,
-                           align=wrap_align if j in ceiling_cols else None,
+                           align=align_for(j),
                            guard=(j in guard_set))
                    for j, v in enumerate(row)])
         if (i + 1) % _PROGRESS_EVERY == 0:
@@ -3121,8 +3142,7 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None,
         ws.conditional_formatting.add(f"A2:{last_field}{last}", FormulaRule(
             formula=[f'${c_why}2="entire route"'], fill=PatternFill(bgColor=tint)))
 
-    ceiling_cols = _ceiling_wrapped_columns(ws)
-    wrap_align = _ceiling_wrap_align() if ceiling_cols else None
+    align_for = _ceiling_wrapper(ws)
 
     link_font = _link_font()
     link_col = 3 if lay.has_route else 2              # the "<side> Row" position
@@ -3175,7 +3195,7 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None,
         else:
             guard_set = set(range(len(row))) - {link_col}
         ws.append([_styled(ws, v, link_font if j == link_col else body_font,
-                           align=wrap_align if j in ceiling_cols else None,
+                           align=align_for(j),
                            guard=(j in guard_set))
                    for j, v in enumerate(row)])
         if (i + 1) % _PROGRESS_EVERY == 0:
@@ -3332,6 +3352,7 @@ def _write_routes(wb, all_routes, lay, vals=None):
                    ("E", 16), ("F", 16), ("G", 18), ("H", 14)):
         ws.column_dimensions[col].width = w
     ws.row_dimensions[1].height = 30
+    align_for = _ceiling_wrapper(ws)
     # Status colors match the Comparison sheet; red counts where differences exist.
     ws.conditional_formatting.add(f"A2:H{last}", FormulaRule(
         formula=[f'$B2="{lay.only_a}"'], fill=PatternFill(bgColor="FFE699")))
@@ -3373,7 +3394,8 @@ def _write_routes(wb, all_routes, lay, vals=None):
         # Guard only the route-id cell (cell 0): a route like "=X" would become
         # a live formula. The other cells are our own =formulas (formulas flavor)
         # or safe literals (values flavor) and must NOT be forced to text.
-        ws.append([_styled(ws, v, body_font, guard=(j == 0))
+        ws.append([_styled(ws, v, body_font, align=align_for(j),
+                           guard=(j == 0))
                    for j, v in enumerate(cells)])
     return ws
 
@@ -3858,16 +3880,30 @@ def _write_provenance_sheet(wb, provenance):
                                       minimum=12)),
                    ("B", 110)):
         ws.column_dimensions[col].width = w
+    # A role long enough to reach Excel's ceiling cannot be fitted any wider,
+    # and column B beside it is populated, so it would be cut off. Wrap it
+    # instead (RB2-R2-002). The rest of this sheet writes raw values, so the
+    # styled cell appears only in the case that needs it.
+    align_for = _ceiling_wrapper(ws)
+    role_align = align_for(0)
+
+    def role(value):
+        """Column-A text, wrapped only when the column is at the ceiling."""
+        return (value if role_align is None
+                else _styled(ws, value, Font(name="Arial", size=11),
+                             align=role_align))
+
     recipe = provenance.get("recipe") or {}
-    ws.append(["Comparison Provenance"])
-    ws.append(["What this workbook compared — captured before the inputs "
-               "were read."])
+    ws.append([role("Comparison Provenance")])
+    ws.append([role("What this workbook compared — captured before the inputs "
+                    "were read.")])
     ws.append([])
-    ws.append(["Report", recipe.get("report", "")])
-    ws.append(["Run", recipe.get("banner", "")])
+    ws.append([role("Report"), recipe.get("report", "")])
+    ws.append([role("Run"), recipe.get("banner", "")])
     for rec in provenance.get("inputs") or ():
         ws.append([])
-        ws.append([str(rec.get("role", "")), str(rec.get("selection", ""))])
+        ws.append([role(str(rec.get("role", ""))),
+                   str(rec.get("selection", ""))])
         if rec.get("kind") == "folder":
             ws.append(["", f"{rec.get('member_count', 0)} discovered source "
                            "file(s); the exact member census is in the "
@@ -3883,9 +3919,10 @@ def _write_provenance_sheet(wb, provenance):
         if rec.get("producer_completion") is not None:
             ws.append(["", f"producer completion: {rec['producer_completion']}"])
     ws.append([])
-    ws.append(["Note", "The machine-readable record (including the committed "
-                       "generation binding) is the .provenance.json sidecar "
-                       "beside this workbook."])
+    ws.append([role("Note"),
+               "The machine-readable record (including the committed "
+               "generation binding) is the .provenance.json sidecar "
+               "beside this workbook."])
 
 
 def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
