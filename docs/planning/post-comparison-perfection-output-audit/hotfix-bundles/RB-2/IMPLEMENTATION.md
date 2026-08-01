@@ -1,6 +1,8 @@
 # `RB-2` — Implementation Record
 
-Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (Review 2's `RB2-R2-001` remedied; Review 1's `EG-001`/`EG-002` remain closed)
+Status: **DENIED — RETURN TO IMPLEMENTATION** (`RB2-R2-002`; Review 2's
+`RB2-R2-001` selection mechanism is closed, but the retained whole-column result
+proves HF-02 criterion 1 still fails; Review 1's `EG-001`/`EG-002` remain closed)
 
 | Field | Value |
 |---|---|

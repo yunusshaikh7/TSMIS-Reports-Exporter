@@ -2,11 +2,11 @@
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
 RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
-RB-2 is IMPLEMENTED — AWAITING ADVERSARIAL REVIEW on
-`hotfix/rb-2-deliverable-presentation`; Review 2's `RB2-R2-001` is remedied
-and the acceptance set re-established at `81d5bca69b9c7d2e065db24c537c5a305be4815c`**
+RB-2 Review 2 re-review is DENIED — RETURN TO IMPLEMENTATION on
+`hotfix/rb-2-deliverable-presentation` for `RB2-R2-002`, reviewed through
+`040b98190ca86cfac41f0a5b6d3942fd5c71f7a6`**
 
-Last updated: 2026-07-31
+Last updated: 2026-08-01
 
 This is the entry point for every new Codex or Claude chat. Read this file
 before opening the other audit documents. The project deliberately separates
@@ -21,17 +21,19 @@ Resume
 on the existing `hotfix/rb-2-deliverable-presentation` branch with
 `<BUNDLE_ID> = RB-2` and `<IMPLEMENTER> = Claude`.
 
-Codex Review 2 denied one concrete HF-02 acceptance failure as
-`RB2-R2-001`: `compare_core._auto_field_widths` claimed to fit the pixel-widest
-value but first chose one candidate per side by Python character count, so a
-shorter wide-glyph value could be discarded for a longer narrow-glyph one and
-published in a materially narrow Comparison/Only-in
-column. The exact source probe measured a stored width of `13.0` / 91 usable
-pixels for `WWWWWWWWWW`, whose own product measurement requires 135.25 pixels.
-The signed denial and bounded return are in
+Codex Review 2 re-review closes `RB2-R2-001`'s character-count selection
+mechanism: the rendered-width fixture passes in both twins and the exact-head
+verifier binds all 21 claimed results to acceptance head `81d5bca69b9c`. It
+denies one new concrete HF-02 criterion-1 failure as `RB2-R2-002`. The retained
+whole-column result reports **4,978 materially clipped head cells** in real
+Comparison sheets, all at the bundle's `60.0` width cap, while marking the run
+`clean: true` only by redefining clean to ignore cap-bound clipping. The frozen
+criterion requires zero and contains no cap exception. The signed denial and
+bounded return are in
 [`hotfix-bundles/RB-2/REVIEW.md`](hotfix-bundles/RB-2/REVIEW.md).
 
-Do not merge or begin another Review 2 until the return is implemented.
+Do not merge, clean up, or begin RB-3. Implement the bounded return before
+another Review 2 re-review.
 
 RB-1 (work item HF-01, branch `hotfix/rb-1-clean-road-source-truth`) was
 implemented, denied by Codex Review 1 on the clipped `ArcGIS Build` disclosure
@@ -144,9 +146,11 @@ The other two point in opposite directions on purpose:
   pair-aware, opt-in, and must not widen into the HF-09 class.
 
 Both planners signed the Stage 3 plan. **RB-1 is merged. RB-2 Review 1 approved
-the same-head evidence remedies; Review 2 then found `RB2-R2-001`, a concrete
-pixel-width selection failure in the new presentation logic. That is now
-remedied and RB-2 awaits a fresh Review 2 on its existing branch.**
+the original same-head evidence remedies. Review 2's `RB2-R2-001` selection
+failure is now closed, but its re-review found `RB2-R2-002`: the refreshed
+acceptance result itself records 4,978 materially clipped head cells at the
+bundle's width cap and then classifies them as clean. RB-2 is returned to Stage
+4 on its existing branch.**
 
 Stage 2 is closed with no open conflict:
 
@@ -168,8 +172,8 @@ Stage 2 is closed with no open conflict:
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-2 IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-2 AWAITING REVIEW 2 RE-REVIEW** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-2 DENIED — RETURN TO IMPLEMENTATION (`RB2-R2-002`)** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-2 REVIEW 2 RE-REVIEW DENIED** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

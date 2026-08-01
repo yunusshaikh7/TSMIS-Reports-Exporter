@@ -1,6 +1,6 @@
 # `RB-2` — Adversarial Review Record
 
-Status: **REVIEW 2 DENIED — RETURN TO IMPLEMENTATION** (`RB2-R2-001`)
+Status: **REVIEW 2 RE-REVIEW DENIED — RETURN TO IMPLEMENTATION** (`RB2-R2-002`)
 
 ## Initial Review 1 verdict — 2026-07-30
 
@@ -459,3 +459,153 @@ implementer.
 
 **Reviewer signature:** Codex, Review 2 — **DENIED — RETURN TO IMPLEMENTATION** —
 `2026-07-31T09:50:49.5577999-07:00`.
+
+---
+
+## Review 2 re-review — Codex, 2026-08-01
+
+### Verdict
+
+**DENIED — RETURN TO IMPLEMENTATION.** The returned change closes the specific
+candidate-selection defect recorded as `RB2-R2-001`: the shared width helpers
+now select by rendered pixel width, the deterministic inverse-order fixture
+passes for both twins, and all 21 retained claims are bound to the exact runtime
+head. The same-head expanded corpus result nevertheless proves a new concrete
+HF-02 criterion 1 failure. It reports 4,978 materially clipped Comparison and
+Only-in cells at the declared `60.0` width cap, then calls the corpus clean by
+excluding cap-bound clipping from its verdict. The frozen acceptance criterion
+requires zero materially clipped cells and grants no cap exception. This is
+`RB2-R2-002`.
+
+### Review identity and bounded execution
+
+| Field | Re-review record |
+|---|---|
+| Reviewer | Codex, Review 2 re-review; not the implementer |
+| Branch | `hotfix/rb-2-deliverable-presentation` |
+| Recorded base | `896083e014d0451d5b05e5b6b024339aebc84d74` |
+| Merge base | `896083e014d0451d5b05e5b6b024339aebc84d74` — exact match |
+| Acceptance runtime head | `81d5bca69b9c7d2e065db24c537c5a305be4815c` |
+| Manifest-build head | `c8cbf543c50ba3ad11516f04cafd2506dc4b0e04` |
+| Review-entry / reviewed branch head | `040b98190ca86cfac41f0a5b6d3942fd5c71f7a6` |
+| Remote branch head on entry | `040b98190ca86cfac41f0a5b6d3942fd5c71f7a6` |
+| Entry worktree | Clean |
+| Active review budget | Approximately 29 minutes; stopped after the first new blocking acceptance contradiction |
+
+The re-review stayed within the Prompt 05 resource boundary. It did not
+regenerate the corpus, automate Excel, repeat the full implementation gate, or
+rehash the corpus. It ran one 22.1-second independent manifest verification and
+one 2.2-second deterministic presentation fixture, then used the retained
+same-head artifacts and small source/history reads.
+
+### Preconditions, scope, and evidence binding
+
+| Check | Result | Evidence |
+|---|---|---|
+| Re-review authorization | **PASS** | The user explicitly invoked Prompt 05 as the Review 2 re-review of `RB2-R2-001`; the final plan routes a returned Review 2 through the same prompt. |
+| Reviewer independence | **PASS** | Codex is the Review 2 reviewer; Claude is the named implementer. |
+| Base and merge-base identity | **PASS** | Both resolve to `896083e014d0451d5b05e5b6b024339aebc84d74`. |
+| Branch scope | **PASS** | The complete base-to-entry-head diff contains 21 paths, limited to the frozen shared-presentation runtime, its gates/tests, retained evidence, and workflow records. |
+| Whitespace integrity | **PASS** | `git diff --check` was clean before this review record. |
+| Exact-head manifest | **PASS** | The independent verifier matched all 418 runtime files to `81d5bca69b9c7d2e065db24c537c5a305be4815c`, rejected no retained claim, and reported 21/21 claims at that head. |
+| Runtime immutability after acceptance head | **PASS** | The verifier found three later commits and no later runtime changes. |
+| Retained witness binding | **PASS** | Four committed witnesses matched their recorded hashes and acceptance head. |
+
+The independently checked manifest is
+`RB2-A1-manifest.json`, 1,802,846 bytes, SHA-256
+`26FED2CE29CC1F9D1920CA7AB952663EC491662FDD3DE2520AB4E7BD7A410887`.
+Its source inventory is 962,858 bytes, SHA-256
+`F18DBD96830B6C710642080D71057FE924E481B278A17584544947DCBE54AD98`.
+The verifier reproduced runtime digest
+`1CC46D40C871ABDB728DEBBB0354F8BA7A54F23A07BF382AEB6F5B945BA9A2D9`.
+
+### `RB2-R2-001` return closure
+
+| Required return | Result | Re-review evidence |
+|---|---|---|
+| Select candidates by rendered width | **PASS** | The bounded source sweep found no remaining character-count shortlist in the affected Comparison, Only-in, or Summary/category paths; the helpers measure candidate text and choose by pixel width. |
+| Add inverse character-count/pixel-width fixture | **PASS** | The fixture proves its shorter wide-glyph value is pixel-wider, then passes Comparison, Only-in, and category checks in both twins. |
+| Re-establish an exact acceptance head | **PASS** | All 21 claims and four committed witnesses bind to `81d5bca69b9c7d2e065db24c537c5a305be4815c`; no later runtime change exists. |
+| Original finding disposition | **CLOSED** | The mechanism described by `RB2-R2-001` is no longer present. |
+
+The direct targeted command
+`build\.venv\Scripts\python.exe build\check_workbook_presentation.py`
+completed successfully. Its wide-glyph checks cover the shared writer in both
+twins and the affected Comparison, Only-in, and category routes.
+
+### Independent Review 2 challenge
+
+Review 1 and the returned unit fixture do not adjudicate long values that reach
+the declared maximum column width. The committed HF-02 oracle scans only the
+first eight columns and first 80 rows of Summary, Spot Check, and Comparison.
+The implementer's later retained expanded-corpus result was therefore examined
+as the narrowest same-head challenge to the frozen zero-clipping claim.
+
+The retained file
+`HF-02/clipping-corpus-head.json` is 125,725 bytes with independently matched
+SHA-256
+`1B29E9385C0C829A0976C33E4664AAE4DBE56D266CD3A7B8A44D8A78ABF3D163`.
+It is recorded against the exact acceptance runtime head and reports:
+
+| Expanded head-corpus field | Exact result |
+|---|---:|
+| Deliverables examined | 42 |
+| Sheets examined | 126 |
+| Columns examined | 3,226 |
+| Materially clipped cells | **4,978** |
+| Clipped at declared `60.0` cap | **4,978** |
+| Clipped below cap | 0 |
+| Stored `clean` verdict | `true` |
+
+The first retained hit is
+`direct-tsn\highway_log vs tsn (values).xlsx`, `Comparison!AI2`: 425 usable
+pixels, 513 required pixels, and an 88-pixel shortfall. This is an actual head
+cell containing the long A-not-equal-B description, not a synthetic probe.
+The result's own purpose identifies the scan as criterion 1 across every column
+of Comparison and Only-in, but its `clean` definition silently changes the
+criterion to “no clipping below the cap.”
+
+That semantic substitution is not allowed. HF-02 criterion 1 says that RC-1
+must report **0 materially clipped cells in every regenerated workbook, both
+twins**. Neither the signed Stage 3 plan nor the bundle grants an exception for
+text clipped at a chosen maximum width. The cap was introduced within RB-2's
+presentation work rather than inherited from the recorded base, so it cannot be
+treated as a frozen external constraint. Exact-head evidence makes this a
+stronger contradiction, not a waiver: the evidence accurately demonstrates
+that the accepted runtime fails its frozen contract.
+
+### Acceptance and review-domain disposition
+
+| Acceptance criterion | Disposition | Re-review basis |
+|---|---|---|
+| HF-02.1 — zero materially clipped cells, both twins | **FAIL** | The same-head expanded corpus records 4,978 actual clipped cells. |
+| HF-02.2–5 — labels, widths, row heights, counts/masks/typed outcomes | No new contradiction | Retained Review 1 evidence remains usable; it cannot override criterion 1. |
+| HF-02.6 — permanent gate plus pre-fix proof | **FAIL** | The committed oracle's first-eight-column/80-row window misses the actual affected columns, and the new result changes `clean` semantics instead of enforcing zero. |
+| HF-03.1–6 | No new contradiction | Retained Review 1 evidence remains usable, but HF-03 cannot override HF-02's blocking failure. |
+
+| Review domain | Disposition |
+|---|---|
+| Source truth / counts / masks | No new contradiction; retained evidence reused |
+| Values and formulas | **FAIL for deliverable presentation** — long actual cell values are not fully legible |
+| Visual / presentation | **FAIL** — the frozen zero-clipping guarantee is false |
+| Evidence and exact-head binding | **PASS** — the manifest and retained artifacts are coherently bound |
+| Regression coverage | **FAIL** — the permanent oracle misses the affected columns and accepts cap-bound clipping |
+| Failure behavior | No new contradiction found |
+
+### Actionable finding and exact return
+
+| ID | Priority | Failure | Required return |
+|---|---|---|---|
+| `RB2-R2-002` | P1 / blocking | The exact-head expanded corpus records 4,978 materially clipped Comparison/Only-in cells, all at the declared width cap, while the frozen HF-02.1 contract requires zero. The result calls itself clean only by inventing an unapproved cap exception, and the committed oracle's first-eight-column/80-row window does not see the failing cells. | Make the actual affected Comparison and Only-in cells legible so an expanded oracle reports zero materially clipped cells, or return to the plan owner for an explicit contract change; a reviewer cannot create the exception. Strengthen the permanent gate and witness to scan the actual affected rows/columns across all 60 head deliverables and fail on any materially clipped cell. If runtime changes, establish a new exact acceptance head and refresh/rebind every dependent retained result, witness, manifest, and verifier identity while preserving prior history. Then rerun the scoped/full implementation checks and return Prompt 05 for Review 2 re-review. |
+
+The first ordinary targeted-test launch encountered the same Windows sandbox
+ACL helper failure seen during read-only checks. The approved bounded launch
+completed successfully; this was a reviewer-environment event, not a product
+failure, and it was not counted against the implementation.
+
+Do not merge, switch to `main`, clean up the RB-2 branch, or begin RB-3. Resume
+Prompt 04 on `hotfix/rb-2-deliverable-presentation` with Claude as implementer
+and preserve the closed `RB2-R2-001` history.
+
+**Reviewer signature:** Codex, Review 2 re-review — **DENIED — RETURN TO
+IMPLEMENTATION** (`RB2-R2-002`) — `2026-08-01T11:48:11.5375227-07:00`.
