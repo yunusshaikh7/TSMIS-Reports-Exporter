@@ -228,6 +228,17 @@ HUGE_CAT_SCHEMA = CompareSchema(
 HUGE_CAT_A = [[HUGE_CATEGORY, "10"]]
 HUGE_CAT_B = [[HUGE_CATEGORY, "11"]]
 
+# ---- RB2-R2-002 round 5: a difference against an EMPTY side ----------------
+# `_field_display_expr` substitutes the literal "(blank)" for an empty side, so
+# this pair RENDERS as "WWWW... != (blank)" -- wider than the value alone, which
+# is all the sizing used to measure when one side's widest value was empty.
+BLANK_SCHEMA = CompareSchema(
+    report_name="Presentation Blank Side", header=["Key", "Value", "Tail"],
+    side_a="TSMIS", side_b="TSN",
+    id_noun="location", id_noun_plural="locations")
+BLANK_A = [["k1", "W" * 20, "t"]]
+BLANK_B = [["k1", "", "t"]]
+
 FRESHNESS_LABEL = ("Build-time source identity and duplicate pairing snapshot "
                    "is current")
 CONTEXT_TEXT = "not compared (context)"
@@ -378,7 +389,13 @@ def _unwrapped_blocked_formulas(path, sheets):
 
     Only the grid sheets are asked. The Comparison and Only-in sheets are full
     of blocked formulas that correctly do NOT wrap: their columns were sized
-    from the literal source values those formulas reproduce."""
+    from the literal source values those formulas reproduce.
+
+    Hidden columns and rows are excluded, matching `_audit_everything`: the
+    versioned helper cells are never rendered, so requiring them to wrap would
+    fail a presentation-correct build for no reader's benefit. Spill is measured
+    across the RUN of empty neighbours, not just the next cell, because that is
+    how Excel renders it — a cell stopped two columns over is still stopped."""
     wb = load_workbook(path, read_only=False)
     bad = []
     try:
@@ -390,11 +407,119 @@ def _unwrapped_blocked_formulas(path, sheets):
                 for cell in row:
                     if not isinstance(cell.value, str) or not cell.value.startswith("="):
                         continue
-                    nxt = ws.cell(row=cell.row, column=cell.column + 1).value
-                    if nxt is None or not str(nxt).strip():
-                        continue
+                    col_dim = ws.column_dimensions.get(cell.column_letter)
+                    row_dim = ws.row_dimensions.get(cell.row)
+                    if (getattr(col_dim, "hidden", False)
+                            or getattr(row_dim, "hidden", False)):
+                        continue          # never rendered; nothing to clip
+                    stopped = False
+                    for j in range(cell.column + 1, ws.max_column + 1):
+                        nxt = ws.cell(row=cell.row, column=j).value
+                        if nxt is not None and str(nxt).strip():
+                            stopped = True
+                            break
+                    if not stopped:
+                        continue          # spills across the rest of the row
                     if not (cell.alignment and cell.alignment.wrap_text):
                         bad.append((name, cell.coordinate))
+        return bad
+    finally:
+        wb.close()
+
+
+def _clipped_run_spill(gate, path):
+    """`[(sheet, coord, short_px, text)]` — clipped cells under the REAL spill
+    rule: text renders across the run of empty neighbours and stops at the first
+    populated cell.
+
+    The committed oracle asks only about `col + 1`, so a cell that reaches
+    through one blank and is stopped by the next reads to it as free to spill.
+    That is how `Spot Check!C10` and `F10` sat 3,449.7 px and 3,465.7 px over
+    their available width while every check here passed. The oracle is a frozen
+    Stage-2 artifact whose recorded numbers are cited elsewhere, so it is left
+    alone and this stricter pass runs beside it; its metrics are still the
+    oracle's own.
+
+    Wrapped, hidden and never-rendered cells are excluded on the same grounds as
+    `_audit_everything`."""
+    from openpyxl.utils import get_column_letter
+
+    wb = load_workbook(path, read_only=False, data_only=True)
+    hits = []
+    try:
+        for name in wb.sheetnames:
+            ws = wb[name]
+            if ws.sheet_state != "visible":
+                continue
+            merged = {c for rng in ws.merged_cells.ranges
+                      for c in rng.cells}
+            def width_px(idx):
+                dim = ws.column_dimensions.get(get_column_letter(idx))
+                w = dim.width if dim is not None and dim.width is not None \
+                    else gate.DEFAULT_COL_WIDTH
+                return gate.width_to_px(float(w))
+            for row in ws.iter_rows():
+                for cell in row:
+                    value = cell.value
+                    if not isinstance(value, str) or not value.strip():
+                        continue
+                    if (cell.row, cell.column) in merged:
+                        continue          # the oracle owns merged geometry
+                    align = cell.alignment
+                    if align is not None and (align.wrap_text
+                                              or align.shrink_to_fit):
+                        continue
+                    col_dim = ws.column_dimensions.get(cell.column_letter)
+                    row_dim = ws.row_dimensions.get(cell.row)
+                    if (getattr(col_dim, "hidden", False)
+                            or getattr(row_dim, "hidden", False)):
+                        continue
+                    avail, stopped = width_px(cell.column), False
+                    for j in range(cell.column + 1, ws.max_column + 1):
+                        nxt = ws.cell(row=cell.row, column=j).value
+                        if nxt is not None and str(nxt).strip():
+                            stopped = True
+                            break
+                        avail += width_px(j)
+                    if not stopped:
+                        continue
+                    font = cell.font
+                    need = gate.text_px(
+                        value, bool(font and font.bold),
+                        float(font.size or 11) if font else 11.0) + 4
+                    if need > avail + gate.TOLERANCE_PX:
+                        hits.append((name, cell.coordinate,
+                                     round(need - avail, 1), value[:48]))
+        return hits
+    finally:
+        wb.close()
+
+
+def _live_formula_rows_are_auto_height(path, sheets):
+    """`[(sheet, row)]` for rows holding a wrapped live formula that ALSO carry
+    an explicit height.
+
+    Excel does not auto-grow a row whose height was set, so such a row shows one
+    line of a wrapped formula result and hides the rest — the wrap is there and
+    achieves nothing. A literal on the same row can set that height, which is
+    how it happens without anyone choosing it."""
+    wb = load_workbook(path, read_only=False)
+    bad = []
+    try:
+        for name in sheets:
+            if name not in wb.sheetnames:
+                continue
+            ws = wb[name]
+            for row in ws.iter_rows():
+                for cell in row:
+                    if not isinstance(cell.value, str) or not cell.value.startswith("="):
+                        continue
+                    if not (cell.alignment and cell.alignment.wrap_text):
+                        continue
+                    dim = ws.row_dimensions.get(cell.row)
+                    if dim is not None and dim.height is not None:
+                        bad.append((name, cell.row))
+                    break
         return bad
     finally:
         wb.close()
@@ -633,6 +758,23 @@ def main():
                         not live,
                         "; ".join(f"{s}!{coord}" for s, coord in live[:8]))
 
+            # Excel renders across a RUN of blanks; the committed oracle asks
+            # only about the next cell, so this stricter pass runs beside it.
+            for label, target in ((f"ceiling/{mode}", path),
+                                  (f"ceiling-cat/{mode}", cat_path)):
+                run_hits = _clipped_run_spill(gate, target)
+                c.check(f"{label}: nothing is clipped once spill is measured "
+                        "across the whole run of blanks, not just one cell",
+                        not run_hits,
+                        "; ".join(f"{s}!{coord} short {short}px {text!r}"
+                                  for s, coord, short, text in run_hits[:6]))
+                tall = _live_formula_rows_are_auto_height(
+                    target, ("Summary", "Spot Check"))
+                c.check(f"{label}: every row with a wrapped live formula keeps "
+                        "Excel's automatic height, so the wrap can grow",
+                        not tall,
+                        "; ".join(f"{s} row {r}" for s, r in tall[:8]))
+
             col = _column_of(path, "Comparison", "Description")
             from openpyxl.utils import get_column_letter
             letter = get_column_letter(col) if col else None
@@ -662,6 +804,35 @@ def main():
                         "; ".join(f"{h['sheet']}!{h['cell']} short "
                                   f"{h['short_by_px']}px {h['text'][:40]!r}"
                                   for h in hits[:6]))
+
+        # ---- RB2-R2-002 round 5: sizing must measure the (blank) marker -----
+        blank_widths = {}
+        for mode in ("values", "formulas"):
+            path = Path(tmp) / f"blank-{mode}.xlsx"
+            result = run_compare(BLANK_SCHEMA, BLANK_A, BLANK_B, False, path,
+                                 mode=mode, name_a="a.xlsx", name_b="b.xlsx")
+            c.check(f"blank/{mode} builds", result.status == "ok", repr(result))
+            hits, _skipped, _sheets = _audit_everything(gate, path)
+            run_hits = _clipped_run_spill(gate, path)
+            c.check(f"blank/{mode}: the field is sized for the text the cell "
+                    "actually renders, marker included",
+                    not hits and not run_hits,
+                    "; ".join(f"{h['sheet']}!{h['cell']} short "
+                              f"{h['short_by_px']}px" for h in hits[:4])
+                    + "; ".join(f"{s}!{coord} short {short}px"
+                                for s, coord, short, _x in run_hits[:4]))
+            vcol = _column_of(path, "Comparison", "Value")
+            from openpyxl.utils import get_column_letter as _gcl
+            blank_widths[mode] = _stored_width(path, "Comparison", _gcl(vcol))
+
+        # The formulas twin writes this cell as a FORMULA, which `data_only`
+        # reads as None — so the scan above can only see the values twin. The
+        # two flavors are built to identical physical geometry, so asserting the
+        # stored widths are equal carries the values-twin proof across to it.
+        c.check("blank: both flavors store the same field width, so the "
+                "values-twin measurement covers the formulas twin too",
+                blank_widths.get("values") == blank_widths.get("formulas"),
+                repr(blank_widths))
 
         # ---- PCOA-FINAL-014: a wholly-context column says so ----------------
         for mode in ("values", "formulas"):

@@ -82,6 +82,7 @@ _TAB_COLORS = {"summary": "808080", "spot": "7030A0", "comparison": "C00000",
                "routes": "ED7D31", "only_a": "BF8F00", "only_b": "2E75B6",
                "side_a": "4472C4", "side_b": "70AD47"}
 _DIFF_MARK = " ≠ "          # presentation separator only; never owns diff truth
+_BLANK_MARK = "(blank)"     # what an EMPTY side renders as; sizing must measure it
 
 # The word a live self-check uses for the one condition that decertifies the
 # whole workbook, so the Summary states it in both flavors (PCOA-FINAL-019).
@@ -762,8 +763,8 @@ def compared_cell(sc, f, rt, rn, off):
     elif is_ditto or is_unavailable or equal:
         display = display_a
     else:
-        display = (f"{display_a or '(blank)'}{_DIFF_MARK}"
-                   f"{display_b or '(blank)'}")
+        display = (f"{display_a or _BLANK_MARK}{_DIFF_MARK}"
+                   f"{display_b or _BLANK_MARK}")
     return ComparedCell(
         raw_a=raw_a,
         raw_b=raw_b,
@@ -1792,8 +1793,8 @@ def _field_display_expr(lay, field_idx, status_ref, trim_t, trim_n, state_ref):
     if lay.sc.is_context(field_idx):
         matched = f'IF({trim_t}="",{trim_n},{trim_t})'
     else:
-        show_t = f'IF({trim_t}="","(blank)",{trim_t})'
-        show_n = f'IF({trim_n}="","(blank)",{trim_n})'
+        show_t = f'IF({trim_t}="","{_BLANK_MARK}",{trim_t})'
+        show_n = f'IF({trim_n}="","{_BLANK_MARK}",{trim_n})'
         matched = (f'IF({state_ref}="D",{show_t}&"{_DIFF_MARK}"&{show_n},'
                    f'{trim_t})')
     return (f'IF({status_ref}="{lay.only_a}",{trim_t},'
@@ -1850,8 +1851,8 @@ def _field_value(sc, rt, rn, off, f, state_code=None):
     if sc.is_context(f):
         return trim_t if trim_t else trim_n
     if state_code == "D":
-        return (f"{trim_t or '(blank)'}{_DIFF_MARK}"
-                f"{trim_n or '(blank)'}")
+        return (f"{trim_t or _BLANK_MARK}{_DIFF_MARK}"
+                f"{trim_n or _BLANK_MARK}")
     return trim_t
 
 
@@ -1989,6 +1990,8 @@ _ROW_LINE_PT = 15.0            # one line of Arial 10 / Calibri 11 in a row
 # as N with ColumnWidth N - 0.71, so a width computed in characters and stored
 # raw is always that much short of what Excel itself says the text needs.
 _STORED_WIDTH_OFFSET = 0.71
+_DEFAULT_COL_WIDTH = 8.43       # Excel's general default, for a column we never
+                                # declared — what a spill actually renders into
 # Rasterize well above the real point size and scale back: at 13 px a 10 pt font
 # loses ~2.5 % per glyph to integer rounding, which is a whole character over a
 # 20-character label (installed Excel wanted 22.29 where the rounded measure
@@ -2124,38 +2127,78 @@ def _grid_geometry(grid, base_widths, caps=None):
     caps = caps or {}
     occupied = {rc for rc, cell in grid.items()
                 if cell[0] is not None and str(cell[0]).strip() != ""}
+    n_cols = max((c for _r, c in grid), default=1)
+
+    def run_to_block(r, c):
+        """`(columns, stopped)` — the columns this cell can render across.
+
+        Excel spills a cell's text over CONSECUTIVE empty neighbours and stops
+        at the first populated one, so "can it spill?" is not a question about
+        `c + 1` alone: `Spot Check!C10` reaches through a blank `D10` and is
+        stopped by `E10` (RB2-R2-002 round 5). `stopped` is False when nothing
+        blocks it at all, in which case the whole row is available and no width
+        can be too small."""
+        cols = [c]
+        j = c + 1
+        while j <= n_cols:
+            if (r, j) in occupied:
+                return cols, True
+            cols.append(j)
+            j += 1
+        return cols, False
+
     blocked = []                            # (row, col, text, bold, size_pt)
+    spans = {}                              # (row, col) -> columns it renders across
     live = set()                            # blocked cells holding a FORMULA
     for (r, c), cell in grid.items():
         value, font = cell[0], cell[1]
         if not isinstance(value, str) or not value.strip():
             continue
-        if (r, c + 1) not in occupied:
+        cols, stopped = run_to_block(r, c)
+        if not stopped:
             continue                        # free to spill; Excel shows it all
+        spans[(r, c)] = cols
         if value.startswith("="):
             # A formula's DISPLAYED text is not knowable at build time — Spot
             # Check's live cells show whatever the source values turn out to be
             # — so no width can be proved to fit it. It cannot be measured, so
             # it is wrapped, which is this module's rule wherever fitting is
-            # impossible (RB2-R2-002). Its row height is left automatic:
-            # Excel grows the row for the lines it actually renders.
+            # impossible (RB2-R2-002).
             live.add((r, c))
             continue
         blocked.append((r, c, value, bool(font and font.bold),
                         float(font.size if font is not None and font.size else 11)))
     widths = dict(base_widths)
+    # Only a cell with NO gap to spill into may drive its column's width; one
+    # that renders across a gap already has that room and must not widen the
+    # column on everyone else's behalf.
     for r, c, text, bold, size in blocked:
-        widths[c] = fitted_width([text], bold=bold, size_pt=size,
-                                  minimum=widths.get(c, 0.0), maximum=caps.get(c))
+        if len(spans[(r, c)]) == 1:
+            widths[c] = fitted_width([text], bold=bold, size_pt=size,
+                                     minimum=widths.get(c, 0.0),
+                                     maximum=caps.get(c))
+
+    def available_px(r, c):
+        """Pixels the cell actually renders into, summed across its run."""
+        total = sum(_usable_px(widths.get(col, _DEFAULT_COL_WIDTH))
+                    for col in spans[(r, c)])
+        return total
+
     wrapped, heights = {}, {}
     for r, c, text, bold, size in blocked:
-        if _text_px(text, bold, size) + _CELL_PAD_PX <= _usable_px(widths[c]):
-            continue                        # the declared width already fits it
-        lines = _wrapped_lines(text, widths[c], bold, size)
+        if _text_px(text, bold, size) + _CELL_PAD_PX <= available_px(r, c):
+            continue                        # what it renders into already fits
+        lines = _wrapped_lines(text, widths.get(c, _DEFAULT_COL_WIDTH),
+                              bold, size)
         wrapped[(r, c)] = lines
         heights[r] = max(heights.get(r, 0.0), lines * _ROW_LINE_PT)
     for rc in live:
-        wrapped.setdefault(rc, 1)           # wrap; leave the height automatic
+        wrapped.setdefault(rc, 1)
+        # A row holding a live formula must keep Excel's AUTOMATIC height, or
+        # the wrap shows one line of many: a custom height does not auto-grow.
+        # A literal on the same row may already have set one, so drop it — the
+        # automatic height fits that literal's lines too (RB2-R2-002 round 5).
+        heights.pop(rc[0], None)
     return widths, wrapped, heights
 
 
@@ -2338,6 +2381,20 @@ def _fit_data_columns(ws, rows, lay):
         dim.width = fitted_width([text], size_pt=10, minimum=floor)
 
 
+def _pair_display(a, b):
+    """The widest text a Comparison field cell can SHOW for this pair.
+
+    Not the same as the values themselves. `_field_display_expr` substitutes the
+    literal `(blank)` for an empty side, so a difference against an empty cell
+    renders "(blank) ≠ value" — longer than the value that a naive `a or b`
+    would measure, and the column came up short by exactly the marker
+    (RB2-R2-002 round 5). Measuring the marker form whenever either side has
+    content can only over-reserve, never under."""
+    if not a and not b:
+        return ""
+    return (a or _BLANK_MARK) + _DIFF_MARK + (b or _BLANK_MARK)
+
+
 def _auto_field_widths(sc, lay, rows_t, rows_n, off):
     """Widths for the Comparison/Only-in FIELD columns.
 
@@ -2375,7 +2432,7 @@ def _auto_field_widths(sc, lay, rows_t, rows_n, off):
                     widest_px[f][slot] = px
                     widest[f][slot] = s
     return {f: fitted_width(
-        [(a + _DIFF_MARK + b) if a and b else (a or b)], size_pt=_CMP_FIELD_PT,
+        [_pair_display(a, b)], size_pt=_CMP_FIELD_PT,
         minimum=max(_CMP_FIELD_MIN_WIDTH,
                     float(sc.cmp_widths.get(sc.header[f], 0))))
         for f, (a, b) in widest.items()}
