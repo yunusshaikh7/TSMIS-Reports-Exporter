@@ -288,30 +288,63 @@ skipped are evidence workbooks with no Comparison sheet, named in the witness):
   whichever arrived first, not the widest. On this corpus the defect bites
   through TIES more often than through shorter-but-wider.
 
-### What was attempted and abandoned
+### The blind spot, measured rather than argued
 
 The committed oracle scans three sheets, the first 8 columns, the first 80 rows.
 That is how a mis-sized field column could sit inside a deliverable it had just
-certified: a Comparison field column lives far past column 8. A corpus-wide
-re-measurement past that window was built, run, and then abandoned, because
-reading a stored width through openpyxl needs the FULL object model, which parses
-every sheet in the book — including the statewide data sheets it never examines.
-Measured: 621 MB resident and over ten minutes for ONE 11 MB deliverable, with 44
-to do per side. Restricting the scan cannot recover it; the parse happens at open.
+certified: a Comparison field column lives far past column 8. Leaving that as
+prose would ask the reviewer to take the diagnosis on trust, so it is measured —
+`clipping-corpus-{head,base}.json`, every column and every row of Comparison and
+of every "Only in ..." sheet, across all 42 deliverables.
 
-It is recorded as a limitation rather than quietly dropped. What stands in its
-place is stronger on the point that matters: the golden gate now carries a
-fixture built specifically to expose that blind spot, driving both twins through
-`run_compare` and measuring them with the oracle's OWN `audit_sheet`, including
-the Only-in and category sheets it does not scan by default. A real corpus
-contains only the inversions it happens to contain; the fixture guarantees one.
+A first attempt used openpyxl's object model and was abandoned after burning
+621 MB and over ten minutes on ONE 11 MB deliverable: reading a stored width that
+way parses every sheet in the book, including the statewide data sheets it never
+examines. The working version streams widths out of the sheet XML, stopping at
+`<sheetData>` (0.004 s on a 256 MB workbook), and streams values read-only.
+Judgement stays the ORACLE'S: `text_px`, `width_to_px`, `DEFAULT_COL_WIDTH` and
+`TOLERANCE_PX` are imported from the committed `stage2-measure-clipping.py`,
+with its own padding and spill rules.
+
+| Measured across ALL columns | base | head |
+|---|---:|---:|
+| Deliverables / sheets / columns | 42 / 126 / 916 | 42 / 126 / 3,226 |
+| Clipped cells | **1,035,437** | **4,978** |
+| ...in a column sized BELOW the declared cap | **1,035,437** | **0** |
+| ...in a column already AT the cap (60.0 -> 425 px) | 0 | 4,978 |
+
+**Not one cell at head is clipped in a column sized below the cap.** Every
+residual sits in a column already at `_MAX_FITTED_WIDTH`, which exists so that
+one pathological value cannot make a sheet unusable — a Highway Log
+`<A> != <B>` description pair can need ~740 px, a stored width near 106. The two
+are reported separately and never folded together: a cap reached is a different
+statement from a column sized wrong, and only the second is the defect this
+return is about. The cap is a pre-existing design bound, neither introduced nor
+moved here, and it is deliberately left alone; changing it is a presentation
+decision outside this return that would move every deliverable's geometry again.
+
+The column counts carry their own signal — 916 at base against 3,226 at head —
+because base largely left columns at Excel's default and set no width at all.
+
+**The measurement is checked, not trusted.** A re-implementation is exactly where
+divergence hides, so on every small deliverable the leg re-runs the committed
+`audit_sheet` over its OWN 8-column, 80-row window and requires cell-for-cell
+agreement: **12 sheets agree, 0 disagree**, on both sides. Had its reading of
+widths, fonts or spill differed from the oracle's, that is what would catch it,
+and the leg exits 2 — the measurement itself is not trustworthy — rather than
+reporting a clean zero it had not earned.
+
+Two assumptions are stated because they are what such a re-implementation risks
+getting wrong: row 1 is skipped (the wrapped header band, which the oracle skips
+anyway), and body cells are measured non-bold at 10 pt, which is what the
+comparison writers emit. Summary and Spot Check are left to the committed
+oracle — they sit inside its window and carry merged ranges whose handling
+belongs with the original.
 
 The same obstacle was solved rather than accepted for `widths-carry`, which needs
-only stored widths: it reads the `<cols>` element straight from the sheet XML and
-stops at `<sheetData>`. Verified identical to openpyxl's own numbers, it reads a
-256 MB workbook in **0.004 s** against more than ten minutes through the object
-model — which is why that leg covers all 44 deliverables rather than the 16 a
-size cap would have allowed.
+only stored widths: it reads `<cols>` straight from the sheet XML. Verified
+identical to openpyxl's own numbers, which is why that leg covers all 44
+deliverables rather than the 16 a size cap would have allowed.
 
 ## Review 1 re-review remedy — `RB2-R1-EG-002`, one exact Git head
 
