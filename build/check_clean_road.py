@@ -520,6 +520,31 @@ def test_consolidator_end_to_end():
             marker[str(r[0])] = r[1]
         check("build marker carries the as-of", marker.get("As-of date") == ASOF)
 
+        # Header tinting (owner ask 2026-07-27): un-sourceable columns carry
+        # the Provenance grey + a hover note on the DATA sheet's header; every
+        # sourced/synthesized header stays plain. Presentation only.
+        swb = load_workbook(out)
+        try:
+            hdr = {c.value: c for c in swb[chc.ARC_SHEET][1]
+                   if c.value is not None}
+
+            def _fill_of(name):
+                f = hdr[name].fill
+                return (str(f.start_color.rgb)
+                        if f is not None and f.patternType else "")
+
+            check("no-source header tinted grey + noted",
+                  _fill_of("THY_MAINT_SVC_LVL_CODE").endswith("D9D9D9")
+                  and hdr["THY_MAINT_SVC_LVL_CODE"].comment is not None)
+            check("TSN-internal header tinted light grey",
+                  _fill_of("THY_ID").endswith("EDEDED"))
+            check("sourced header stays plain",
+                  _fill_of("THY_COUNTY_CODE") == "")
+            check("synthesized header stays plain",
+                  _fill_of("THY_BEGIN_OFFSET_AMT") == "")
+        finally:
+            swb.close()
+
         # refusals
         lib2 = Path(td) / "lib2"
         _build_library(lib2, drop_layer="SHS Median")

@@ -1299,18 +1299,36 @@ def _write_workbook(out_path, rows, index, asof_date, lib_root, warnings,
                     skips=(), n_marked=0, marked_cells=()):
     from openpyxl import Workbook
     from openpyxl.cell import WriteOnlyCell
+    from openpyxl.comments import Comment
     from openpyxl.styles import PatternFill
 
     wb = Workbook(write_only=True)
     ws = wb.create_sheet(SHEET_NAME)
-    ws.append(THY_HEADER)
+    _fills = {tier: PatternFill("solid", fgColor=rgb)
+              for tier, rgb in _PROV_TIER_FILL.items()}
+    # Header tinting (owner ask 2026-07-27, the M2-E colour language): the
+    # columns no ArcGIS layer can fill — "no TSMIS source" + "TSN-internal"
+    # bookkeeping — carry the Provenance sheet's grey on their header cell
+    # with a hover note, so an empty column reads as "couldn't be sourced",
+    # never as lost data. Presentation only; cell VALUES are untouched.
+    header_cells = []
+    for name in THY_HEADER:
+        tier, _layer, _column, note = chc.PROVENANCE[name]
+        cell = WriteOnlyCell(ws, value=name)
+        fill = _fills.get(tier) if tier in ("no TSMIS source",
+                                            "TSN-internal") else None
+        if fill is not None:
+            cell.fill = fill
+            cell.comment = Comment(
+                f"{tier}: {note or 'present but never painted'} — see the "
+                "Provenance sheet.", "TSMIS Exporter")
+        header_cells.append(cell)
+    ws.append(header_cells)
     for row in rows:
         ws.append(row)
     prov = wb.create_sheet("Provenance")
     prov.append(["THY column", "Tier", "Source layer", "Source column", "Note",
                  "FeatureServer Data Source (00_INDEX)"])
-    _fills = {tier: PatternFill("solid", fgColor=rgb)
-              for tier, rgb in _PROV_TIER_FILL.items()}
     for row in _provenance_rows(index):
         fill = _fills.get(row[1])          # row[1] is the tier
         if fill is None:
