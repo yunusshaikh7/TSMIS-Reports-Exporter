@@ -1,6 +1,6 @@
 # `RB-2` — Adversarial Review Record
 
-Status: **JOINTLY APPROVED — AWAITING MERGE**
+Status: **MERGED** — `d679f388e0b12ff595751af9edd816674615b7a5`
 
 ## Initial Review 1 verdict — 2026-07-30
 
@@ -1008,3 +1008,17 @@ to merge.
 
 **Reviewer signature:** Codex, Review 2 re-review of `RB2-R2-004` —
 **APPROVED** — `2026-08-02T14:50:47.3393655-07:00`.
+
+## Merge and post-merge verification
+
+| Item | Result |
+|---|---|
+| Remote-main divergence check | **PASS** — fetched `origin/main`; local `main`, `origin/main`, `FETCH_HEAD`, and merge-base were all `896083e014d0451d5b05e5b6b024339aebc84d74` before merge |
+| Merge | **PASS** — non-forced `--no-ff` merge via `ort`; merge commit `d679f388e0b12ff595751af9edd816674615b7a5` |
+| Planned post-merge smoke gate | **PASS** — `build\.venv\Scripts\python.exe build\run_checks.py -j 4 -k`: **158 passed, 0 failed** in 136.3 seconds |
+| Frozen application self-test | **PASS** — `powershell -NoProfile -ExecutionPolicy Bypass -File .\build\build.ps1 -SelfTest` exited 0 after rebuilding the shipped executable in 83.8 seconds |
+
+The merge and post-merge verification were performed on `main`. No force was
+used, and retained audit artifacts and unrelated branches were not modified.
+The owner-amended acceptance runtime remained exactly the reviewed runtime;
+the post-merge checks exercised it only after both adversarial reviews signed.

@@ -2,9 +2,8 @@
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
 RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
-RB-2 is JOINTLY APPROVED after Review 2 closed `RB2-R2-004` against the
-owner-amended contract, and is AWAITING MERGE from
-`hotfix/rb-2-deliverable-presentation`**
+RB-2 is MERGED at `d679f388e0b12ff595751af9edd816674615b7a5`;
+RB-3 readiness is next**
 
 Last updated: 2026-08-02
 
@@ -16,11 +15,9 @@ first pass.
 
 ## Next action
 
-Complete the final-approval closeout in
-[`PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md):
-fetch and confirm `main`, merge RB-2 without force, run the planned post-merge
-smoke checks, publish the merge record, clean up only RB-2's merged branch and
-worktree, and prepare RB-3's readiness record from the updated `main`.
+Prepare RB-3's HF-04 readiness contract from the updated `main`. Do not create
+its implementation branch or begin implementation or an expensive acceptance
+run inside the RB-2 review closeout.
 
 `RB2-R2-004` was correct to refuse the decision from the reviewer's chair. It
 returned RB-2 to the plan owner over two surfaces the accepted runtime touches:
@@ -64,8 +61,8 @@ measured, so it cannot clip — and correcting it would move the runtime digest 
 force a complete RB2-A1 regeneration, so it belongs to a bundle that regenerates
 anyway.
 
-Do not begin RB-3 implementation or an expensive acceptance run during the
-merge closeout.
+RB-2 merged only after the 158/158 post-merge gate and frozen application
+self-test passed. RB-3 implementation remains outside this review closeout.
 
 ## Workflow
 
@@ -75,8 +72,8 @@ merge closeout.
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-2 IMPLEMENTATION COMPLETE** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-2 JOINTLY APPROVED — AWAITING MERGE** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-2 MERGED; RB-3 readiness next** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-2 COMPLETE — MERGED `d679f38`** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

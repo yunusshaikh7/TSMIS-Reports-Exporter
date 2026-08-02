@@ -1,6 +1,6 @@
 # `RB-2` — Bundle Contract
 
-Status: **JOINTLY APPROVED — AWAITING MERGE.** Review 2 closed
+Status: **MERGED** — `d679f388e0b12ff595751af9edd816674615b7a5`. Review 2 closed
 `RB2-R2-EG-003`: the expanded witness takes its list
 from the same-head measure record and covers **60 of 60** head deliverables —
 526 visible sheets, 8,200 columns, **0** owned materially clipped cells — and the
@@ -17,7 +17,7 @@ The runtime is authorized BYTE-FOR-BYTE: no product file changed, the acceptance
 head is unchanged, and no evidence was regenerated. Review 2 verified the
 amendment in both controlling scope copies, found no remaining contradiction,
 and approved. Review 1 and Review 2 now both approve; the signed history is in
-[REVIEW.md](REVIEW.md). Complete the merge closeout before beginning RB-3.
+[REVIEW.md](REVIEW.md). The post-merge gate and frozen application self-test passed.
 
 > This RB-level contract carries **HF-02 + HF-03** and transcribes both frozen
 > work-item sections from
@@ -33,6 +33,7 @@ and approved. Review 1 and Review 2 now both approve; the signed history is in
 | Theme | The deliverable looks right and describes itself truthfully — 56 of the 68 Stage 2 denials |
 | Branch | `hotfix/rb-2-deliverable-presentation` |
 | Readiness source `main` | `3dbd62daa0b3522c5338354b9d80304db8b771b0` — RB-1 merged, its post-merge record committed, and this state pushed to `origin/main` before readiness preparation |
+| Merge commit | `d679f388e0b12ff595751af9edd816674615b7a5` |
 | Base `main` commit | `896083e014d0451d5b05e5b6b024339aebc84d74` — the branch `hotfix/rb-2-deliverable-presentation` was created from this exact clean, current `main` (identical to `origin/main`) in worktree `C:\Users\Yunus\Projects\TSMIS-rb2-worktree` |
 | Canonical finding IDs | **PCOA-FINAL-002, -003, -008, -009, -014, -016, -019** |
 | Implementer | **Claude** (owner decision 2026-07-26) |
@@ -117,7 +118,7 @@ weakened oracle, or rush ship may not replace that split.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to its own `statewide-summary-visible-text-clipping.json`, `large-detail-no-render-visual-adjudication.json` and native-Excel renders, plus the committed `stage2-measure-clipping.py` / `stage2-clipping-recheck.json` |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-2: JOINTLY APPROVED — AWAITING MERGE** |
+| Status | **Inherits RB-2: MERGED — `d679f388e0b12ff595751af9edd816674615b7a5`** |
 
 **Exact scope** (as amended 2026-08-02 — see the owner amendment below).
 Stored presentation and self-description of the generated comparison workbook,
@@ -288,7 +289,7 @@ and the per-family count-invariance table.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to `run-ledgers/tsn-library-rebuild.json`, `source-audit/all-completed-workflow-note-audit.json`, the committed `stage2-tsn-provenance-scope.json`, and Claude's `witness\temp_captures.txt` (readable since the firewall ended) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-2: JOINTLY APPROVED — AWAITING MERGE** |
+| Status | **Inherits RB-2: MERGED — `d679f388e0b12ff595751af9edd816674615b7a5`** |
 
 **Exact scope.** The matrix lanes' private TSN capture step and what the
 resulting workbooks say about their own TSN input: all 12 vs-TSN families × the

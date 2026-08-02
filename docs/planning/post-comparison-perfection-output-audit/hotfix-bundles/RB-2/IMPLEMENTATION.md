@@ -1,6 +1,6 @@
 # `RB-2` — Implementation Record
 
-Status: **JOINTLY APPROVED — AWAITING MERGE.** `RB2-R2-004` returned the bundle
+Status: **MERGED** — `d679f388e0b12ff595751af9edd816674615b7a5`. `RB2-R2-004` returned the bundle
 to the plan owner rather than to
 implementation, and the owner authorized the existing runtime **byte-for-byte**:
 HF-02's exclusion of the data field columns is withdrawn as founded on a
@@ -19,6 +19,7 @@ approved.
 | Branch | `hotfix/rb-2-deliverable-presentation` (worktree `C:\Users\Yunus\Projects\TSMIS-rb2-worktree`; the user's `main` checkout is untouched and still clean) |
 | Base `main` commit | `896083e014d0451d5b05e5b6b024339aebc84d74` — clean, identical to `origin/main`, fetched without force before branching |
 | Implementation commits | `da1d480` (the change), `eb54b96` (the Excel-measured geometry correction), `1a94183` (the Provenance role column, found by installed Excel's own AutoFit) |
+| Merge commit | `d679f388e0b12ff595751af9edd816674615b7a5` |
 | Pushed | `origin/hotfix/rb-2-deliverable-presentation` |
 | Canonical findings | PCOA-FINAL-002, -003, -008, -009, -014, -016, -019 |
 | Generated-output root | `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-02\` (workbooks + measurements) and `…\HF-03\` (TSN rebuild + capture lifecycle); committed machine-readable witnesses under `hotfix-bundles/HF-02/witness/` and `hotfix-bundles/HF-03/witness/` |
