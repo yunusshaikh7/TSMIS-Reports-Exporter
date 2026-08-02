@@ -15,6 +15,7 @@ import os
 import shutil
 import stat
 import tempfile
+import time
 from pathlib import Path
 
 import consolidation_meta
@@ -223,6 +224,89 @@ def _object_identity(st):
             stat.S_IFMT(st.st_mode))
 
 
+# The private copy is the workbook the comparator actually reads, so it has to
+# carry the SAME producer record the library workbook does — claim lookup is
+# path-adjacent (consolidation_meta.read_extra), and a copy without these keys
+# makes every matrix-lane deliverable claim there is no TSN print identity and
+# tell the user to rebuild a library that is already current (PCOA-FINAL-002).
+_TSN_CARRIED_SIDECAR_KEYS = (
+    "tsn_source_claims",
+    "tsn_normalization_version",
+    "tsn_raw_manifest",
+    "tsn_normalized_workbook_identity",
+    "tsn_artifact_identity_token",
+)
+# Where the capture came from, so a comparison can name the DURABLE input it
+# compared instead of a directory that stops existing (PCOA-FINAL-003).
+TSN_CAPTURE_ORIGIN_KEY = "tsn_capture_origin"
+_TSN_CAPTURE_PREFIX = "tsmis-tsn-consumer-"
+_META_SUFFIX = consolidation_meta.meta_path(
+    Path("workbook")).name[len("workbook"):]
+_REPARSE_POINT = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+# Longer than any single comparison holds its capture, so the sweep can never
+# race a live one; short enough that an abandoned directory does not survive
+# the next day's work.
+_STALE_CAPTURE_AGE_S = 6 * 3600
+
+
+def _carried_tsn_sidecar(source):
+    """The library sidecar keys a private capture must reproduce, or None when
+    the source carries none of them (an older normalization — the capture then
+    says exactly what the library says, which is the honest answer)."""
+    carried = {}
+    for key in _TSN_CARRIED_SIDECAR_KEYS:
+        value = consolidation_meta.read_extra(source, key)
+        if value is not None:
+            carried[key] = value
+    return carried
+
+
+def _sweep_stale_tsn_captures(keep, now=None):
+    """Remove capture directories a previous run could not (PCOA-FINAL-016).
+
+    A cancellation or failure unwinds through this module's own `finally`, but
+    a killed process never runs it, and that is exactly how the audited
+    leftovers survived. Bounded on purpose: only this prefix, only directly
+    under the temp root, only real directories (never a reparse point), only
+    directories older than any comparison could still be using, only the two
+    file shapes a capture creates — and any surprise is LEFT ALONE. The age
+    bound is what makes it safe beside a concurrent run: a capture another
+    process is holding right now is minutes old, never hours."""
+    root = Path(tempfile.gettempdir())
+    now = time.time() if now is None else now
+    try:
+        entries = list(root.glob(_TSN_CAPTURE_PREFIX + "*"))
+    except OSError as e:
+        log.warning("matrix: could not scan for stale TSN captures (%s: %s)",
+                    type(e).__name__, e)
+        return
+    for entry in entries:
+        if entry == keep:
+            continue
+        try:
+            st = entry.lstat()
+            if not stat.S_ISDIR(st.st_mode) or (
+                    getattr(st, "st_file_attributes", 0) & _REPARSE_POINT):
+                continue
+            if now - st.st_mtime < _STALE_CAPTURE_AGE_S:
+                continue                       # possibly a live capture
+            leftovers = list(os.scandir(entry))
+            if any(not item.is_file(follow_symlinks=False)
+                   or not (item.name.endswith(".xlsx")
+                           or item.name.endswith(_META_SUFFIX))
+                   for item in leftovers):
+                log.warning("matrix: left an unrecognized TSN capture directory "
+                            "in place: %s", entry)
+                continue
+            for item in leftovers:
+                os.unlink(item.path)
+            os.rmdir(entry)
+            log.info("matrix: removed the stale TSN capture directory %s", entry)
+        except OSError as e:
+            log.warning("matrix: could not remove the stale TSN capture "
+                        "directory %s (%s: %s)", entry, type(e).__name__, e)
+
+
 @contextlib.contextmanager
 def captured_tsn_workbook(source_path, expected_identity):
     """Yield a private immutable-by-ownership copy bound to expected source bytes.
@@ -230,11 +314,15 @@ def captured_tsn_workbook(source_path, expected_identity):
     The source descriptor and its pathname must identify the same stable file
     before and after copying. The private copy is then independently re-hashed
     and must equal the content identity captured from resolution/certification.
+    It also reproduces the library sidecar's producer claims and records the
+    canonical path it was taken from, so what the comparator reads describes
+    itself exactly as the durable workbook does.
     """
     import tsn_library
     expected = tsn_library.validate_normalized_workbook_identity(expected_identity)
     source = Path(source_path)
-    temp_root = Path(tempfile.mkdtemp(prefix="tsmis-tsn-consumer-"))
+    temp_root = Path(tempfile.mkdtemp(prefix=_TSN_CAPTURE_PREFIX))
+    _sweep_stale_tsn_captures(temp_root)
     try:
         temp_identity = _object_identity(temp_root.lstat())
     except OSError as e:
@@ -245,6 +333,7 @@ def captured_tsn_workbook(source_path, expected_identity):
     sidecar_identity = None
     try:
         source_outcome_before = consolidation_meta.read_outcome(source)
+        carried_before = _carried_tsn_sidecar(source)
         descriptor = None
         try:
             bound_path, descriptor, opened = tsn_library._open_bound_file(source)
@@ -293,6 +382,25 @@ def captured_tsn_workbook(source_path, expected_identity):
                 != _outcome_contract(source_outcome_after)):
             raise ValueError(
                 "the TSN workbook producer outcome changed during capture")
+        # The producer record travels with the bytes, under the same
+        # before/after window the outcome contract uses — a claim that moved
+        # mid-capture is refused rather than copied. The recorded workbook
+        # identity must be the one this capture VERIFIED, so the private copy
+        # can never claim an identity it did not prove for itself.
+        carried = _carried_tsn_sidecar(source)
+        if carried != carried_before:
+            raise ValueError(
+                "the TSN workbook producer record changed during capture")
+        recorded_identity = carried.get("tsn_normalized_workbook_identity")
+        if recorded_identity is not None and recorded_identity != expected:
+            raise ValueError(
+                "the TSN workbook producer record names a different content "
+                "identity than the bytes that were captured")
+        carried[TSN_CAPTURE_ORIGIN_KEY] = {
+            "version": 1,
+            "selection": str(source.resolve(strict=False)),
+            "identity": expected,
+        }
         if source_outcome_after is not None:
             if not source_outcome_after.trusted or not source_outcome_after.current:
                 raise ValueError(
@@ -302,7 +410,8 @@ def captured_tsn_workbook(source_path, expected_identity):
                 completion=source_outcome_after.completion,
                 skipped_inputs=source_outcome_after.skipped_inputs or 0,
                 failed_inputs=source_outcome_after.failed_inputs or 0)
-            if not consolidation_meta.write_outcome(captured, snapshot_result):
+            if not consolidation_meta.write_outcome(captured, snapshot_result,
+                                                    extra=carried):
                 raise ValueError(
                     "the TSN workbook producer outcome could not be bound to its capture")
             try:

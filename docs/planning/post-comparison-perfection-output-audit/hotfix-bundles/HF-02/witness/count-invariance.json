@@ -1,0 +1,961 @@
+{
+ "method": "base code vs head code, same inputs, same day; every published cell of every truth-bearing sheet compared cell for cell, plus the typed outcome sidecar",
+ "runtime_base": "54873CE5AFF297FAD0CF507A9A2AD981D9DC41866FC6E19054E16ABFCFD30353",
+ "totals": {
+  "compared": 42,
+  "changed": 0,
+  "changed_list": []
+ },
+ "workbooks": {
+  "classic-env\\intersection_summary new-vs-prior-ssor (values).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Only in SSOR-PROD 2026-07-23": 0,
+    "Only in SSOR-PROD 2026-07-09": 0,
+    "SSOR-PROD 2026-07-23": 0,
+    "SSOR-PROD 2026-07-09": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Provenance": 0
+   }
+  },
+  "classic-env\\intersection_summary new-vs-prior-ssor.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Only in SSOR-PROD 2026-07-23": 0,
+    "Only in SSOR-PROD 2026-07-09": 0,
+    "SSOR-PROD 2026-07-23": 0,
+    "SSOR-PROD 2026-07-09": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 3,
+    "Spot Check": 0,
+    "Provenance": 0
+   }
+  },
+  "classic-env\\ramp_detail_pdf new-vs-prior-ssor (values).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in SSOR-PROD 2026-07-23": 0,
+    "Only in SSOR-PROD 2026-07-09": 0,
+    "SSOR-PROD 2026-07-23": 0,
+    "SSOR-PROD 2026-07-09": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Provenance": 0
+   }
+  },
+  "classic-env\\ramp_detail_pdf new-vs-prior-ssor.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in SSOR-PROD 2026-07-23": 0,
+    "Only in SSOR-PROD 2026-07-09": 0,
+    "SSOR-PROD 2026-07-23": 0,
+    "SSOR-PROD 2026-07-09": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 3,
+    "Spot Check": 0,
+    "Provenance": 0
+   }
+  },
+  "classic-env\\ramp_summary new-vs-prior-ssor (values).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Only in SSOR-PROD 2026-07-23": 0,
+    "Only in SSOR-PROD 2026-07-09": 0,
+    "SSOR-PROD 2026-07-23": 0,
+    "SSOR-PROD 2026-07-09": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Provenance": 0
+   }
+  },
+  "classic-env\\ramp_summary new-vs-prior-ssor.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Only in SSOR-PROD 2026-07-23": 0,
+    "Only in SSOR-PROD 2026-07-09": 0,
+    "SSOR-PROD 2026-07-23": 0,
+    "SSOR-PROD 2026-07-09": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 3,
+    "Spot Check": 0,
+    "Provenance": 0
+   }
+  },
+  "direct-tsn\\highway_log vs tsn (values).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "Legend": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 0
+   }
+  },
+  "direct-tsn\\highway_log vs tsn.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "Legend": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 3,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 0
+   }
+  },
+  "direct-tsn\\highway_log_pdf vs tsn (values).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS (PDF)": 0,
+    "Only in TSN (PDF)": 0,
+    "TSMIS (PDF)": 0,
+    "TSN (PDF)": 0,
+    "Legend": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 0
+   }
+  },
+  "direct-tsn\\highway_log_pdf vs tsn.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS (PDF)": 0,
+    "Only in TSN (PDF)": 0,
+    "TSMIS (PDF)": 0,
+    "TSN (PDF)": 0,
+    "Legend": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 3,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 0
+   }
+  },
+  "direct-tsn\\highway_sequence vs tsn (values).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 9,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 0
+   }
+  },
+  "direct-tsn\\highway_sequence vs tsn.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 0
+   }
+  },
+  "direct-tsn\\highway_sequence_pdf vs tsn (values).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS (PDF)": 0,
+    "Only in TSN": 0,
+    "TSMIS (PDF)": 0,
+    "TSN": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 9,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 0
+   }
+  },
+  "direct-tsn\\highway_sequence_pdf vs tsn.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS (PDF)": 0,
+    "Only in TSN": 0,
+    "TSMIS (PDF)": 0,
+    "TSN": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 0
+   }
+  },
+  "direct-tsn\\intersection_detail vs tsn (values).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "Report View": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 0
+   }
+  },
+  "direct-tsn\\intersection_detail vs tsn.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "Report View": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 3,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 0
+   }
+  },
+  "direct-tsn\\intersection_detail_pdf vs tsn (values).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS (PDF)": 0,
+    "Only in TSN": 0,
+    "TSMIS (PDF)": 0,
+    "TSN": 0,
+    "Report View": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 0
+   }
+  },
+  "direct-tsn\\intersection_detail_pdf vs tsn.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS (PDF)": 0,
+    "Only in TSN": 0,
+    "TSMIS (PDF)": 0,
+    "TSN": 0,
+    "Report View": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 3,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 0
+   }
+  },
+  "direct-tsn\\intersection_summary vs tsn (values).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Summary by Category": 0,
+    "Provenance": 0
+   }
+  },
+  "direct-tsn\\intersection_summary vs tsn.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 3,
+    "Spot Check": 0,
+    "Summary by Category": 0,
+    "Provenance": 0
+   }
+  },
+  "direct-tsn\\ramp_detail_pdf vs tsn (values).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS (PDF)": 0,
+    "Only in TSN": 0,
+    "TSMIS (PDF)": 0,
+    "TSN": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 8,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 0
+   }
+  },
+  "direct-tsn\\ramp_detail_pdf vs tsn.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS (PDF)": 0,
+    "Only in TSN": 0,
+    "TSMIS (PDF)": 0,
+    "TSN": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 5,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 0
+   }
+  },
+  "direct-tsn\\ramp_summary vs tsn (values).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Summary by Category": 0,
+    "Provenance": 0
+   }
+  },
+  "direct-tsn\\ramp_summary vs tsn.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 3,
+    "Spot Check": 0,
+    "Summary by Category": 0,
+    "Provenance": 0
+   }
+  },
+  "everything\\comparisons\\tsn\\ssor-prod_highway_log_pdf_tsn (formulas).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS (PDF)": 0,
+    "Only in TSN (PDF)": 0,
+    "TSMIS (PDF)": 0,
+    "TSN (PDF)": 0,
+    "Legend": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 3,
+    "Spot Check": 0,
+    "Notes": 4,
+    "Provenance": 7
+   }
+  },
+  "everything\\comparisons\\tsn\\ssor-prod_highway_log_pdf_tsn.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS (PDF)": 0,
+    "Only in TSN (PDF)": 0,
+    "TSMIS (PDF)": 0,
+    "TSN (PDF)": 0,
+    "Legend": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Notes": 4,
+    "Provenance": 7
+   }
+  },
+  "everything\\comparisons\\tsn\\ssor-prod_highway_log_tsn (formulas).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "Legend": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 3,
+    "Spot Check": 0,
+    "Notes": 4,
+    "Provenance": 7
+   }
+  },
+  "everything\\comparisons\\tsn\\ssor-prod_highway_log_tsn.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "Legend": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Notes": 4,
+    "Provenance": 7
+   }
+  },
+  "everything\\comparisons\\tsn\\ssor-prod_highway_sequence_pdf_tsn (formulas).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS (PDF)": 0,
+    "Only in TSN": 0,
+    "TSMIS (PDF)": 0,
+    "TSN": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Notes": 3,
+    "Provenance": 7
+   }
+  },
+  "everything\\comparisons\\tsn\\ssor-prod_highway_sequence_pdf_tsn.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS (PDF)": 0,
+    "Only in TSN": 0,
+    "TSMIS (PDF)": 0,
+    "TSN": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 9,
+    "Spot Check": 0,
+    "Notes": 3,
+    "Provenance": 7
+   }
+  },
+  "everything\\comparisons\\tsn\\ssor-prod_highway_sequence_tsn (formulas).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Notes": 3,
+    "Provenance": 7
+   }
+  },
+  "everything\\comparisons\\tsn\\ssor-prod_highway_sequence_tsn.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 9,
+    "Spot Check": 0,
+    "Notes": 3,
+    "Provenance": 7
+   }
+  },
+  "everything\\comparisons\\tsn\\ssor-prod_intersection_detail_pdf_tsn (formulas).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS (PDF)": 0,
+    "Only in TSN": 0,
+    "TSMIS (PDF)": 0,
+    "TSN": 0,
+    "Report View": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 3,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 7
+   }
+  },
+  "everything\\comparisons\\tsn\\ssor-prod_intersection_detail_pdf_tsn.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS (PDF)": 0,
+    "Only in TSN": 0,
+    "TSMIS (PDF)": 0,
+    "TSN": 0,
+    "Report View": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 7
+   }
+  },
+  "everything\\comparisons\\tsn\\ssor-prod_intersection_detail_tsn (formulas).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "Report View": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 3,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 7
+   }
+  },
+  "everything\\comparisons\\tsn\\ssor-prod_intersection_detail_tsn.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "Report View": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 7
+   }
+  },
+  "everything\\comparisons\\tsn\\ssor-prod_intersection_summary_tsn (formulas).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 3,
+    "Spot Check": 0,
+    "Summary by Category": 88,
+    "Provenance": 7
+   }
+  },
+  "everything\\comparisons\\tsn\\ssor-prod_intersection_summary_tsn.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Summary by Category": 88,
+    "Provenance": 7
+   }
+  },
+  "everything\\comparisons\\tsn\\ssor-prod_ramp_detail_pdf_tsn (formulas).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS (PDF)": 0,
+    "Only in TSN": 0,
+    "TSMIS (PDF)": 0,
+    "TSN": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 5,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 7
+   }
+  },
+  "everything\\comparisons\\tsn\\ssor-prod_ramp_detail_pdf_tsn.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Routes": 0,
+    "Only in TSMIS (PDF)": 0,
+    "Only in TSN": 0,
+    "TSMIS (PDF)": 0,
+    "TSN": 0,
+    "Source Files": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 8,
+    "Spot Check": 0,
+    "Notes": 0,
+    "Provenance": 7
+   }
+  },
+  "everything\\comparisons\\tsn\\ssor-prod_ramp_summary_tsn (formulas).xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 3,
+    "Spot Check": 0,
+    "Summary by Category": 1,
+    "Provenance": 7
+   }
+  },
+  "everything\\comparisons\\tsn\\ssor-prod_ramp_summary_tsn.xlsx": {
+   "verdict": "same",
+   "outcome_equal": true,
+   "counts": null,
+   "truth_sheets": {
+    "Comparison": 0,
+    "Only in TSMIS": 0,
+    "Only in TSN": 0,
+    "TSMIS": 0,
+    "TSN": 0,
+    "__CMP_E2_SNAPSHOT_A": 0,
+    "__CMP_E2_SNAPSHOT_B": 0
+   },
+   "presentation_sheets": {
+    "Summary": 6,
+    "Spot Check": 0,
+    "Summary by Category": 1,
+    "Provenance": 7
+   }
+  }
+ },
+ "runtime": {
+  "tree": "C:\\Users\\Yunus\\Projects\\TSMIS-rb2-worktree",
+  "git": {
+   "head": "06266eca1a4858dc5ebd000d1dd2e946249c7338",
+   "head_tree": "c2a3d47688d99098738bcbab40dc12d10df2715e",
+   "branch": "HEAD",
+   "clean": false,
+   "dirty_paths": [
+    "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-02/witness/clipping-before-after.json",
+    "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-02/witness/clipping-expanded-coverage.json"
+   ],
+   "runtime_dirty_paths": [],
+   "runtime_clean": true,
+   "clean_note": "`clean` covers the whole worktree; `runtime_clean` covers only the files the runtime digest is taken over. A result written into the worktree necessarily observes clean=false."
+  },
+  "stamped_utc": "2026-08-02T20:52:21.001773+00:00",
+  "file_counts": {
+   "product": 152,
+   "gate": 265,
+   "oracle": 1
+  },
+  "group_digests": {
+   "product": "D1EC1AEE20395B2A00EC432CE2B4EC078CD43BD15B9AA2DEF945BDAF534CA6C2",
+   "gate": "3911F15FE54A700AA206CE1698B0C9B0735D4E5DCF72A12B0619BE585FF68ADF",
+   "oracle": "343A2FEA11B9E551963F9C4E18425355C7850ED6473E256433589726EB03D114"
+  },
+  "runtime_digest": "9E411BA215C5C511C7351630A688319E9900B25B6C94BE8DBBD0A50469A38483",
+  "python": {
+   "version": "3.11.0",
+   "executable": "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\build\\.venv\\Scripts\\python.exe"
+  },
+  "packages": {
+   "openpyxl": "3.1.5",
+   "pdfplumber": "0.11.9",
+   "pdfminer.six": "20251230",
+   "pillow": "12.2.0",
+   "pypdfium2": "5.9.0"
+  },
+  "files_note": "per-file digests omitted here by design; the full listing is in RB2-A1-manifest.json and is re-derivable from the tree by rb2-verify-manifest.py"
+ }
+}

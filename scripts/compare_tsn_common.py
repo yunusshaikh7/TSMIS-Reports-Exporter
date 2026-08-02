@@ -463,8 +463,26 @@ def write_source_files_sheet(wb, side_specs, sheet_title="Source Files"):
     + append plain values), so it works with the streaming comparison workbook and
     needs no change to the correctness-locked engine. Rows the side actually wrote
     are listed in order, so row N here corresponds to data-sheet row N+1."""
+    from compare_core import fitted_width
+
     ws = wb.create_sheet(sheet_title)
-    ws.append(["Side", "Row #", "Route (as compared)", "Source File"])
+    headers = ["Side", "Row #", "Route (as compared)", "Source File"]
+    # This sheet declared no widths at all, so every column sat at Excel's 8.43
+    # default and its own header clipped: "Route (as compared)" needs 132 px
+    # against 64 (RB2-R2-002 round 9). Each column is blocked by the next, so
+    # none of them can spill — measure all four against what they will hold.
+    sides = [str(s) for s, _r, _f in side_specs]
+    routes = ["" if not row or row[0] is None else str(row[0])
+              for _s, rows, _f in side_specs for row in rows]
+    names = [str(fn) for _s, _r, files in side_specs for fn in files]
+    longest_run = max((len(files) for _s, _r, files in side_specs), default=1)
+    for col, texts, minimum in (("A", sides + headers[:1], 10),
+                                ("B", [str(max(longest_run, 1))] + headers[1:2], 7),
+                                ("C", routes + headers[2:3], 10),
+                                ("D", names + headers[3:4], 14)):
+        ws.column_dimensions[col].width = fitted_width(
+            [x for x in texts if x], bold=True, size_pt=11, minimum=minimum)
+    ws.append(headers)
     for side_name, rows, files in side_specs:
         for i, (row, fn) in enumerate(zip(rows, files), start=1):
             route = "" if not row or row[0] is None else str(row[0])
@@ -601,6 +619,39 @@ def _sha256_file(path):
     return h.hexdigest()
 
 
+_CAPTURE_ORIGIN_KEY = "tsn_capture_origin"
+
+
+def _durable_selection(path, digest, size):
+    """The DURABLE path this input was taken from, when it is a verified
+    private capture of one (PCOA-FINAL-003).
+
+    The matrix lanes compare a byte-verified private copy of the canonical TSN
+    library workbook, and that copy is deleted when the run ends — so recording
+    its own pathname answers "what did this workbook compare?" with a directory
+    the reader can never open. The capture records where it came from and the
+    content identity it proved; this substitutes the canonical path ONLY when
+    that identity equals the bytes just hashed here and the canonical file is
+    still readable. Anything else keeps the literal path that was read."""
+    origin = consolidation_meta.read_extra(path, _CAPTURE_ORIGIN_KEY)
+    if not isinstance(origin, dict):
+        return None
+    identity = origin.get("identity")
+    selection = origin.get("selection")
+    if not isinstance(identity, dict) or not isinstance(selection, str):
+        return None
+    if (identity.get("sha256") != digest
+            or identity.get("byte_length") != size):
+        return None
+    canonical = Path(selection)
+    try:
+        if not canonical.is_file():
+            return None
+    except OSError:  # silent-ok: an unverifiable origin keeps the literal path
+        return None
+    return str(canonical.resolve(strict=False))
+
+
 def capture_input_provenance(sides):
     """[{role, name, selection, sha256, size, mtime_ns}] for ``sides`` =
     ((role_label, path), ...), hashed BEFORE any loader reads (CMP-AUD-098
@@ -618,17 +669,24 @@ def capture_input_provenance(sides):
             raise ValueError(f"Could not capture the {role} input identity for "
                              f"{path.name}: {type(e).__name__}: {e}")
         producer = consolidation_meta.read_outcome(path)
-        captured.append({
+        durable = _durable_selection(path, digest, st.st_size)
+        record = {
             "role": role,
             "kind": "file",
             "name": path.name,
-            "selection": str(path.resolve(strict=False)),
+            "selection": durable or str(path.resolve(strict=False)),
             "sha256": digest,
             "size": st.st_size,
             "mtime_ns": st.st_mtime_ns,
             "producer_completion": (producer.completion if producer is not None
                                     else None),
-        })
+        }
+        if durable:
+            # Say HOW it was read, without naming a path that stops existing:
+            # the digest above is of the bytes this comparison actually read,
+            # and they were proved equal to the canonical workbook's.
+            record["read_via"] = "verified private copy of the selection"
+        captured.append(record)
     return captured
 
 

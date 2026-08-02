@@ -35,6 +35,7 @@ the usual cadence, ConsolidateResult returned.
 import difflib
 import math
 import re
+import textwrap
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
@@ -62,7 +63,7 @@ try:
     from openpyxl.comments import Comment
     from openpyxl.formatting.rule import CellIsRule, FormulaRule
     from openpyxl.styles import Alignment, Font, PatternFill
-    from openpyxl.utils import get_column_letter
+    from openpyxl.utils import column_index_from_string, get_column_letter
     _DEPS_OK = True
 except ImportError:
     _DEPS_OK = False
@@ -81,6 +82,38 @@ _TAB_COLORS = {"summary": "808080", "spot": "7030A0", "comparison": "C00000",
                "routes": "ED7D31", "only_a": "BF8F00", "only_b": "2E75B6",
                "side_a": "4472C4", "side_b": "70AD47"}
 _DIFF_MARK = " ≠ "          # presentation separator only; never owns diff truth
+_BLANK_MARK = "(blank)"     # what an EMPTY side renders as; sizing must measure it
+
+# The word a live self-check uses for the one condition that decertifies the
+# whole workbook, so the Summary states it in both flavors (PCOA-FINAL-019).
+_STALE_VERDICT = "REGENERATE REQUIRED"
+# Summary/Spot Check label columns carry whole sentences as well as identities.
+# Past this width a label WRAPS instead of widening the sheet (PCOA-FINAL-008's
+# ownership note: an instruction is not an identity).
+_SUMMARY_LABEL_MAX_WIDTH = 46.0
+_SPOT_LABEL_MAX_WIDTH = 34.0
+# A Comparison field cell shows "<side A value> ≠ <side B value>", so it needs
+# more room than Excel's 8.43 general default. Schema-declared widths still win.
+_CMP_FIELD_MIN_WIDTH = 13.0
+# The point size the Comparison/Only-in body is written at. Sizing a column
+# MEASURES at this size, so the constant is shared rather than repeated: a
+# candidate chosen at one size and fitted at another is not a fit at all.
+_CMP_FIELD_PT = 10
+# A DIFFERING field cell is rendered BOLD by conditional formatting (the "D"
+# state rule below sets `bold=True`), and bold is wider than regular at the same
+# point size. Sizing therefore measures bold: a matched cell renders regular and
+# simply gets a little room to spare, where the reverse under-sizes exactly the
+# cells a comparison exists to show (RB2-R2-002 round 7).
+_CMP_FIELD_BOLD = True
+# Identity and unsized columns are WIDENED to fit rather than wrapped — a key
+# has to read on one line. The only bound is Excel's own: a stored width past
+# this is rejected by the format, so it is a FILE-FORMAT limit, not a
+# presentation choice. RB2-R2-002: an earlier 60.0 product cap lived here and
+# clipped 4,978 real cells, because a cap is only safe where the caller WRAPS
+# what it cannot fit, and an identity column never wraps.
+_EXCEL_MAX_COL_WIDTH = 255.0
+# What a wholly-context column reports instead of a bare 0 (PCOA-FINAL-014).
+_CONTEXT_FIELD_TEXT = "not compared (context)"
 
 # E1 Med-Wid formula twin.  The optional suffix is deliberately an explicit
 # printable-ASCII whitelist: Unicode digits/letters and control characters stay
@@ -736,8 +769,8 @@ def compared_cell(sc, f, rt, rn, off):
     elif is_ditto or is_unavailable or equal:
         display = display_a
     else:
-        display = (f"{display_a or '(blank)'}{_DIFF_MARK}"
-                   f"{display_b or '(blank)'}")
+        display = (f"{display_a or _BLANK_MARK}{_DIFF_MARK}"
+                   f"{display_b or _BLANK_MARK}")
     return ComparedCell(
         raw_a=raw_a,
         raw_b=raw_b,
@@ -1766,8 +1799,8 @@ def _field_display_expr(lay, field_idx, status_ref, trim_t, trim_n, state_ref):
     if lay.sc.is_context(field_idx):
         matched = f'IF({trim_t}="",{trim_n},{trim_t})'
     else:
-        show_t = f'IF({trim_t}="","(blank)",{trim_t})'
-        show_n = f'IF({trim_n}="","(blank)",{trim_n})'
+        show_t = f'IF({trim_t}="","{_BLANK_MARK}",{trim_t})'
+        show_n = f'IF({trim_n}="","{_BLANK_MARK}",{trim_n})'
         matched = (f'IF({state_ref}="D",{show_t}&"{_DIFF_MARK}"&{show_n},'
                    f'{trim_t})')
     return (f'IF({status_ref}="{lay.only_a}",{trim_t},'
@@ -1824,8 +1857,8 @@ def _field_value(sc, rt, rn, off, f, state_code=None):
     if sc.is_context(f):
         return trim_t if trim_t else trim_n
     if state_code == "D":
-        return (f"{trim_t or '(blank)'}{_DIFF_MARK}"
-                f"{trim_n or '(blank)'}")
+        return (f"{trim_t or _BLANK_MARK}{_DIFF_MARK}"
+                f"{trim_n or _BLANK_MARK}")
     return trim_t
 
 
@@ -1941,6 +1974,389 @@ def set_safe_literal_cell(cell, value, *, exact_source_numeric=False):
     return cell
 
 
+# --------------------------------------------------------------------------- #
+# Stored presentation geometry (PCOA-FINAL-008 / -009).
+#
+# Excel clips at the STORED column width, so a sheet that carries identities has
+# to DECLARE a width that fits them — a reader must never have to widen a column
+# to learn which row is which. Everything below measures rather than guesses,
+# using the same pixel model the delivered workbooks are audited with: a stored
+# width of N is round(N * 7) + 5 px, and a cell pads ~2 px on each side.
+#
+# Text is measured in the real font when the platform can (the workbooks are
+# Arial; the audit gate measures Calibri — the WIDER of the two wins, so a fit
+# satisfies both), and by a deliberately generous character estimate when no
+# font file can be read. The failure direction is always a wider column, never a
+# clipped one.
+# --------------------------------------------------------------------------- #
+_MDW_PX = 7                    # Calibri 11 max digit width — Excel's width unit
+_CELL_PAD_PX = 4               # ~2 px of padding on each side of the text
+_ROW_LINE_PT = 15.0            # one line of Arial 10 / Calibri 11 in a row
+# MEASURED against installed Excel, not assumed: Excel reports a column we store
+# as N with ColumnWidth N - 0.71, so a width computed in characters and stored
+# raw is always that much short of what Excel itself says the text needs.
+_STORED_WIDTH_OFFSET = 0.71
+_DEFAULT_COL_WIDTH = 8.43       # Excel's general default, for a column we never
+                                # declared — what a spill actually renders into
+# Rasterize well above the real point size and scale back: at 13 px a 10 pt font
+# loses ~2.5 % per glyph to integer rounding, which is a whole character over a
+# 20-character label (installed Excel wanted 22.29 where the rounded measure
+# said 21).
+_MEASURE_SCALE = 4
+# Even oversampled, an unhinted glyph-advance sum runs 1.3-2.4 % under what
+# installed Excel's own AutoFit asks for (measured on real labels: 18.43 vs
+# 18.00, 22.29 vs 22.00, 46.00 vs 45.29). Carry a margin that covers it.
+_MEASURE_MARGIN = 1.05
+_WRAP_FONTS = ("arial.ttf", "calibri.ttf")
+_WRAP_FONTS_BOLD = ("arialbd.ttf", "calibrib.ttf")
+_FALLBACK_CHAR_PX = 8.0        # generous: wider than any Arial/Calibri glyph
+                               # at 11 pt except a few, and never used when a
+                               # font file is readable
+_FONT_CACHE = {}
+_FONT_DIR = "C:/Windows/Fonts/"
+_PX_CACHE = {}
+_PX_CACHE_MAX = 200_000        # distinct measured strings held before resetting
+
+
+def _fonts_for(bold, size_pt):
+    """The measuring fonts for one cell, or () when none can be loaded."""
+    key = (bool(bold), round(float(size_pt), 1))
+    if key in _FONT_CACHE:
+        return _FONT_CACHE[key]
+    loaded = []
+    try:
+        from PIL import ImageFont
+    except ImportError:      # silent-ok: no measuring library -> the wider
+        ImageFont = None     # character estimate below, which never clips
+    if ImageFont is not None:
+        px = max(1, int(round(float(size_pt) * 96.0 / 72.0 * _MEASURE_SCALE)))
+        for name in (_WRAP_FONTS_BOLD if bold else _WRAP_FONTS):
+            try:
+                loaded.append(ImageFont.truetype(_FONT_DIR + name, px))
+            except OSError:  # silent-ok: an unreadable font file falls back the same way
+                pass
+    result = tuple(loaded)
+    _FONT_CACHE[key] = result
+    return result
+
+
+_NOTDEF_PROBE = "￾"        # a noncharacter: no font maps it, ever
+_COVERAGE_CACHE = {}
+
+
+def _covers(ch, fonts, bold, size_pt):
+    """Does any measuring font have a real glyph for `ch`?
+
+    FreeType substitutes .notdef for a character the font does not map, and
+    .notdef has one fixed advance — so a character measuring exactly that width
+    is one we are not really measuring at all. The probe is a Unicode
+    NONCHARACTER, which no font may map, so it yields the .notdef advance by
+    definition rather than by assumption.
+
+    An allowlist was tried first and was the same enumeration mistake in new
+    clothes: it missed the very characters this module emits itself, `Δ` and
+    `−` in the Summary notes among them. This asks the font instead of
+    guessing, and errs toward WRAPPING — a covered character that happens to
+    share .notdef's advance is wrapped needlessly, which hides nothing."""
+    key = (ch, bold, float(size_pt))
+    hit = _COVERAGE_CACHE.get(key)
+    if hit is not None:
+        return hit
+    notdef = max(f.getlength(_NOTDEF_PROBE) for f in fonts)
+    covered = abs(max(f.getlength(ch) for f in fonts) - notdef) > 1e-6
+    if len(_COVERAGE_CACHE) >= _PX_CACHE_MAX:
+        _COVERAGE_CACHE.clear()
+    _COVERAGE_CACHE[key] = covered
+    return covered
+
+
+def measurable_text(s, bold=False, size_pt=10.0):
+    """Can our fonts honestly measure this string?
+
+    Arial and Calibri are the fonts we measure in. For a character they do not
+    carry, Excel falls back to some other font whose metrics we do not have and
+    cannot obtain, so any width we compute is a guess.
+
+    This replaced an East Asian Width model, which was the wrong predictor
+    twice over (RB2-R2-002 round 10): U+0D05 MALAYALAM LETTER A is EAW=Neutral
+    yet rendered 225 px wider than measured, while U+1F600 is EAW=Wide yet
+    exceeded the one em that model charged it. The property describes typography,
+    not glyph coverage, and no constant derived from it was ever going to hold.
+
+    So the rule is the one this module already applies wherever fitting cannot be
+    proved — the live grid formulas, Excel's width ceiling — and it is applied
+    here for the same reason: a cell we cannot measure WRAPS, showing every line,
+    instead of being given a width we have no basis for."""
+    s = "" if s is None else str(s)
+    if s.isascii():
+        return True                      # the common case, and free
+    fonts = _fonts_for(bold, size_pt)
+    if not fonts:
+        return True                      # the per-character fallback estimate
+    return all(ch.isascii() or _covers(ch, fonts, bold, size_pt) for ch in s)
+
+
+def serialized_text(value, exact_source_numeric=True):
+    """The text a cell will actually HOLD, per `set_safe_literal_cell`.
+
+    Neither `str(value)` nor `_xl_trim(value)` is right on its own, and picking
+    either one wrongly has now cost two rounds: `str(1e20)` is "1e+20" where the
+    cell stores "100000000000000000000" (round 8), while `_xl_trim` collapses
+    interior spaces that a raw string keeps, so `"W" + " "*100 + "W"` measured
+    3 characters and stored 102 (round 10). Numbers serialize through `_xl_trim`;
+    strings are stored verbatim."""
+    if type(value) is bool:
+        return "TRUE" if value else "FALSE"
+    if ((exact_source_numeric and _is_finite_source_numeric(value))
+            or _excel_numeric_needs_text(value)):
+        return _xl_trim(value)
+    return "" if value is None else str(value)
+
+
+def _text_px(text, bold=False, size_pt=11.0):
+    """Rendered width of `text` in pixels, measured in the widest candidate font.
+
+    Memoized because sizing a column measures EVERY candidate (see
+    `_auto_field_widths`), and a statewide field sweep repeats the same handful
+    of distinct values millions of times."""
+    s = "" if text is None else str(text)
+    if not s:
+        return 0.0
+    key = (s, bool(bold), float(size_pt))
+    hit = _PX_CACHE.get(key)
+    if hit is not None:
+        return hit
+    fonts = _fonts_for(bold, size_pt)
+    if not fonts:
+        px = len(s) * _FALLBACK_CHAR_PX * (float(size_pt) / 11.0)
+    else:
+        px = (max(f.getlength(s) for f in fonts)
+              / _MEASURE_SCALE * _MEASURE_MARGIN)
+    if len(_PX_CACHE) >= _PX_CACHE_MAX:
+        _PX_CACHE.clear()        # bounded: a corpus run must not grow this
+    _PX_CACHE[key] = px          # without limit
+    return px
+
+
+def _width_to_px(width):
+    """Excel's own stored-width -> pixel conversion."""
+    return round(float(width) * _MDW_PX) + 5
+
+
+def _usable_px(width):
+    """What a cell of that STORED width can actually render — the character
+    width Excel reports, not the stored number (see the offset above)."""
+    return _width_to_px(max(float(width) - _STORED_WIDTH_OFFSET, 0.0))
+
+
+def _px_to_width(px):
+    """The smallest stored width whose cell can render `px` of text, in the
+    units Excel itself reports (hence the measured stored-width offset)."""
+    return (math.ceil((float(px) + _CELL_PAD_PX - 5) / _MDW_PX)
+            + _STORED_WIDTH_OFFSET)
+
+
+def fitted_width(texts, *, bold=False, size_pt=11.0, minimum=0.0, maximum=None):
+    """A stored width that fits every one of `texts`, clamped to [min, max].
+
+    `maximum` caps a runaway instruction string: the caller wraps whatever the
+    cap cannot fit (see `_wrap_overflow`), which is what a long sentence wants
+    anyway — so a cap is only ever passed by a caller that WRAPS. An identity
+    cell passes none and is always widened to fit, because nothing downstream
+    will wrap it and a clipped identity reads as a different value (RB2-R2-002).
+
+    Excel's own ceiling is applied unconditionally and last. It bounds the
+    format, not the presentation: a wider stored width is rejected on open, so
+    honouring it is not the kind of cap this function's callers get to make."""
+    need = max((_text_px(t, bold, size_pt) for t in texts), default=0.0)
+    width = max(float(minimum), float(_px_to_width(need)))
+    if maximum is not None:
+        width = min(width, float(maximum))
+    return min(width, _EXCEL_MAX_COL_WIDTH)
+
+
+def _wrapped_lines(text, width, bold=False, size_pt=11.0):
+    """Lines `text` needs at a stored `width` — Excel wraps on words and breaks
+    a word longer than the column. Counted BOTH by characters and by pixels so a
+    row is never left one line short for wide text."""
+    s = "" if text is None else str(text)
+    if not s:
+        return 1
+    room_px = max(_usable_px(width) - _CELL_PAD_PX, 1)
+    by_chars = len(textwrap.wrap(s, max(int(float(width)) - 1, 8))) or 1
+    by_px = math.ceil(_text_px(s, bold, size_pt) / room_px)
+    return max(1, by_chars, by_px)
+
+
+def _grid_geometry(grid, base_widths, caps=None):
+    """Stored geometry for a fully built sparse grid: {col -> width},
+    {(row, col) -> wrapped lines} and {row -> height}.
+
+    A cell is only fitted when it CANNOT spill — i.e. its immediate right
+    neighbour is occupied (a literal OR a formula: the audit gate reads a
+    formulas twin data-only and sees a blank there, but the reader's Excel does
+    not, so the product must treat it as occupied). Only literal strings are
+    measured; a number renders rounded rather than clipped, and a formula's
+    result is not knowable at build time — the callers declare a minimum width
+    for the columns whose formulas render text.
+
+    A column widens to fit its identity cells; `caps` bounds the columns that
+    also carry sentences, and whatever the cap cannot fit is wrapped in a row
+    tall enough for every one of its lines."""
+    caps = caps or {}
+    occupied = {rc for rc, cell in grid.items()
+                if cell[0] is not None and str(cell[0]).strip() != ""}
+    n_cols = max((c for _r, c in grid), default=1)
+
+    def run_to_block(r, c):
+        """`(columns, stopped)` — the columns this cell can render across.
+
+        Excel spills a cell's text over CONSECUTIVE empty neighbours and stops
+        at the first populated one, so "can it spill?" is not a question about
+        `c + 1` alone: `Spot Check!C10` reaches through a blank `D10` and is
+        stopped by `E10` (RB2-R2-002 round 5). `stopped` is False when nothing
+        blocks it at all, in which case the whole row is available and no width
+        can be too small."""
+        cols = [c]
+        j = c + 1
+        while j <= n_cols:
+            if (r, j) in occupied:
+                return cols, True
+            cols.append(j)
+            j += 1
+        return cols, False
+
+    blocked = []                            # (row, col, text, bold, size_pt)
+    spans = {}                              # (row, col) -> columns it renders across
+    live = set()                            # blocked cells holding a FORMULA
+    for (r, c), cell in grid.items():
+        value, font = cell[0], cell[1]
+        if not isinstance(value, str) or not value.strip():
+            continue
+        cols, stopped = run_to_block(r, c)
+        if not stopped:
+            continue                        # free to spill; Excel shows it all
+        spans[(r, c)] = cols
+        if value.startswith("="):
+            # A formula's DISPLAYED text is not knowable at build time — Spot
+            # Check's live cells show whatever the source values turn out to be
+            # — so no width can be proved to fit it. It cannot be measured, so
+            # it is wrapped, which is this module's rule wherever fitting is
+            # impossible (RB2-R2-002).
+            live.add((r, c))
+            continue
+        bold = bool(font and font.bold)
+        size = float(font.size if font is not None and font.size else 11)
+        if not measurable_text(value, bold, size):
+            # Same rule, same reason: no width can be proved for text our fonts
+            # do not cover, so it wraps. This sheet's own headline carries `✓`,
+            # which Arial and Calibri do not map (RB2-R2-002 round 10).
+            live.add((r, c))
+            continue
+        blocked.append((r, c, value, bold, size))
+    widths = dict(base_widths)
+    # Only a cell with NO gap to spill into may drive its column's width; one
+    # that renders across a gap already has that room and must not widen the
+    # column on everyone else's behalf.
+    for r, c, text, bold, size in blocked:
+        if len(spans[(r, c)]) == 1:
+            widths[c] = fitted_width([text], bold=bold, size_pt=size,
+                                     minimum=widths.get(c, 0.0),
+                                     maximum=caps.get(c))
+
+    def available_px(r, c):
+        """Pixels the cell actually renders into, summed across its run."""
+        total = sum(_usable_px(widths.get(col, _DEFAULT_COL_WIDTH))
+                    for col in spans[(r, c)])
+        return total
+
+    wrapped, heights = {}, {}
+    for r, c, text, bold, size in blocked:
+        if _text_px(text, bold, size) + _CELL_PAD_PX <= available_px(r, c):
+            continue                        # what it renders into already fits
+        lines = _wrapped_lines(text, widths.get(c, _DEFAULT_COL_WIDTH),
+                              bold, size)
+        wrapped[(r, c)] = lines
+        heights[r] = max(heights.get(r, 0.0), lines * _ROW_LINE_PT)
+    for rc in live:
+        wrapped.setdefault(rc, 1)
+        # A row holding a live formula must keep Excel's AUTOMATIC height, or
+        # the wrap shows one line of many: a custom height does not auto-grow.
+        # A literal on the same row may already have set one, so drop it — the
+        # automatic height fits that literal's lines too (RB2-R2-002 round 5).
+        heights.pop(rc[0], None)
+    return widths, wrapped, heights
+
+
+def _wrap_align(align):
+    """The cell's own alignment, wrapped and top-anchored so a wrapped label
+    still reads against the first line of whatever sits beside it."""
+    return Alignment(horizontal=(align.horizontal if align is not None else None),
+                     vertical="top", wrap_text=True)
+
+
+def _apply_grid_geometry(ws, widths, heights):
+    """Declare the measured geometry BEFORE the first append (write-only mode
+    serializes the column/row records with the sheet header)."""
+    for col, width in sorted(widths.items()):
+        ws.column_dimensions[get_column_letter(col)].width = width
+    for row, height in sorted(heights.items()):
+        ws.row_dimensions[row].height = height
+
+
+def _ceiling_wrapped_columns(ws):
+    """Zero-based positions of the columns stored AT Excel's width ceiling.
+
+    Every other column was sized to fit its widest value, so it fits. A column
+    that lands on the ceiling is the one case a width cannot settle: the format
+    has nothing wider to store, so fitting can no longer be proved. Those cells
+    wrap instead — several auto-height lines, all of the text — rather than
+    being cut off (RB2-R2-002). It is deliberately an over-approximation: a
+    column that happens to fit exactly at the ceiling wraps too, which costs a
+    little vertical space and hides nothing.
+
+    On the real corpus this set is EMPTY — the widest column measures 251.85 of
+    255 — so it is the format's own edge, not a routine path."""
+    return {column_index_from_string(letter) - 1
+            for letter, dim in ws.column_dimensions.items()
+            if dim.width is not None
+            and float(dim.width) >= _EXCEL_MAX_COL_WIDTH}
+
+
+def _ceiling_wrap_align(align=None):
+    """How a ceiling-wrapped cell sits: top-anchored so its first line reads
+    against its neighbours, and left to Excel's automatic row height so every
+    wrapped line is shown. Any horizontal alignment the caller already wanted
+    is preserved."""
+    return Alignment(horizontal=(align.horizontal if align is not None else None),
+                     vertical="top", wrap_text=True)
+
+
+def _ceiling_wrapper(ws):
+    """`align_for(position, align=None)` for a sheet whose widths are declared.
+
+    Returns the wrap alignment for any column stored AT Excel's ceiling and the
+    caller's own alignment everywhere else, so every body writer applies the
+    rule identically and a NEW writer has one call to make instead of three
+    lines to remember.
+
+    That is the point of it. RB2-R2-002 was first fixed by hand-wiring the wrap
+    into three writers, which left Routes, Provenance and the category sheet
+    still clipping at the ceiling — the rule is cross-cutting, so it needs one
+    place to live. `check_workbook_presentation` drives every one of these
+    writers with ceiling-width content, so a writer that forgets this call
+    fails the gate rather than a review."""
+    ceiling = _ceiling_wrapped_columns(ws)
+
+    def align_for(position, align=None, value=None):
+        if position in ceiling or (value is not None
+                                   and not measurable_text(value)):
+            return _ceiling_wrap_align(align)
+        return align
+
+    return align_for
+
+
 def _styled(ws, value, font, fill=None, align=None, guard=False,
             exact_source_numeric=False):
     c = WriteOnlyCell(ws, value=value)
@@ -2023,6 +2439,132 @@ def _apply_field_widths(ws, widths, col_for, lay):
             ws.column_dimensions[col].width = width
 
 
+def _fit_data_columns(ws, rows, lay):
+    """Widen each data-sheet field column to its own widest value.
+
+    Every cell on a data sheet is blocked from spilling: the next field sits
+    beside it, and the Key(helper) column sits after the last one. So a column
+    left at Excel's 8.43 default — or at a schema `data_widths` entry chosen
+    for a different corpus — truncates ordinary content exactly the way the
+    Comparison sheet's columns did (RB2-R2-002; these are what the gate found
+    once it stopped scanning only the first eight columns).
+
+    Declared widths stay a FLOOR, never a ceiling: a schema that asked for a
+    roomier column still gets it. Values are measured, headers are not — the
+    header band wraps in a tall row and is legible regardless."""
+    off = 1 if lay.has_route else 0
+    widest = {}
+    for row in rows:
+        for idx in range(len(lay.sc.header)):
+            i = idx + off
+            if i >= len(row) or row[i] is None:
+                continue
+            # Exactly what `set_safe_literal_cell` will store — numbers through
+            # `_xl_trim`, strings verbatim (RB2-R2-002 rounds 8 and 10).
+            s = serialized_text(row[i])
+            px = _text_px(s, False, 10)
+            if px > widest.get(idx, (0.0, ""))[0]:
+                widest[idx] = (px, s)
+    for idx, (_px, text) in widest.items():
+        # Unlike the Comparison sheet's field_col, data_col places EVERY header
+        # index (including the key), so there is no unplaceable column to skip.
+        dim = ws.column_dimensions[lay.data_col(idx)]
+        floor = float(dim.width) if dim.width is not None else 0.0
+        dim.width = fitted_width([text], size_pt=10, minimum=floor)
+
+
+_EXCEL_MAX_ROW = 1_048_576      # the widest row number a cell can ever show
+
+
+def _numeric_width(max_value, minimum):
+    """Width for a column of whole numbers, measured rather than assumed.
+
+    A number too wide for its column does not truncate — Excel renders `###`.
+    Every clipping pass here, including the committed oracle, looks only at
+    STRING cells, so this failure is invisible to all of them: occurrence 1,000
+    in a width-4 column reads as `###` and no gate says a word (RB2-R2-002
+    round 8). A number is also right-aligned and never spills, so the only
+    remedy is a column that fits it.
+
+    Three of the four hard-coded widths here were too narrow for their own worst
+    case: 4 could not show 1,000, 7 could not show 1,048,576, 6 could not show
+    999,999. The current constants are kept as MINIMUMS so nothing narrows."""
+    return fitted_width([str(int(max_value))], size_pt=10, minimum=minimum)
+
+
+def _pair_display(a, b):
+    """The widest text a Comparison field cell can SHOW for this pair.
+
+    Not the same as the values themselves. `_field_display_expr` substitutes the
+    literal `(blank)` for an empty side, so a difference against an empty cell
+    renders "(blank) ≠ value" — longer than the value that a naive `a or b`
+    would measure, and the column came up short by exactly the marker
+    (RB2-R2-002 round 5). Measuring the marker form whenever either side has
+    content can only over-reserve, never under."""
+    if not a and not b:
+        return ""
+    return (a or _BLANK_MARK) + _DIFF_MARK + (b or _BLANK_MARK)
+
+
+def _auto_field_widths(sc, lay, rows_t, rows_n, off):
+    """Widths for the Comparison/Only-in FIELD columns.
+
+    A difference cell renders "<A value> ≠ <B value>", so a column left at
+    Excel's 8.43 general default truncates ordinary content (PCOA-FINAL-008's
+    measured `1873 ≠ 1874`, and the schema-declared 12 that installed Excel says
+    needs 12.57). A schema's declared width is therefore a FLOOR — never a
+    ceiling that clips its own content — and every column is fitted to the
+    widest pair its data can produce, bounded so one pathological value cannot
+    make the sheet unusable. Computed once per comparison so both twins carry
+    identical geometry.
+
+    The winning value per field and side is the RENDERED-WIDEST one, never the
+    longest (RB2-R2-001). Character count and pixel width do not order the same
+    way — `WWWWWWWWWW` is one character shorter than `iiiiiiiiiii` and three
+    and a half times wider — so choosing by `len` and measuring afterwards can
+    discard the only candidate that needed the room and publish it clipped."""
+    fields = list(lay.field_indices)
+    if not fields:
+        return {}
+    # A side contributes TWO display candidates, not one: its pixel-widest
+    # value, and — if any of its rows renders empty — the literal blank marker.
+    # Keeping only the widest raw value loses the second: a side holding
+    # ["x", ""] would be measured at "x" and never learn it can also render
+    # "(blank)", which is wider (RB2-R2-002 round 6). Values are normalized the
+    # way the workbook normalizes them, because both flavors apply Excel TRIM —
+    # a whitespace-only cell RENDERS as blank however it was stored.
+    widest = {f: ["", ""] for f in fields}
+    widest_px = {f: [0.0, 0.0] for f in fields}
+    can_blank = {f: [False, False] for f in fields}
+    for rows, slot in ((rows_t, 0), (rows_n, 1)):
+        for row in rows:
+            for f in fields:
+                i = f + off
+                s = _xl_trim(row[i]) if i < len(row) else ""
+                if not s:
+                    can_blank[f][slot] = True      # a short row renders blank too
+                    continue
+                px = _text_px(s, _CMP_FIELD_BOLD, _CMP_FIELD_PT)
+                if px > widest_px[f][slot]:
+                    widest_px[f][slot] = px
+                    widest[f][slot] = s
+
+    blank_px = _text_px(_BLANK_MARK, _CMP_FIELD_BOLD, _CMP_FIELD_PT)
+
+    def side_display(f, slot):
+        """The widest text this side can put in the cell."""
+        if can_blank[f][slot] and blank_px > widest_px[f][slot]:
+            return _BLANK_MARK
+        return widest[f][slot]
+
+    return {f: fitted_width(
+        [_pair_display(side_display(f, 0), side_display(f, 1))],
+        bold=_CMP_FIELD_BOLD, size_pt=_CMP_FIELD_PT,
+        minimum=max(_CMP_FIELD_MIN_WIDTH,
+                    float(sc.cmp_widths.get(sc.header[f], 0))))
+        for f in fields}
+
+
 def _write_data_sheet(wb, name, tab_color, rows, lay, events, cmp_rows,
                       helper_keys=None, live_medwid_helpers=True):
     """One input copied to its sheet, with a leading 'Comparison row' LINK
@@ -2044,16 +2586,29 @@ def _write_data_sheet(wb, name, tab_color, rows, lay, events, cmp_rows,
     # Keep the back-link + Route + key column in view while scrolling fields.
     ws.freeze_panes = "D2" if lay.has_route else "C2"
     ws.auto_filter.ref = f"A1:{lay.data_last_col}{len(rows) + 1}"
-    ws.column_dimensions[lay.key_col].width = 14
-    ws.column_dimensions[lay.back_col].width = 13
+    # The opaque key token and the back-link header are both blocked from
+    # spilling by their populated neighbours (PCOA-FINAL-009's ownership site).
+    ws.column_dimensions[lay.key_col].width = fitted_width(
+        ["Key (helper)"] + [str(k) for k in list(helper_keys or ())[:1]],
+        size_pt=10, minimum=14)
+    ws.column_dimensions[lay.back_col].width = fitted_width(
+        ("Comparison row",), bold=True, size_pt=10, minimum=13)
     for f in lay.medwid_field_indices:
         for stage in _MEDWID_HELPER_STAGES:
             ws.column_dimensions[lay.medwid_helper_col(f, stage)].hidden = True
     for column in lay.build_fresh_cols:
         ws.column_dimensions[column].hidden = True
     if lay.has_route:
-        ws.column_dimensions[lay.route_data_col].width = 8
+        # Measured, not assumed: the route is this row's identity here too and
+        # the first data field always sits beside it, so a hard-coded 8 clipped
+        # any route that did not fit (RB2-R2-002 — this was the last fixed
+        # identity width left in the writers).
+        ws.column_dimensions[lay.route_data_col].width = fitted_width(
+            {str(r[0]) for r in rows if r and r[0] is not None} | {"Route"},
+            size_pt=10, minimum=8)
     _apply_field_widths(ws, lay.sc.data_widths, lay.data_col, lay)
+    _fit_data_columns(ws, rows, lay)
+    align_for = _ceiling_wrapper(ws)
 
     ws.append(_header_row(
         ws,
@@ -2077,8 +2632,10 @@ def _write_data_sheet(wb, name, tab_color, rows, lay, events, cmp_rows,
         # Raw input values are guarded: a Description like "=cmd…" stays text,
         # never a live formula (the field FORMULAS read these via TRIM/INDEX, so
         # guarding here protects both flavors at the source).
-        cells += [_styled(ws, v, body_font, guard=True,
-                          exact_source_numeric=True) for v in row]
+        cells += [_styled(ws, v, body_font,
+                          align=align_for(j + 1, value=v),
+                          guard=True, exact_source_numeric=True)
+                  for j, v in enumerate(row)]
         row_fills = fills.get(r - 2) if fills else None
         if row_fills:                        # mark each dittoed cell in this row
             for col_in_row, resolved in row_fills.items():
@@ -2184,7 +2741,8 @@ def _write_snapshot_sheet(wb, side, rows, lay, events, helper_keys):
     return ws
 
 
-def _write_comparison(wb, union, lay, events, vals=None, helper_tokens=None):
+def _write_comparison(wb, union, lay, events, vals=None, helper_tokens=None,
+                      field_widths=None):
     """The big sheet. `vals` None = live formulas (the default workbook);
     else the values model (run_compare builds it) and every cell is the
     computed RESULT — identical text, no formulas, links kept."""
@@ -2197,14 +2755,32 @@ def _write_comparison(wb, union, lay, events, vals=None, helper_tokens=None):
     ws.row_dimensions[1].height = 45.75
     ws.freeze_panes = f"{lay.first_field_col}2"
     ws.auto_filter.ref = f"A1:{lay.last_field_col}{last}"
+    # PCOA-FINAL-008: the key/category column is the row's IDENTITY and its
+    # right neighbour is always populated, so it can never spill — a stored
+    # width that does not fit the widest key makes two different rows read the
+    # same ("Ramp Type: C", "Highway Group: R"). Measure the real keys and the
+    # real status labels, and give every field column enough room for a
+    # "<A> ≠ <B>" pair unless the schema declared its own. EVERY key is
+    # measured, never a `len`-shortlist of them: a shorter key can render wider
+    # (RB2-R2-001), and the one left out is exactly the one that gets clipped.
     if lay.has_route:
-        ws.column_dimensions["A"].width = 8
-    ws.column_dimensions[lay.c_loc].width = 12
-    ws.column_dimensions[lay.c_occ].width = 4
-    ws.column_dimensions[lay.c_trow].width = 7
-    ws.column_dimensions[lay.c_status].width = 11
-    ws.column_dimensions[lay.c_diffs].width = 6
+        ws.column_dimensions["A"].width = fitted_width(
+            {str(route) for route, _l, _o in union},
+            size_pt=_CMP_FIELD_PT, minimum=8)
+    ws.column_dimensions[lay.c_loc].width = fitted_width(
+        {str(_visible_key(loc)) for _r, loc, _o in union},
+        size_pt=_CMP_FIELD_PT, minimum=12)
+    ws.column_dimensions[lay.c_occ].width = _numeric_width(
+        max((occ for _r, _l, occ in union), default=1), 4)
+    ws.column_dimensions[lay.c_trow].width = _numeric_width(_EXCEL_MAX_ROW, 7)
+    ws.column_dimensions[lay.c_status].width = fitted_width(
+        ("Both", lay.only_a, lay.only_b), size_pt=10, minimum=11)
+    ws.column_dimensions[lay.c_diffs].width = _numeric_width(lay.n_fields, 6)
     _apply_field_widths(ws, sc.cmp_widths, lay.field_col, lay)
+    for f, width in (field_widths or {}).items():
+        ws.column_dimensions[lay.field_col(f)].width = width
+
+    align_for = _ceiling_wrapper(ws)
 
     for chunk in lay.state_chunks:
         ws.column_dimensions[chunk["col"]].hidden = True
@@ -2312,6 +2888,7 @@ def _write_comparison(wb, union, lay, events, vals=None, helper_tokens=None):
         else:
             guard_set = set(range(len(row))) - link_cols
         ws.append([_styled(ws, v, link_font if j in link_cols else body_font,
+                           align=align_for(j, value=v),
                            guard=(j in guard_set))
                    for j, v in enumerate(row)])
         if (i + 1) % _PROGRESS_EVERY == 0:
@@ -2375,9 +2952,8 @@ def _write_spot_check(wb, lay, n_union, default_row, default_key,
     F_LAST = F_FIRST + lay.n_fields - 1
     has_medwid = bool(lay.medwid_field_indices)
 
-    for col, w in (("A", 2), ("B", 19), ("C", 24), ("D", 24), ("E", 17),
-                   ("F", 30), ("G", 9), ("H", 16), ("I", 16), ("J", 16)):
-        ws.column_dimensions[col].width = w
+    base_widths = {1: 2.0, 2: 19.0, 3: 24.0, 4: 24.0, 5: 17.0,
+                   6: 30.0, 7: 9.0, 8: 16.0, 9: 16.0, 10: 16.0}
     # Values workbooks keep their large data-sheet helpers literal. A tiny live
     # staged block here (ten cells per Med-Wid field row) preserves Spot Check's
     # genuinely independent recomputation after a reviewer edits source values.
@@ -2669,6 +3245,14 @@ def _write_spot_check(wb, lay, n_union, default_row, default_key,
         "into both data sheets — the row pairing itself is verified, not "
         "assumed.", note_font)
 
+    # PCOA-FINAL-009: the audit instructions and the picked row's own key are
+    # written here, so this sheet declares widths that fit them. The label
+    # column carries whole sentences and is capped — those wrap; the value
+    # columns hold identities and are widened to fit.
+    widths, wrapped, heights = _grid_geometry(
+        grid, base_widths, caps={2: _SPOT_LABEL_MAX_WIDTH})
+    _apply_grid_geometry(ws, widths, heights)
+
     # Emit the sparse grid (append-only streaming sheet).
     n_rows = max(r for r, _c in grid)
     n_cols = max(c for _r, c in grid)
@@ -2677,6 +3261,8 @@ def _write_spot_check(wb, lay, n_union, default_row, default_key,
         for c in range(1, n_cols + 1):
             if (r, c) in grid:
                 value, font, fill, align, fmt = grid[(r, c)]
+                if (r, c) in wrapped:
+                    align = _wrap_align(align)
                 cell = _styled(ws, value, font, fill, align)
                 if fmt:
                     cell.number_format = fmt
@@ -2688,7 +3274,7 @@ def _write_spot_check(wb, lay, n_union, default_row, default_key,
 
 
 def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None,
-                      helper_tokens=None):
+                      helper_tokens=None, field_widths=None):
     """'Only in <side>': every one-sided union row, in union order, with the
     full field data pulled LIVE from that system's data sheet (same
     MATCH-on-helper-key + INDEX pattern as the Comparison sheet, so the tab
@@ -2723,12 +3309,28 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None,
     ws.freeze_panes = f"{first_field}2"
     ws.auto_filter.ref = f"A1:{last_field}{last}"
     if lay.has_route:
-        ws.column_dimensions[c_route].width = 8
-        ws.column_dimensions[c_why].width = 18
-    ws.column_dimensions[c_loc].width = 12
-    ws.column_dimensions[c_occ].width = 4
-    ws.column_dimensions[c_row].width = 9
+        # The route is part of the row's identity on this sheet too, and the
+        # "Missing from" header and phrases are both schema-derived, so neither
+        # width can be assumed (RB2-R2-001 — the Comparison sheet measured its
+        # route while this one kept a fixed 8). The header is bold and the two
+        # phrases are not; measuring them all bold only ever over-reserves.
+        ws.column_dimensions[c_route].width = fitted_width(
+            {str(route) for route, _l, _o in keys} | {id_headers[0]},
+            size_pt=_CMP_FIELD_PT, minimum=8)
+        ws.column_dimensions[c_why].width = fitted_width(
+            (id_headers[-1], "entire route", f"this {sc.id_noun} only"),
+            bold=True, size_pt=_CMP_FIELD_PT, minimum=18)
+    # Same identity rule as the Comparison sheet, measured the same way: these
+    # are the SAME keys, repeated in one place (PCOA-FINAL-008 / -009).
+    ws.column_dimensions[c_loc].width = fitted_width(
+        {str(_visible_key(loc)) for _r, loc, _o in keys},
+        size_pt=_CMP_FIELD_PT, minimum=12)
+    ws.column_dimensions[c_occ].width = _numeric_width(
+        max((occ for _r, _l, occ in keys), default=1), 4)
+    ws.column_dimensions[c_row].width = _numeric_width(_EXCEL_MAX_ROW, 9)
     _apply_field_widths(ws, sc.cmp_widths, fcol, lay)
+    for f, width in (field_widths or {}).items():
+        ws.column_dimensions[fcol(f)].width = width
     if lay.has_route and keys:
         # Whole-route gaps stand out; single-location gaps stay plain. Colors
         # mirror the Comparison sheet's one-sided row tints. (`keys` can be
@@ -2737,6 +3339,8 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None,
         tint = "FFE699" if side == sc.side_a else "BDD7EE"
         ws.conditional_formatting.add(f"A2:{last_field}{last}", FormulaRule(
             formula=[f'${c_why}2="entire route"'], fill=PatternFill(bgColor=tint)))
+
+    align_for = _ceiling_wrapper(ws)
 
     link_font = _link_font()
     link_col = 3 if lay.has_route else 2              # the "<side> Row" position
@@ -2789,6 +3393,7 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None,
         else:
             guard_set = set(range(len(row))) - {link_col}
         ws.append([_styled(ws, v, link_font if j == link_col else body_font,
+                           align=align_for(j, value=v),
                            guard=(j in guard_set))
                    for j, v in enumerate(row)])
         if (i + 1) % _PROGRESS_EVERY == 0:
@@ -2933,10 +3538,19 @@ def _write_routes(wb, all_routes, lay, vals=None):
 
     ws.freeze_panes = "B2"
     ws.auto_filter.ref = f"A1:H{last}"
-    for col, w in (("A", 8), ("B", 12), ("C", 12), ("D", 12),
+    # A is the route — this sheet's identity — and B its status; both are text
+    # blocked by a populated neighbour, so both are measured rather than
+    # assumed (RB2-R2-002). C–H carry counts, which render rounded rather than
+    # clipped, under a header band that wraps in its own tall row.
+    for col, w in (("A", fitted_width([str(r) for r in all_routes] + ["Route"],
+                                      size_pt=10, minimum=8)),
+                   ("B", fitted_width(("Both", lay.only_a, lay.only_b),
+                                      size_pt=10, minimum=12)),
+                   ("C", 12), ("D", 12),
                    ("E", 16), ("F", 16), ("G", 18), ("H", 14)):
         ws.column_dimensions[col].width = w
     ws.row_dimensions[1].height = 30
+    align_for = _ceiling_wrapper(ws)
     # Status colors match the Comparison sheet; red counts where differences exist.
     ws.conditional_formatting.add(f"A2:H{last}", FormulaRule(
         formula=[f'$B2="{lay.only_a}"'], fill=PatternFill(bgColor="FFE699")))
@@ -2978,7 +3592,8 @@ def _write_routes(wb, all_routes, lay, vals=None):
         # Guard only the route-id cell (cell 0): a route like "=X" would become
         # a live formula. The other cells are our own =formulas (formulas flavor)
         # or safe literals (values flavor) and must NOT be forced to text.
-        ws.append([_styled(ws, v, body_font, guard=(j == 0))
+        ws.append([_styled(ws, v, body_font, align=align_for(j, value=v),
+                           guard=(j == 0))
                    for j, v in enumerate(cells)])
     return ws
 
@@ -3027,9 +3642,6 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None, warnings=(),
     ws = wb.create_sheet("Summary")
     ws.sheet_properties.tabColor = _TAB_COLORS["summary"]
     ws.sheet_view.showGridLines = False
-    ws.column_dimensions["B"].width = 46
-    ws.column_dimensions["C"].width = 16
-    ws.column_dimensions["D"].width = 20
 
     title_font = Font(name="Arial", size=14, bold=True, color=_DARK)
     note_font = Font(name="Arial", size=10, color="595959")
@@ -3143,10 +3755,14 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None, warnings=(),
             raise ValueError("live Summary verdict must be an Excel formula")
         verdict_cell = (
             f'=IF({freshness},{verdict_cell[1:]},{_formula_text(stale_text)})')
-    else:
-        verdict_cell = (
-            f'=IF({freshness},{_formula_text(verdict_cell)},'
-            f'{_formula_text(stale_text)})')
+    elif not isinstance(verdict_cell, str) or verdict_cell.startswith("="):
+        # PCOA-FINAL-019: the values copy publishes its headline as the STORED
+        # result, so every reader — including one that never recalculates
+        # (openpyxl data_only, pandas, an automated consumer) — reads the same
+        # verdict the typed outcome carries. Certification does not move: the
+        # live SELF-CHECK freshness row below still says REGENERATE REQUIRED
+        # the moment a source or helper cell is edited, and the notes say so.
+        raise ValueError("the values Summary verdict must be a literal")
     row[0] = 2
     line((2, f"{a} vs {b} — {sc.report_name} — Discrepancy Report ({scope})", title_font))
     if manual_banner:
@@ -3171,8 +3787,11 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None, warnings=(),
                 if vals is None else
                 "This copy holds plain VALUES — it opens instantly and "
                 "nothing needs calculating, but edits do NOT recalculate "
-                "(the live-formulas copy does that). The Spot Check sheet "
-                "and the SELF-CHECK rows below stay live."), note_font))
+                "(the live-formulas copy does that). The verdict above is the "
+                "STORED build-time result; the Spot Check sheet and the "
+                "SELF-CHECK rows below stay live, and the freshness row there "
+                "says REGENERATE REQUIRED after any source/helper edit."),
+          note_font))
     line((2, f"{a}: {name_a}      {b}: {name_b}      "
              f"created {date.today().isoformat()}", note_font), advance=2)
 
@@ -3220,9 +3839,15 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None, warnings=(),
         chunk, offset = lay.state_location(f)
         state_range = (f'Comparison!${chunk["col"]}$2:'
                        f'${chunk["col"]}${last}')
+        # PCOA-FINAL-014: a column that is CONTEXT in its entirety is never
+        # compared, so a bare 0 here reads exactly like a compared column that
+        # matched everywhere. Say what it is instead. (A per-cell context state
+        # — Highway Log's ditto columns — is not this: those columns do carry
+        # real counted cells and keep reporting them.)
         line((2, sc.header[f]), (3, col),
-             (4, f'=SUMPRODUCT(--(MID({state_range},{offset},1)="D"))'
-              if vals is None else c["field_diffs"][f],
+             (4, _CONTEXT_FIELD_TEXT if sc.is_context(f) else
+              (f'=SUMPRODUCT(--(MID({state_range},{offset},1)="D"))'
+               if vals is None else c["field_diffs"][f]),
               bold_font, None, center))
     f_end = row[0] - 1
     row[0] += 1
@@ -3235,8 +3860,8 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None, warnings=(),
     only_a_ref = _sref(f"Only in {a}")
     only_b_ref = _sref(f"Only in {b}")
 
-    def check(label, cond):
-        line((2, label), (3, f'=IF({cond},"OK","CHECK")', bold_font, None, center))
+    def check(label, cond, bad="CHECK"):
+        line((2, label), (3, f'=IF({cond},"OK","{bad}")', bold_font, None, center))
 
     union_count = f"COUNT(Comparison!{lay.c_occ}:{lay.c_occ})"
     check(f"Every Comparison row has a status (Both + {lay.only_a} + {lay.only_b})",
@@ -3259,8 +3884,10 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None, warnings=(),
           f'COUNTIF(Comparison!{st}:{st},"{lay.only_b}")')
     check("Per-field difference counts add up to the total differing cells",
           f'SUM(D{f_start}:D{f_end})=SUM(Comparison!{df}2:{df}{last})')
+    # This one row is the workbook's live certification guard in BOTH flavors,
+    # so it says the certifying words rather than the generic "CHECK".
     check("Build-time source identity and duplicate pairing snapshot is current",
-          freshness)
+          freshness, bad=_STALE_VERDICT)
     if sc.report_view_diff_check:
         cfg = sc.report_view_diff_check
         valid_cfg = (
@@ -3375,16 +4002,18 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None, warnings=(),
         "recomputed verdict for every field.")
     if vals is not None:
         notes.append(
-            "• This is the VALUES copy: every number and comparison cell is "
-            "a computed result, not a formula (only the Spot Check sheet and "
-            "the SELF-CHECK rows stay live). If the data changes, re-create "
-            "the comparison — or use the live-formulas copy, which "
-            "recalculates.")
+            "• This is the VALUES copy: every number and comparison cell — "
+            "including the verdict at the top — is a computed result, not a "
+            "formula (only the Spot Check sheet and the SELF-CHECK rows stay "
+            "live, and the build-time identity row there says "
+            f"{_STALE_VERDICT} if a source or helper cell is edited). If the "
+            "data changes, re-create the comparison — or use the live-formulas "
+            "copy, which recalculates.")
     notes.append(
         "• SELF-CHECK recomputes the headline numbers a second, independent "
-        "way; a CHECK there means the sheets no longer agree (e.g. rows were "
-        "inserted or deleted on a data sheet) — re-create the report rather "
-        "than trust the numbers.")
+        f"way; a CHECK — or {_STALE_VERDICT} on the build-time identity row — "
+        "means the sheets no longer agree (e.g. rows were inserted or deleted "
+        "on a data sheet); re-create the report rather than trust the numbers.")
     if lay.has_route:
         notes.append(
             "• The Routes sheet lists every route either system carries — "
@@ -3400,6 +4029,18 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None, warnings=(),
     for note in notes:
         line((2, note, note_font))
 
+    # PCOA-FINAL-008 / -009: declare the geometry this sheet's own content
+    # needs. B carries both identities and sentences, so it is capped and the
+    # sentences wrap; C and D render live verdicts and counts whose text is not
+    # in the grid, so they declare a minimum that fits the widest of those.
+    widths, wrapped, heights = _grid_geometry(
+        grid,
+        {2: 46.0,
+         3: max(16.0, fitted_width([_STALE_VERDICT], bold=True, size_pt=10)),
+         4: max(20.0, fitted_width([_CONTEXT_FIELD_TEXT], bold=True, size_pt=10))},
+        caps={2: _SUMMARY_LABEL_MAX_WIDTH})
+    _apply_grid_geometry(ws, widths, heights)
+
     # Emit the grid (append-only streaming sheet).
     n_rows = max(r for r, _c in grid)
     n_cols = max(c for _r, c in grid)
@@ -3408,6 +4049,8 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None, warnings=(),
         for c in range(1, n_cols + 1):
             if (r, c) in grid:
                 value, font, fill, align = grid[(r, c)]
+                if (r, c) in wrapped:
+                    align = _wrap_align(align)
                 cells.append(_styled(ws, value, font, fill, align))
             else:
                 cells.append(None)
@@ -3424,30 +4067,60 @@ def _write_provenance_sheet(wb, provenance):
     sidecar beside the workbook; this sheet is its concise display."""
     ws = wb.create_sheet("Provenance")
     ws.sheet_properties.tabColor = "808080"
-    for col, w in (("A", 12), ("B", 110)):
+    # Column A is the input's ROLE, and a role is an identity: on a
+    # cross-environment comparison it is the side's own name ("SSOR-PROD
+    # 2026-07-23"), which a hard-coded 12 cannot hold. Its right neighbour is
+    # always populated, so it can never spill — fit it (PCOA-FINAL-008's rule,
+    # applied to the sheet this bundle also gives a `read via` line).
+    roles = [str(rec.get("role", ""))
+             for rec in provenance.get("inputs") or ()] + ["Report", "Run", "Note"]
+    for col, w in (("A", fitted_width(roles, bold=False, size_pt=11,
+                                      minimum=12)),
+                   ("B", 110)):
         ws.column_dimensions[col].width = w
+    # A role long enough to reach Excel's ceiling cannot be fitted any wider,
+    # and column B beside it is populated, so it would be cut off. Wrap it
+    # instead (RB2-R2-002). The rest of this sheet writes raw values, so the
+    # styled cell appears only in the case that needs it.
+    align_for = _ceiling_wrapper(ws)
+    def role(value):
+        """Column-A text, wrapped when the column is at Excel's ceiling or the
+        text is one our fonts cannot measure."""
+        align = align_for(0, value=value)
+        return (value if align is None
+                else _styled(ws, value, Font(name="Arial", size=11),
+                             align=align))
+
     recipe = provenance.get("recipe") or {}
-    ws.append(["Comparison Provenance"])
-    ws.append(["What this workbook compared — captured before the inputs "
-               "were read."])
+    ws.append([role("Comparison Provenance")])
+    ws.append([role("What this workbook compared — captured before the inputs "
+                    "were read.")])
     ws.append([])
-    ws.append(["Report", recipe.get("report", "")])
-    ws.append(["Run", recipe.get("banner", "")])
+    ws.append([role("Report"), recipe.get("report", "")])
+    ws.append([role("Run"), recipe.get("banner", "")])
     for rec in provenance.get("inputs") or ():
         ws.append([])
-        ws.append([str(rec.get("role", "")), str(rec.get("selection", ""))])
+        ws.append([role(str(rec.get("role", ""))),
+                   str(rec.get("selection", ""))])
         if rec.get("kind") == "folder":
             ws.append(["", f"{rec.get('member_count', 0)} discovered source "
                            "file(s); the exact member census is in the "
                            "provenance sidecar"])
         else:
             ws.append(["", f"sha256 {rec.get('sha256', '')}"])
+        if rec.get("read_via"):
+            # PCOA-FINAL-003: say how the bytes were reached when they were not
+            # read from the named path directly, instead of naming a private
+            # directory the reader can never open.
+            ws.append(["", f"read via: {rec['read_via']} (the sha256 above is "
+                           "of the bytes this comparison read)"])
         if rec.get("producer_completion") is not None:
             ws.append(["", f"producer completion: {rec['producer_completion']}"])
     ws.append([])
-    ws.append(["Note", "The machine-readable record (including the committed "
-                       "generation binding) is the .provenance.json sidecar "
-                       "beside this workbook."])
+    ws.append([role("Note"),
+               "The machine-readable record (including the committed "
+               "generation binding) is the .provenance.json sidecar "
+               "beside this workbook."])
 
 
 def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
@@ -3835,6 +4508,9 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
                         failure_items=failure_items,
                         skipped_inputs=exact_skipped,
                         failed_inputs=exact_failed)
+    # Measured ONCE, so the values and formulas twins carry identical geometry.
+    auto_field_widths = _auto_field_widths(sc, lay, rows_t, rows_n,
+                                           1 if has_route else 0)
     for m in modes:
         path = out_paths[m]
         if not output_allowed(path.parent) or not output_allowed(path):
@@ -3893,7 +4569,8 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
                           manual_calc=(has_route and m == "formulas"))
         if _write_comparison(
                 wb, union, lay, events, vals=vals,
-                helper_tokens=helper_tokens) is None:
+                helper_tokens=helper_tokens,
+                field_widths=auto_field_widths) is None:
             return cancelled
         if has_route:
             _write_routes(wb, all_routes, lay, vals=vals)
@@ -3902,11 +4579,13 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
         # from the other side within shared routes.
         if _write_only_sheet(
                 wb, a, b, _TAB_COLORS["only_a"], only_t, lay,
-                events, vals=vals, helper_tokens=helper_tokens) is None:
+                events, vals=vals, helper_tokens=helper_tokens,
+                field_widths=auto_field_widths) is None:
             return cancelled
         if _write_only_sheet(
                 wb, b, a, _TAB_COLORS["only_b"], only_n, lay,
-                events, vals=vals, helper_tokens=helper_tokens) is None:
+                events, vals=vals, helper_tokens=helper_tokens,
+                field_widths=auto_field_widths) is None:
             return cancelled
         if _write_data_sheet(wb, a, _TAB_COLORS["side_a"], rows_t, lay, events,
                              cmp_rows_t, helper_keys=hk_t,

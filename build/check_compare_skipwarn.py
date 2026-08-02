@@ -62,13 +62,22 @@ def test_compare_warning_blocks_match():
         ("skipped file must be listed in the summary", res.summary_lines)
     wb = load_workbook(out, data_only=False)
     banner = wb["Summary"]["B3"].value
+    freshness = [row[2].value for row in wb["Summary"].iter_rows()
+                 if len(row) > 2 and row[1].value == "Build-time source "
+                 "identity and duplicate pairing snapshot is current"]
     wb.close()
     os.remove(out)
-    assert isinstance(banner, str) and banner.startswith("=IF("), \
-        ("workbook banner must be guarded by the freshness formula", banner)
-    assert "REGENERATE REQUIRED" in banner, banner
+    # PCOA-FINAL-019: the values twin publishes its headline as the STORED
+    # result so a consumer that never recalculates can read it. The freshness
+    # guard is unchanged in strength — it is the live SELF-CHECK row, and it
+    # says the certifying words.
+    assert isinstance(banner, str) and not banner.startswith("="), \
+        ("the values workbook banner must be a stored literal", banner)
     assert "COULD NOT COMPARE EVERYTHING" in banner, banner
     assert "✓ EVERYTHING MATCHES" not in banner, banner
+    assert len(freshness) == 1 and str(freshness[0]).startswith("=IF("), \
+        ("the values workbook must keep a live freshness guard", freshness)
+    assert "REGENERATE REQUIRED" in str(freshness[0]), freshness
 
 
 def test_consolidate_partial_and_allfail():

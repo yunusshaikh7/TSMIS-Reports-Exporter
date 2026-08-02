@@ -1,0 +1,107 @@
+{
+ "oracle": "docs/planning/post-comparison-perfection-output-audit/stage2-measure-clipping.py (imported, not reimplemented)",
+ "scope": "comparison DELIVERABLES only; the ~1,200 per-route source exports provisioned into each store are INPUTS that RB-2 does not touch, and are counted separately below",
+ "stage2_recorded_total": 268,
+ "base_code_deliverables": 2036,
+ "head_code_deliverables": 0,
+ "base_code_non_deliverables": 64,
+ "head_code_non_deliverables": 128,
+ "non_deliverable_detail": {
+  "base": {
+   "everything\\comparisons\\tsn\\ssor-prod_highway_log_tsn (evidence).xlsx": 63,
+   "everything\\comparisons\\tsn\\ssor-prod_highway_sequence_tsn (evidence).xlsx": 1
+  },
+  "head": {
+   "everything\\comparisons\\tsn\\ssor-prod_highway_log_tsn (evidence).xlsx": 63,
+   "everything\\comparisons\\tsn\\ssor-prod_highway_sequence_tsn (evidence).xlsx": 1,
+   "byday/tsn-by-day\\2026-07-23 ssor-prod\\highway_log_vs_tsn 2026-07-23 ssor-prod (evidence).xlsx": 63,
+   "byday/tsn-by-day\\2026-07-23 ssor-prod\\highway_sequence_vs_tsn 2026-07-23 ssor-prod (evidence).xlsx": 1
+  }
+ },
+ "deliverables_measured": {
+  "base": 42,
+  "head": 60
+ },
+ "base_deliverables_by_workbook": {
+  "classic-env\\intersection_summary new-vs-prior-ssor (values).xlsx": 9,
+  "classic-env\\intersection_summary new-vs-prior-ssor.xlsx": 7,
+  "classic-env\\ramp_detail_pdf new-vs-prior-ssor (values).xlsx": 5,
+  "classic-env\\ramp_detail_pdf new-vs-prior-ssor.xlsx": 1,
+  "classic-env\\ramp_summary new-vs-prior-ssor (values).xlsx": 5,
+  "classic-env\\ramp_summary new-vs-prior-ssor.xlsx": 1,
+  "direct-tsn\\highway_log vs tsn (values).xlsx": 3,
+  "direct-tsn\\highway_log vs tsn.xlsx": 1,
+  "direct-tsn\\highway_log_pdf vs tsn (values).xlsx": 3,
+  "direct-tsn\\highway_log_pdf vs tsn.xlsx": 1,
+  "direct-tsn\\highway_sequence vs tsn (values).xlsx": 82,
+  "direct-tsn\\highway_sequence vs tsn.xlsx": 80,
+  "direct-tsn\\highway_sequence_pdf vs tsn (values).xlsx": 82,
+  "direct-tsn\\highway_sequence_pdf vs tsn.xlsx": 80,
+  "direct-tsn\\intersection_detail vs tsn (values).xlsx": 80,
+  "direct-tsn\\intersection_detail vs tsn.xlsx": 78,
+  "direct-tsn\\intersection_detail_pdf vs tsn (values).xlsx": 80,
+  "direct-tsn\\intersection_detail_pdf vs tsn.xlsx": 78,
+  "direct-tsn\\intersection_summary vs tsn (values).xlsx": 70,
+  "direct-tsn\\intersection_summary vs tsn.xlsx": 68,
+  "direct-tsn\\ramp_detail_pdf vs tsn (values).xlsx": 78,
+  "direct-tsn\\ramp_detail_pdf vs tsn.xlsx": 76,
+  "direct-tsn\\ramp_summary vs tsn (values).xlsx": 33,
+  "direct-tsn\\ramp_summary vs tsn.xlsx": 31,
+  "everything\\comparisons\\tsn\\ssor-prod_highway_log_pdf_tsn (formulas).xlsx": 1,
+  "everything\\comparisons\\tsn\\ssor-prod_highway_log_pdf_tsn.xlsx": 3,
+  "everything\\comparisons\\tsn\\ssor-prod_highway_log_tsn (formulas).xlsx": 1,
+  "everything\\comparisons\\tsn\\ssor-prod_highway_log_tsn.xlsx": 3,
+  "everything\\comparisons\\tsn\\ssor-prod_highway_sequence_pdf_tsn (formulas).xlsx": 80,
+  "everything\\comparisons\\tsn\\ssor-prod_highway_sequence_pdf_tsn.xlsx": 82,
+  "everything\\comparisons\\tsn\\ssor-prod_highway_sequence_tsn (formulas).xlsx": 80,
+  "everything\\comparisons\\tsn\\ssor-prod_highway_sequence_tsn.xlsx": 82,
+  "everything\\comparisons\\tsn\\ssor-prod_intersection_detail_pdf_tsn (formulas).xlsx": 78,
+  "everything\\comparisons\\tsn\\ssor-prod_intersection_detail_pdf_tsn.xlsx": 80,
+  "everything\\comparisons\\tsn\\ssor-prod_intersection_detail_tsn (formulas).xlsx": 78,
+  "everything\\comparisons\\tsn\\ssor-prod_intersection_detail_tsn.xlsx": 80,
+  "everything\\comparisons\\tsn\\ssor-prod_intersection_summary_tsn (formulas).xlsx": 68,
+  "everything\\comparisons\\tsn\\ssor-prod_intersection_summary_tsn.xlsx": 70,
+  "everything\\comparisons\\tsn\\ssor-prod_ramp_detail_pdf_tsn (formulas).xlsx": 76,
+  "everything\\comparisons\\tsn\\ssor-prod_ramp_detail_pdf_tsn.xlsx": 78,
+  "everything\\comparisons\\tsn\\ssor-prod_ramp_summary_tsn (formulas).xlsx": 31,
+  "everything\\comparisons\\tsn\\ssor-prod_ramp_summary_tsn.xlsx": 33
+ },
+ "head_deliverables_with_any_hit": {},
+ "runtime": {
+  "tree": "C:\\Users\\Yunus\\Projects\\TSMIS-rb2-worktree",
+  "git": {
+   "head": "06266eca1a4858dc5ebd000d1dd2e946249c7338",
+   "head_tree": "c2a3d47688d99098738bcbab40dc12d10df2715e",
+   "branch": "HEAD",
+   "clean": true,
+   "dirty_paths": [],
+   "runtime_dirty_paths": [],
+   "runtime_clean": true,
+   "clean_note": "`clean` covers the whole worktree; `runtime_clean` covers only the files the runtime digest is taken over. A result written into the worktree necessarily observes clean=false."
+  },
+  "stamped_utc": "2026-08-02T20:52:20.175719+00:00",
+  "file_counts": {
+   "product": 152,
+   "gate": 265,
+   "oracle": 1
+  },
+  "group_digests": {
+   "product": "D1EC1AEE20395B2A00EC432CE2B4EC078CD43BD15B9AA2DEF945BDAF534CA6C2",
+   "gate": "3911F15FE54A700AA206CE1698B0C9B0735D4E5DCF72A12B0619BE585FF68ADF",
+   "oracle": "343A2FEA11B9E551963F9C4E18425355C7850ED6473E256433589726EB03D114"
+  },
+  "runtime_digest": "9E411BA215C5C511C7351630A688319E9900B25B6C94BE8DBBD0A50469A38483",
+  "python": {
+   "version": "3.11.0",
+   "executable": "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\build\\.venv\\Scripts\\python.exe"
+  },
+  "packages": {
+   "openpyxl": "3.1.5",
+   "pdfplumber": "0.11.9",
+   "pdfminer.six": "20251230",
+   "pillow": "12.2.0",
+   "pypdfium2": "5.9.0"
+  },
+  "files_note": "per-file digests omitted here by design; the full listing is in RB2-A1-manifest.json and is re-derivable from the tree by rb2-verify-manifest.py"
+ }
+}
