@@ -13,8 +13,9 @@
   },
   "head": {
    "everything\\comparisons\\tsn\\ssor-prod_highway_log_tsn (evidence).xlsx": 63,
+   "everything\\comparisons\\tsn\\ssor-prod_highway_sequence_tsn (evidence).xlsx": 1,
    "byday/tsn-by-day\\2026-07-23 ssor-prod\\highway_log_vs_tsn 2026-07-23 ssor-prod (evidence).xlsx": 63,
-   "byday/tsn-by-day\\2026-07-23 ssor-prod\\highway_sequence_vs_tsn 2026-07-23 ssor-prod (evidence).xlsx": 2
+   "byday/tsn-by-day\\2026-07-23 ssor-prod\\highway_sequence_vs_tsn 2026-07-23 ssor-prod (evidence).xlsx": 1
   }
  },
  "deliverables_measured": {
@@ -69,8 +70,8 @@
  "runtime": {
   "tree": "C:\\Users\\Yunus\\Projects\\TSMIS-rb2-worktree",
   "git": {
-   "head": "81d5bca69b9c7d2e065db24c537c5a305be4815c",
-   "head_tree": "56168ce36e02a2ce6fe6ea4228c08c0e1328d7ee",
+   "head": "06266eca1a4858dc5ebd000d1dd2e946249c7338",
+   "head_tree": "c2a3d47688d99098738bcbab40dc12d10df2715e",
    "branch": "hotfix/rb-2-deliverable-presentation",
    "clean": true,
    "dirty_paths": [],
@@ -78,18 +79,18 @@
    "runtime_clean": true,
    "clean_note": "`clean` covers the whole worktree; `runtime_clean` covers only the files the runtime digest is taken over. A result written into the worktree necessarily observes clean=false."
   },
-  "stamped_utc": "2026-08-01T08:48:33.415412+00:00",
+  "stamped_utc": "2026-08-02T16:14:13.353614+00:00",
   "file_counts": {
    "product": 152,
    "gate": 265,
    "oracle": 1
   },
   "group_digests": {
-   "product": "1FBE12177CBDD1A76700B41AE0A6B4E848516CCBAB90F5A2B4FDCEEC847EB22D",
-   "gate": "9083DB9EBC8AA350F648FACA19B46CF6CA056CD0571138A1E4F5E399B54CC3E4",
+   "product": "D1EC1AEE20395B2A00EC432CE2B4EC078CD43BD15B9AA2DEF945BDAF534CA6C2",
+   "gate": "3911F15FE54A700AA206CE1698B0C9B0735D4E5DCF72A12B0619BE585FF68ADF",
    "oracle": "343A2FEA11B9E551963F9C4E18425355C7850ED6473E256433589726EB03D114"
   },
-  "runtime_digest": "1CC46D40C871ABDB728DEBBB0354F8BA7A54F23A07BF382AEB6F5B945BA9A2D9",
+  "runtime_digest": "9E411BA215C5C511C7351630A688319E9900B25B6C94BE8DBBD0A50469A38483",
   "python": {
    "version": "3.11.0",
    "executable": "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\build\\.venv\\Scripts\\python.exe"

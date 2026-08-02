@@ -2,7 +2,7 @@
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
 RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
-RB-2 Review 2 re-review is DENIED — RETURN TO IMPLEMENTATION on
+RB-2 Review 2 re-review is IMPLEMENTED — AWAITING ADVERSARIAL REVIEW (RB2-R2-002 remedied; acceptance re-run at 06266ec)
 `hotfix/rb-2-deliverable-presentation` for `RB2-R2-002`, reviewed through
 `040b98190ca86cfac41f0a5b6d3942fd5c71f7a6`**
 

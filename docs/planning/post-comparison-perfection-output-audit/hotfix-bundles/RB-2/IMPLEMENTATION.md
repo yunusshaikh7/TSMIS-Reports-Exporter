@@ -1,8 +1,7 @@
 # `RB-2` — Implementation Record
 
-Status: **DENIED — RETURN TO IMPLEMENTATION** (`RB2-R2-002`; Review 2's
-`RB2-R2-001` selection mechanism is closed, but the retained whole-column result
-proves HF-02 criterion 1 still fails; Review 1's `EG-001`/`EG-002` remain closed)
+Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (`RB2-R2-002` remedied;
+`RB2-R2-001` and Review 1's `EG-001`/`EG-002` remain closed)
 
 | Field | Value |
 |---|---|
@@ -101,6 +100,138 @@ that width. Deliberately hidden columns (the state-mask chunks) and the
 Stage-2-validated 45.75 pt wrapped header band are excluded as out of scope.
 Witness: `HF-02\excel-metrics-ramp-summary{,2,3}.json` — the failing pass is
 retained beside the passing one.
+
+## Review 2 re-review remedy — `RB2-R2-002`, no bound clips a value
+
+Review 2's re-review denied the bundle on a fact this implementation had already
+measured and then declined to act on: the expanded corpus reported 4,978
+materially clipped Comparison and Only-in cells, and the result called itself
+`clean` by counting only cells clipped BELOW a declared width cap. HF-02
+criterion 1 requires zero materially clipped cells in every regenerated workbook,
+both twins, and grants no cap exception. A result may not narrow the criterion it
+reports against.
+
+The finding is accepted in full, and so is the sharper half of it: the reviewer
+checked whether the cap was inherited, and it was not.
+
+### The claim that was wrong
+
+The previous record called `_MAX_FITTED_WIDTH = 60.0` "a pre-existing design bound
+outside the return's scope" and left it in place on that basis. That is
+checkable, and it is false:
+
+```
+$ git show 896083e:scripts/compare_core.py | grep -c "_MAX_FITTED_WIDTH\|fitted_width"
+0
+```
+
+Neither the constant nor `fitted_width` exists at the recorded base. Both were
+introduced by RB-2's own presentation work, so the cap was this bundle's choice
+and this bundle's to fix. Calling it inherited turned a decision into a
+constraint, and that mislabel is what kept a known 4,978-cell failure open across
+a review cycle.
+
+### The rule, stated once so it stops being re-derived
+
+`fitted_width`'s own docstring already contained what the code was breaking:
+
+> `maximum` caps a runaway instruction string: the caller wraps whatever the cap
+> cannot fit. An identity cell passes no cap and is always widened to fit.
+
+**A cap is safe exactly where the caller WRAPS what the cap cannot show.** Summary
+and Spot Check do that through `_grid_geometry`. The Comparison, Only-in,
+data-sheet, Routes, Provenance and category columns do not wrap, so a cap there is
+simply truncation. Eleven call sites passed one.
+
+The remedy is a deletion rather than a bigger number: `_MAX_FITTED_WIDTH` is gone,
+and no non-wrapping column passes any product cap. One bound survives and it is
+the file format's, not a presentation choice — Excel rejects a stored width above
+255, so `fitted_width` applies that ceiling unconditionally and last, where no
+caller can forget or raise it. And because a bound that clips is the very defect
+this return is about, a column stored AT the ceiling has its cells WRAPPED
+(`_ceiling_wrapper`), top-anchored, on Excel's automatic row height.
+
+On the real corpus that path is never taken. Measured across all 42 comparison
+deliverables of the denied corpus, every column and every row:
+
+| Columns needing more than… | count |
+|---|---:|
+| `60.0` — the retired product cap | **16** |
+| `255.0` — Excel's own ceiling | **0** |
+
+The widest column is a Highway Log ditto chain at **1,768 px → width 251.85**,
+98.8% of the ceiling. Thin enough that the ceiling wraps rather than being left
+as another disclosed boundary.
+
+### Ten rounds of adversarial code review, and what each one found
+
+The first fix was wrong in three places, and the fix for THAT was wrong in three
+more. The pattern is worth recording because it is the reason this section is
+long: each round fixed the rendered form or the writer that had been thought of,
+and missed another the same code path produces.
+
+| Round | Found | Fixed |
+|---|---|---|
+| 1 | The cap itself (4,978 cells) | `_MAX_FITTED_WIDTH` deleted; every non-wrapping caller stops passing one |
+| — | *(self-found when the gate window was widened)* data sheets and Routes carried unmeasured/fixed widths | `_fit_data_columns`; the data-sheet route and Routes route/status columns measured |
+| 2 | Routes, `summary_layout` and Provenance still unwrapped AT the ceiling; category B/C fixed at 13 | the wrap moved into ONE helper every body writer calls; B/C measured from the side names |
+| 3 | The ceiling fixture proved sheet PRESENCE, not that a ceiling cell was exercised — paired sides left both Only-in sheets header-only, and a category label with a blank neighbour could legally spill | per-side unique keys; a category fixture with real counts; a POSITIVE per-writer witness assertion |
+| 4 | Spot Check's live FORMULAS clip after recalculation (`_grid_geometry` skips formulas; `data_only=True` reads them as `None`); the witness predicate accepted cells that could never clip | blocked grid formulas wrap; a witness must be a visible literal that would actually have clipped |
+| 5 | Sizing ignored the `(blank)` marker; "can spill" meant only "next cell empty"; a literal-set row height defeats a formula's wrap; the formula assertion demanded wrap on hidden helpers | `_pair_display`; `run_to_block` sums the whole run; live-formula rows drop their height; hidden cells excluded |
+| 6 | The blank marker was still discarded in MIXED columns — one widest raw value per side loses it — and whitespace-only values were measured before `_xl_trim` | each side contributes {widest trimmed value, `_BLANK_MARK` if it can render empty}; selection normalizes first |
+| 7 | Conditional formatting renders a DIFFERING cell bold; sizing measured regular. Category total/footnote labels were absent from the candidate set | `_CMP_FIELD_BOLD`; the gate reads `rule.dxf.font.b`, and `_bold_overflow` checks the product against its OWN metric — the oracle measures Calibri and cannot see it |
+| 8 | Data columns measured `str(v)` while the writer serialized `_xl_trim(v)`; three of four fixed numeric widths could not show their own worst case, rendering `###` | `serialized_text`; `_numeric_width` with the old constants as minimums. Numbers had been invisible to EVERY clipping pass, including the committed oracle |
+| 9 | The `Source Files` sheet declared no widths at all; summary counts were unmeasured and General-formatted; the font metric underestimated valid Unicode | all four columns measured; counts measured and given an explicit `"0"` format; a fullwidth top-up (later superseded) |
+| 10 | East Asian Width was the wrong predictor in both directions — Malayalam is Neutral yet 225 px wider, emoji are Wide yet exceeded one em. Data sheets measured trimmed text but store raw | glyph COVERAGE replaces the property: a character measuring at `.notdef` cannot be measured, so its cell WRAPS. `serialized_text` fixed the raw/trimmed direction |
+
+Not one of these needed the corpus. Every one was found by reading code and
+running a fixture, which is why the acceptance chain was deliberately NOT run
+between rounds — it binds evidence, it does not discover defects.
+
+### The permanent gate now sees what the oracle cannot
+
+The committed oracle scans three sheets, the first eight columns, the first 80
+rows. That window is how a mis-sized field column sat inside workbooks it had just
+certified; the failing corpus cell was `Comparison!AI2`.
+
+`_audit_everything` runs the oracle's OWN `audit_sheet` — same glyph metrics, same
+Excel pixel model, same 6 px tolerance, same merged-range rules — with the row,
+column and sheet limits lifted, over every VISIBLE sheet. Exclusions are limited
+to cells nobody can render (hidden columns/rows; hidden and very-hidden sheets),
+and each is counted and named. `_clipped_run_spill` re-scans with the correct
+run-spill rule beside it, because the committed oracle asks only about `col + 1`;
+that frozen Stage-2 artifact is deliberately untouched, since its recorded numbers
+are cited in earlier review records.
+
+Every assertion is MUTATION-TESTED rather than declared to have teeth:
+
+| Mutation | Result |
+|---|---|
+| `_ceiling_wrapper` neutered | names all six wired writers, and `Ceiling Categories!A8` clipped 1,679.6 px |
+| live-formula wrap removed | names `Spot Check!C10, F10` — the reviewer's cells — plus `C11, C12, F12, G17, G18` |
+| `HUGE_ROLE` shortened | "no qualifying witness on ['Provenance']" |
+| blank-marker sizing reverted | `Comparison!G3 short 10.0px` — the reviewer's exact figure — plus `G4`, the TRIM case |
+
+| | at `bab9527` (denied head) | at head |
+|---|---|---|
+| `check_workbook_presentation.py` | **18 FAILs** | **all good** |
+
+### The witness scans what the criterion covers
+
+`clipping-corpus-{head,base}.json` no longer answers a narrower question than it
+sounds like: all **60** deliverables via `acc_measure.is_deliverable` verbatim —
+the measure leg's own definition, so a disagreement between the two legs cannot be
+a scoping artefact — across every visible sheet, every column, every row. `clean`
+means ZERO, with no cap exception and no other exception. The count of
+ceiling-wrapped columns is reported separately so "we wrapped instead of fitting"
+can never hide inside a zero.
+
+Summary and Spot Check stay with the committed oracle, which the measure leg now
+runs over them with its window LIFTED — previously they were measured only within
+80 rows and 8 columns across the entire corpus, so most of a statewide Summary had
+never been looked at. Between the two legs no visible sheet of a deliverable is
+unmeasured, and the witness asserts that no sheet it measures carries a merged
+range, so that division is verified rather than assumed.
 
 ## Review 2 remedy — `RB2-R2-001`, columns sized by rendered width
 
@@ -347,6 +478,61 @@ The same obstacle was solved rather than accepted for `widths-carry`, which need
 only stored widths: it reads `<cols>` straight from the sheet XML. Verified
 identical to openpyxl's own numbers, which is why that leg covers all 44
 deliverables rather than the 16 a size cap would have allowed.
+
+### Acceptance `RB2-A1`, re-run whole at `06266ec`
+
+Every leg below was produced by the same runtime. The corpus witness is a
+scratchpad harness rather than one of the 418 tracked runtime files, so
+re-scoping it (see the Report View note) moved no digest and invalidated no
+earlier leg.
+
+| Leg | Result | vs the pass Review 2 examined |
+|---|---|---|
+| Generation | 40 steps, 31 ok, 9 refusals | **0 status differences** |
+| Measure head | 1,265 workbooks, 60 deliverables, **0 clipped** — windowed AND unwindowed | prior had no unwindowed figure |
+| Measure base | 1,244 workbooks, 2,036 clipped | **identical** |
+| Invariance | 42 pairs, **0 changed** | identical |
+| Excel recalculation | 8 workbooks, 70 self-checks, 0 cached errors | identical |
+| Excel AutoFit | **0 columns too narrow** (prior: 4) | the 4 became auto-height rows |
+| Corpus witness (head) | **0 owned**; 30,048 disclosed pre-existing | new split |
+| Corpus witness (base) | 1,678,435 clipped | new leg |
+| Width rule carried | CARRIES THE WIDTH RULE | - |
+| Frozen inputs / base identity / evidence / generation equivalence / provenance | FROZEN, EVIDENCE INTACT, EQUIVALENT, CARRIES FINAL COMMIT | - |
+| Full gate | **158 passed, 0 failed** | - |
+
+Across every visible sheet the corpus went from **1,678,435 clipped cells to
+30,048**, and every one of the residue is on `Report View`.
+
+**The four AutoFit cells inverted rather than vanished.** Installed Excel
+previously wanted 4 Spot Check columns wider than stored; it now wants none, and
+instead reports 4 rows shorter than their content needs. That is the fix
+working: those cells are wrapped, and their rows carry no `ht` attribute -
+checked in the sheet XML, `<row r="22">` and `<row r="37">` - so Excel grows them
+on render. A wrapped cell in a row with a FIXED height would have been the
+round-5 defect all over again; these have no fixed height.
+
+### `Report View` - a pre-existing defect this bundle did not cause
+
+The witness reports **30,048 clipped cells on `Report View`**, and they are
+disclosed rather than excluded: counted, totalled, sampled and named in
+`clipping-corpus-head.json` under `clipped_cells_preexisting_unowned`.
+
+They are not attributed to RB-2, on evidence rather than assertion. Neither the
+base corpus nor the head corpus emits a `<cols>` element for that sheet - the
+same code path, no widths, in both. RB-2 never wrote it. It surfaced now only
+because this round's witness scans every visible sheet for the first time, which
+is further than HF-02 asked.
+
+Nor is it a width bug that can be mechanically fixed here. `Report View`
+replicates a PRINTED report - a four-row header band, `freeze_panes = "I5"`,
+columns chosen to mirror the print. Fitting them would break the replication the
+sheet exists to provide, so what it needs is a presentation decision from that
+report's owner, tracked separately.
+
+The distinction against `RB2-R2-002` itself is deliberate and worth stating,
+because the shape looks similar: that cap was **this bundle's own invention**,
+absent from the recorded base, and excusing it was correctly refused. This sheet
+predates the bundle and is byte-identical in base.
 
 ## Review 1 re-review remedy — `RB2-R1-EG-002`, one exact Git head
 
