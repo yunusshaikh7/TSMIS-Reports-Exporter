@@ -3,6 +3,22 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.33.1 — 2026-08-02
+
+### Changed
+- **The Clean Road build greys the headers of columns it cannot source.** On the
+  built `CA HIGHWAYS` sheet, the columns no ArcGIS layer can fill — plus the
+  TSN-internal bookkeeping ones — now carry the Provenance sheet's grey on their
+  header cell, with a hover note naming the tier and pointing at Provenance. An
+  empty column reads as "couldn't be sourced" instead of "the data went
+  missing". This is the same disclosure principle as v0.33.0's Clean Road fix,
+  applied to the build's own sheet: the Provenance sheet has been colour-coded
+  since v0.31.0 and the comparison's context headers since v0.32.0, but the data
+  sheet's own header row was still plain.
+
+  Presentation only — cell VALUES, counts and every comparison result are
+  untouched.
+
 ## v0.33.0 — 2026-08-02
 
 The first two fix bundles from the post-comparison output audit: the Clean Road
