@@ -2375,7 +2375,11 @@ def _fit_data_columns(ws, rows, lay):
             i = idx + off
             if i >= len(row) or row[i] is None:
                 continue
-            s = str(row[i])
+            # `_xl_trim` is what the WRITER stores, and the two forms differ:
+            # `str(1e20)` is "1e+20" where the cell holds
+            # "100000000000000000000" (RB2-R2-002 round 8). Measure the
+            # serialized form, never the repr.
+            s = _xl_trim(row[i])
             px = _text_px(s, False, 10)
             if px > widest.get(idx, (0.0, ""))[0]:
                 widest[idx] = (px, s)
@@ -2385,6 +2389,25 @@ def _fit_data_columns(ws, rows, lay):
         dim = ws.column_dimensions[lay.data_col(idx)]
         floor = float(dim.width) if dim.width is not None else 0.0
         dim.width = fitted_width([text], size_pt=10, minimum=floor)
+
+
+_EXCEL_MAX_ROW = 1_048_576      # the widest row number a cell can ever show
+
+
+def _numeric_width(max_value, minimum):
+    """Width for a column of whole numbers, measured rather than assumed.
+
+    A number too wide for its column does not truncate — Excel renders `###`.
+    Every clipping pass here, including the committed oracle, looks only at
+    STRING cells, so this failure is invisible to all of them: occurrence 1,000
+    in a width-4 column reads as `###` and no gate says a word (RB2-R2-002
+    round 8). A number is also right-aligned and never spills, so the only
+    remedy is a column that fits it.
+
+    Three of the four hard-coded widths here were too narrow for their own worst
+    case: 4 could not show 1,000, 7 could not show 1,048,576, 6 could not show
+    999,999. The current constants are kept as MINIMUMS so nothing narrows."""
+    return fitted_width([str(int(max_value))], size_pt=10, minimum=minimum)
 
 
 def _pair_display(a, b):
@@ -2665,11 +2688,12 @@ def _write_comparison(wb, union, lay, events, vals=None, helper_tokens=None,
     ws.column_dimensions[lay.c_loc].width = fitted_width(
         {str(_visible_key(loc)) for _r, loc, _o in union},
         size_pt=_CMP_FIELD_PT, minimum=12)
-    ws.column_dimensions[lay.c_occ].width = 4
-    ws.column_dimensions[lay.c_trow].width = 7
+    ws.column_dimensions[lay.c_occ].width = _numeric_width(
+        max((occ for _r, _l, occ in union), default=1), 4)
+    ws.column_dimensions[lay.c_trow].width = _numeric_width(_EXCEL_MAX_ROW, 7)
     ws.column_dimensions[lay.c_status].width = fitted_width(
         ("Both", lay.only_a, lay.only_b), size_pt=10, minimum=11)
-    ws.column_dimensions[lay.c_diffs].width = 6
+    ws.column_dimensions[lay.c_diffs].width = _numeric_width(lay.n_fields, 6)
     _apply_field_widths(ws, sc.cmp_widths, lay.field_col, lay)
     for f, width in (field_widths or {}).items():
         ws.column_dimensions[lay.field_col(f)].width = width
@@ -3219,8 +3243,9 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None,
     ws.column_dimensions[c_loc].width = fitted_width(
         {str(_visible_key(loc)) for _r, loc, _o in keys},
         size_pt=_CMP_FIELD_PT, minimum=12)
-    ws.column_dimensions[c_occ].width = 4
-    ws.column_dimensions[c_row].width = 9
+    ws.column_dimensions[c_occ].width = _numeric_width(
+        max((occ for _r, _l, occ in keys), default=1), 4)
+    ws.column_dimensions[c_row].width = _numeric_width(_EXCEL_MAX_ROW, 9)
     _apply_field_widths(ws, sc.cmp_widths, fcol, lay)
     for f, width in (field_widths or {}).items():
         ws.column_dimensions[fcol(f)].width = width

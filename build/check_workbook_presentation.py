@@ -279,6 +279,23 @@ TOTAL_SCHEMA = CompareSchema(
 TOTAL_A = [["x", "1"], ["TOTAL", "2"]]
 TOTAL_B = [["x", "1"], ["TOTAL", "3"]]
 
+# ---- RB2-R2-002 round 8: measured form vs SERIALIZED form -------------------
+# `str(1e20)` is "1e+20"; the cell stores "100000000000000000000". Sizing that
+# measures the repr under-sizes the column by 121 px of rendered text.
+SERIAL_SCHEMA = CompareSchema(
+    report_name="Presentation Serialized", header=["Key", "Value", "Tail"],
+    side_a="A", side_b="B", id_noun="location", id_noun_plural="locations")
+SERIAL_A = SERIAL_B = [["k", 1e20, "stop"]]
+
+# ---- RB2-R2-002 round 8: a number too narrow renders ### --------------------
+# 1,000 duplicate occurrences of one key, which stays under the exact-pairing
+# cap. The occurrence column held a hard-coded 4 and could not show "1000".
+OCC_SCHEMA = CompareSchema(
+    report_name="Presentation Occurrence", header=["Key", "Value"],
+    side_a="A", side_b="B", id_noun="location", id_noun_plural="locations")
+OCC_A = [["duplicate", "x"] for _ in range(1000)]
+OCC_B = [["duplicate", "x"]]
+
 FRESHNESS_LABEL = ("Build-time source identity and duplicate pairing snapshot "
                    "is current")
 CONTEXT_TEXT = "not compared (context)"
@@ -463,6 +480,57 @@ def _unwrapped_blocked_formulas(path, sheets):
                     if not (cell.alignment and cell.alignment.wrap_text):
                         bad.append((name, cell.coordinate))
         return bad
+    finally:
+        wb.close()
+
+
+def _hash_rendered_numbers(path):
+    """`[(sheet, coord, value, short_px)]` for NUMBERS too wide for their column.
+
+    A number that does not fit is not truncated — Excel renders `###`, showing
+    the reader nothing at all. Every clipping pass in this file and in the
+    committed oracle skips non-string cells, so this whole failure mode has been
+    invisible to all of them (RB2-R2-002 round 8: occurrence 1,000 in a width-4
+    column). A number is right-aligned and never spills, so fitting is the only
+    remedy and the neighbour does not matter.
+
+    General-format integers only. A number carrying an explicit `number_format`
+    renders through that format, which this does not attempt to evaluate; those
+    are reported as skipped rather than silently passed."""
+    from openpyxl.utils import get_column_letter
+
+    wb = load_workbook(path, read_only=False, data_only=True)
+    bad, skipped = [], 0
+    try:
+        for name in wb.sheetnames:
+            ws = wb[name]
+            if ws.sheet_state != "visible":
+                continue
+            for row in ws.iter_rows(min_row=2):
+                for cell in row:
+                    value = cell.value
+                    if isinstance(value, bool) or not isinstance(value, int):
+                        continue
+                    fmt = cell.number_format
+                    if fmt and fmt not in ("General", "@"):
+                        skipped += 1
+                        continue
+                    letter = get_column_letter(cell.column)
+                    col_dim = ws.column_dimensions.get(letter)
+                    row_dim = ws.row_dimensions.get(cell.row)
+                    if (getattr(col_dim, "hidden", False)
+                            or getattr(row_dim, "hidden", False)):
+                        continue
+                    if col_dim is None or col_dim.width is None:
+                        continue
+                    avail = _usable_px(float(col_dim.width))
+                    font = cell.font
+                    need = _text_px(str(value), bool(font and font.bold),
+                                    float(font.size or 11) if font else 11.0)
+                    if need > avail:
+                        bad.append((name, cell.coordinate, value,
+                                    round(need - avail, 1)))
+        return bad, skipped
     finally:
         wb.close()
 
@@ -960,6 +1028,30 @@ def main():
                     == blank_widths.get((tag, "formulas")),
                     repr({k: v for k, v in blank_widths.items()
                           if k[0] == tag}))
+
+        # ---- RB2-R2-002 round 8: serialized form, and numbers as ### --------
+        for tag, schema, ra, rb in (("serial", SERIAL_SCHEMA, SERIAL_A, SERIAL_B),
+                                    ("occ", OCC_SCHEMA, OCC_A, OCC_B)):
+            for mode in ("values", "formulas"):
+                path = Path(tmp) / f"{tag}-{mode}.xlsx"
+                result = run_compare(schema, ra, rb, False, path, mode=mode,
+                                     name_a="a.xlsx", name_b="b.xlsx")
+                c.check(f"{tag}/{mode} builds", result.status == "ok",
+                        repr(result))
+                hits, _sk, _sh = _audit_everything(gate, path)
+                run_hits = _clipped_run_spill(gate, path)
+                c.check(f"{tag}/{mode}: no text cell is clipped",
+                        not hits and not run_hits,
+                        "; ".join(f"{h['sheet']}!{h['cell']} short "
+                                  f"{h['short_by_px']}px" for h in hits[:3])
+                        + "; ".join(f"{s}!{coord} short {short}px"
+                                    for s, coord, short, _x in run_hits[:3]))
+                nums, skipped = _hash_rendered_numbers(path)
+                c.check(f"{tag}/{mode}: no NUMBER is too wide for its column, "
+                        f"which would render ### ({skipped} formatted skipped)",
+                        not nums,
+                        "; ".join(f"{s}!{coord}={val} short {short}px"
+                                  for s, coord, val, short in nums[:4]))
 
         # ---- PCOA-FINAL-014: a wholly-context column says so ----------------
         for mode in ("values", "formulas"):
