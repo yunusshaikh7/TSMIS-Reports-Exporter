@@ -1,17 +1,21 @@
 # `RB-2` — Bundle Contract
 
-Status: **DENIED — RETURN TO IMPLEMENTATION** (`RB2-R2-004`; planning ruling
-required). Review 2 closes `RB2-R2-EG-003`: the expanded witness takes its list
+Status: **SCOPE AMENDED BY THE OWNER (2026-08-02) — AWAITING ADVERSARIAL
+REVIEW.** Review 2 closed `RB2-R2-EG-003`: the expanded witness takes its list
 from the same-head measure record and covers **60 of 60** head deliverables —
 526 visible sheets, 8,200 columns, **0** owned materially clipped cells — and the
 manifest verifies all 21 claimed results plus five committed witnesses at
 acceptance runtime head `06266eca1a4858dc5ebd000d1dd2e946249c7338`.
-The bundle remains denied because that accepted runtime calls
-`_fit_data_columns` for ordinary data-sheet fields the frozen HF-02 contract
-explicitly excludes, and changes Source Files geometry through
-`compare_tsn_common.py` even though this contract authorizes that file only for
-provenance selection. A reviewer cannot silently amend the frozen scope. The
-signed denial and exact return are in [REVIEW.md](REVIEW.md); do not merge, clean
+It then denied `RB2-R2-004` and returned the bundle to the plan owner, correctly
+refusing to amend a frozen scope from the reviewer's chair: the accepted runtime
+calls `_fit_data_columns` for ordinary data-sheet fields this contract excluded,
+and gives the `Source Files` sheet geometry through `compare_tsn_common.py`.
+**The owner has now amended this contract to authorize both surfaces** — the
+exclusion rested on a superseded eight-column measurement, and data sheets are in
+fact the largest clipping class in the corpus (see the owner amendment below).
+The runtime is authorized BYTE-FOR-BYTE: no product file changed, the acceptance
+head is unchanged, and no evidence was regenerated. The signed review history is
+in [REVIEW.md](REVIEW.md); do not merge, clean
 up, or begin RB-3.
 
 > This RB-level contract carries **HF-02 + HF-03** and transcribes both frozen
@@ -41,7 +45,8 @@ RB-2 is the union of HF-02 and HF-03, with every criterion below controlling.
 The allowed implementation surface is only the union named by those contracts:
 `scripts/compare_core.py`, `scripts/summary_layout.py`,
 `scripts/matrix_build.py` (`captured_tsn_workbook` only),
-`scripts/compare_tsn_common.py` (provenance selection), and the required focused
+`scripts/compare_tsn_common.py` (provenance selection, **and the `Source Files`
+sheet's stored geometry — owner amendment 2026-08-02**), and the required focused
 checks/golden check. A change outside that union requires a return to planning;
 it is not silently absorbed here.
 
@@ -111,20 +116,68 @@ weakened oracle, or rush ship may not replace that split.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to its own `statewide-summary-visible-text-clipping.json`, `large-detail-no-render-visual-adjudication.json` and native-Excel renders, plus the committed `stage2-measure-clipping.py` / `stage2-clipping-recheck.json` |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-2: DENIED — RETURN TO IMPLEMENTATION (`RB2-R2-004`)** |
+| Status | **Inherits RB-2: SCOPE AMENDED BY THE OWNER (2026-08-02) — AWAITING ADVERSARIAL REVIEW** |
 
-**Exact scope.** Stored presentation and self-description of the generated
-comparison workbook, **all families, both twins**: the `Comparison` category/key
-column, the data sheets' key and back-link columns, `Spot Check`, `Summary`
-labels, the *DIFFERENCES BY FIELD* rendering of wholly-context columns, and the
-values twin's `Summary!B3` headline.
+**Exact scope** (as amended 2026-08-02 — see the owner amendment below).
+Stored presentation and self-description of the generated comparison workbook,
+**all families, both twins**: the `Comparison` category/key column, the data
+sheets' key and back-link columns **and their ordinary field columns**,
+**the `Source Files` sheet's four columns**, `Spot Check`, `Summary` labels, the
+*DIFFERENCES BY FIELD* rendering of wholly-context columns, and the values twin's
+`Summary!B3` headline.
 
 **Explicitly out of scope.** Any equality, normalization, pairing, count, or
-mask change; the data columns (explicit width 13.0), the 45.75 pt wrapped header
-row, hidden/veryHidden states, autofilter ranges and freeze panes — all Stage
-2-validated clean and must stay byte-identical in behaviour; the `Notes` prose of
-any family; evidence; the live `Summary!C56:C62` SELF-CHECK rows (deliberately
-live and disclosed).
+mask change; the 45.75 pt wrapped header row, hidden/veryHidden states,
+autofilter ranges and freeze panes — all Stage 2-validated clean and must stay
+byte-identical in behaviour; the `Notes` prose of any family; evidence; the live
+`Summary!C56:C62` SELF-CHECK rows (deliberately live and disclosed).
+
+### Owner amendment — 2026-08-02, data field columns and `Source Files`
+
+`RB2-R2-004` correctly refused to let a reviewer settle this, and returned the
+bundle to the plan owner. The owner authorized the existing runtime
+**byte-for-byte**: no product file changes, the acceptance head stays
+`06266eca1a4858dc5ebd000d1dd2e946249c7338`, and no acceptance evidence is
+regenerated.
+
+**Why the data columns move INTO scope.** The original exclusion rested on the
+data columns being "Stage 2-validated clean" at an explicit width of 13.0. Both
+halves of that premise are false against the produced output:
+
+- the base workbooks store a width for the route, key and back-link columns
+  only. Every field column between them has NO stored width and renders at
+  Excel's 8.43 default, blocked from spilling by the field beside it;
+- measured over the twelve base deliverables under 3 MB, by the committed
+  oracle's own metrics, **data sheets are the largest clipping class in the
+  whole corpus** — 736 cells, against 392 on the `Comparison` sheet the bundle
+  was written for. `intersection_summary vs tsn (values).xlsx`, sheet `TSMIS`,
+  `B2` needs 213 px and has 64.
+
+The "clean" finding came from `VC-14`, which measured through the same
+eight-column window `RB2-R2-001` later disproved. So HF-02.1 — zero materially
+clipped cells on every visible sheet of every workbook — and the exclusion could
+not both be honoured. **Criterion 1 governs**; the exclusion is withdrawn as
+founded on a superseded measurement.
+
+**Why `Source Files` moves into scope.** That sheet declared no widths at all,
+so all four columns sat at 8.43 and its own header clipped — `Route (as
+compared)` needs 132 px against 64. It is not Stage 2-validated and no contract
+froze it; it was simply never named. Every clipping scan here, the committed
+oracle included, skips row 1 as "the wrapped header band", and on this sheet row
+1 is an ordinary row — which is why a real clip stayed invisible to all of them.
+`scripts/compare_tsn_common.py` is therefore authorized for this presentation
+change in addition to provenance selection.
+
+**Known and accepted, not hidden.** `_fit_data_columns` takes its floor from the
+live column dimension, and subscripting `ws.column_dimensions[col]` creates one
+at openpyxl's `DEFAULT_COLUMN_WIDTH = 13.0` with `customWidth=True`. So every
+data column stores at least 13.0 and serializes where base stored nothing.
+`fitted_width` returns `max(floor, measured)`, so a column is never narrower than
+its content: the floor cannot clip, cannot render `###`, and cannot approach
+Excel's ceiling — it only over-widens. Correcting it would change
+`scripts/compare_core.py`, move the runtime digest and force a complete RB2-A1
+regeneration for a cosmetic gain, so the owner accepted it here and it is
+carried as follow-up work for a bundle that regenerates anyway.
 
 **Verified root cause.** Widths are hard-coded workbook facts in the shared
 writer: `compare_core._write_comparison:2170` (`c_loc` = 12 → the measured 89 px
@@ -234,7 +287,7 @@ and the per-family count-invariance table.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to `run-ledgers/tsn-library-rebuild.json`, `source-audit/all-completed-workflow-note-audit.json`, the committed `stage2-tsn-provenance-scope.json`, and Claude's `witness\temp_captures.txt` (readable since the firewall ended) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-2: DENIED — RETURN TO IMPLEMENTATION (`RB2-R2-004`)** |
+| Status | **Inherits RB-2: SCOPE AMENDED BY THE OWNER (2026-08-02) — AWAITING ADVERSARIAL REVIEW** |
 
 **Exact scope.** The matrix lanes' private TSN capture step and what the
 resulting workbooks say about their own TSN input: all 12 vs-TSN families × the
@@ -262,7 +315,8 @@ capture directory is not always removed.
 
 **Files expected to change.** `scripts/matrix_build.py`
 (`captured_tsn_workbook` only), `scripts/compare_tsn_common.py`
-(provenance selection), plus checks.
+(provenance selection, and the `Source Files` sheet's stored geometry per the
+2026-08-02 owner amendment), plus checks.
 
 **Planner design sketch (not binding).** Carry the library sidecar's full extra
 payload onto the private copy (or bind claim lookup to the workbook's content

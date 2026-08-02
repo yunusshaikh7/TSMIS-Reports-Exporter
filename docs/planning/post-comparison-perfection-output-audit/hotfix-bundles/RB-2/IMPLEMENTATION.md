@@ -1,11 +1,14 @@
 # `RB-2` — Implementation Record
 
-Status: **DENIED — RETURN TO IMPLEMENTATION** (`RB2-R2-004`; planning ruling
-required). `RB2-R2-EG-003` is closed at 60/60 head deliverables and 0 owned
-clipped cells, but the accepted runtime changes data-sheet field columns and
-Source Files geometry outside the frozen implementation surface. `RB2-R2-001`,
-`RB2-R2-002`, and Review 1's `EG-001`/`EG-002` remain closed; acceptance runtime
-head remains `06266eca1a4858dc5ebd000d1dd2e946249c7338`.
+Status: **SCOPE AMENDED BY THE OWNER (2026-08-02) — AWAITING ADVERSARIAL
+REVIEW.** `RB2-R2-004` returned the bundle to the plan owner rather than to
+implementation, and the owner authorized the existing runtime **byte-for-byte**:
+HF-02's exclusion of the data field columns is withdrawn as founded on a
+superseded measurement, and `compare_tsn_common.py` is authorized for the
+`Source Files` sheet's geometry. **No product file changed**, so the acceptance
+head remains `06266eca1a4858dc5ebd000d1dd2e946249c7338` and no acceptance evidence was regenerated or rebound.
+`RB2-R2-EG-003` (60/60, 0 owned clipped cells), `RB2-R2-001`, `RB2-R2-002` and
+Review 1's `EG-001`/`EG-002` all remain closed.
 
 | Field | Value |
 |---|---|
@@ -482,6 +485,65 @@ The same obstacle was solved rather than accepted for `widths-carry`, which need
 only stored widths: it reads `<cols>` straight from the sheet XML. Verified
 identical to openpyxl's own numbers, which is why that leg covers all 44
 deliverables rather than the 16 a size cap would have allowed.
+
+## Review 2 remedy — `RB2-R2-004`, a plan-owner ruling, no runtime change
+
+`RB2-R2-004` did not ask for a code edit. It asked for a decision this bundle's
+implementer and reviewer both lack the authority to make, and it was right to:
+the previous pass disclosed both surfaces and invited the reviewer to pick a
+scope policy, which is not a reviewer's call.
+
+**The owner ruled on 2026-08-02: authorize the existing runtime, byte-for-byte.**
+HF-02's exclusion of the data field columns is withdrawn, and
+`compare_tsn_common.py` is authorized for the `Source Files` sheet's geometry.
+The amendment and its evidence live in the contract itself —
+[`BUNDLE.md`](BUNDLE.md), mirrored in the plan's HF-02 section — not here, so the
+signed contract is the thing that changed rather than a note about it.
+
+The two facts the ruling rests on, both measured earlier in this record:
+
+- base workbooks store NO width for the data field columns; they render at
+  Excel's 8.43 default, blocked from spilling by the field beside them. The
+  contract's "explicit width 13.0" describes the schema's intent, not the output;
+- **data sheets are the largest clipping class in the corpus** — 736 cells
+  against `Comparison`'s 392 over the same twelve base deliverables. The
+  exclusion's justification, "Stage 2-validated clean", came from `VC-14`, which
+  measured through the eight-column window `RB2-R2-001` disproved.
+
+So HF-02.1 and the exclusion could not both be honoured, and criterion 1 governs.
+`Source Files` is the weaker case and is authorized on its own terms: never
+Stage 2-validated, never frozen, no widths at all, and a header that clipped
+where no scan here could see it (they all skip row 1 as a wrapped header band).
+
+### What this cost
+
+Nothing was regenerated. **No file in the 418-file runtime set changed**, so:
+
+| | |
+|---|---|
+| Acceptance head | unchanged — `06266eca1a4858dc5ebd000d1dd2e946249c7338` |
+| Runtime digest | unchanged — `9E411BA2…` |
+| Corpus generation, both sides | not re-run |
+| Installed-Excel recalc / AutoFit / renders | not re-run |
+| Full gate | not re-run |
+| Committed witnesses, manifest, verifier identity | unchanged, not rebuilt |
+
+That is the return's own "if the owner authorizes the current runtime
+byte-for-byte, retain the exact-head evidence and rebuild only records whose
+identities change" branch, and no record's identity changed. The only edits are
+the contract amendment and the status lines that mirror it.
+
+### Carried forward, not fixed
+
+`_fit_data_columns` reads its floor from the live column dimension, and
+subscripting `ws.column_dimensions[col]` creates one at openpyxl's
+`DEFAULT_COLUMN_WIDTH = 13.0` with `customWidth=True`, so every data column
+stores at least 13.0 and serializes where base stored nothing. `fitted_width`
+returns `max(floor, measured)`, so no column is ever narrower than its content:
+it can only over-widen. Correcting it changes `scripts/compare_core.py`, moves
+the runtime digest, and forces a complete RB2-A1 regeneration for a cosmetic
+gain — so it is owner-accepted here and belongs to a later bundle that
+regenerates anyway.
 
 ## Review 2 re-review remedy — `RB2-R2-EG-003`, all 60 head deliverables
 
