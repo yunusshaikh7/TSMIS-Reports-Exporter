@@ -1,7 +1,7 @@
 # `RB-2` — Bundle Contract
 
-Status: **SCOPE AMENDED BY THE OWNER (2026-08-02) — AWAITING ADVERSARIAL
-REVIEW.** Review 2 closed `RB2-R2-EG-003`: the expanded witness takes its list
+Status: **JOINTLY APPROVED — AWAITING MERGE.** Review 2 closed
+`RB2-R2-EG-003`: the expanded witness takes its list
 from the same-head measure record and covers **60 of 60** head deliverables —
 526 visible sheets, 8,200 columns, **0** owned materially clipped cells — and the
 manifest verifies all 21 claimed results plus five committed witnesses at
@@ -14,9 +14,10 @@ and gives the `Source Files` sheet geometry through `compare_tsn_common.py`.
 exclusion rested on a superseded eight-column measurement, and data sheets are in
 fact the largest clipping class in the corpus (see the owner amendment below).
 The runtime is authorized BYTE-FOR-BYTE: no product file changed, the acceptance
-head is unchanged, and no evidence was regenerated. The signed review history is
-in [REVIEW.md](REVIEW.md); do not merge, clean
-up, or begin RB-3.
+head is unchanged, and no evidence was regenerated. Review 2 verified the
+amendment in both controlling scope copies, found no remaining contradiction,
+and approved. Review 1 and Review 2 now both approve; the signed history is in
+[REVIEW.md](REVIEW.md). Complete the merge closeout before beginning RB-3.
 
 > This RB-level contract carries **HF-02 + HF-03** and transcribes both frozen
 > work-item sections from
@@ -116,7 +117,7 @@ weakened oracle, or rush ship may not replace that split.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to its own `statewide-summary-visible-text-clipping.json`, `large-detail-no-render-visual-adjudication.json` and native-Excel renders, plus the committed `stage2-measure-clipping.py` / `stage2-clipping-recheck.json` |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-2: SCOPE AMENDED BY THE OWNER (2026-08-02) — AWAITING ADVERSARIAL REVIEW** |
+| Status | **Inherits RB-2: JOINTLY APPROVED — AWAITING MERGE** |
 
 **Exact scope** (as amended 2026-08-02 — see the owner amendment below).
 Stored presentation and self-description of the generated comparison workbook,
@@ -287,7 +288,7 @@ and the per-family count-invariance table.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to `run-ledgers/tsn-library-rebuild.json`, `source-audit/all-completed-workflow-note-audit.json`, the committed `stage2-tsn-provenance-scope.json`, and Claude's `witness\temp_captures.txt` (readable since the firewall ended) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-2: SCOPE AMENDED BY THE OWNER (2026-08-02) — AWAITING ADVERSARIAL REVIEW** |
+| Status | **Inherits RB-2: JOINTLY APPROVED — AWAITING MERGE** |
 
 **Exact scope.** The matrix lanes' private TSN capture step and what the
 resulting workbooks say about their own TSN input: all 12 vs-TSN families × the

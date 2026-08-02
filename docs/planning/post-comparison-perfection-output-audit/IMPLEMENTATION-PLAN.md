@@ -178,7 +178,7 @@ Two layers, because the owner wants **fewer branches, reviews and releases**
 | Order | Batch | Specs | Theme | Depends on | Branch | Status |
 |---:|---|---|---|---|---|---|
 | 1 | **RB-1** | HF-01 | Clean Road source truth — the owner's immediate need | None | `hotfix/rb-1-clean-road-source-truth` | **MERGED** — `560ea5e501fdd76003985753ba7fc9ff0a551320` |
-| 2 | **RB-2** | HF-02 + HF-03 | The deliverable looks right and describes itself truthfully — **56 of the 68 denials** | None (RB-1 for the Clean Road witness) | `hotfix/rb-2-deliverable-presentation` | **SCOPE AMENDED BY THE OWNER (2026-08-02) — AWAITING REVIEW** |
+| 2 | **RB-2** | HF-02 + HF-03 | The deliverable looks right and describes itself truthfully — **56 of the 68 denials** | None (RB-1 for the Clean Road witness) | `hotfix/rb-2-deliverable-presentation` | **JOINTLY APPROVED — AWAITING MERGE** |
 | 3 | **RB-3** | HF-04 | Ramp Detail — restores 9 comparison placements that produce nothing today | None | `hotfix/rb-3-ramp-detail-layout` | BLOCKED |
 | 4 | **RB-4** | HF-05 + HF-10 | Evidence, end to end: eligibility, binding, panels, and the missing cross-environment lane | None | `hotfix/rb-4-evidence` | BLOCKED |
 | 5 | **RB-5** | HF-06 + HF-09 | Difference classification — the two opposite rulings applied to the right classes | RB-1, RB-2 | `hotfix/rb-5-difference-classification` | BLOCKED |
@@ -479,7 +479,7 @@ mapping also proves one primary implementation/review bundle per finding:
 | RB bundle | Work items | Canonical findings | Count | Queue status |
 |---|---|---|---:|---|
 | **RB-1** | HF-01 | 010 | 1 | **MERGED** — `560ea5e501fdd76003985753ba7fc9ff0a551320` |
-| **RB-2** | HF-02, HF-03 | 002, 003, 008, 009, 014, 016, 019 | 7 | **SCOPE AMENDED BY THE OWNER (2026-08-02) — AWAITING REVIEW** |
+| **RB-2** | HF-02, HF-03 | 002, 003, 008, 009, 014, 016, 019 | 7 | **JOINTLY APPROVED — AWAITING MERGE** |
 | **RB-3** | HF-04 | 001, 012 | 2 | BLOCKED |
 | **RB-4** | HF-05, HF-10 | 004, 005, 006, 007 | 4 | BLOCKED |
 | **RB-5** | HF-06, HF-09 | 011, 013 | 2 | BLOCKED |
@@ -781,7 +781,7 @@ join, the recount totals) →
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to its own `statewide-summary-visible-text-clipping.json`, `large-detail-no-render-visual-adjudication.json` and native-Excel renders, plus the committed `stage2-measure-clipping.py` / `stage2-clipping-recheck.json` |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-2: SCOPE AMENDED BY THE OWNER (2026-08-02) — AWAITING ADVERSARIAL REVIEW** |
+| Status | **Inherits RB-2: JOINTLY APPROVED — AWAITING MERGE** |
 
 **Exact scope** (as amended 2026-08-02 — see the owner amendment below).
 Stored presentation and self-description of the generated comparison workbook,
@@ -952,7 +952,7 @@ and the per-family count-invariance table.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to `run-ledgers/tsn-library-rebuild.json`, `source-audit/all-completed-workflow-note-audit.json`, the committed `stage2-tsn-provenance-scope.json`, and Claude's `witness\temp_captures.txt` (readable since the firewall ended) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-2: SCOPE AMENDED BY THE OWNER (2026-08-02) — AWAITING ADVERSARIAL REVIEW** |
+| Status | **Inherits RB-2: JOINTLY APPROVED — AWAITING MERGE** |
 
 **Exact scope.** The matrix lanes' private TSN capture step and what the
 resulting workbooks say about their own TSN input: all 12 vs-TSN families × the
@@ -2130,5 +2130,7 @@ one `RB2-R2-001` disproved, and data sheets are in fact the corpus's largest
 clipping class (736 cells against `Comparison`'s 392 on the same twelve base
 deliverables), so HF-02.1 and the exclusion could not both hold. No product file
 changed, the acceptance head is unchanged, and nothing was regenerated or
-rebound. Return Prompt 05 for a fresh Review 2 re-review; do not merge, clean up,
-or begin RB-3 before it signs.
+rebound. Review 2 independently verified the two controlling scope copies,
+exact-head runtime identity, and retained manifest, found no remaining
+contradiction, and approved. RB-2 is **JOINTLY APPROVED — AWAITING MERGE**;
+complete Prompt 05's merge closeout before beginning RB-3.

@@ -1,6 +1,6 @@
 # `RB-2` — Adversarial Review Record
 
-Status: **REVIEW 2 RE-REVIEW DENIED — RETURN TO IMPLEMENTATION** (`RB2-R2-004`)
+Status: **JOINTLY APPROVED — AWAITING MERGE**
 
 ## Initial Review 1 verdict — 2026-07-30
 
@@ -895,3 +895,116 @@ history.
 
 **Reviewer signature:** Codex, Review 2 re-review — **DENIED — RETURN TO
 IMPLEMENTATION** (`RB2-R2-004`) — `2026-08-02T14:12:49.5219567-07:00`.
+
+---
+
+## Review 2 re-review of `RB2-R2-004` — Codex, 2026-08-02
+
+### Verdict
+
+**APPROVED.** The plan-owner return required by `RB2-R2-004` is complete. At
+owner-amendment and review-entry head
+`2dd95862b4f407c6b24c601ad4829129768ac946`, both authoritative scope copies —
+`IMPLEMENTATION-PLAN.md` and `BUNDLE.md` — expressly include ordinary
+data-sheet field columns, all four `Source Files` columns, and the `Source
+Files` stored-geometry surface in `compare_tsn_common.py`. The amendment
+authorizes the existing acceptance runtime byte-for-byte, so the exact runtime
+head, corpus, installed-Excel results, witnesses, and manifest remain valid.
+
+The amendment also resolves the factual conflict rather than merely waiving
+it: base data columns store no explicit width and render at Excel's 8.43
+default; the former 13.0 premise came from the same eight-column measurement
+window later disproved by `RB2-R2-001`; and ordinary data sheets are the
+largest measured clipping class (736 cells versus 392 in `Comparison` on the
+same twelve base deliverables). `Source Files` was not Stage 2-frozen and its
+row-1 header clipping was outside the scans that skipped the wrapped header
+band. The accepted openpyxl 13.0 floor can over-widen but cannot make a measured
+column narrower, and the owner has explicitly carried any refinement forward.
+
+### Review identity and bounded execution
+
+| Field | Final re-review record |
+|---|---|
+| Reviewer / pass | Codex / Review 2 re-review of `RB2-R2-004`; not the implementer |
+| Implementer | Claude |
+| Branch | `hotfix/rb-2-deliverable-presentation` |
+| Recorded base / merge base | `896083e014d0451d5b05e5b6b024339aebc84d74` / exact match |
+| Acceptance runtime head | `06266eca1a4858dc5ebd000d1dd2e946249c7338` |
+| Manifest-build head | `4b48df644f0068ff5ec21f814da98e102631e971` |
+| Owner-amendment / review-entry head | `2dd95862b4f407c6b24c601ad4829129768ac946` |
+| Remote branch head on entry | `2dd95862b4f407c6b24c601ad4829129768ac946` |
+| Entry state | Clean worktree; local and remote agree; base-to-entry `git diff --check` clean |
+| Runtime identity | 418 tracked files; digest `9E411BA215C5C511C7351630A688319E9900B25B6C94BE8DBBD0A50469A38483`; zero runtime files changed after acceptance |
+| Active review budget | Approximately 15 minutes |
+| Resource budget | **RESPECTED** — no generation, corpus re-hash, Excel automation, application build, full gate, or bulk output; one 1.6-second committed-verifier run plus bounded source, diff, and record probes |
+
+### Owner ruling and exact-head verification
+
+| Required return / precondition | Result | Evidence |
+|---|---|---|
+| Plan owner rules on the excluded data-field surface | **PASS** | Owner-authored `2dd9586` amends HF-02 in the authoritative plan and mirrored bundle to include ordinary field columns and authorizes the accepted runtime byte-for-byte. |
+| Plan owner rules on `Source Files` geometry | **PASS** | The same commit explicitly includes all four `Source Files` columns and expands `compare_tsn_common.py`'s allowed surface to stored geometry. |
+| The two controlling scope copies agree | **PASS** | Direct comparison of the amended HF-02 text in `IMPLEMENTATION-PLAN.md` and `BUNDLE.md`; no contradictory exclusion remains. |
+| No unapproved runtime or evidence drift | **PASS** | `git diff --name-only 06266eca..2dd9586 -- scripts build` is empty; only records follow the acceptance runtime. |
+| Branch and base are exact | **PASS** | Local and remote entry heads agree; `git merge-base 896083e 2dd9586` returns the recorded base exactly. |
+| Retained evidence remains usable | **PASS** | Independent committed verifier re-derived the runtime digest, matched all 418 files, bound all 21 claimed results and five witnesses to `06266eca`, and returned `VERIFIED — 0 problem(s)`. |
+
+The verified `RB2-A1-manifest.json` is 1,808,348 bytes with reviewer SHA-256
+`6256A0FB882BCD29AF5A25C97E57B81A130F0CC68325B00AEA75B8D6B17FFC9F`.
+The verifier itself is bound at SHA-256
+`C13E4720FBD2D77B9B6CED5A0A932A85AEBA1EF6D7ADE0FBA6B7DE7871705775`.
+
+### Acceptance-criterion coverage
+
+| Acceptance criterion | Final result | Exact evidence |
+|---|---|---|
+| HF-02.1 — zero materially clipped cells, all families and both twins | **PASS** | Manifest-derived expanded result covers 60/60 head deliverables, 526 visible sheets, and 8,200 columns with zero bundle-owned hits; `clipping-corpus-head.json` is 117,385 bytes / `2BF616FC74B8511C6A183C104CD2CA4CFD6481B22A6DD48EEE3A2A4F87EF2FF3`. Base proof covers 42/42 and 1,648,387 owned hits at `2F708943F78FB83B4F74BECDC49F4857CA1A676CFF8336A0F126A1A367ACAA12`. |
+| HF-02.2 — category labels are unambiguous | **PASS** | Retained stored-width and native-Excel metric/render results are exact-head manifest entries; the focused permanent presentation gate passed. |
+| HF-02.3 — context labels are truthful | **PASS** | Retained comparison witnesses and the focused gate prove `not compared (context)` for wholly-context fields while compared zeroes and Highway Log per-cell context retain their semantics. |
+| HF-02.4 — values `Summary!B3` is consumable without recalculation | **PASS** | Exact-head `excel-recalc.json` (120,757 bytes / `ADBD1153D3652645880A4FDD4DFEBF1B08B4D904AFB753C8CB1A7DE8542B3F09`) and the retained headline checks pass with zero cached errors. |
+| HF-02.5 — cells, masks, counts, and typed outcomes stay invariant | **PASS** | Committed `count-invariance.json` (23,182 bytes / `4E909DE624CF94F9C13C20CB2B2F84C0706530EE382ABB38438D2B9C8B5CC3F3`) and exact-head `invariance.json` preserve the semantic result set. |
+| HF-02.6 — durable red-to-green gate and complete bound evidence | **PASS** | Base/head witness `D272FA310C6E8E8D474CB302789E76CC9D7F7D117103ECCEA2CE952F0B8F7B5F`, expanded coverage witness `BBB1767EDBF4EA6670C779EA209567C88BA099EFDD5B47536BEF9FE733E3740D`, exact harness `B24C32CBEC2D27A67733613CF753244E916FDEC4782717A0CDD337B461C4801A`, retained full gate 158/158, and focused presentation check all pass. |
+| HF-03.1 — rebuilt TSN claims remain available on matrix captures | **PASS** | Exact-head `tsn_rebuild.json` and provenance witness retain the same canonical source identity and no false rebuild instruction. |
+| HF-03.2 — published provenance names durable canonical inputs | **PASS** | `tsn-provenance-scope.json` (21,144 bytes / `9AAED68A2E5715EF8F797ABE8F017DB3303C8685078948CB19A48176AC08A0CE`) records zero `%TEMP%` paths and readable durable selections. |
+| HF-03.3 — sidecar/capture claims are complete | **PASS** | The same-head manifest and focused canonical-consumer test bind the full sidecar payload for all required lanes. |
+| HF-03.4 — capture cleanup covers success, failure, and cancellation | **PASS** | `temp-capture-lifecycle.json` (2,019 bytes / `279D285E9A72067E2BF7435EB415B025516F62FB1F1193CC3F86F7870B043F22`) records zero remaining run-owned temp directories. |
+| HF-03.5 — neighboring behavior and published outcomes remain invariant | **PASS** | Retained generation-equivalence, count/state/outcome, provenance, publication, and sibling checks are all exact-head manifest entries. |
+| HF-03.6 — permanent gates and failure behavior | **PASS** | Focused canonical-consumer, freshness, pairing, skip/warn, publication, cache, and artifact-store gates are included in the retained 158/158 full gate; no runtime changed afterward. |
+
+The expanded clipping witness separately discloses 45,072 `Report View` hits
+as pre-existing and unowned under the unchanged disposition. They are neither
+hidden nor charged to this bundle.
+
+### Review-domain matrix
+
+| Review domain | Final disposition |
+|---|---|
+| Source truth / counts / masks | **PASS** — same-head invariance and typed-outcome witnesses remain exact |
+| Values / formulas | **PASS** — both twins, cached headline, self-checks, and zero cached-error result remain bound |
+| Visual / presentation | **PASS** — 60/60 expanded coverage, zero owned clips, retained native-Excel metrics/renders |
+| Evidence eligibility / provenance | **PASS** — durable source identities; no published `%TEMP%` path or false rebuild instruction |
+| Neighboring-family regression / full gate | **PASS (retained)** — 158/158; no runtime drift, so the gate was not duplicated during review |
+| Performance / atomic publication / stale state / failure behavior | **PASS (retained)** — focused transaction, freshness, cache, cleanup, and publication records remain same-head |
+| Frozen implementation scope | **PASS** — both controlling copies expressly authorize every disputed accepted-runtime surface |
+
+### Review 2 challenge to Review 1
+
+Review 1 could not assess the later `RB2-R2-001` and `RB2-R2-002` remedies and
+therefore missed the wide-glyph selection failure, the remaining bound-width
+clip, the incomplete 18-deliverable all-sheet evidence lane, and the resulting
+scope conflict. Review 2 did not copy Review 1: it found and forced closure of
+each issue in sequence, then refused to decide `RB2-R2-004` from the reviewer
+chair. This final pass challenged the owner's answer by checking both
+authoritative copies, their factual reconciliation, the complete branch diff,
+and byte-for-byte runtime identity. The retained evidence was then revalidated
+with the independent committed verifier. No contradiction remains.
+
+### Final decision
+
+No actionable failure or evidence gap remains. Review 1 and Review 2 both
+approve, neither reviewer implemented the bundle, and the owner has resolved
+the only planning-authority question. RB-2 is **JOINTLY APPROVED** and eligible
+to merge.
+
+**Reviewer signature:** Codex, Review 2 re-review of `RB2-R2-004` —
+**APPROVED** — `2026-08-02T14:50:47.3393655-07:00`.

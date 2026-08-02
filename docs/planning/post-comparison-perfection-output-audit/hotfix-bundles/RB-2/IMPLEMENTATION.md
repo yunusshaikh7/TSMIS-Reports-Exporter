@@ -1,14 +1,16 @@
 # `RB-2` — Implementation Record
 
-Status: **SCOPE AMENDED BY THE OWNER (2026-08-02) — AWAITING ADVERSARIAL
-REVIEW.** `RB2-R2-004` returned the bundle to the plan owner rather than to
+Status: **JOINTLY APPROVED — AWAITING MERGE.** `RB2-R2-004` returned the bundle
+to the plan owner rather than to
 implementation, and the owner authorized the existing runtime **byte-for-byte**:
 HF-02's exclusion of the data field columns is withdrawn as founded on a
 superseded measurement, and `compare_tsn_common.py` is authorized for the
 `Source Files` sheet's geometry. **No product file changed**, so the acceptance
 head remains `06266eca1a4858dc5ebd000d1dd2e946249c7338` and no acceptance evidence was regenerated or rebound.
 `RB2-R2-EG-003` (60/60, 0 owned clipped cells), `RB2-R2-001`, `RB2-R2-002` and
-Review 1's `EG-001`/`EG-002` all remain closed.
+Review 1's `EG-001`/`EG-002` all remain closed. Review 2 verified the amended
+scope and retained exact-head evidence, found no remaining contradiction, and
+approved.
 
 | Field | Value |
 |---|---|
