@@ -1,6 +1,7 @@
 # `RB-2` — Implementation Record
 
-Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (`RB2-R2-002` remedied;
+Status: **DENIED — EVIDENCE GAP** (`RB2-R2-EG-003`; the targeted
+`RB2-R2-002` product remedy passes, but expanded evidence covers 42/60;
 `RB2-R2-001` and Review 1's `EG-001`/`EG-002` remain closed)
 
 | Field | Value |

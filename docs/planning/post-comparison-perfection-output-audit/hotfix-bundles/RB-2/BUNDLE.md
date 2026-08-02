@@ -1,14 +1,16 @@
 # `RB-2` — Bundle Contract
 
-Status: **DENIED — RETURN TO IMPLEMENTATION** (`RB2-R2-002`). Review 2's
-`RB2-R2-001` character-count selection defect is closed at acceptance head
-`81d5bca69b9c`, but the re-review found a new concrete HF-02 criterion-1
-failure. The hash-bound whole-column result records **4,978 materially clipped
-head cells** at the bundle's `60.0` width cap and nevertheless sets
-`clean: true` by excluding cap-bound clipping from clean. This contract requires
-zero and authorizes no cap exception. The denial and exact return are in
-[REVIEW.md](REVIEW.md); resume Prompt 04 on the existing branch and do not
-merge, clean up, or begin RB-3.
+Status: **DENIED — EVIDENCE GAP** (`RB2-R2-EG-003`). Review 2 confirms that
+`RB2-R2-001` remains closed and the targeted `RB2-R2-002` product mechanism
+passes at acceptance runtime head
+`06266eca1a4858dc5ebd000d1dd2e946249c7338`: the bundle's `60.0` cap is gone,
+long values widen beyond it, and Excel-ceiling values wrap. The returned
+all-visible-sheet witness nevertheless examines only **42 of 60** head
+deliverables. The omitted 18 By Day deliverables do not receive its expanded
+Comparison/Only-in/data/Routes/Provenance scan, so HF-02 criterion 1 is not
+finally proved. The denial and exact bounded evidence return are in
+[REVIEW.md](REVIEW.md); resume Prompt 04 on the existing branch and do not merge,
+clean up, or begin RB-3.
 
 > This RB-level contract carries **HF-02 + HF-03** and transcribes both frozen
 > work-item sections from
@@ -107,7 +109,7 @@ weakened oracle, or rush ship may not replace that split.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to its own `statewide-summary-visible-text-clipping.json`, `large-detail-no-render-visual-adjudication.json` and native-Excel renders, plus the committed `stage2-measure-clipping.py` / `stage2-clipping-recheck.json` |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-2: DENIED — RETURN TO IMPLEMENTATION (`RB2-R2-002`)** |
+| Status | **Inherits RB-2: DENIED — EVIDENCE GAP (`RB2-R2-EG-003`)** |
 
 **Exact scope.** Stored presentation and self-description of the generated
 comparison workbook, **all families, both twins**: the `Comparison` category/key
@@ -230,7 +232,7 @@ and the per-family count-invariance table.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to `run-ledgers/tsn-library-rebuild.json`, `source-audit/all-completed-workflow-note-audit.json`, the committed `stage2-tsn-provenance-scope.json`, and Claude's `witness\temp_captures.txt` (readable since the firewall ended) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-2: DENIED — RETURN TO IMPLEMENTATION (`RB2-R2-002`)** |
+| Status | **Inherits RB-2: DENIED — EVIDENCE GAP (`RB2-R2-EG-003`)** |
 
 **Exact scope.** The matrix lanes' private TSN capture step and what the
 resulting workbooks say about their own TSN input: all 12 vs-TSN families × the

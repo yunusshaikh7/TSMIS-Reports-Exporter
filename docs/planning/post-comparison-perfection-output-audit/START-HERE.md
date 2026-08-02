@@ -2,11 +2,12 @@
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
 RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
-RB-2 Review 2 re-review is IMPLEMENTED — AWAITING ADVERSARIAL REVIEW (RB2-R2-002 remedied; acceptance re-run at 06266ec)
-`hotfix/rb-2-deliverable-presentation` for `RB2-R2-002`, reviewed through
-`040b98190ca86cfac41f0a5b6d3942fd5c71f7a6`**
+RB-2 Review 2 re-review is DENIED — EVIDENCE GAP (`RB2-R2-EG-003`;
+the targeted `RB2-R2-002` remedy passes, but expanded evidence covers 42/60)
+on `hotfix/rb-2-deliverable-presentation`, reviewed through
+`efdf9fc8e97bba1d222483a4bb237716dcbcaa1d`**
 
-Last updated: 2026-08-01
+Last updated: 2026-08-02
 
 This is the entry point for every new Codex or Claude chat. Read this file
 before opening the other audit documents. The project deliberately separates
@@ -21,19 +22,22 @@ Resume
 on the existing `hotfix/rb-2-deliverable-presentation` branch with
 `<BUNDLE_ID> = RB-2` and `<IMPLEMENTER> = Claude`.
 
-Codex Review 2 re-review closes `RB2-R2-001`'s character-count selection
-mechanism: the rendered-width fixture passes in both twins and the exact-head
-verifier binds all 21 claimed results to acceptance head `81d5bca69b9c`. It
-denies one new concrete HF-02 criterion-1 failure as `RB2-R2-002`. The retained
-whole-column result reports **4,978 materially clipped head cells** in real
-Comparison sheets, all at the bundle's `60.0` width cap, while marking the run
-`clean: true` only by redefining clean to ignore cap-bound clipping. The frozen
-criterion requires zero and contains no cap exception. The signed denial and
-bounded return are in
+Codex Review 2 re-review confirms that the targeted `RB2-R2-002` product
+mechanism now passes at acceptance runtime head
+`06266eca1a4858dc5ebd000d1dd2e946249c7338`: the bundle's `60.0` cap is gone,
+long values widen beyond it, Excel-ceiling values wrap, and the focused
+all-visible-sheet fixture passes both twins. It denies one blocking evidence
+gap as `RB2-R2-EG-003`. The retained expanded corpus result examines only
+**42 of 60** head deliverables. The omitted 18 By Day deliverables receive an
+unwindowed scan only on Summary and Spot Check, leaving Comparison, Only-in,
+data, Routes, Provenance, and other visible sheets inside the old eight-column /
+80-row blind spot. The signed denial and bounded return are in
 [`hotfix-bundles/RB-2/REVIEW.md`](hotfix-bundles/RB-2/REVIEW.md).
 
-Do not merge, clean up, or begin RB-3. Implement the bounded return before
-another Review 2 re-review.
+Do not merge, clean up, or begin RB-3. Supply one retained, hash-bound expanded
+result covering the missing 18 deliverables or all 60, rebuild the manifest,
+and then return for another Review 2 re-review. No product regeneration,
+installed-Excel rebuild, or full-gate rerun is requested unless runtime changes.
 
 RB-1 (work item HF-01, branch `hotfix/rb-1-clean-road-source-truth`) was
 implemented, denied by Codex Review 1 on the clipped `ArcGIS Build` disclosure
@@ -147,10 +151,11 @@ The other two point in opposite directions on purpose:
 
 Both planners signed the Stage 3 plan. **RB-1 is merged. RB-2 Review 1 approved
 the original same-head evidence remedies. Review 2's `RB2-R2-001` selection
-failure is now closed, but its re-review found `RB2-R2-002`: the refreshed
-acceptance result itself records 4,978 materially clipped head cells at the
-bundle's width cap and then classifies them as clean. RB-2 is returned to Stage
-4 on its existing branch.**
+mechanism and the targeted `RB2-R2-002` product mechanism now pass, but the
+current re-review denies `RB2-R2-EG-003`: the all-visible-sheet result covers
+42/60 head deliverables and omits the 18 By Day deliverables from the expanded
+Comparison/Only-in/data/Routes/Provenance scan. RB-2 is returned to Stage 4 on
+its existing branch for the bounded evidence return.**
 
 Stage 2 is closed with no open conflict:
 
@@ -172,8 +177,8 @@ Stage 2 is closed with no open conflict:
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-2 DENIED — RETURN TO IMPLEMENTATION (`RB2-R2-002`)** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-2 REVIEW 2 RE-REVIEW DENIED** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-2 DENIED — EVIDENCE GAP (`RB2-R2-EG-003`)** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-2 REVIEW 2 RE-REVIEW DENIED — EVIDENCE GAP** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

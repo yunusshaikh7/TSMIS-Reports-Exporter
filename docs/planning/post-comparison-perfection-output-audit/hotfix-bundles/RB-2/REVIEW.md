@@ -1,6 +1,6 @@
 # `RB-2` — Adversarial Review Record
 
-Status: **REVIEW 2 RE-REVIEW DENIED — RETURN TO IMPLEMENTATION** (`RB2-R2-002`)
+Status: **REVIEW 2 RE-REVIEW DENIED — EVIDENCE GAP** (`RB2-R2-EG-003`)
 
 ## Initial Review 1 verdict — 2026-07-30
 
@@ -609,3 +609,154 @@ and preserve the closed `RB2-R2-001` history.
 
 **Reviewer signature:** Codex, Review 2 re-review — **DENIED — RETURN TO
 IMPLEMENTATION** (`RB2-R2-002`) — `2026-08-01T11:48:11.5375227-07:00`.
+
+---
+
+## Review 2 re-review of `RB2-R2-002` — Codex, 2026-08-02
+
+### Verdict
+
+**DENIED — EVIDENCE GAP.** The bounded source challenge and permanent
+presentation fixture close the specific `RB2-R2-002` product mechanism: the
+bundle's `60.0` cap is gone, long Comparison/Only-in values widen past it, and
+cells that reach Excel's own `255.0` format ceiling wrap in both twins. The
+returned acceptance evidence does not, however, supply the required expanded
+scan across all 60 head deliverables.
+
+The exact missing item is:
+
+> One retained, hash-bound all-visible-sheet clipping result covering the 18
+> By Day deliverables omitted by `clipping-corpus-head.json`, or one replacement
+> result covering all 60 head deliverables, at acceptance head
+> `06266eca1a4858dc5ebd000d1dd2e946249c7338`.
+
+This is material because the omitted sheets retain the committed oracle's first
+eight-column / first-80-row window. That is the precise blind spot that allowed
+the prior real failure at `Comparison!AI2` to pass. A zero over 42 deliverables
+cannot prove the returned requirement over 60.
+
+### Review identity and bounded execution
+
+| Field | Re-review record |
+|---|---|
+| Reviewer / pass | Codex / Review 2 re-review of `RB2-R2-002`; not the implementer |
+| Implementer | Claude |
+| Branch | `hotfix/rb-2-deliverable-presentation` |
+| Recorded base / merge base | `896083e014d0451d5b05e5b6b024339aebc84d74` / exact match |
+| Acceptance runtime head | `06266eca1a4858dc5ebd000d1dd2e946249c7338` |
+| Manifest-build head | `1a0028942ffcf83b6bae7351ec11c12541aafe92` |
+| Review-entry / reviewed branch head | `efdf9fc8e97bba1d222483a4bb237716dcbcaa1d` |
+| Remote branch head on entry | `efdf9fc8e97bba1d222483a4bb237716dcbcaa1d` |
+| Entry worktree | Clean; `git diff --check` clean |
+| Runtime digest recorded | `9E411BA215C5C511C7351630A688319E9900B25B6C94BE8DBBD0A50469A38483` over 418 tracked runtime files |
+| Active review budget | Approximately 30 minutes; stopped at the first material evidence gap |
+| Resource budget | **RESPECTED** — no corpus generation, Excel automation, application build, full gate, corpus re-hash, or new bulk output; one 20.4-second focused fixture run |
+
+### Preconditions and exact-head binding
+
+| Prompt 05 precondition | Result | Evidence |
+|---|---|---|
+| Explicit re-review authorization | **PASS** | The user invoked Prompt 05 specifically for the Review 2 re-review of `RB2-R2-002`. |
+| Branch, base, and retained roots exist | **PASS** | Local and remote branch heads agree; merge-base equals the recorded base; retained HF-02/HF-03 roots and the manifest-recorded harness location exist. |
+| Exact acceptance head is recorded | **PASS** | Manifest and 20/20 claimed results name `06266eca1a4858dc5ebd000d1dd2e946249c7338`; no runtime file changed in the two later record/manifest commits. |
+| Expensive acceptance operations have complete retained coverage | **FAIL** | The all-sheet expanded witness examines 42 head deliverables; the same-head measure record identifies 60, with 18 By Day deliverables outside that witness's only corpus root. |
+
+The current `RB2-A1-manifest.json` is 1,802,846 bytes with reviewer SHA-256
+`90BB704BB1D28185F7AF6F1ABA087E7D6ED7DA20C6E95E55EBA04A648FAC4DC3`.
+Its source listing is 962,858 bytes with SHA-256
+`7CD39FBABDB93EF98C8742D66FABA605315FDD2D934030AED11FE9F31108EC71`.
+The manifest classifies 31 result records: 20 acceptance, two base-side, eight
+history, and one source record; it records zero off-head, unstamped, or
+mislabelled claimed results. The four committed witness bytes independently
+matched their manifest hashes.
+
+The committed verifier was launched once with a reviewer-inferred expansion of
+the abbreviated `06266ec` SHA. Git rejected that incorrect expansion as
+`not a tree object` before comparing a runtime file. Per Prompt 05 it was not
+retried. The exact head was then read directly from the manifest and the
+20-result exact-head census, witness hashes, 418-file set, and post-head Git
+runtime diff were checked independently. This is a reviewer-tool error, not a
+product failure.
+
+### `RB2-R2-002` targeted closure
+
+| Required return | Result | Evidence |
+|---|---|---|
+| Remove the unapproved `60.0` cap from non-wrapping columns | **PASS, targeted** | Source inspection finds no product cap; long-field fixtures widen beyond `60.0` in both twins. |
+| Make Excel-ceiling values legible | **PASS, targeted** | The focused fixture drives Comparison, both Only-in sheets, data sheets, Routes, Provenance, and category rendering to `255.0` and requires qualifying wrapped cells. |
+| Strengthen the permanent gate beyond column 8 / row 80 | **PASS for fixtures; incomplete for retained corpus** | `build/check_workbook_presentation.py` scans every visible fixture sheet and completed `all good` in 20.4 seconds. |
+| Prove zero on all 60 regenerated head deliverables | **FAIL — EVIDENCE GAP** | `clipping-corpus-head.json` examines 42; the missing 18 By Day deliverables do not receive its all-sheet scan. |
+
+The retained `clipping-corpus-head.json` is 114,090 bytes with independently
+matched SHA-256
+`3422F0E0CD9A5E324BAA0AA2FAC13EB2044F96BDAB006569F59FF3B31EBFFBCE`.
+It records 42 deliverables, 364 visible sheets, 5,890 columns, zero
+bundle-owned clipped cells, and 30,048 separately disclosed pre-existing hits
+on `Report View`. Those `Report View` hits are not charged to RB-2 in this pass:
+the base and head both omit stored widths there, the sheet replicates a printed
+report, and it is outside the frozen HF-02 surface. The blocking problem is the
+missing 18-deliverable coverage, not that disclosed residue.
+
+### Independent challenge to Review 1
+
+Review 1 could reuse the implementation's 60-deliverable **windowed** RC-1
+result and the earlier 42-deliverable expanded result without checking how the
+new all-sheet scan reached the By Day publication root. This re-review compared
+the two result counts and then read the exact hash-bound harness:
+
+- `measure-head.json` records 1,265 workbooks and **60 deliverables**, including
+  **18** paths rooted at `byday/`; its unwindowed helper scans only `Summary`
+  and `Spot Check`;
+- exact harness `acc_measure.py`, SHA-256
+  `878818E5FA0196DE71DFD8473C7C57AE9180216D47DC10D4EE5253173A5E0532`,
+  states that Comparison, Only-in, data, and Routes are delegated to
+  `acc_clipping_corpus.py`;
+- exact harness `acc_clipping_corpus.py`, SHA-256
+  `E6D3CE8B5C148AE8C2FF26A0CD12EC09C6296951BBC92A7AA9420F7C4FD5129D`,
+  enumerates only `ROOT.rglob("*.xlsx")`; the retained result's sole root is
+  `HF-02\head`, where it finds **42**, with zero skips.
+
+Therefore the claim that the two legs leave no visible sheet unmeasured is
+false for the 18 By Day deliverables: their Summary and Spot Check sheets are
+unwindowed, but their Comparison, Only-in, data, Routes, Provenance, and extra
+visible sheets are not.
+
+### Acceptance and review-domain disposition
+
+| Acceptance criterion | Re-review disposition | Basis |
+|---|---|---|
+| HF-02.1 — zero materially clipped cells, both twins | **NOT FINALLY ADJUDICATED** | The targeted remedy passes, but the required 60-deliverable all-sheet result is incomplete by 18. |
+| HF-02.2–5 | **No new contradiction; retained evidence reused** | Native renders, context rendering, cached headline, and semantic/state/count/outcome invariance remain same-head evidence. |
+| HF-02.6 — permanent gate and pre-fix proof | **PASS for the focused gate; corpus coverage incomplete** | The focused gate passes and mutation coverage is retained; it cannot replace the missing By Day corpus leg. |
+| HF-03.1–6 | **No new contradiction; not repeated** | Review 1's signed same-head evidence remains usable and is not implicated by the clipping-coverage gap. |
+
+| Review domain | Disposition |
+|---|---|
+| Source truth / counts / masks | No new contradiction; retained invariance reused |
+| Values / formulas | Targeted presentation fixture passes both twins; full corpus conclusion withheld |
+| Visual / presentation | **EVIDENCE GAP** — 18 deliverables lack an all-sheet expanded result |
+| Evidence / exact-head identity | Exact-head census and hashes pass; coverage is incomplete |
+| Neighboring-family regression / full gate | Retained 158/158 gate reused; not rerun |
+| Failure / atomic behavior | No new contradiction found |
+
+Source inspection also surfaced an unresolved scope question: the remedy calls
+`_fit_data_columns` even though the frozen contract limits the data-sheet change
+to key/back-link columns and explicitly names data columns out of scope, and it
+changes `write_source_files_sheet` although `compare_tsn_common.py` is authorized
+only for provenance selection. Prompt 05 requires stopping on the one material
+evidence gap, so this pass does **not** issue a second finding or prescribe a
+source change. The next re-review must resume that scope challenge rather than
+assuming it approved.
+
+### Actionable evidence gap
+
+| ID | Priority | Missing item | Required return |
+|---|---|---|---|
+| `RB2-R2-EG-003` | P1 / blocking | The returned all-visible-sheet witness covers 42/60 head deliverables. The 18 By Day deliverables receive an unwindowed scan only on Summary and Spot Check, leaving the exact Comparison/Only-in blind spot from `RB2-R2-002` unproved. | Preserve the acceptance runtime and prior history. Produce one hash-bound expanded result from an explicit manifest-derived list of all 60 head deliverables, or add the 18 By Day paths to the existing all-sheet harness; scan every visible sheet with only documented never-rendered/out-of-scope treatment, require zero bundle-owned materially clipped cells, record exact path/size/SHA-256/runtime head, and rebuild the manifest. No product regeneration, installed-Excel rebuild, or full-gate rerun is requested unless product runtime changes. Then return Prompt 05 for a fresh Review 2 re-review. |
+
+Do not merge, switch to `main`, clean up the RB-2 branch, or begin RB-3. Resume
+Prompt 04 on the existing branch only to supply `RB2-R2-EG-003`; preserve the
+closed `RB2-R2-001` and targeted `RB2-R2-002` remedy history.
+
+**Reviewer signature:** Codex, Review 2 re-review — **DENIED — EVIDENCE GAP**
+(`RB2-R2-EG-003`) — `2026-08-02T11:42:41.2637201-07:00`.
