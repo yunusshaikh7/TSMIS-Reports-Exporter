@@ -36,7 +36,6 @@ import difflib
 import math
 import re
 import textwrap
-import unicodedata
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
@@ -2041,35 +2040,77 @@ def _fonts_for(bold, size_pt):
     return result
 
 
-def _fullwidth_topup(s, fonts, size_pt):
-    """Extra pixels for characters Excel renders WIDER than our fonts measure.
+_NOTDEF_PROBE = "￾"        # a noncharacter: no font maps it, ever
+_COVERAGE_CACHE = {}
 
-    The measuring fonts are Arial and Calibri. A character outside their design
-    — an ideographic space, a CJK glyph, a fullwidth form — either has no glyph
-    or a narrow stand-in there, while Excel falls back to an East Asian font and
-    renders it FULL WIDTH. Measured on U+3000: our fonts report 10.5 px where
-    installed Excel needs about 13.6, and twenty of them under-sized a column by
-    62 px (RB2-R2-002 round 9).
 
-    Unicode's East Asian Width property names exactly this class, so each `W`
-    (wide) or `F` (fullwidth) character is topped up to ONE EM — which is what
-    "full width" means — and never reduced. Two digit widths was tried first and
-    is not the same thing: it left U+3000 at 12.73 px where Excel needs ~13.6,
-    still 24 px short across the probe. An em at 10 pt is 13.33 px at 96 dpi,
-    and the same measurement margin the rest of this function carries takes it
-    to 14.0. ASCII text is untouched, so the real corpus measures exactly as
-    before; this only widens input our fonts cannot honestly speak for."""
+def _covers(ch, fonts, bold, size_pt):
+    """Does any measuring font have a real glyph for `ch`?
+
+    FreeType substitutes .notdef for a character the font does not map, and
+    .notdef has one fixed advance — so a character measuring exactly that width
+    is one we are not really measuring at all. The probe is a Unicode
+    NONCHARACTER, which no font may map, so it yields the .notdef advance by
+    definition rather than by assumption.
+
+    An allowlist was tried first and was the same enumeration mistake in new
+    clothes: it missed the very characters this module emits itself, `Δ` and
+    `−` in the Summary notes among them. This asks the font instead of
+    guessing, and errs toward WRAPPING — a covered character that happens to
+    share .notdef's advance is wrapped needlessly, which hides nothing."""
+    key = (ch, bold, float(size_pt))
+    hit = _COVERAGE_CACHE.get(key)
+    if hit is not None:
+        return hit
+    notdef = max(f.getlength(_NOTDEF_PROBE) for f in fonts)
+    covered = abs(max(f.getlength(ch) for f in fonts) - notdef) > 1e-6
+    if len(_COVERAGE_CACHE) >= _PX_CACHE_MAX:
+        _COVERAGE_CACHE.clear()
+    _COVERAGE_CACHE[key] = covered
+    return covered
+
+
+def measurable_text(s, bold=False, size_pt=10.0):
+    """Can our fonts honestly measure this string?
+
+    Arial and Calibri are the fonts we measure in. For a character they do not
+    carry, Excel falls back to some other font whose metrics we do not have and
+    cannot obtain, so any width we compute is a guess.
+
+    This replaced an East Asian Width model, which was the wrong predictor
+    twice over (RB2-R2-002 round 10): U+0D05 MALAYALAM LETTER A is EAW=Neutral
+    yet rendered 225 px wider than measured, while U+1F600 is EAW=Wide yet
+    exceeded the one em that model charged it. The property describes typography,
+    not glyph coverage, and no constant derived from it was ever going to hold.
+
+    So the rule is the one this module already applies wherever fitting cannot be
+    proved — the live grid formulas, Excel's width ceiling — and it is applied
+    here for the same reason: a cell we cannot measure WRAPS, showing every line,
+    instead of being given a width we have no basis for."""
+    s = "" if s is None else str(s)
     if s.isascii():
-        return 0.0                       # the common case, and free
-    full = float(size_pt) * 96.0 / 72.0 * _MEASURE_MARGIN
-    extra = 0.0
-    for ch in s:
-        if unicodedata.east_asian_width(ch) not in ("W", "F"):
-            continue
-        measured = (max(f.getlength(ch) for f in fonts)
-                    / _MEASURE_SCALE * _MEASURE_MARGIN)
-        extra += max(0.0, full - measured)
-    return extra
+        return True                      # the common case, and free
+    fonts = _fonts_for(bold, size_pt)
+    if not fonts:
+        return True                      # the per-character fallback estimate
+    return all(ch.isascii() or _covers(ch, fonts, bold, size_pt) for ch in s)
+
+
+def serialized_text(value, exact_source_numeric=True):
+    """The text a cell will actually HOLD, per `set_safe_literal_cell`.
+
+    Neither `str(value)` nor `_xl_trim(value)` is right on its own, and picking
+    either one wrongly has now cost two rounds: `str(1e20)` is "1e+20" where the
+    cell stores "100000000000000000000" (round 8), while `_xl_trim` collapses
+    interior spaces that a raw string keeps, so `"W" + " "*100 + "W"` measured
+    3 characters and stored 102 (round 10). Numbers serialize through `_xl_trim`;
+    strings are stored verbatim."""
+    if type(value) is bool:
+        return "TRUE" if value else "FALSE"
+    if ((exact_source_numeric and _is_finite_source_numeric(value))
+            or _excel_numeric_needs_text(value)):
+        return _xl_trim(value)
+    return "" if value is None else str(value)
 
 
 def _text_px(text, bold=False, size_pt=11.0):
@@ -2091,7 +2132,6 @@ def _text_px(text, bold=False, size_pt=11.0):
     else:
         px = (max(f.getlength(s) for f in fonts)
               / _MEASURE_SCALE * _MEASURE_MARGIN)
-        px += _fullwidth_topup(s, fonts, size_pt)
     if len(_PX_CACHE) >= _PX_CACHE_MAX:
         _PX_CACHE.clear()        # bounded: a corpus run must not grow this
     _PX_CACHE[key] = px          # without limit
@@ -2205,8 +2245,15 @@ def _grid_geometry(grid, base_widths, caps=None):
             # impossible (RB2-R2-002).
             live.add((r, c))
             continue
-        blocked.append((r, c, value, bool(font and font.bold),
-                        float(font.size if font is not None and font.size else 11)))
+        bold = bool(font and font.bold)
+        size = float(font.size if font is not None and font.size else 11)
+        if not measurable_text(value, bold, size):
+            # Same rule, same reason: no width can be proved for text our fonts
+            # do not cover, so it wraps. This sheet's own headline carries `✓`,
+            # which Arial and Calibri do not map (RB2-R2-002 round 10).
+            live.add((r, c))
+            continue
+        blocked.append((r, c, value, bold, size))
     widths = dict(base_widths)
     # Only a cell with NO gap to spill into may drive its column's width; one
     # that renders across a gap already has that room and must not widen the
@@ -2300,10 +2347,14 @@ def _ceiling_wrapper(ws):
     writers with ceiling-width content, so a writer that forgets this call
     fails the gate rather than a review."""
     ceiling = _ceiling_wrapped_columns(ws)
-    if not ceiling:
-        return lambda _position, align=None: align
-    return lambda position, align=None: (
-        _ceiling_wrap_align(align) if position in ceiling else align)
+
+    def align_for(position, align=None, value=None):
+        if position in ceiling or (value is not None
+                                   and not measurable_text(value)):
+            return _ceiling_wrap_align(align)
+        return align
+
+    return align_for
 
 
 def _styled(ws, value, font, fill=None, align=None, guard=False,
@@ -2408,11 +2459,9 @@ def _fit_data_columns(ws, rows, lay):
             i = idx + off
             if i >= len(row) or row[i] is None:
                 continue
-            # `_xl_trim` is what the WRITER stores, and the two forms differ:
-            # `str(1e20)` is "1e+20" where the cell holds
-            # "100000000000000000000" (RB2-R2-002 round 8). Measure the
-            # serialized form, never the repr.
-            s = _xl_trim(row[i])
+            # Exactly what `set_safe_literal_cell` will store — numbers through
+            # `_xl_trim`, strings verbatim (RB2-R2-002 rounds 8 and 10).
+            s = serialized_text(row[i])
             px = _text_px(s, False, 10)
             if px > widest.get(idx, (0.0, ""))[0]:
                 widest[idx] = (px, s)
@@ -2584,7 +2633,7 @@ def _write_data_sheet(wb, name, tab_color, rows, lay, events, cmp_rows,
         # never a live formula (the field FORMULAS read these via TRIM/INDEX, so
         # guarding here protects both flavors at the source).
         cells += [_styled(ws, v, body_font,
-                          align=align_for(j + 1),
+                          align=align_for(j + 1, value=v),
                           guard=True, exact_source_numeric=True)
                   for j, v in enumerate(row)]
         row_fills = fills.get(r - 2) if fills else None
@@ -2839,7 +2888,7 @@ def _write_comparison(wb, union, lay, events, vals=None, helper_tokens=None,
         else:
             guard_set = set(range(len(row))) - link_cols
         ws.append([_styled(ws, v, link_font if j in link_cols else body_font,
-                           align=align_for(j),
+                           align=align_for(j, value=v),
                            guard=(j in guard_set))
                    for j, v in enumerate(row)])
         if (i + 1) % _PROGRESS_EVERY == 0:
@@ -3344,7 +3393,7 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None,
         else:
             guard_set = set(range(len(row))) - {link_col}
         ws.append([_styled(ws, v, link_font if j == link_col else body_font,
-                           align=align_for(j),
+                           align=align_for(j, value=v),
                            guard=(j in guard_set))
                    for j, v in enumerate(row)])
         if (i + 1) % _PROGRESS_EVERY == 0:
@@ -3543,7 +3592,7 @@ def _write_routes(wb, all_routes, lay, vals=None):
         # Guard only the route-id cell (cell 0): a route like "=X" would become
         # a live formula. The other cells are our own =formulas (formulas flavor)
         # or safe literals (values flavor) and must NOT be forced to text.
-        ws.append([_styled(ws, v, body_font, align=align_for(j),
+        ws.append([_styled(ws, v, body_font, align=align_for(j, value=v),
                            guard=(j == 0))
                    for j, v in enumerate(cells)])
     return ws
@@ -4034,13 +4083,13 @@ def _write_provenance_sheet(wb, provenance):
     # instead (RB2-R2-002). The rest of this sheet writes raw values, so the
     # styled cell appears only in the case that needs it.
     align_for = _ceiling_wrapper(ws)
-    role_align = align_for(0)
-
     def role(value):
-        """Column-A text, wrapped only when the column is at the ceiling."""
-        return (value if role_align is None
+        """Column-A text, wrapped when the column is at Excel's ceiling or the
+        text is one our fonts cannot measure."""
+        align = align_for(0, value=value)
+        return (value if align is None
                 else _styled(ws, value, Font(name="Arial", size=11),
-                             align=role_align))
+                             align=align))
 
     recipe = provenance.get("recipe") or {}
     ws.append([role("Comparison Provenance")])

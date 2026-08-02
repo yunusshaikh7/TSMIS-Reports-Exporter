@@ -18,6 +18,7 @@ cannot drift apart — then asserts the two self-description contracts.
 """
 from __future__ import annotations
 
+import datetime
 import importlib.util
 from pathlib import Path
 
@@ -319,6 +320,25 @@ BIGCOUNT_SCHEMA = CompareSchema(
 BIGCOUNT_A = [["K", "999999999"]]
 BIGCOUNT_B = [["K", "0"]]
 
+# ---- RB2-R2-002 round 10: text our fonts cannot measure --------------------
+# U+0D05 MALAYALAM LETTER A is East-Asian-Width NEUTRAL and rendered 225 px wider
+# than measured; U+1F600 is WIDE and exceeded one em by 92 px. Both prove the
+# same thing -- glyph coverage, not typography class, is what matters -- so both
+# are fixtures and the assertion is that such text WRAPS.
+UNMEASURABLE_SCHEMA = CompareSchema(
+    report_name="Presentation Unmeasurable", header=["Key", "Value", "Tail"],
+    side_a="A", side_b="B", id_noun="location", id_noun_plural="locations")
+MALAYALAM_A = MALAYALAM_B = [["k", "\u0D05" * 20, "stop"]]
+EMOJI_A = EMOJI_B = [["k", "\U0001F600" * 20, "stop"]]
+
+# ---- RB2-R2-002 round 10: interior spaces are stored, not trimmed ----------
+# `_xl_trim` collapses them; the data sheet stores the raw string. Measuring the
+# trimmed form sized this column for 3 characters where the cell holds 102.
+SPACES_SCHEMA = CompareSchema(
+    report_name="Presentation Interior Spaces", header=["Key", "Value", "Tail"],
+    side_a="A", side_b="B", id_noun="location", id_noun_plural="locations")
+SPACES_A = SPACES_B = [["k", "W" + " " * 100 + "W", "stop"]]
+
 FRESHNESS_LABEL = ("Build-time source identity and duplicate pairing snapshot "
                    "is current")
 CONTEXT_TEXT = "not compared (context)"
@@ -507,26 +527,27 @@ def _unwrapped_blocked_formulas(path, sheets):
         wb.close()
 
 
-def _fullwidth_shortfall(gate, path):
-    """`[(sheet, coord, short_px)]` for cells holding FULL-WIDTH characters that
-    their column cannot show.
+def _unmeasurable_unwrapped(gate, path):
+    """`[(sheet, coord, sample)]` for cells holding text our fonts cannot
+    measure that were NOT wrapped.
 
-    Deliberately not decided by the product's `_text_px`: asking the measurement
-    under test whether it measured correctly is circular, and it is why the first
-    version of this fixture passed against the broken code. The gate carries its
-    own model, from Unicode rather than from a font file — a character whose East
-    Asian Width is `W` or `F` occupies ONE EM by definition.
+    This replaced a check built on East Asian Width, which was the wrong
+    predictor in both directions: U+0D05 is EAW=Neutral and rendered 225 px
+    wider than measured, U+1F600 is EAW=Wide and exceeded the one em that model
+    charged. No width constant derived from that property was going to hold,
+    because the property describes typography and the problem is glyph coverage.
 
-    Two corrections over that first version, both found by running it:
-    the em is applied as a TOP-UP over the oracle's whole-string measurement
-    rather than by summing per character, which loses kerning and inflated every
-    ordinary sentence; and a cell that can spill into empty neighbours is not
-    clipped, which is why Summary's note rows were being reported. `\u2260` is
-    Ambiguous width, not fullwidth, so a normal difference string tops up by
-    nothing and is skipped outright."""
-    import unicodedata
-
-    from openpyxl.utils import get_column_letter
+    So the gate asserts the CONTRACT instead of a number: text our measuring
+    fonts do not cover cannot be fitted honestly, so it must wrap. That is
+    checkable exactly, and it cannot be defeated by finding another character —
+    which is what the previous two rounds did."""
+    # The gate does its OWN coverage test. Importing `measurable_text` from the
+    # product made the check circular: a mutation that disabled the product's
+    # predicate disabled the gate's copy of it too, and the mutation test came
+    # back with zero failures against code that had stopped wrapping entirely.
+    def covered(ch, bold, size):
+        font = gate.font_for(bold, size)
+        return abs(font.getlength(ch) - font.getlength("￾")) > 1e-6
 
     wb = load_workbook(path, read_only=False, data_only=True)
     bad = []
@@ -540,44 +561,30 @@ def _fullwidth_shortfall(gate, path):
                     value = cell.value
                     if not isinstance(value, str) or value.isascii():
                         continue
-                    wide = [ch for ch in value
-                            if unicodedata.east_asian_width(ch) in ("W", "F")]
-                    if not wide:
-                        continue          # nothing our fonts misjudge
+                    font = cell.font
+                    size = float(font.size or 11) if font else 11.0
+                    bold = bool(font and font.bold)
+                    if all(ch.isascii() or covered(ch, bold, size)
+                           for ch in value):
+                        continue
+                    dim = ws.column_dimensions.get(cell.column_letter)
+                    row_dim = ws.row_dimensions.get(cell.row)
+                    if (getattr(dim, "hidden", False)
+                            or getattr(row_dim, "hidden", False)):
+                        continue
                     align = cell.alignment
                     if align is not None and (align.wrap_text
                                               or align.shrink_to_fit):
                         continue
-                    letter = get_column_letter(cell.column)
-                    dim = ws.column_dimensions.get(letter)
-                    row_dim = ws.row_dimensions.get(cell.row)
-                    if dim is None or dim.width is None:
-                        continue
-                    if (getattr(dim, "hidden", False)
-                            or getattr(row_dim, "hidden", False)):
-                        continue
-                    avail, stopped = gate.width_to_px(float(dim.width)), False
+                    stopped = False
                     for j in range(cell.column + 1, ws.max_column + 1):
                         nxt = ws.cell(row=cell.row, column=j).value
                         if nxt is not None and str(nxt).strip():
                             stopped = True
                             break
-                        d = ws.column_dimensions.get(get_column_letter(j))
-                        avail += gate.width_to_px(
-                            float(d.width) if d is not None and d.width
-                            else gate.DEFAULT_COL_WIDTH)
                     if not stopped:
-                        continue          # free to spill
-                    font = cell.font
-                    size = float(font.size or 11) if font else 11.0
-                    bold = bool(font and font.bold)
-                    em = size * 96.0 / 72.0
-                    need = gate.text_px(value, bold, size) + 4
-                    need += sum(max(0.0, em - gate.text_px(ch, bold, size))
-                                for ch in wide)
-                    if need > avail + gate.TOLERANCE_PX:
-                        bad.append((name, cell.coordinate,
-                                    round(need - avail, 1)))
+                        continue      # spills across the row; shows in full
+                    bad.append((name, cell.coordinate, value[:24]))
         return bad
     finally:
         wb.close()
@@ -609,7 +616,7 @@ def _hash_rendered_numbers(path):
                 for cell in row:
                     value = cell.value
                     if isinstance(value, bool) or not isinstance(
-                            value, (int, float)):
+                            value, (int, float, datetime.date, datetime.time)):
                         continue
                     # Floats, dates and times were rejected BEFORE this check,
                     # so they were neither measured nor counted as skipped —
@@ -634,6 +641,12 @@ def _hash_rendered_numbers(path):
                         continue
                     avail = _usable_px(float(col_dim.width))
                     font = cell.font
+                    if isinstance(value, (datetime.date, datetime.time)):
+                        # A date is a formatted serial; without evaluating the
+                        # format we cannot know its rendered text, so it is
+                        # disclosed rather than measured or dropped.
+                        skipped += 1
+                        continue
                     shown = (str(int(value))
                              if isinstance(value, float) and value.is_integer()
                              else str(value))
@@ -1147,7 +1160,13 @@ def main():
                                     ("widechar", WIDECHAR_SCHEMA,
                                      WIDECHAR_A, WIDECHAR_B),
                                     ("bigcount", BIGCOUNT_SCHEMA,
-                                     BIGCOUNT_A, BIGCOUNT_B)):
+                                     BIGCOUNT_A, BIGCOUNT_B),
+                                    ("malayalam", UNMEASURABLE_SCHEMA,
+                                     MALAYALAM_A, MALAYALAM_B),
+                                    ("emoji", UNMEASURABLE_SCHEMA,
+                                     EMOJI_A, EMOJI_B),
+                                    ("spaces", SPACES_SCHEMA,
+                                     SPACES_A, SPACES_B)):
             for mode in ("values", "formulas"):
                 path = Path(tmp) / f"{tag}-{mode}.xlsx"
                 result = run_compare(schema, ra, rb, False, path, mode=mode,
@@ -1162,12 +1181,12 @@ def main():
                                   f"{h['short_by_px']}px" for h in hits[:3])
                         + "; ".join(f"{s}!{coord} short {short}px"
                                     for s, coord, short, _x in run_hits[:3]))
-                wide = _fullwidth_shortfall(gate, path)
-                c.check(f"{tag}/{mode}: full-width characters fit, measured by "
-                        "Unicode width rather than by a font we cannot trust",
+                wide = _unmeasurable_unwrapped(gate, path)
+                c.check(f"{tag}/{mode}: text our fonts cannot measure is "
+                        "WRAPPED rather than given a guessed width",
                         not wide,
-                        "; ".join(f"{s}!{coord} short {short}px"
-                                  for s, coord, short in wide[:4]))
+                        "; ".join(f"{s}!{coord} {sample!r}"
+                                  for s, coord, sample in wide[:4]))
                 nums, skipped = _hash_rendered_numbers(path)
                 c.check(f"{tag}/{mode}: no NUMBER is too wide for its column, "
                         f"which would render ### ({skipped} formatted skipped)",

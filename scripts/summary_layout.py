@@ -653,6 +653,7 @@ def _render(wb, ctx, spec, footnote_values=None, extra_notes=None):
     # numbers and give them an explicit integer format so the value shown is the
     # value counted (RB2-R2-002 round 9).
     counts = [str(v) for v in list(va.values()) + list(vb.values())
+              + list((footnote_values or {}).values())
               if isinstance(v, int)]
     deltas = [str(b - a) for a, b in ((va.get(k), vb.get(k))
                                       for k in set(va) | set(vb))
