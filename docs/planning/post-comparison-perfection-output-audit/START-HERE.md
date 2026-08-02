@@ -2,10 +2,10 @@
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
 RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
-RB-2 is IMPLEMENTED and AWAITING ADVERSARIAL REVIEW
-(`RB2-R2-EG-003` remedied — the expanded witness covers 60 of 60 head
-deliverables with 0 owned clipped cells) on
-`hotfix/rb-2-deliverable-presentation`**
+RB-2 Review 2 re-review is DENIED — RETURN TO IMPLEMENTATION (`RB2-R2-004`;
+`RB2-R2-EG-003` is closed, but the accepted runtime exceeds the frozen scope)
+on `hotfix/rb-2-deliverable-presentation`, reviewed through
+`7fe2397240e5e0033e9d7638c6255596e5bf5fb6`**
 
 Last updated: 2026-08-02
 
@@ -17,36 +17,33 @@ first pass.
 
 ## Next action
 
-Run
-[`PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md)
-with `<BUNDLE_ID> = RB-2` and `<REVIEWER> = Codex`. This is the Review 2
-re-review of `RB2-R2-EG-003`.
+Return RB-2 to the plan owner before another runtime edit, then resume
+[`PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
+on the existing `hotfix/rb-2-deliverable-presentation` branch with
+`<BUNDLE_ID> = RB-2` and `<IMPLEMENTER> = Claude` only after that ruling.
 
-The evidence gap is closed. The expanded all-visible-sheet witness no longer
-discovers its books by globbing one root — it takes the deliverable list from
-the same-head measure record, refuses a list from a different runtime, and
-treats an unresolvable recorded deliverable as fatal. It now examines **60 of
-60** head deliverables (`byday` 18, `direct-tsn` 18, `everything` 18,
-`classic-env` 6), 526 visible sheets, 8,200 columns, and reports **0** owned
-materially clipped cells; the base side re-ran through the same harness at
-**42 of 42** with 1,648,387. The `Report View` residue stays disclosed, not
-excluded, on the same unchanged disposition.
+Codex Review 2 re-review closes `RB2-R2-EG-003`. The expanded witness now takes
+its exact deliverable set from the same-head measure record and covers **60 of
+60** head deliverables, 526 visible sheets, and 8,200 columns with **0** owned
+materially clipped cells. The committed verifier re-derived the 418-file runtime
+digest, bound all 21 claimed results and all five committed witnesses to
+acceptance head `06266eca1a4858dc5ebd000d1dd2e946249c7338`, and reported zero
+problems.
 
-**No product runtime file changed**, so no corpus was regenerated, no
-installed-Excel leg re-ran, and the full gate was not re-run — as the return
-instructed. The acceptance head is still
-`06266eca1a4858dc5ebd000d1dd2e946249c7338`; both witnesses were produced with
-the worktree detached there. The manifest is rebuilt and verifies
-**VERIFIED — 0 problem(s)** with 21 claimed results all naming that head and 5
-committed witnesses same-head.
+The re-review nevertheless denies one concrete frozen-scope failure as
+`RB2-R2-004`. The accepted runtime calls `_fit_data_columns` on every data sheet
+even though the signed HF-02 contract explicitly excludes the data columns and
+requires their behaviour to remain unchanged. It also adds presentation geometry
+to `write_source_files_sheet`, although the allowed `compare_tsn_common.py`
+surface is provenance selection only. The implementation itself confirms both
+changes and asks the reviewer to choose among scope policies. Prompt 05 does not
+let a reviewer rewrite the signed plan; the exact denial is in
+[`hotfix-bundles/RB-2/REVIEW.md`](hotfix-bundles/RB-2/REVIEW.md).
 
-Two disclosures are recorded in
-[`hotfix-bundles/RB-2/IMPLEMENTATION.md`](hotfix-bundles/RB-2/IMPLEMENTATION.md)
-rather than fixed, because fixing either changes product runtime and forces a
-full regeneration the return did not ask for: an openpyxl `DEFAULT_COLUMN_WIDTH`
-floor inside `_fit_data_columns` (it can only over-widen, never clip), and the
-scope standing of the data-sheet fit and `write_source_files_sheet` — with the
-measurement showing data sheets are the LARGEST clipping class in base.
+The plan owner must either authorize the existing presentation surfaces and
+reconcile the contradictory scope text, or require them reverted. If runtime
+changes, establish a new exact acceptance head and regenerate/rebind the whole
+RB2-A1 set. Do not merge, clean up, or begin RB-3.
 
 ## Workflow
 
@@ -56,8 +53,8 @@ measurement showing data sheets are the LARGEST clipping class in base.
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-2 IMPLEMENTED — `RB2-R2-EG-003` remedied** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-2 AWAITING REVIEW 2 RE-REVIEW** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-2 DENIED — RETURN TO IMPLEMENTATION (`RB2-R2-004`; planning ruling required)** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-2 REVIEW 2 RE-REVIEW DENIED** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

@@ -1,6 +1,6 @@
 # `RB-2` — Adversarial Review Record
 
-Status: **REVIEW 2 RE-REVIEW DENIED — EVIDENCE GAP** (`RB2-R2-EG-003`)
+Status: **REVIEW 2 RE-REVIEW DENIED — RETURN TO IMPLEMENTATION** (`RB2-R2-004`)
 
 ## Initial Review 1 verdict — 2026-07-30
 
@@ -760,3 +760,138 @@ closed `RB2-R2-001` and targeted `RB2-R2-002` remedy history.
 
 **Reviewer signature:** Codex, Review 2 re-review — **DENIED — EVIDENCE GAP**
 (`RB2-R2-EG-003`) — `2026-08-02T11:42:41.2637201-07:00`.
+
+---
+
+## Review 2 re-review of `RB2-R2-EG-003` — Codex, 2026-08-02
+
+### Verdict
+
+**DENIED — RETURN TO IMPLEMENTATION** (`RB2-R2-004`). The exact evidence item
+requested by `RB2-R2-EG-003` is now present, complete, hash-bound, and verified:
+the expanded witness covers all 60 head deliverables and reports zero owned
+materially clipped cells. Approval is still blocked by the deferred source-scope
+challenge. The accepted runtime knowingly changes two presentation surfaces the
+signed bundle contract excludes or does not authorize.
+
+The concrete failure is:
+
+> `_fit_data_columns` changes ordinary data-sheet field columns that HF-02 names
+> explicitly out of scope and requires to remain behaviour-identical, while
+> `write_source_files_sheet` adds Source Files geometry through
+> `compare_tsn_common.py`, whose allowed RB-2 surface is provenance selection.
+
+The implementation accurately discloses both changes and asks the reviewer to
+choose among scope policies. A reviewer cannot make that plan-owner decision or
+silently expand the frozen contract.
+
+### Review identity and bounded execution
+
+| Field | Re-review record |
+|---|---|
+| Reviewer / pass | Codex / Review 2 re-review of `RB2-R2-EG-003`; not the implementer |
+| Implementer | Claude |
+| Branch | `hotfix/rb-2-deliverable-presentation` |
+| Recorded base / merge base | `896083e014d0451d5b05e5b6b024339aebc84d74` / exact match |
+| Acceptance runtime head | `06266eca1a4858dc5ebd000d1dd2e946249c7338` |
+| Manifest-build head | `4b48df644f0068ff5ec21f814da98e102631e971` |
+| Review-entry / reviewed branch head | `7fe2397240e5e0033e9d7638c6255596e5bf5fb6` |
+| Remote branch head on entry | `7fe2397240e5e0033e9d7638c6255596e5bf5fb6` |
+| Entry worktree | Clean; branch and remote agree; base-to-entry `git diff --check` clean |
+| Runtime digest | `9E411BA215C5C511C7351630A688319E9900B25B6C94BE8DBBD0A50469A38483` over 418 tracked runtime files |
+| Active review budget | Approximately 20 minutes; stopped at the first concrete acceptance contradiction |
+| Resource budget | **RESPECTED** — no workbook generation, corpus re-hash, Excel automation, application build, full gate, or bulk output; one 2.2-second committed verifier run plus small JSON hashes/parses and source inspection |
+
+### Preconditions and exact-head binding
+
+| Prompt 05 precondition | Result | Evidence |
+|---|---|---|
+| Explicit re-review authorization | **PASS** | The user invoked Prompt 05 specifically for the Review 2 re-review of `RB2-R2-EG-003`. |
+| Branch, base, and retained roots exist | **PASS** | Worktree clean; local and remote heads agree; merge-base equals the recorded base; retained result and harness paths exist. |
+| No runtime drift after acceptance | **PASS** | Four record/evidence commits follow `06266eca`; `git diff` finds no `scripts/` or `build/` path changed after it. |
+| Expensive operations are retained and bound | **PASS** | The rebuilt manifest records 21 claimed results at one acceptance head and five committed witnesses; the committed verifier reports zero problems. |
+| Frozen implementation scope is respected | **FAIL** | The accepted runtime changes explicitly excluded data fields and a `compare_tsn_common.py` presentation path outside the authorized provenance-selection surface. |
+
+The current `RB2-A1-manifest.json` is 1,808,348 bytes with reviewer SHA-256
+`6256A0FB882BCD29AF5A25C97E57B81A130F0CC68325B00AEA75B8D6B17FFC9F`.
+The committed verifier independently re-derived the same 418-file runtime
+digest, found zero runtime files changed between the acceptance and manifest
+heads, bound all 21 claimed results to the exact acceptance head, matched all
+five committed witnesses, and completed `VERIFIED — 0 problem(s)`.
+
+### `RB2-R2-EG-003` disposition — closed
+
+| Required return | Result | Exact evidence |
+|---|---|---|
+| Derive the expanded corpus from the complete same-head deliverable set | **PASS** | `measure-head.json`, 1,180,593 bytes, SHA-256 `F1D47B4305385791C4B510B7E47ED04A4529A196692CFDBAAFAABDAF88FBC6F7`; the harness resolves all listed keys rather than discovering by glob. |
+| Cover all 60 head deliverables | **PASS** | 18 By Day + 18 Direct-vs-TSN + 18 Everything + 6 classic-env; 60 expected, 60 examined, zero missing, zero unlisted. |
+| Scan the expanded visible-sheet surface | **PASS for the requested missing lane** | 526 visible sheets and 8,200 columns; the 18 By Day deliverables add the previously omitted Comparison/Only-in/data/Routes/Provenance surface. |
+| Require zero owned material clipping | **PASS** | `clipping-corpus-head.json`, 117,385 bytes, SHA-256 `2BF616FC74B8511C6A183C104CD2CA4CFD6481B22A6DD48EEE3A2A4F87EF2FF3`, records zero owned hits and `clean: true`. |
+| Preserve before-state proof | **PASS** | `clipping-corpus-base.json`, 129,388 bytes, SHA-256 `2F708943F78FB83B4F74BECDC49F4857CA1A676CFF8336A0F126A1A367ACAA12`, records 42/42 and 1,648,387 owned hits. |
+| Commit a compact bound witness and rebuild the manifest | **PASS** | `clipping-expanded-coverage.json`, 4,425 bytes, SHA-256 `BBB1767EDBF4EA6670C779EA209567C88BA099EFDD5B47536BEF9FE733E3740D`; exact harness `acc_clipping_corpus.py`, 22,971 bytes, SHA-256 `B24C32CBEC2D27A67733613CF753244E916FDEC4782717A0CDD337B461C4801A`. |
+
+The 45,072 `Report View` hits remain separately disclosed as pre-existing and
+unowned under the unchanged prior disposition. They are not the reason for this
+denial.
+
+### Deferred challenge to Review 1 — frozen scope
+
+Review 1 could not have caught this later expansion: the data-field and Source
+Files geometry arrived during subsequent `RB2-R2-002` remedy commits. The prior
+re-review identified the scope question but correctly stopped at the material
+EG-003 gap. This pass resumed it by comparing the frozen contract directly with
+the accepted runtime and the implementation's new measurement.
+
+| Frozen authority | Accepted runtime | Disposition |
+|---|---|---|
+| `BUNDLE.md` permits data-sheet **key and back-link** columns and explicitly excludes ordinary data columns, requiring their behaviour to stay byte-identical. | `compare_core._fit_data_columns` at line 2442, called at line 2610 and introduced by `51b5ab9`, assigns a measured width to every ordinary field column. | **FAIL — out of scope.** |
+| `BUNDLE.md` permits `compare_tsn_common.py` only for provenance selection. A change outside the union must return to planning. | `write_source_files_sheet` at line 458 imports `fitted_width` and assigns widths to all four Source Files columns; the geometry arrived in `8f51021`. | **FAIL — unauthorized surface.** |
+
+The implementation independently demonstrates the first behavior change: one
+named data sheet goes from five stored-width columns in base to 71 at head,
+including 68 columns at `13.0`. That floor is created by openpyxl when
+`ws.column_dimensions[col]` is subscripted, not by a selected schema rule. It may
+only over-widen, but the contract requires unchanged behavior; absence of clipping
+does not waive scope. Likewise, Source Files had a real clipped header, but a
+real defect outside the signed surface belongs in a plan-authorized follow-up.
+
+Prompt 05 says no review may answer uncertainty by silently expanding scope.
+`BUNDLE.md` is stronger: a change outside its union requires return to planning.
+The review therefore cannot select any of the implementation's three proposed
+scope policies.
+
+### Acceptance and review-domain disposition
+
+| Acceptance criterion | Re-review disposition | Basis |
+|---|---|---|
+| Bundle completeness / scope | **FAIL** | Accepted runtime contains excluded and unauthorized presentation changes. |
+| HF-02.1 — zero materially clipped cells, both twins | **PASS as evidence; bundle not approvable** | EG-003 is closed at 60/60 and zero owned hits. |
+| HF-02.2 — category labels unambiguous | **No new contradiction; retained evidence reused** | Same acceptance runtime; no runtime change in the EG-003 return. |
+| HF-02.3 — context labels truthful | **No new contradiction; retained evidence reused** | Same acceptance runtime and same-head witness set. |
+| HF-02.4 — values `Summary!B3` cached headline | **No new contradiction; retained evidence reused** | Same acceptance runtime and retained installed-Excel result. |
+| HF-02.5 — counts, masks, typed outcomes invariant | **PASS, retained** | Same-head count witness; no runtime drift after acceptance. |
+| HF-02.6 — full gate and pre-fix failure | **PASS, retained** | Prior focused fixture and full gate remain same-runtime evidence; neither was needlessly rerun. |
+| HF-03.1–6 | **No new contradiction; retained evidence reused** | TSN capture/provenance/temp evidence remains exact-head bound, but it cannot override bundle scope failure. |
+
+| Review domain | Disposition |
+|---|---|
+| Source truth / counts / masks | Retained same-head invariance passes |
+| Values / formulas | Retained recalculation and cached-error evidence passes |
+| Visual / presentation | EG-003 coverage closes at 60/60 and zero owned hits; scope still fails |
+| Evidence / exact-head identity | **PASS** — verifier reports zero problems |
+| Neighboring-family regression / full gate | Retained 158/158 gate reused; no runtime changed |
+| Performance / atomic / failure behavior | No new contradiction; retained focused records reused |
+| Frozen implementation scope | **FAIL** — excluded data fields and unauthorized Source Files geometry |
+
+### Actionable finding and exact return
+
+| ID | Priority | Failure | Required return |
+|---|---|---|---|
+| `RB2-R2-004` | P1 / blocking | The accepted runtime exceeds the signed RB-2 implementation surface: it fits explicitly excluded ordinary data columns and changes Source Files geometry through a file authorized only for provenance selection. The implementation asks the reviewer to adjudicate the plan conflict, which Review 2 has no authority to do. | Return RB-2 to the plan owner before another runtime edit. The owner must either (a) explicitly amend and re-approve HF-02/RB-2 to authorize the existing data-field and Source Files presentation behavior, reconciling the “explicit width 13.0” / zero-clipping conflict and the `compare_tsn_common.py` surface, or (b) require the out-of-scope behavior reverted and state how HF-02.1 treats those visible cells. If the chosen return changes runtime, establish a new exact acceptance head and regenerate/rebind the complete RB2-A1 set, including all 60 deliverables, Excel results, gates, witnesses, manifest, and verifier identity. If the owner authorizes the current runtime byte-for-byte, retain the exact-head evidence and rebuild only records whose identities change. Then return Prompt 05 for a fresh Review 2 re-review. |
+
+Do not merge, switch to `main`, clean up the RB-2 branch, or begin RB-3. Preserve
+the closed `RB2-R2-001`, targeted `RB2-R2-002`, and closed `RB2-R2-EG-003`
+history.
+
+**Reviewer signature:** Codex, Review 2 re-review — **DENIED — RETURN TO
+IMPLEMENTATION** (`RB2-R2-004`) — `2026-08-02T14:12:49.5219567-07:00`.

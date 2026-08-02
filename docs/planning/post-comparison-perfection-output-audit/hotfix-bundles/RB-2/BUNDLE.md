@@ -1,17 +1,18 @@
 # `RB-2` — Bundle Contract
 
-Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (`RB2-R2-EG-003`
-remedied). Review 2 confirms `RB2-R2-001` closed and the targeted `RB2-R2-002`
-product mechanism passing at acceptance runtime head
-`06266eca1a4858dc5ebd000d1dd2e946249c7338`. The evidence gap it denied is now
-closed: the expanded all-visible-sheet witness no longer globs a single root but
-takes its deliverable list from the same-head measure record, and examines
-**60 of 60** head deliverables — 526 visible sheets, 8,200 columns, **0** owned
-materially clipped cells, against 1,648,387 on the base side. No product runtime
-file changed, so nothing was regenerated and the acceptance head is unchanged.
-The signed history is in [REVIEW.md](REVIEW.md) and the remedy in
-[IMPLEMENTATION.md](IMPLEMENTATION.md); return Prompt 05 for a fresh Review 2
-re-review, and do not merge, clean up, or begin RB-3 before it signs.
+Status: **DENIED — RETURN TO IMPLEMENTATION** (`RB2-R2-004`; planning ruling
+required). Review 2 closes `RB2-R2-EG-003`: the expanded witness takes its list
+from the same-head measure record and covers **60 of 60** head deliverables —
+526 visible sheets, 8,200 columns, **0** owned materially clipped cells — and the
+manifest verifies all 21 claimed results plus five committed witnesses at
+acceptance runtime head `06266eca1a4858dc5ebd000d1dd2e946249c7338`.
+The bundle remains denied because that accepted runtime calls
+`_fit_data_columns` for ordinary data-sheet fields the frozen HF-02 contract
+explicitly excludes, and changes Source Files geometry through
+`compare_tsn_common.py` even though this contract authorizes that file only for
+provenance selection. A reviewer cannot silently amend the frozen scope. The
+signed denial and exact return are in [REVIEW.md](REVIEW.md); do not merge, clean
+up, or begin RB-3.
 
 > This RB-level contract carries **HF-02 + HF-03** and transcribes both frozen
 > work-item sections from
@@ -110,7 +111,7 @@ weakened oracle, or rush ship may not replace that split.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to its own `statewide-summary-visible-text-clipping.json`, `large-detail-no-render-visual-adjudication.json` and native-Excel renders, plus the committed `stage2-measure-clipping.py` / `stage2-clipping-recheck.json` |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-2: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| Status | **Inherits RB-2: DENIED — RETURN TO IMPLEMENTATION (`RB2-R2-004`)** |
 
 **Exact scope.** Stored presentation and self-description of the generated
 comparison workbook, **all families, both twins**: the `Comparison` category/key
@@ -233,7 +234,7 @@ and the per-family count-invariance table.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to `run-ledgers/tsn-library-rebuild.json`, `source-audit/all-completed-workflow-note-audit.json`, the committed `stage2-tsn-provenance-scope.json`, and Claude's `witness\temp_captures.txt` (readable since the firewall ended) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-2: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| Status | **Inherits RB-2: DENIED — RETURN TO IMPLEMENTATION (`RB2-R2-004`)** |
 
 **Exact scope.** The matrix lanes' private TSN capture step and what the
 resulting workbooks say about their own TSN input: all 12 vs-TSN families × the

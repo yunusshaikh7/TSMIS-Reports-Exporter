@@ -1,10 +1,11 @@
 # `RB-2` — Implementation Record
 
-Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW**
-(`RB2-R2-EG-003` remedied: the expanded witness now covers **60 of 60** head
-deliverables and reports **0** owned clipped cells; `RB2-R2-001`, `RB2-R2-002`
-and Review 1's `EG-001`/`EG-002` remain closed. No product runtime file changed,
-so the acceptance head is still `06266eca1a4858dc5ebd000d1dd2e946249c7338`.)
+Status: **DENIED — RETURN TO IMPLEMENTATION** (`RB2-R2-004`; planning ruling
+required). `RB2-R2-EG-003` is closed at 60/60 head deliverables and 0 owned
+clipped cells, but the accepted runtime changes data-sheet field columns and
+Source Files geometry outside the frozen implementation surface. `RB2-R2-001`,
+`RB2-R2-002`, and Review 1's `EG-001`/`EG-002` remain closed; acceptance runtime
+head remains `06266eca1a4858dc5ebd000d1dd2e946249c7338`.
 
 | Field | Value |
 |---|---|
