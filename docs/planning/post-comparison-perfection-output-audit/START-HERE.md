@@ -2,10 +2,10 @@
 
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
 RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
-RB-2 Review 2 re-review is DENIED — EVIDENCE GAP (`RB2-R2-EG-003`;
-the targeted `RB2-R2-002` remedy passes, but expanded evidence covers 42/60)
-on `hotfix/rb-2-deliverable-presentation`, reviewed through
-`efdf9fc8e97bba1d222483a4bb237716dcbcaa1d`**
+RB-2 is IMPLEMENTED and AWAITING ADVERSARIAL REVIEW
+(`RB2-R2-EG-003` remedied — the expanded witness covers 60 of 60 head
+deliverables with 0 owned clipped cells) on
+`hotfix/rb-2-deliverable-presentation`**
 
 Last updated: 2026-08-02
 
@@ -17,157 +17,36 @@ first pass.
 
 ## Next action
 
-Resume
-[`PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
-on the existing `hotfix/rb-2-deliverable-presentation` branch with
-`<BUNDLE_ID> = RB-2` and `<IMPLEMENTER> = Claude`.
+Run
+[`PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md)
+with `<BUNDLE_ID> = RB-2` and `<REVIEWER> = Codex`. This is the Review 2
+re-review of `RB2-R2-EG-003`.
 
-Codex Review 2 re-review confirms that the targeted `RB2-R2-002` product
-mechanism now passes at acceptance runtime head
-`06266eca1a4858dc5ebd000d1dd2e946249c7338`: the bundle's `60.0` cap is gone,
-long values widen beyond it, Excel-ceiling values wrap, and the focused
-all-visible-sheet fixture passes both twins. It denies one blocking evidence
-gap as `RB2-R2-EG-003`. The retained expanded corpus result examines only
-**42 of 60** head deliverables. The omitted 18 By Day deliverables receive an
-unwindowed scan only on Summary and Spot Check, leaving Comparison, Only-in,
-data, Routes, Provenance, and other visible sheets inside the old eight-column /
-80-row blind spot. The signed denial and bounded return are in
-[`hotfix-bundles/RB-2/REVIEW.md`](hotfix-bundles/RB-2/REVIEW.md).
+The evidence gap is closed. The expanded all-visible-sheet witness no longer
+discovers its books by globbing one root — it takes the deliverable list from
+the same-head measure record, refuses a list from a different runtime, and
+treats an unresolvable recorded deliverable as fatal. It now examines **60 of
+60** head deliverables (`byday` 18, `direct-tsn` 18, `everything` 18,
+`classic-env` 6), 526 visible sheets, 8,200 columns, and reports **0** owned
+materially clipped cells; the base side re-ran through the same harness at
+**42 of 42** with 1,648,387. The `Report View` residue stays disclosed, not
+excluded, on the same unchanged disposition.
 
-Do not merge, clean up, or begin RB-3. Supply one retained, hash-bound expanded
-result covering the missing 18 deliverables or all 60, rebuild the manifest,
-and then return for another Review 2 re-review. No product regeneration,
-installed-Excel rebuild, or full-gate rerun is requested unless runtime changes.
+**No product runtime file changed**, so no corpus was regenerated, no
+installed-Excel leg re-ran, and the full gate was not re-run — as the return
+instructed. The acceptance head is still
+`06266eca1a4858dc5ebd000d1dd2e946249c7338`; both witnesses were produced with
+the worktree detached there. The manifest is rebuilt and verifies
+**VERIFIED — 0 problem(s)** with 21 claimed results all naming that head and 5
+committed witnesses same-head.
 
-RB-1 (work item HF-01, branch `hotfix/rb-1-clean-road-source-truth`) was
-implemented, denied by Codex Review 1 on the clipped `ArcGIS Build` disclosure
-(RB1-R1-001), and that return is now implemented: the marker sheet carries
-measured stored column widths, wrapped cells in tall-enough rows, and the 102
-skips as an itemized 14-column table. The build and both twins were
-regenerated and the whole acceptance matrix re-run — the review's own
-`REVIEW.md` findings table, the new "Review 1 remedy" section of
-[`hotfix-bundles/RB-1/IMPLEMENTATION.md`](hotfix-bundles/RB-1/IMPLEMENTATION.md),
-the frozen contract
-[`hotfix-bundles/RB-1/BUNDLE.md`](hotfix-bundles/RB-1/BUNDLE.md) and the
-committed witnesses `hotfix-bundles/HF-01/witness/` are the record. Bulk
-acceptance output is retained at
-`C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-01\` (the
-remedy run in its `r1-remedy\` subfolder; Review 1's own proof files are
-untouched). That head remained unmerged pending Review 2.
-
-Codex Review 1 re-reviewed exact head
-`6d2a2ce2e70688bfaa20e8f2e11039165742d55e`, closed RB1-R1-001, and
-approved the complete matrix. Reviewer-owned re-review artifacts are retained
-in the same HF-01 root under `r1-codex-rereview\`.
-Review 2 then denied exact requested head
-`d330312efc949523caf07f1fec4e867afed87cf7` on `RB1-R2-001`: the
-controlling plan requires the four genuine route 036 / TEH / 40.15 and 40.352
-lane/width source facts to be itemized in Summary and Notes as well as the
-retained witness, but both sheets contain aggregate coverage only. Exact probe,
-evidence bindings, and signature are in `hotfix-bundles/RB-1/REVIEW.md`.
-
-**That return is now implemented (Claude, 2026-07-28).** The build records what
-each unavailable marker withholds on a new itemized `ArcGIS Marked Anchors`
-sheet; the comparison joins it to the TSN row each marker pairs with and names
-every marker that withholds a value TSN does not show, in BOTH Summary and
-Notes — derived from source, never hard-coded. The build and both twins were
-regenerated through the shipped GUI path and the whole acceptance matrix
-re-run: `Comparison` is cell-identical to the Review-1-approved twin over
-65,165 rows (the only moves are the Summary bullet, the Notes block and
-run-identity Provenance), the build diff is 0 data cells, every CRH-SW-E3
-figure reproduces (291,127 differing cells), both disclosure sheets pass
-installed Excel's own font metrics, the neighbouring family is cell-identical
-to base code, and the full gate is 157/157 plus the frozen self-test. The
-itemization is SIX cells, not four — all four Review 2 named plus two the
-witness's reference-anchor rule masks; the `165 = 161 + 4 = 159 + 6`
-reconciliation is in
-[`hotfix-bundles/RB-1/IMPLEMENTATION.md`](hotfix-bundles/RB-1/IMPLEMENTATION.md).
-The jointly approved branch is now merged at
-560ea5e501fdd76003985753ba7fc9ff0a551320.
-
-**Read before starting Review 2 — owner ruling, 2026-07-28.** The bounded
-review model Review 1 wrote into Prompt 05 (`fa84016`) is **owner-approved**:
-the 30-minute / 2 GB / 5-minute-operation / 500 MB caps stand, and no reviewer
-performs the installed-Excel `CalculateFullRebuild`. Two consequences are
-owner-accepted and **must not be raised as findings**: Review 2 may rely on
-Review 1's signed evidence as a ranked source instead of regenerating the
-acceptance corpus, and RB-1's formulas-twin recalculation stands on the
-implementation's own recorded run alone. The prompt change is sanctioned
-workflow support, not scope leakage. Everything else — the two-approval merge
-gate, every acceptance criterion, and Review 2's duty to reason independently
-and probe anything the retained evidence leaves uncertain — is unchanged. Full
-text: [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md) § bounded reviews.
-
-Claude drafted the plan as first planner (both sign-off rows read `NOT STARTED`
-when Prompt 03 was invoked, so the prompt's own first-planner rule applied — the
-same reversal Stage 2 recorded). [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md)
-now holds **11 verified work-item specs (`HF-01` … `HF-11`) grouped into 6
-implementation/review bundles (`RB-1` … `RB-6`), Clean Road first** — plus a finding-to-file overlap map
-built by code inspection at `main` `a29bdb6`, all 22 canonical findings mapped to
-exactly one primary spec, a merge order, a branch/worktree lifecycle, and a
-whole-program definition of done. The batch layer is an owner decision (fewer
-branches, reviews and releases; 12 Codex passes instead of 22). The plan also
-defines **rush ship** — a named, owner-invoked exception under which a batch may be
-released to the owner *before* its adversarial review, at most one at a time, with
-the full gate, the acceptance run and the implementation record never deferred. It
-is a capability, not a plan: no batch is scheduled to use it, and the default path
-(implement → two reviews → merge → release) applies everywhere unless the owner
-says otherwise for a named batch.
-
-Codex completed the second-planner challenge and signed the plan. The final pass
-re-opened the owning code, rechecked all 22 assignments, and made four material
-corrections: (1) HF-01's 165 non-asserting cells now have the exact
-`291,292 - 165 = 291,127` count oracle; (2) RB IDs now unambiguously control
-Prompts 04/05, records, branches, statuses and merges; (3) HF-04 must produce
-both censused layouts rather than pass through continued refusal; and (4)
-ordinary workbook regression uses published semantic/state equivalence rather
-than unreliable raw OOXML package-byte identity.
-**All four owner policy gates are now RULED (2026-07-26)** — no open owner
-question blocks the second planner:
-
-- **HF-01 — mark the skipped anchors.** The Clean Road cells whose ArcGIS side was
-  never built carry an explicit non-asserting "unavailable" marker and are
-  excluded from the differing-cell count, rather than a bare blank that reads as
-  a disagreement. All 165 affected `D` cells become `N`, so the exact post-fix
-  count is **291,127**. Disclosure-only was rejected: it names the problem
-  without naming which cells.
-- **HF-05 — exact-source evidence, keep the feature.** Each side is evidenced from
-  the document that side was compared from; no borrowed sibling prints; no prose
-  asserting unread sources; no artifact at all where a side cannot be bound. The
-  literal audit rule, which would retire nearly the whole shipped evidence
-  feature, is **not** adopted.
-
-The other two point in opposite directions on purpose:
-
-- **PCOA-FINAL-013 / HF-09 — stays FLAGGED.** The representation-only Description
-  class (`NEVADA STATE LINE , END OF COUNTY` vs `… /END OF COUNTY` and its
-  siblings) is two independent sources ten months apart whose text genuinely
-  differs. HF-09 adds a disclosure count line and **may not change equality**.
-- **PCOA-FINAL-011 / HF-06 — NORMALIZED to zero.** The Highway Sequence
-  PDF-vs-Excel equate cells are one pull rendered twice: the `E` suffix sits on the
-  partner row, HG/FT are simply not repeated on the print's annotation line, and
-  the Description is the same label with `EQUATES TO ` prepended. The rule must be
-  pair-aware, opt-in, and must not widen into the HF-09 class.
-
-Both planners signed the Stage 3 plan. **RB-1 is merged. RB-2 Review 1 approved
-the original same-head evidence remedies. Review 2's `RB2-R2-001` selection
-mechanism and the targeted `RB2-R2-002` product mechanism now pass, but the
-current re-review denies `RB2-R2-EG-003`: the all-visible-sheet result covers
-42/60 head deliverables and omits the 18 By Day deliverables from the expanded
-Comparison/Only-in/data/Routes/Provenance scan. RB-2 is returned to Stage 4 on
-its existing branch for the bounded evidence return.**
-
-Stage 2 is closed with no open conflict:
-
-- the 88-decision topology is **0 APPROVED / 68 DENIED / 16 BLOCKED / 4 N/A**;
-- the exact 25-cell evidence registry is **6 APPROVED / 16 DENIED / 3 N/A**;
-- the canonical handoff contains **22 records**: **9 P1 / 9 P2 / 2 P3 /
-  2 NO FIX**, of which 20 are actionable;
-- all four formerly open Stage 2 issues were closed, and the controlling
-  evidence rule was corrected with an explicit second-review audit trail.
-
-`FINAL-RECONCILIATION.md` and
-`FINAL-FINDINGS-FOR-IMPLEMENTATION.md` are now joint implementation authority.
+Two disclosures are recorded in
+[`hotfix-bundles/RB-2/IMPLEMENTATION.md`](hotfix-bundles/RB-2/IMPLEMENTATION.md)
+rather than fixed, because fixing either changes product runtime and forces a
+full regeneration the return did not ask for: an openpyxl `DEFAULT_COLUMN_WIDTH`
+floor inside `_fit_data_columns` (it can only over-widen, never clip), and the
+scope standing of the data-sheet fit and `write_source_files_sheet` — with the
+measurement showing data sheets are the LARGEST clipping class in base.
 
 ## Workflow
 
@@ -177,8 +56,8 @@ Stage 2 is closed with no open conflict:
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-2 DENIED — EVIDENCE GAP (`RB2-R2-EG-003`)** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-2 REVIEW 2 RE-REVIEW DENIED — EVIDENCE GAP** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-2 IMPLEMENTED — `RB2-R2-EG-003` remedied** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-2 AWAITING REVIEW 2 RE-REVIEW** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

@@ -1,0 +1,103 @@
+{
+ "method": "every VISIBLE sheet, every column, every row of every deliverable the same-head measure record lists \u2014 judged by stage2-measure-clipping.py's own metrics, imported rather than reimplemented",
+ "why_this_exists": "the committed oracle reads 3 sheets through an 8-column / 80-row window (RB2-R2-001 hid there); the first expanded scan then discovered its books by globbing ONE root and never opened the 18 By Day deliverables, which day_matrix publishes under the app's own comparisons root (RB2-R2-EG-003)",
+ "discovery": "NOT a glob. The deliverable list is taken from the same-head measure record, the runtime digests must match, and a recorded deliverable that cannot be resolved on disk is fatal. Globbing still runs as a cross-check only: anything on disk the record does not list is reported.",
+ "head": {
+  "role": "AFTER \u2014 must be zero owned clipped cells",
+  "deliverables_expected": 60,
+  "deliverables_examined": 60,
+  "by_lane": {
+   "byday": 18,
+   "classic-env": 6,
+   "direct-tsn": 18,
+   "everything": 18
+  },
+  "coverage_complete": true,
+  "deliverable_list_source": "measure-head.json",
+  "deliverable_list_source_sha256": "F1D47B4305385791C4B510B7E47ED04A4529A196692CFDBAAFAABDAF88FBC6F7",
+  "roots_walked_for_cross_check": [
+   "head",
+   "comparisons"
+  ],
+  "on_disk_but_unlisted": 0,
+  "sheets_measured": 526,
+  "columns_measured": 8200,
+  "clipped_cells_owned": 0,
+  "clipped_cells_preexisting_unowned": 45072,
+  "selfcheck_ok": true,
+  "clean": true,
+  "source": {
+   "file": "clipping-corpus-head.json",
+   "bytes": 117385,
+   "sha256": "2BF616FC74B8511C6A183C104CD2CA4CFD6481B22A6DD48EEE3A2A4F87EF2FF3"
+  }
+ },
+ "base": {
+  "role": "BEFORE \u2014 the base output; a large count here is the defect being fixed, not a failure of this pass",
+  "deliverables_expected": 42,
+  "deliverables_examined": 42,
+  "by_lane": {
+   "classic-env": 6,
+   "direct-tsn": 18,
+   "everything": 18
+  },
+  "coverage_complete": true,
+  "deliverable_list_source": "measure-base.json",
+  "deliverable_list_source_sha256": "2F7C22F58C23C43765D22BB39FB9F76041177A5F3D16F8FF99982E42F434A841",
+  "roots_walked_for_cross_check": [
+   "base"
+  ],
+  "on_disk_but_unlisted": 0,
+  "sheets_measured": 364,
+  "columns_measured": 1920,
+  "clipped_cells_owned": 1648387,
+  "clipped_cells_preexisting_unowned": 30048,
+  "selfcheck_ok": true,
+  "clean": false,
+  "source": {
+   "file": "clipping-corpus-base.json",
+   "bytes": 129388,
+   "sha256": "2F708943F78FB83B4F74BECDC49F4857CA1A676CFF8336A0F126A1A367ACAA12"
+  }
+ },
+ "by_day_lane_note": "the By Day lane is head-only, exactly as acc_measure.extra_roots records it \u2014 so 60 deliverables on the head side and 42 on the base side is the correct pair, not a shortfall",
+ "runtime": {
+  "tree": "C:\\Users\\Yunus\\Projects\\TSMIS-rb2-worktree",
+  "git": {
+   "head": "06266eca1a4858dc5ebd000d1dd2e946249c7338",
+   "head_tree": "c2a3d47688d99098738bcbab40dc12d10df2715e",
+   "branch": "HEAD",
+   "clean": false,
+   "dirty_paths": [
+    "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-02/witness/clipping-before-after.json"
+   ],
+   "runtime_dirty_paths": [],
+   "runtime_clean": true,
+   "clean_note": "`clean` covers the whole worktree; `runtime_clean` covers only the files the runtime digest is taken over. A result written into the worktree necessarily observes clean=false."
+  },
+  "stamped_utc": "2026-08-02T20:52:20.635235+00:00",
+  "file_counts": {
+   "product": 152,
+   "gate": 265,
+   "oracle": 1
+  },
+  "group_digests": {
+   "product": "D1EC1AEE20395B2A00EC432CE2B4EC078CD43BD15B9AA2DEF945BDAF534CA6C2",
+   "gate": "3911F15FE54A700AA206CE1698B0C9B0735D4E5DCF72A12B0619BE585FF68ADF",
+   "oracle": "343A2FEA11B9E551963F9C4E18425355C7850ED6473E256433589726EB03D114"
+  },
+  "runtime_digest": "9E411BA215C5C511C7351630A688319E9900B25B6C94BE8DBBD0A50469A38483",
+  "python": {
+   "version": "3.11.0",
+   "executable": "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\build\\.venv\\Scripts\\python.exe"
+  },
+  "packages": {
+   "openpyxl": "3.1.5",
+   "pdfplumber": "0.11.9",
+   "pdfminer.six": "20251230",
+   "pillow": "12.2.0",
+   "pypdfium2": "5.9.0"
+  },
+  "files_note": "per-file digests omitted here by design; the full listing is in RB2-A1-manifest.json and is re-derivable from the tree by rb2-verify-manifest.py"
+ }
+}

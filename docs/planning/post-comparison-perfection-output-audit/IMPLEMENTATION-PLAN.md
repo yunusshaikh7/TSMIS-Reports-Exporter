@@ -178,7 +178,7 @@ Two layers, because the owner wants **fewer branches, reviews and releases**
 | Order | Batch | Specs | Theme | Depends on | Branch | Status |
 |---:|---|---|---|---|---|---|
 | 1 | **RB-1** | HF-01 | Clean Road source truth — the owner's immediate need | None | `hotfix/rb-1-clean-road-source-truth` | **MERGED** — `560ea5e501fdd76003985753ba7fc9ff0a551320` |
-| 2 | **RB-2** | HF-02 + HF-03 | The deliverable looks right and describes itself truthfully — **56 of the 68 denials** | None (RB-1 for the Clean Road witness) | `hotfix/rb-2-deliverable-presentation` | **DENIED — EVIDENCE GAP** (`RB2-R2-EG-003`) |
+| 2 | **RB-2** | HF-02 + HF-03 | The deliverable looks right and describes itself truthfully — **56 of the 68 denials** | None (RB-1 for the Clean Road witness) | `hotfix/rb-2-deliverable-presentation` | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
 | 3 | **RB-3** | HF-04 | Ramp Detail — restores 9 comparison placements that produce nothing today | None | `hotfix/rb-3-ramp-detail-layout` | BLOCKED |
 | 4 | **RB-4** | HF-05 + HF-10 | Evidence, end to end: eligibility, binding, panels, and the missing cross-environment lane | None | `hotfix/rb-4-evidence` | BLOCKED |
 | 5 | **RB-5** | HF-06 + HF-09 | Difference classification — the two opposite rulings applied to the right classes | RB-1, RB-2 | `hotfix/rb-5-difference-classification` | BLOCKED |
@@ -479,7 +479,7 @@ mapping also proves one primary implementation/review bundle per finding:
 | RB bundle | Work items | Canonical findings | Count | Queue status |
 |---|---|---|---:|---|
 | **RB-1** | HF-01 | 010 | 1 | **MERGED** — `560ea5e501fdd76003985753ba7fc9ff0a551320` |
-| **RB-2** | HF-02, HF-03 | 002, 003, 008, 009, 014, 016, 019 | 7 | **DENIED — EVIDENCE GAP** (`RB2-R2-EG-003`) |
+| **RB-2** | HF-02, HF-03 | 002, 003, 008, 009, 014, 016, 019 | 7 | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
 | **RB-3** | HF-04 | 001, 012 | 2 | BLOCKED |
 | **RB-4** | HF-05, HF-10 | 004, 005, 006, 007 | 4 | BLOCKED |
 | **RB-5** | HF-06, HF-09 | 011, 013 | 2 | BLOCKED |
@@ -781,7 +781,7 @@ join, the recount totals) →
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to its own `statewide-summary-visible-text-clipping.json`, `large-detail-no-render-visual-adjudication.json` and native-Excel renders, plus the committed `stage2-measure-clipping.py` / `stage2-clipping-recheck.json` |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-2: DENIED — EVIDENCE GAP (`RB2-R2-EG-003`)** |
+| Status | **Inherits RB-2: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
 
 **Exact scope.** Stored presentation and self-description of the generated
 comparison workbook, **all families, both twins**: the `Comparison` category/key
@@ -904,7 +904,7 @@ and the per-family count-invariance table.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to `run-ledgers/tsn-library-rebuild.json`, `source-audit/all-completed-workflow-note-audit.json`, the committed `stage2-tsn-provenance-scope.json`, and Claude's `witness\temp_captures.txt` (readable since the firewall ended) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-2: DENIED — EVIDENCE GAP (`RB2-R2-EG-003`)** |
+| Status | **Inherits RB-2: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
 
 **Exact scope.** The matrix lanes' private TSN capture step and what the
 resulting workbooks say about their own TSN input: all 12 vs-TSN families × the
@@ -2068,10 +2068,11 @@ closure. Review 2 denied `RB2-R2-001`, whose character-count selection mechanism
 is closed. The targeted `RB2-R2-002` product mechanism now passes at acceptance
 runtime head `06266eca1a4858dc5ebd000d1dd2e946249c7338`: the bundle's width cap is
 gone, Excel-ceiling values wrap, and the focused presentation fixture passes.
-The 2026-08-02 Review 2 re-review nevertheless denies `RB2-R2-EG-003`: the
-retained all-visible-sheet result covers only 42/60 head deliverables, while the
-18 omitted By Day deliverables retain the old Comparison/Only-in blind spot.
-Resume Prompt 04 on the existing RB-2 branch only to supply one hash-bound
-expanded result covering the missing 18 or all 60 and rebuild the manifest. No
-product regeneration, installed-Excel rebuild, or full-gate rerun is requested
-unless runtime changes. Do not merge, clean up, or begin RB-3.
+The 2026-08-02 Review 2 re-review denied `RB2-R2-EG-003` — the retained
+all-visible-sheet result covered only 42/60 head deliverables — and that gap is
+now closed. The witness takes its deliverable list from the same-head measure
+record instead of globbing one root, and covers **60 of 60** head deliverables
+with **0** owned materially clipped cells (base: 42/42, 1,648,387). No product
+runtime file changed, so nothing was regenerated and the manifest re-verifies at
+the same acceptance head. Return Prompt 05 for a fresh Review 2 re-review; do
+not merge, clean up, or begin RB-3 before it signs.

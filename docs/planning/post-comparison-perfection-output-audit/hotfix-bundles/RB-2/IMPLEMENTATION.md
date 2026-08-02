@@ -1,8 +1,10 @@
 # `RB-2` — Implementation Record
 
-Status: **DENIED — EVIDENCE GAP** (`RB2-R2-EG-003`; the targeted
-`RB2-R2-002` product remedy passes, but expanded evidence covers 42/60;
-`RB2-R2-001` and Review 1's `EG-001`/`EG-002` remain closed)
+Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW**
+(`RB2-R2-EG-003` remedied: the expanded witness now covers **60 of 60** head
+deliverables and reports **0** owned clipped cells; `RB2-R2-001`, `RB2-R2-002`
+and Review 1's `EG-001`/`EG-002` remain closed. No product runtime file changed,
+so the acceptance head is still `06266eca1a4858dc5ebd000d1dd2e946249c7338`.)
 
 | Field | Value |
 |---|---|
@@ -479,6 +481,214 @@ The same obstacle was solved rather than accepted for `widths-carry`, which need
 only stored widths: it reads `<cols>` straight from the sheet XML. Verified
 identical to openpyxl's own numbers, which is why that leg covers all 44
 deliverables rather than the 16 a size cap would have allowed.
+
+## Review 2 re-review remedy — `RB2-R2-EG-003`, all 60 head deliverables
+
+### What was actually wrong
+
+The expanded witness found its books by globbing ONE root. The By Day lane does
+not publish under the caller's dest: `day_matrix` owns its own subtree beneath
+the app's canonical comparisons root, which is why `acc_measure.extra_roots`
+adds `<tree>/output/comparisons` as a second root and records those paths under
+a `byday/` prefix. The witness had `acc_measure.is_deliverable` copied verbatim
+— including its `rel.startswith("byday")` clause — but that clause could never
+fire, because `rel` was taken relative to the single root it walked. It reported
+42 of 60 and called that the corpus.
+
+Codex is right that this is material rather than clerical. The 18 unopened
+deliverables are exactly the ones whose Comparison and Only-in sheets were still
+covered only by the committed oracle's eight-column / 80-row window — the blind
+spot that hid `Comparison!AI2`.
+
+### The fix: the witness no longer decides what the corpus is
+
+Discovery does not glob any more. `acc_clipping_corpus.py` now takes the
+same-head measure record and opens exactly the deliverables that record lists:
+
+- it REFUSES to run if the measure record carries a different `runtime_digest`
+  than the checkout it is measuring, so a deliverable list can never be
+  inherited across runtimes;
+- it resolves each recorded key back to disk, `byday/` included, and treats a
+  key it cannot resolve as FATAL — not a skip. A leg that cannot open every
+  recorded deliverable must never round down to a pass;
+- it still globs the roots, but only as a CROSS-CHECK: a deliverable found on
+  disk that the record does not list is reported as a discrepancy;
+- `clean` now requires complete coverage as well as zero hits, and the exit code
+  is 2 — measurement not trustworthy — when coverage is short.
+
+The two legs can no longer disagree about what the corpus is, because there is
+only one list and the witness does not own it.
+
+**Proved, not asserted.** Two negative tests were run before the real pass:
+
+| Test | Result |
+|---|---|
+| Restore the pre-fix single-root resolution | `REFUSED: 18 recorded deliverable(s) are not on disk, first: byday/tsn-by-day\…` |
+| Feed a list stamped with a different runtime digest | `REFUSED: … was produced by runtime DEADBEEFDEADBEEF…, this run is 9E411BA215C5C511…` |
+
+The first is the EG-003 condition itself: the exact code that reported 42 as the
+whole corpus now refuses to report anything.
+
+### The result
+
+| | returned before (`RB2-R2-EG-003`) | now |
+|---|---|---|
+| deliverables examined | 42 | **60 of 60 recorded** |
+| by lane | everything 18, direct-tsn 18, classic-env 6 | + **byday 18** |
+| coverage complete | not asserted | **True** |
+| on disk but unlisted | not checked | 0 |
+| visible sheets measured | 364 | **526** |
+| columns measured | 5,890 | **8,200** |
+| **owned clipped cells** | 0 | **0** |
+| disclosed `Report View` residue | 30,048 | 45,072 |
+| self-check vs the committed oracle | agreed | **16 sheets agree, 0 disagree, 0 merged** |
+
+The 18 By Day deliverables add 162 visible sheets and 2,310 columns to the
+scan, and none of them carries a materially clipped cell. The `Report View`
+residue grows with them for the same reason it exists at all — that sheet
+declares no widths in base or head, is unchanged by this bundle, and is
+disclosed rather than excluded (unchanged disposition from the last pass).
+
+The base side re-ran through the same rewritten harness so both sides come from
+one harness version: **42 of 42 recorded, coverage complete, 1,648,387 owned
+clipped cells** — the before-state this bundle exists to remove. Across every
+visible sheet of every recorded deliverable the corpus therefore goes
+**1,648,387 → 0**.
+
+Both results carry `git.head = 06266eca1a4858dc5ebd000d1dd2e946249c7338` with
+`runtime_clean: true`. A fifth committed witness,
+`hotfix-bundles/HF-02/witness/clipping-expanded-coverage.json`, distils both
+sides — expected vs examined, the per-lane split, the list source's own SHA-256,
+and each bulk result's path/size/SHA-256 — so coverage can be checked without
+the local corpus.
+
+The manifest was rebuilt and independently verified:
+
+```
+EXACT HEAD    acceptance head 06266eca1a48 · claimed results 21 · all name it: yes
+              manifest built at 4b48df644f00 · runtime files changed in between: 0
+RUNTIME       re-derived digest MATCHES 9E411BA2… over 418 files
+WITNESSES     5 committed record(s), all same-head
+VERIFIED — 0 problem(s)
+```
+
+The verifier needs the FULL 40-character head — the abbreviation is what made it
+abort last pass. Ready to paste, from the worktree root:
+
+```
+build/.venv/Scripts/python.exe docs/planning/post-comparison-perfection-output-audit/rb2-verify-manifest.py docs/planning/post-comparison-perfection-output-audit/RB2-A1-manifest.json
+```
+
+### What re-ran, and what did not
+
+The witness is a scratchpad harness, not one of the 418 tracked runtime files.
+Re-scoping it moves no runtime digest, so no other leg is invalidated and none
+was re-run — matching the return's own instruction that no product
+regeneration, installed-Excel rebuild, or full gate rerun is requested unless
+product runtime changes. **No product runtime file changed.** The worktree was
+detached at `06266eca1a4858dc5ebd000d1dd2e946249c7338` for both passes so each
+result names the acceptance head rather than the later docs commits.
+
+### The scope question Codex flagged, answered before it becomes a finding
+
+The re-review noted, without opening a finding, that the remedy calls
+`_fit_data_columns` although the frozen contract names "the data columns
+(explicit width 13.0)" out of scope, and touches `write_source_files_sheet`
+although `compare_tsn_common.py` is authorized only for provenance selection.
+Both are real. Here is the whole of what is true, including a defect Codex had
+not reached.
+
+**The data columns were never at 13.0 in the base output, and they clip.** The
+contract's phrase describes the schema's intent. What the base workbook actually
+stores on a data sheet is a width for the route, key and back-link columns only
+— every field column between them has NO stored width and renders at Excel's
+8.43 default, blocked from spilling by the field beside it.
+
+Measured, not argued. Splitting the base corpus's clipped cells by SHEET, over
+the 12 base DELIVERABLES under 3 MB — deliverables only, since the ~1,200
+per-route exports in each store are inputs this bundle does not write — judged
+by the committed oracle's own metrics:
+
+| Sheet class | Clipped cells in base |
+|---|---|
+| **data sheets** | **736** |
+| `Comparison` | 392 |
+| `Only in TSMIS` | 32 |
+| `Provenance` | 8 |
+| `Only in TSN` | 8 |
+
+The data sheets are the LARGEST class — nearly twice the `Comparison` sheet the
+bundle was written for, on the same twelve workbooks.
+`intersection_summary vs tsn (values).xlsx`, sheet `TSMIS`, cell `B2` needs
+213 px and has 64: `HIGHWAY GROUP: R - RIGHT I…`.
+
+So criterion 1 — zero materially clipped cells on every visible sheet of every
+workbook — cannot be met without fitting them, and the freeze's stated
+justification, "Stage 2-validated clean", rests on a measurement taken through
+the same eight-column window `RB2-R2-001` disproved. The two clauses of the
+contract contradict each other on this surface; the fit is forced by the
+criterion, not chosen.
+
+**And there is a defect inside that call.** `_fit_data_columns` reads its floor
+from the live column dimension:
+
+```python
+floor = float(dim.width) if dim.width is not None else 0.0
+```
+
+`dim.width` is never `None`. Merely subscripting `ws.column_dimensions[col]`
+CREATES a `ColumnDimension` at openpyxl's own `DEFAULT_COLUMN_WIDTH = 13.0`,
+with `customWidth=True`, so it also serializes. Measured directly:
+
+```
+touched C -> width= 13.0  customWidth= True
+serialized: <col width="13" customWidth="1" min="3" max="3" />
+```
+
+The visible consequence, on `classic-env/intersection_summary new-vs-prior-ssor
+(values).xlsx`, sheet `SSOR-PROD 2026-07-23`:
+
+| | base | head |
+|---|---|---|
+| columns with a stored width | 5 | 71 |
+| widths | 13.0, 12.0, 14.0, 13.0, 13.0 | 68 × 13.0, plus 16.71, 12.0, 29.71 |
+
+So every data column carries at least 13.0, and that floor is an openpyxl
+constructor default rather than anything the schema, the contract or this bundle
+chose. `fitted_width` returns `max(floor, measured)`, so **no column is ever
+narrower than its content** — the floor cannot clip, cannot produce `###`, and
+cannot push anything toward Excel's ceiling. It makes columns wider than they
+need to be, on a surface the contract froze.
+
+**Not fixed here, deliberately.** Correcting the floor changes
+`scripts/compare_core.py`, which moves the runtime digest and forces a complete
+regeneration of both corpora and every dependent leg. The return explicitly
+asked for no product regeneration. Absorbing a product change into an
+evidence-gap remedy is also exactly the move that turned `RB2-R2-002` into a
+review cycle. It is therefore recorded here, with its measurement, for the
+reviewer and the owner to adjudicate as a scope decision:
+
+1. accept the data-column fit as required by criterion 1 and correct the floor
+   in a follow-up that carries its own regeneration; or
+2. accept it as it stands, since it can only over-widen; or
+3. return the data-sheet change to planning, in which case criterion 1 needs an
+   explicit exception for field columns at Excel's default width.
+
+**`write_source_files_sheet` is a weaker version of the same question, with no
+defect inside it.** That sheet declared no widths at all, so all four columns sat
+at 8.43 and its own HEADER clipped — `Route (as compared)` needs 132 px against
+64. Worth stating precisely, because it explains why no automated pass ever
+reported it: every clipping scan here, the committed oracle included, skips row 1
+as "the wrapped header band". On this sheet row 1 is not a wrapped band, just an
+ordinary row — so its clip was real and structurally invisible to all of them,
+which is also why it does not appear in the table above.
+
+Nothing about that sheet is Stage 2-validated or frozen, and the change measures
+four columns and adds no floor. The scope point is only that
+`compare_tsn_common.py` is authorized for provenance SELECTION, and this is a
+presentation fix that happens to live in the same file. Disclosed on the same
+terms: it is criterion 1 applied to a visible sheet, and if the reviewer holds
+the authorization to the letter it belongs in a follow-up rather than here.
 
 ### Acceptance `RB2-A1`, re-run whole at `06266ec`
 

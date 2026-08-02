@@ -1,12 +1,12 @@
 {
  "id": "RB2-A1",
  "bundle": "RB-2",
- "built_utc": "2026-08-02T16:34:09.451771+00:00",
+ "built_utc": "2026-08-02T20:54:35.731731+00:00",
  "purpose": "bind the complete RB2-A1 acceptance set to one exact runtime head (return RB2-R1-EG-001)",
  "acceptance_head": {
   "commit": "06266eca1a4858dc5ebd000d1dd2e946249c7338",
   "note": "the ONE exact Git head every claimed result names. Runtime digest equality is not head identity \u2014 a set spanning two commits with identical runtime content is still two heads, which is what Review 1's re-review denied.",
-  "manifest_built_at": "1a0028942ffcf83b6bae7351ec11c12541aafe92",
+  "manifest_built_at": "4b48df644f0068ff5ec21f814da98e102631e971",
   "manifest_built_after_acceptance": true,
   "why_they_differ": "the manifest and the records are committed AFTER the run they describe; neither is a runtime file, so the runtime digest is unchanged between them \u2014 see runtime.lineage"
  },
@@ -14,16 +14,22 @@
   "head": {
    "tree": "C:\\Users\\Yunus\\Projects\\TSMIS-rb2-worktree",
    "git": {
-    "head": "1a0028942ffcf83b6bae7351ec11c12541aafe92",
-    "head_tree": "7c5db428dfc4c3e87fb3d53144ef1eb7ac63de10",
+    "head": "4b48df644f0068ff5ec21f814da98e102631e971",
+    "head_tree": "fa643ff012471febcb2a49f800d1c856e566b860",
     "branch": "hotfix/rb-2-deliverable-presentation",
-    "clean": true,
-    "dirty_paths": [],
+    "clean": false,
+    "dirty_paths": [
+     "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-02/witness/clipping-before-after.json",
+     "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-02/witness/count-invariance.json",
+     "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-03/witness/temp-capture-lifecycle.json",
+     "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-03/witness/tsn-provenance-scope.json",
+     "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-02/witness/clipping-expanded-coverage.json"
+    ],
     "runtime_dirty_paths": [],
     "runtime_clean": true,
     "clean_note": "`clean` covers the whole worktree; `runtime_clean` covers only the files the runtime digest is taken over. A result written into the worktree necessarily observes clean=false."
    },
-   "stamped_utc": "2026-08-02T16:33:51.386641+00:00",
+   "stamped_utc": "2026-08-02T20:52:23.550421+00:00",
    "file_counts": {
     "product": 152,
     "gate": 265,
@@ -2148,7 +2154,7 @@
   "base": {
    "tree": "C:\\Users\\Yunus\\AppData\\Local\\Temp\\claude\\C--Users-Yunus-Projects-TSMIS-Reports-Exporter\\d54215e2-3d15-4a0c-9f9f-57309e122bb6\\scratchpad\\base-tree",
    "git": null,
-   "stamped_utc": "2026-08-02T16:33:51.573362+00:00",
+   "stamped_utc": "2026-08-02T20:52:25.565867+00:00",
    "file_counts": {
     "product": 151,
     "gate": 0,
@@ -2938,6 +2944,8 @@
    "runtime_last_changed_at": "06266eca1a4858dc5ebd000d1dd2e946249c7338",
    "runtime_last_changed_subject": "wrap what our fonts cannot measure, and measure what the cell will hold",
    "commits_since_on_head": [
+    "4b48df6 docs: deny RB-2 review 2 re-review evidence gap",
+    "efdf9fc rebind the RB2-A1 manifest to the re-run acceptance head",
     "1a00289 record the RB2-R2-002 remedy and the re-run acceptance"
    ],
    "runtime_files_changed_since": [],
@@ -18195,7 +18203,7 @@
      "baseline-by-day/_attempts.json": {
       "bytes": 92,
       "sha256": "A69DD9AB01DA74FACBCB80F84D7F6B9324034F1EAC4654F3F07281BACDEF7176",
-      "mtime_utc": "2026-08-02T16:15:13.661515+00:00"
+      "mtime_utc": "2026-08-02T16:35:45.038974+00:00"
      },
      "tsn-by-day/2026-07-23 ssor-prod/.cmpv3-5717fc62c61494fa-000000-879dd7d638976300.comparison-payload.zlib": {
       "bytes": 35529,
@@ -19485,7 +19493,7 @@
      "tsn-by-day/_attempts.json": {
       "bytes": 92,
       "sha256": "A69DD9AB01DA74FACBCB80F84D7F6B9324034F1EAC4654F3F07281BACDEF7176",
-      "mtime_utc": "2026-08-02T16:15:13.646501+00:00"
+      "mtime_utc": "2026-08-02T16:35:45.025481+00:00"
      },
      "tsn-by-day/_results.json": {
       "bytes": 4065,
@@ -35596,8 +35604,8 @@
     "sha256": "0641B72AE7D8B1FC5714622DDECD30024D227F3866DAEBBAFDB157CC7E5447B3"
    },
    "acc_clipping_corpus.py": {
-    "bytes": 17591,
-    "sha256": "E6D3CE8B5C148AE8C2FF26A0CD12EC09C6296951BBC92A7AA9420F7C4FD5129D"
+    "bytes": 22971,
+    "sha256": "B24C32CBEC2D27A67733613CF753244E916FDEC4782717A0CDD337B461C4801A"
    },
    "acc_clipping_full.py": {
     "bytes": 10927,
@@ -35660,8 +35668,8 @@
     "sha256": "E56D942A9808F4036C30F9A4A7498A7F3BF99F3556761A81F733F0AC7EB7DC6E"
    },
    "acc_witnesses.py": {
-    "bytes": 12011,
-    "sha256": "6E93860434E3C38513CD3EA09675AE164FF37117EA3CB7026B33906E2E526934"
+    "bytes": 16685,
+    "sha256": "3B700F8523A3AA7EFF90BE8740B78F5321CACA35D04794F3010084F954116F28"
    }
   },
   "committed_oracle": {
@@ -35677,8 +35685,8 @@
  },
  "results": {
   "note": "every retained result, bound by content. Judged over the CLAIMED (acceptance) class: those must carry the head runtime digest. Base-side results carry the base runtime; history is retained and claims nothing.",
-  "count": 31,
-  "claimed": 20,
+  "count": 32,
+  "claimed": 21,
   "acceptance_head": "06266eca1a4858dc5ebd000d1dd2e946249c7338",
   "all_claimed_same_head": true,
   "claimed_heads": [
@@ -35761,9 +35769,9 @@
    },
    {
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-02\\clipping-corpus-base.json",
-    "bytes": 127961,
-    "sha256": "60BA5C33FED2A1DAB89513DD586F0A548179D1E0471477ECA2574E6874C835EA",
-    "mtime_utc": "2026-08-02T16:10:20.236165+00:00",
+    "bytes": 129388,
+    "sha256": "2F708943F78FB83B4F74BECDC49F4857CA1A676CFF8336A0F126A1A367ACAA12",
+    "mtime_utc": "2026-08-02T20:51:57.295533+00:00",
     "class": "acceptance",
     "runtime_digest": "9E411BA215C5C511C7351630A688319E9900B25B6C94BE8DBBD0A50469A38483",
     "runtime_head_commit": "06266eca1a4858dc5ebd000d1dd2e946249c7338",
@@ -35771,9 +35779,9 @@
    },
    {
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-02\\clipping-corpus-head.json",
-    "bytes": 114090,
-    "sha256": "3422F0E0CD9A5E324BAA0AA2FAC13EB2044F96BDAB006569F59FF3B31EBFFBCE",
-    "mtime_utc": "2026-08-02T15:41:56.963341+00:00",
+    "bytes": 117385,
+    "sha256": "2BF616FC74B8511C6A183C104CD2CA4CFD6481B22A6DD48EEE3A2A4F87EF2FF3",
+    "mtime_utc": "2026-08-02T19:46:56.362413+00:00",
     "class": "acceptance",
     "runtime_digest": "9E411BA215C5C511C7351630A688319E9900B25B6C94BE8DBBD0A50469A38483",
     "runtime_head_commit": "06266eca1a4858dc5ebd000d1dd2e946249c7338",
@@ -35997,19 +36005,29 @@
    },
    {
     "path": "C:\\Users\\Yunus\\Projects\\TSMIS-rb2-worktree\\docs\\planning\\post-comparison-perfection-output-audit\\hotfix-bundles\\HF-02\\witness\\clipping-before-after.json",
-    "bytes": 5665,
-    "sha256": "B5884FB53800E30ECC87C7E002B2B1857DCE2363B3987E636E155C6DE4BB7BFE",
-    "mtime_utc": "2026-08-02T16:33:03.507244+00:00",
+    "bytes": 5633,
+    "sha256": "D272FA310C6E8E8D474CB302789E76CC9D7F7D117103ECCEA2CE952F0B8F7B5F",
+    "mtime_utc": "2026-08-02T20:52:22.750704+00:00",
     "class": "acceptance",
     "runtime_digest": "9E411BA215C5C511C7351630A688319E9900B25B6C94BE8DBBD0A50469A38483",
     "runtime_head_commit": "06266eca1a4858dc5ebd000d1dd2e946249c7338",
     "runtime_clean": true
    },
    {
+    "path": "C:\\Users\\Yunus\\Projects\\TSMIS-rb2-worktree\\docs\\planning\\post-comparison-perfection-output-audit\\hotfix-bundles\\HF-02\\witness\\clipping-expanded-coverage.json",
+    "bytes": 4425,
+    "sha256": "BBB1767EDBF4EA6670C779EA209567C88BA099EFDD5B47536BEF9FE733E3740D",
+    "mtime_utc": "2026-08-02T20:52:22.752708+00:00",
+    "class": "acceptance",
+    "runtime_digest": "9E411BA215C5C511C7351630A688319E9900B25B6C94BE8DBBD0A50469A38483",
+    "runtime_head_commit": "06266eca1a4858dc5ebd000d1dd2e946249c7338",
+    "runtime_clean": false
+   },
+   {
     "path": "C:\\Users\\Yunus\\Projects\\TSMIS-rb2-worktree\\docs\\planning\\post-comparison-perfection-output-audit\\hotfix-bundles\\HF-02\\witness\\count-invariance.json",
-    "bytes": 23091,
-    "sha256": "6FD62EA1DBD056908FC33FF5EF259256224CAA7F87A8E67174C31D6DA2987321",
-    "mtime_utc": "2026-08-02T16:33:03.508245+00:00",
+    "bytes": 23182,
+    "sha256": "4E909DE624CF94F9C13C20CB2B2F84C0706530EE382ABB38438D2B9C8B5CC3F3",
+    "mtime_utc": "2026-08-02T20:52:22.765212+00:00",
     "class": "acceptance",
     "runtime_digest": "9E411BA215C5C511C7351630A688319E9900B25B6C94BE8DBBD0A50469A38483",
     "runtime_head_commit": "06266eca1a4858dc5ebd000d1dd2e946249c7338",
@@ -36017,9 +36035,9 @@
    },
    {
     "path": "C:\\Users\\Yunus\\Projects\\TSMIS-rb2-worktree\\docs\\planning\\post-comparison-perfection-output-audit\\hotfix-bundles\\HF-03\\witness\\temp-capture-lifecycle.json",
-    "bytes": 1928,
-    "sha256": "6093B18F3106AE91AC0B4D4310130B972D22A20CD3CE71907B7E200AEF828D28",
-    "mtime_utc": "2026-08-02T16:33:03.510270+00:00",
+    "bytes": 2019,
+    "sha256": "279D285E9A72067E2BF7435EB415B025516F62FB1F1193CC3F86F7870B043F22",
+    "mtime_utc": "2026-08-02T20:52:22.816217+00:00",
     "class": "acceptance",
     "runtime_digest": "9E411BA215C5C511C7351630A688319E9900B25B6C94BE8DBBD0A50469A38483",
     "runtime_head_commit": "06266eca1a4858dc5ebd000d1dd2e946249c7338",
@@ -36027,9 +36045,9 @@
    },
    {
     "path": "C:\\Users\\Yunus\\Projects\\TSMIS-rb2-worktree\\docs\\planning\\post-comparison-perfection-output-audit\\hotfix-bundles\\HF-03\\witness\\tsn-provenance-scope.json",
-    "bytes": 21053,
-    "sha256": "42D528A6362BFE75CCE067E5BD3FD435D979ABCE01858F0982615659DACEC205",
-    "mtime_utc": "2026-08-02T16:33:03.512270+00:00",
+    "bytes": 21144,
+    "sha256": "9AAED68A2E5715EF8F797ABE8F017DB3303C8685078948CB19A48176AC08A0CE",
+    "mtime_utc": "2026-08-02T20:52:22.828220+00:00",
     "class": "acceptance",
     "runtime_digest": "9E411BA215C5C511C7351630A688319E9900B25B6C94BE8DBBD0A50469A38483",
     "runtime_head_commit": "06266eca1a4858dc5ebd000d1dd2e946249c7338",

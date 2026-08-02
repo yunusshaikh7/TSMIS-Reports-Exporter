@@ -6,18 +6,19 @@
   "git": {
    "head": "06266eca1a4858dc5ebd000d1dd2e946249c7338",
    "head_tree": "c2a3d47688d99098738bcbab40dc12d10df2715e",
-   "branch": "hotfix/rb-2-deliverable-presentation",
+   "branch": "HEAD",
    "clean": false,
    "dirty_paths": [
     "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-02/witness/clipping-before-after.json",
     "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-02/witness/count-invariance.json",
-    "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-03/witness/tsn-provenance-scope.json"
+    "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-03/witness/tsn-provenance-scope.json",
+    "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-02/witness/clipping-expanded-coverage.json"
    ],
    "runtime_dirty_paths": [],
    "runtime_clean": true,
    "clean_note": "`clean` covers the whole worktree; `runtime_clean` covers only the files the runtime digest is taken over. A result written into the worktree necessarily observes clean=false."
   },
-  "stamped_utc": "2026-08-02T16:14:14.439767+00:00",
+  "stamped_utc": "2026-08-02T20:52:21.745285+00:00",
   "file_counts": {
    "product": 152,
    "gate": 265,
