@@ -1,7 +1,7 @@
 {
  "id": "RB2-A1",
  "note": "per-file identity of every frozen input",
- "runtime_head_digest": "1CC46D40C871ABDB728DEBBB0354F8BA7A54F23A07BF382AEB6F5B945BA9A2D9",
+ "runtime_head_digest": "9E411BA215C5C511C7351630A688319E9900B25B6C94BE8DBBD0A50469A38483",
  "roots": {
   "export-archive-new": {
    "path": "C:\\Users\\Yunus\\Projects\\TSMIS-rb2-worktree\\output\\2026-07-23 ssor-prod",
