@@ -625,6 +625,8 @@ def _render(wb, ctx, spec, footnote_values=None, extra_notes=None):
             return value
         c = WriteOnlyCell(ws, value=value)
         c.font = font
+        if isinstance(value, int) and not isinstance(value, bool):
+            c.number_format = "0"      # never let General render a count as 1E+09
         if fill:
             c.fill = fill
         if align:
@@ -646,17 +648,27 @@ def _render(wb, ctx, spec, footnote_values=None, extra_notes=None):
     if spec.total is not None:
         labels.append(spec.total.label)
     labels += [f.label for f in (spec.footnotes or ())]
+    # B/C/D hold COUNTS, and a count too wide for its column renders `###` while
+    # General format silently degrades a large one to `1E+09`. Measure the real
+    # numbers and give them an explicit integer format so the value shown is the
+    # value counted (RB2-R2-002 round 9).
+    counts = [str(v) for v in list(va.values()) + list(vb.values())
+              if isinstance(v, int)]
+    deltas = [str(b - a) for a, b in ((va.get(k), vb.get(k))
+                                      for k in set(va) | set(vb))
+              if isinstance(a, int) and isinstance(b, int)]
     # B and C carry the two SIDE NAMES in their header, bold, and a side name is
     # as long as its environment and date make it ("SSOR-PROD 2026-07-23"); the
     # count beneath is short but the header is not, and its neighbour is
     # populated. Measured rather than left at 13 (RB2-R2-002).
     for col, w in (("A", fitted_width(labels, bold=True, size_pt=10,
                                       minimum=34)),
-                   ("B", fitted_width([str(side_a)], bold=True, size_pt=10,
-                                      minimum=13)),
-                   ("C", fitted_width([str(side_b)], bold=True, size_pt=10,
-                                      minimum=13)),
-                   ("D", 10)):
+                   ("B", fitted_width([str(side_a)] + counts, bold=True,
+                                      size_pt=10, minimum=13)),
+                   ("C", fitted_width([str(side_b)] + counts, bold=True,
+                                      size_pt=10, minimum=13)),
+                   ("D", fitted_width(["\u0394"] + deltas, bold=True,
+                                      size_pt=10, minimum=10))):
         ws.column_dimensions[col].width = w
     # A category label long enough to reach Excel's ceiling cannot be widened
     # further and its count sits beside it, so it wraps rather than being cut.

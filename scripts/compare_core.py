@@ -36,6 +36,7 @@ import difflib
 import math
 import re
 import textwrap
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
@@ -2040,6 +2041,37 @@ def _fonts_for(bold, size_pt):
     return result
 
 
+def _fullwidth_topup(s, fonts, size_pt):
+    """Extra pixels for characters Excel renders WIDER than our fonts measure.
+
+    The measuring fonts are Arial and Calibri. A character outside their design
+    — an ideographic space, a CJK glyph, a fullwidth form — either has no glyph
+    or a narrow stand-in there, while Excel falls back to an East Asian font and
+    renders it FULL WIDTH. Measured on U+3000: our fonts report 10.5 px where
+    installed Excel needs about 13.6, and twenty of them under-sized a column by
+    62 px (RB2-R2-002 round 9).
+
+    Unicode's East Asian Width property names exactly this class, so each `W`
+    (wide) or `F` (fullwidth) character is topped up to ONE EM — which is what
+    "full width" means — and never reduced. Two digit widths was tried first and
+    is not the same thing: it left U+3000 at 12.73 px where Excel needs ~13.6,
+    still 24 px short across the probe. An em at 10 pt is 13.33 px at 96 dpi,
+    and the same measurement margin the rest of this function carries takes it
+    to 14.0. ASCII text is untouched, so the real corpus measures exactly as
+    before; this only widens input our fonts cannot honestly speak for."""
+    if s.isascii():
+        return 0.0                       # the common case, and free
+    full = float(size_pt) * 96.0 / 72.0 * _MEASURE_MARGIN
+    extra = 0.0
+    for ch in s:
+        if unicodedata.east_asian_width(ch) not in ("W", "F"):
+            continue
+        measured = (max(f.getlength(ch) for f in fonts)
+                    / _MEASURE_SCALE * _MEASURE_MARGIN)
+        extra += max(0.0, full - measured)
+    return extra
+
+
 def _text_px(text, bold=False, size_pt=11.0):
     """Rendered width of `text` in pixels, measured in the widest candidate font.
 
@@ -2059,6 +2091,7 @@ def _text_px(text, bold=False, size_pt=11.0):
     else:
         px = (max(f.getlength(s) for f in fonts)
               / _MEASURE_SCALE * _MEASURE_MARGIN)
+        px += _fullwidth_topup(s, fonts, size_pt)
     if len(_PX_CACHE) >= _PX_CACHE_MAX:
         _PX_CACHE.clear()        # bounded: a corpus run must not grow this
     _PX_CACHE[key] = px          # without limit

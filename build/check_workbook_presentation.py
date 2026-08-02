@@ -296,6 +296,29 @@ OCC_SCHEMA = CompareSchema(
 OCC_A = [["duplicate", "x"] for _ in range(1000)]
 OCC_B = [["duplicate", "x"]]
 
+# ---- RB2-R2-002 round 9: characters our fonts cannot speak for -------------
+# U+3000 IDEOGRAPHIC SPACE is valid input -- `_xl_trim` deliberately preserves it
+# -- and Arial/Calibri render it narrow while Excel falls back to an East Asian
+# font and renders it FULL WIDTH. Twenty of them under-sized a column by 62 px.
+WIDECHAR_SCHEMA = CompareSchema(
+    report_name="Presentation Fullwidth", header=["Key", "Value", "Tail"],
+    side_a="A", side_b="B", id_noun="location", id_noun_plural="locations")
+WIDECHAR_A = WIDECHAR_B = [["k", ("W\u3000" * 20) + "X", "stop"]]
+
+# ---- RB2-R2-002 round 9: a count too big for its column --------------------
+# The familiar-summary count columns were sized from the SIDE NAMES only, and
+# left in General format, which degrades a large integer to "1E+09".
+BIGCOUNT_SPEC = SummarySpec(
+    report="Presentation Big Count", sheet_name="R9 Categories",
+    title="Counts must fit and must not degrade",
+    sections=(Section(name="S", cats=(Cat(slug="k", label="K", key="K"),)),))
+BIGCOUNT_SCHEMA = CompareSchema(
+    report_name="Presentation Big Count", header=["Category", "Count"],
+    side_a="A", side_b="B", id_noun="category", id_noun_plural="categories",
+    extra_sheet_writer=make_extra_sheet_writer(BIGCOUNT_SPEC))
+BIGCOUNT_A = [["K", "999999999"]]
+BIGCOUNT_B = [["K", "0"]]
+
 FRESHNESS_LABEL = ("Build-time source identity and duplicate pairing snapshot "
                    "is current")
 CONTEXT_TEXT = "not compared (context)"
@@ -484,6 +507,82 @@ def _unwrapped_blocked_formulas(path, sheets):
         wb.close()
 
 
+def _fullwidth_shortfall(gate, path):
+    """`[(sheet, coord, short_px)]` for cells holding FULL-WIDTH characters that
+    their column cannot show.
+
+    Deliberately not decided by the product's `_text_px`: asking the measurement
+    under test whether it measured correctly is circular, and it is why the first
+    version of this fixture passed against the broken code. The gate carries its
+    own model, from Unicode rather than from a font file — a character whose East
+    Asian Width is `W` or `F` occupies ONE EM by definition.
+
+    Two corrections over that first version, both found by running it:
+    the em is applied as a TOP-UP over the oracle's whole-string measurement
+    rather than by summing per character, which loses kerning and inflated every
+    ordinary sentence; and a cell that can spill into empty neighbours is not
+    clipped, which is why Summary's note rows were being reported. `\u2260` is
+    Ambiguous width, not fullwidth, so a normal difference string tops up by
+    nothing and is skipped outright."""
+    import unicodedata
+
+    from openpyxl.utils import get_column_letter
+
+    wb = load_workbook(path, read_only=False, data_only=True)
+    bad = []
+    try:
+        for name in wb.sheetnames:
+            ws = wb[name]
+            if ws.sheet_state != "visible":
+                continue
+            for row in ws.iter_rows(min_row=2):
+                for cell in row:
+                    value = cell.value
+                    if not isinstance(value, str) or value.isascii():
+                        continue
+                    wide = [ch for ch in value
+                            if unicodedata.east_asian_width(ch) in ("W", "F")]
+                    if not wide:
+                        continue          # nothing our fonts misjudge
+                    align = cell.alignment
+                    if align is not None and (align.wrap_text
+                                              or align.shrink_to_fit):
+                        continue
+                    letter = get_column_letter(cell.column)
+                    dim = ws.column_dimensions.get(letter)
+                    row_dim = ws.row_dimensions.get(cell.row)
+                    if dim is None or dim.width is None:
+                        continue
+                    if (getattr(dim, "hidden", False)
+                            or getattr(row_dim, "hidden", False)):
+                        continue
+                    avail, stopped = gate.width_to_px(float(dim.width)), False
+                    for j in range(cell.column + 1, ws.max_column + 1):
+                        nxt = ws.cell(row=cell.row, column=j).value
+                        if nxt is not None and str(nxt).strip():
+                            stopped = True
+                            break
+                        d = ws.column_dimensions.get(get_column_letter(j))
+                        avail += gate.width_to_px(
+                            float(d.width) if d is not None and d.width
+                            else gate.DEFAULT_COL_WIDTH)
+                    if not stopped:
+                        continue          # free to spill
+                    font = cell.font
+                    size = float(font.size or 11) if font else 11.0
+                    bold = bool(font and font.bold)
+                    em = size * 96.0 / 72.0
+                    need = gate.text_px(value, bold, size) + 4
+                    need += sum(max(0.0, em - gate.text_px(ch, bold, size))
+                                for ch in wide)
+                    if need > avail + gate.TOLERANCE_PX:
+                        bad.append((name, cell.coordinate,
+                                    round(need - avail, 1)))
+        return bad
+    finally:
+        wb.close()
+
+
 def _hash_rendered_numbers(path):
     """`[(sheet, coord, value, short_px)]` for NUMBERS too wide for their column.
 
@@ -509,10 +608,20 @@ def _hash_rendered_numbers(path):
             for row in ws.iter_rows(min_row=2):
                 for cell in row:
                     value = cell.value
-                    if isinstance(value, bool) or not isinstance(value, int):
+                    if isinstance(value, bool) or not isinstance(
+                            value, (int, float)):
                         continue
+                    # Floats, dates and times were rejected BEFORE this check,
+                    # so they were neither measured nor counted as skipped —
+                    # the skip counter disclosed a hole it did not cover
+                    # (RB2-R2-002 round 9).
+                    # "0" renders a whole number exactly as its digits, so it is
+                    # measurable here. It is listed explicitly because the
+                    # summary writer now sets it on every count — without this
+                    # the fix for those counts would move them OUT of this
+                    # check's coverage and the gate would pass by exemption.
                     fmt = cell.number_format
-                    if fmt and fmt not in ("General", "@"):
+                    if fmt and fmt not in ("General", "@", "0"):
                         skipped += 1
                         continue
                     letter = get_column_letter(cell.column)
@@ -525,7 +634,10 @@ def _hash_rendered_numbers(path):
                         continue
                     avail = _usable_px(float(col_dim.width))
                     font = cell.font
-                    need = _text_px(str(value), bool(font and font.bold),
+                    shown = (str(int(value))
+                             if isinstance(value, float) and value.is_integer()
+                             else str(value))
+                    need = _text_px(shown, bool(font and font.bold),
                                     float(font.size or 11) if font else 11.0)
                     if need > avail:
                         bad.append((name, cell.coordinate, value,
@@ -1031,7 +1143,11 @@ def main():
 
         # ---- RB2-R2-002 round 8: serialized form, and numbers as ### --------
         for tag, schema, ra, rb in (("serial", SERIAL_SCHEMA, SERIAL_A, SERIAL_B),
-                                    ("occ", OCC_SCHEMA, OCC_A, OCC_B)):
+                                    ("occ", OCC_SCHEMA, OCC_A, OCC_B),
+                                    ("widechar", WIDECHAR_SCHEMA,
+                                     WIDECHAR_A, WIDECHAR_B),
+                                    ("bigcount", BIGCOUNT_SCHEMA,
+                                     BIGCOUNT_A, BIGCOUNT_B)):
             for mode in ("values", "formulas"):
                 path = Path(tmp) / f"{tag}-{mode}.xlsx"
                 result = run_compare(schema, ra, rb, False, path, mode=mode,
@@ -1046,12 +1162,41 @@ def main():
                                   f"{h['short_by_px']}px" for h in hits[:3])
                         + "; ".join(f"{s}!{coord} short {short}px"
                                     for s, coord, short, _x in run_hits[:3]))
+                wide = _fullwidth_shortfall(gate, path)
+                c.check(f"{tag}/{mode}: full-width characters fit, measured by "
+                        "Unicode width rather than by a font we cannot trust",
+                        not wide,
+                        "; ".join(f"{s}!{coord} short {short}px"
+                                  for s, coord, short in wide[:4]))
                 nums, skipped = _hash_rendered_numbers(path)
                 c.check(f"{tag}/{mode}: no NUMBER is too wide for its column, "
                         f"which would render ### ({skipped} formatted skipped)",
                         not nums,
                         "; ".join(f"{s}!{coord}={val} short {short}px"
                                   for s, coord, val, short in nums[:4]))
+
+        # ---- RB2-R2-002 round 9: the Source Files companion sheet -----------
+        # Built through the PRODUCTION writer, which declared no widths at all,
+        # so its own header "Route (as compared)" clipped on every workbook.
+        from compare_tsn_common import write_source_files_sheet
+        from openpyxl import Workbook
+
+        sf = Path(tmp) / "source-files.xlsx"
+        wb = Workbook(write_only=True)
+        write_source_files_sheet(wb, [
+            ("SSOR-PROD 2026-07-23", [["001", "k", "v"]],
+             ["highway_log_route_001.xlsx"])])
+        wb.save(sf)
+        hits, _sk, _sh = _audit_everything(gate, sf)
+        run_hits = _clipped_run_spill(gate, sf)
+        c.check("source-files: the companion sheet fits its own headers "
+                "and values",
+                not hits and not run_hits,
+                "; ".join(f"{h['sheet']}!{h['cell']} short "
+                          f"{h['short_by_px']}px {h['text'][:32]!r}"
+                          for h in hits[:4])
+                + "; ".join(f"{s}!{coord} short {short}px"
+                            for s, coord, short, _x in run_hits[:4]))
 
         # ---- PCOA-FINAL-014: a wholly-context column says so ----------------
         for mode in ("values", "formulas"):

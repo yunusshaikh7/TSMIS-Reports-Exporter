@@ -463,8 +463,26 @@ def write_source_files_sheet(wb, side_specs, sheet_title="Source Files"):
     + append plain values), so it works with the streaming comparison workbook and
     needs no change to the correctness-locked engine. Rows the side actually wrote
     are listed in order, so row N here corresponds to data-sheet row N+1."""
+    from compare_core import fitted_width
+
     ws = wb.create_sheet(sheet_title)
-    ws.append(["Side", "Row #", "Route (as compared)", "Source File"])
+    headers = ["Side", "Row #", "Route (as compared)", "Source File"]
+    # This sheet declared no widths at all, so every column sat at Excel's 8.43
+    # default and its own header clipped: "Route (as compared)" needs 132 px
+    # against 64 (RB2-R2-002 round 9). Each column is blocked by the next, so
+    # none of them can spill — measure all four against what they will hold.
+    sides = [str(s) for s, _r, _f in side_specs]
+    routes = ["" if not row or row[0] is None else str(row[0])
+              for _s, rows, _f in side_specs for row in rows]
+    names = [str(fn) for _s, _r, files in side_specs for fn in files]
+    longest_run = max((len(files) for _s, _r, files in side_specs), default=1)
+    for col, texts, minimum in (("A", sides + headers[:1], 10),
+                                ("B", [str(max(longest_run, 1))] + headers[1:2], 7),
+                                ("C", routes + headers[2:3], 10),
+                                ("D", names + headers[3:4], 14)):
+        ws.column_dimensions[col].width = fitted_width(
+            [x for x in texts if x], bold=True, size_pt=11, minimum=minimum)
+    ws.append(headers)
     for side_name, rows, files in side_specs:
         for i, (row, fn) in enumerate(zip(rows, files), start=1):
             route = "" if not row or row[0] is None else str(row[0])
