@@ -459,6 +459,11 @@ field-driven hotfixes, so "enterprise-ready" now cuts as **v0.18.5** (see
 Bump `version.py` first (v0.18.0 sets it; the tag must be `v<__version__>`); nothing is
 published if any gate fails.
 
+> **Version line — owner decision 2026-08-02: stay on `0.33.x`.** v0.33.0 shipped
+> the post-comparison audit's first two fix bundles; every release after it bumps
+> the PATCH — `0.33.1`, `0.33.2`, … — rather than opening a new minor. Do not
+> bump the minor without asking.
+
 ```
 git push origin refs/tags/v0.14.2
 ```

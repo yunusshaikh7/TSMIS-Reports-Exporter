@@ -3,6 +3,79 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.33.0 — 2026-08-02
+
+The first two fix bundles from the post-comparison output audit: the Clean Road
+workbook stops calling unreadable source data a difference, and every comparison
+workbook is legible — no cut-off text anywhere — and says what it means.
+
+### Fixed
+- **The Clean Road comparison no longer publishes differences that aren't
+  differences.** 102 of the ArcGIS as-of spans have a postmile the layer cannot
+  resolve. The build used to skip them in silence, leaving the ArcGIS side blank
+  at **165 cells** — and the comparison then coloured **161** of those red as
+  "ArcGIS ≠ TSN" when the raw ArcGIS data actually agreed, while
+  misrepresenting the 4 that genuinely differ. Those cells now carry an explicit
+  unavailable marker, count as not-compared instead of a difference, and the
+  workbook discloses all of it: Summary and Notes state the count and the reason,
+  a marker sheet itemizes all 102 skipped spans, and a new **ArcGIS Marked
+  Anchors** sheet names — per marked cell — the value that could not be placed,
+  which layer it came from, and its one known postmile. Where a marker stands in
+  front of two unplaceable values, it names both.
+- **Text no longer gets cut off in the comparison workbooks.** Column widths were
+  hard-coded guesses; they are now measured against what each cell will actually
+  hold, in the font it renders in, across every sheet the workbook publishes —
+  the Comparison key and field columns, both Only-in sheets, the data sheets,
+  Routes, Provenance, Source Files, Spot Check and Summary. Sentences too long
+  for any sensible column wrap in a row tall enough to show every line instead of
+  being clipped; identity values are widened and never wrapped, because a
+  truncated identity reads as a different value. Measured over every visible
+  sheet of every deliverable: the old build produced **1,648,387** cut-off cells,
+  the new one produces **zero**.
+- **A column that is entirely context now says so.** *DIFFERENCES BY FIELD* used
+  to print a bare `0` for it, which reads exactly like a compared column that
+  happened to have no differences. It now reads `not compared (context)`.
+  Per-cell context, like the Highway Log ditto columns, still reports real counts.
+- **The values workbook publishes its own headline.** `Summary!B3` is written as
+  a literal, so anything that reads the file without recalculating — openpyxl,
+  pandas, any automated reader — sees the same verdict the app does. The live
+  freshness guard now says `REGENERATE REQUIRED` in both twins rather than a
+  generic `CHECK`.
+- **Provenance names a file you can actually open.** When a comparison read its
+  input through a verified private copy, the sheet used to record that temporary
+  path — a directory deleted when the run ended. It now names the canonical
+  source and adds `read via: …`, and the recorded digest is still that of the
+  bytes actually read.
+- **Stale capture directories are cleaned up.** A killed process could leave temp
+  capture folders behind with nothing to unwind them; they are now swept, bounded
+  by prefix, location, age and contents, and anything unexpected is left alone
+  and logged.
+
+### Internal
+- **A new permanent gate, `check_workbook_presentation.py`.** It builds
+  comparisons in both flavors and measures them with the audit's own oracle —
+  imported, not reimplemented, so the shipped check and the audit cannot drift —
+  covering every visible sheet, every column, every row. It also proves the
+  identity-widened-never-wrapped rule, the context rendering, the published
+  headline, and its agreement with the typed outcome.
+- Clean Road canary re-blessed as **CRH-SW-E3**, superseding CRH-SW-E2's counts,
+  with the exact input identities recorded.
+- `backfill_release_notes.ps1 -WhatIf` previews through a real temp file.
+
+### Known / owed
+- **The work-PC acceptance run is still owed** and only the owner can do it — the
+  dev box cannot reach the TSMIS intranet. This release changes what the
+  comparison workbooks look like on purpose: re-run both sides rather than
+  reconciling old output against new.
+- Data-sheet columns are slightly wider than they strictly need to be — the
+  sizing inherits openpyxl's own 13.0 default as a floor. It can only over-widen,
+  never cut anything off; correcting it forces a full output regeneration, so it
+  is deferred to a release that regenerates anyway.
+- The `Report View` sheet declares no column widths, in this release and every
+  release before it. It replicates a printed report, so fitting its columns would
+  break the replication it exists to provide; it is measured, disclosed and
+  unchanged rather than silently excluded.
+
 ## v0.32.0 — 2026-07-23
 
 Marathon 2 (close-out): fast mode saves both formats in one pass, every
