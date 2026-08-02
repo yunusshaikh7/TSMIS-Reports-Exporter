@@ -640,11 +640,18 @@ def _render(wb, ctx, spec, footnote_values=None, extra_notes=None):
     from compare_core import _ceiling_wrapper, fitted_width
     labels = [c.label for sec in spec.sections for c in sec.cats]
     labels += [sec.name for sec in spec.sections] + ["Category"]
+    # The TOTAL row and the footnote rows put their own labels in this column
+    # with a populated count beside them, so they are identities here too and
+    # were missing from the candidate set (RB2-R2-002 round 7).
+    if spec.total is not None:
+        labels.append(spec.total.label)
+    labels += [f.label for f in (spec.footnotes or ())]
     # B and C carry the two SIDE NAMES in their header, bold, and a side name is
     # as long as its environment and date make it ("SSOR-PROD 2026-07-23"); the
     # count beneath is short but the header is not, and its neighbour is
     # populated. Measured rather than left at 13 (RB2-R2-002).
-    for col, w in (("A", fitted_width(labels, size_pt=10, minimum=34)),
+    for col, w in (("A", fitted_width(labels, bold=True, size_pt=10,
+                                      minimum=34)),
                    ("B", fitted_width([str(side_a)], bold=True, size_pt=10,
                                       minimum=13)),
                    ("C", fitted_width([str(side_b)], bold=True, size_pt=10,

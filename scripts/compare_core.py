@@ -99,6 +99,12 @@ _CMP_FIELD_MIN_WIDTH = 13.0
 # MEASURES at this size, so the constant is shared rather than repeated: a
 # candidate chosen at one size and fitted at another is not a fit at all.
 _CMP_FIELD_PT = 10
+# A DIFFERING field cell is rendered BOLD by conditional formatting (the "D"
+# state rule below sets `bold=True`), and bold is wider than regular at the same
+# point size. Sizing therefore measures bold: a matched cell renders regular and
+# simply gets a little room to spare, where the reverse under-sizes exactly the
+# cells a comparison exists to show (RB2-R2-002 round 7).
+_CMP_FIELD_BOLD = True
 # Identity and unsized columns are WIDENED to fit rather than wrapped — a key
 # has to read on one line. The only bound is Excel's own: a stored width past
 # this is rejected by the format, so it is a FILE-FORMAT limit, not a
@@ -2433,12 +2439,12 @@ def _auto_field_widths(sc, lay, rows_t, rows_n, off):
                 if not s:
                     can_blank[f][slot] = True      # a short row renders blank too
                     continue
-                px = _text_px(s, False, _CMP_FIELD_PT)
+                px = _text_px(s, _CMP_FIELD_BOLD, _CMP_FIELD_PT)
                 if px > widest_px[f][slot]:
                     widest_px[f][slot] = px
                     widest[f][slot] = s
 
-    blank_px = _text_px(_BLANK_MARK, False, _CMP_FIELD_PT)
+    blank_px = _text_px(_BLANK_MARK, _CMP_FIELD_BOLD, _CMP_FIELD_PT)
 
     def side_display(f, slot):
         """The widest text this side can put in the cell."""
@@ -2448,7 +2454,7 @@ def _auto_field_widths(sc, lay, rows_t, rows_n, off):
 
     return {f: fitted_width(
         [_pair_display(side_display(f, 0), side_display(f, 1))],
-        size_pt=_CMP_FIELD_PT,
+        bold=_CMP_FIELD_BOLD, size_pt=_CMP_FIELD_PT,
         minimum=max(_CMP_FIELD_MIN_WIDTH,
                     float(sc.cmp_widths.get(sc.header[f], 0))))
         for f in fields}

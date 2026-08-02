@@ -25,7 +25,8 @@ from _checklib import Checker, ROOT, scripts_path, temp_dir
 
 scripts_path()
 
-from compare_core import CompareSchema, _text_px, run_compare  # noqa: E402
+from compare_core import (CompareSchema, _CELL_PAD_PX,  # noqa: E402
+                          _text_px, _usable_px, run_compare)
 from openpyxl import load_workbook  # noqa: E402
 from summary_layout import (Cat, Section, SummarySpec,  # noqa: E402
                             make_extra_sheet_writer)
@@ -251,6 +252,33 @@ MIXED_SCHEMA = CompareSchema(
 MIXED_A = [["k1", "x", "t"], ["k2", "", "t"], ["k3", "   ", "t"]]
 MIXED_B = [["k1", "W" * 7, "t"], ["k2", "W" * 7, "t"], ["k3", "W" * 7, "t"]]
 
+# ---- RB2-R2-002 round 7: the DIFFERENCE font is bold ------------------------
+# Conditional formatting renders every differing value bold, and bold is wider
+# than regular at the same point size. Sizing measured regular, so the columns a
+# comparison exists to show were the ones under-sized. The delta is ~0.7%, which
+# is invisible on short text and crosses the oracle's 6px tolerance only once the
+# value is long -- hence 90 characters a side, which is Codex's own repro.
+BOLD_SCHEMA = CompareSchema(
+    report_name="Presentation Bold Difference", header=["Key", "Value"],
+    side_a="A", side_b="B", id_noun="location", id_noun_plural="locations")
+BOLD_A = [["k", "A" * 90]]
+BOLD_B = [["k", "B" * 90]]
+
+# The TOTAL row writes its label bold beside a populated count, and footnote rows
+# do the same -- neither was in the Category column's candidate set.
+TOTAL_SPEC = SummarySpec(
+    report="Presentation Total Label", sheet_name="Total Categories",
+    title="Total and footnote labels are identities too",
+    sections=(Section(name="S", cats=(Cat(slug="c", label="x", key="x"),)),),
+    total=Cat(slug="total", label="A" * 90, key="TOTAL"))
+TOTAL_SCHEMA = CompareSchema(
+    report_name="Presentation Total", header=["Category", "Count"],
+    side_a="TSMIS", side_b="TSN", id_noun="category",
+    id_noun_plural="categories",
+    extra_sheet_writer=make_extra_sheet_writer(TOTAL_SPEC))
+TOTAL_A = [["x", "1"], ["TOTAL", "2"]]
+TOTAL_B = [["x", "1"], ["TOTAL", "3"]]
+
 FRESHNESS_LABEL = ("Build-time source identity and duplicate pairing snapshot "
                    "is current")
 CONTEXT_TEXT = "not compared (context)"
@@ -439,6 +467,69 @@ def _unwrapped_blocked_formulas(path, sheets):
         wb.close()
 
 
+def _bold_overflow(path, sheet, header):
+    """`[(coord, short_px)]` for cells that do not fit BOLD, by the PRODUCT'S own
+    metric.
+
+    The committed oracle cannot answer this. It measures Calibri only, while the
+    product measures the max over its candidate fonts and so already reserves
+    more than Calibri needs -- a column can overflow in the product's own model
+    and still look roomy to the oracle. Measured on the round-7 repro: bold needs
+    1,811.0 px of the product's metric against 1,678 px usable, while the oracle
+    sees 1,362.0 px against 1,683 px and reports nothing at all.
+
+    So this asserts the product against ITSELF: a field column must fit the text
+    it stores, measured the way conditional formatting will render it."""
+    wb = load_workbook(path, read_only=False, data_only=True)
+    try:
+        ws = wb[sheet]
+        col = None
+        for cell in ws[1]:
+            if cell.value == header:
+                col = cell.column_letter
+                break
+        if col is None:
+            return []
+        dim = ws.column_dimensions.get(col)
+        if dim is None or dim.width is None:
+            return []
+        avail = _usable_px(float(dim.width))
+        bad = []
+        for row in range(2, ws.max_row + 1):
+            cell = ws[f"{col}{row}"]
+            value = cell.value
+            if not isinstance(value, str) or not value.strip():
+                continue
+            if cell.alignment and cell.alignment.wrap_text:
+                continue      # at the ceiling and wrapped: every line shows
+            need = _text_px(value, True, 10.0) + _CELL_PAD_PX
+            if need > avail:
+                bad.append((f"{col}{row}", round(need - avail, 1)))
+        return bad
+    finally:
+        wb.close()
+
+
+def _cf_bold_ranges(ws):
+    """Ranges whose CONDITIONAL FORMATTING can render a cell bold.
+
+    `cell.font` is the cell's base font; openpyxl does not fold a conditional
+    format's differential font into it. The Comparison sheet bolds every
+    differing value that way, so a checker reading only `cell.font` measures
+    regular text for exactly the cells that render bold and never sees the
+    shortfall (RB2-R2-002 round 7). Bold is the wider case, so treating a cell
+    inside such a range as bold is the conservative reading."""
+    out = []
+    for fmt in ws.conditional_formatting:
+        for rule in fmt.rules:
+            dxf = getattr(rule, "dxf", None)
+            font = getattr(dxf, "font", None) if dxf is not None else None
+            if font is not None and getattr(font, "b", None):
+                out.append(fmt.sqref)
+                break
+    return out
+
+
 def _clipped_run_spill(gate, path):
     """`[(sheet, coord, short_px, text)]` — clipped cells under the REAL spill
     rule: text renders across the run of empty neighbours and stops at the first
@@ -463,6 +554,7 @@ def _clipped_run_spill(gate, path):
             ws = wb[name]
             if ws.sheet_state != "visible":
                 continue
+            bold_cf = _cf_bold_ranges(ws)
             merged = {c for rng in ws.merged_cells.ranges
                       for c in rng.cells}
             def width_px(idx):
@@ -496,8 +588,10 @@ def _clipped_run_spill(gate, path):
                     if not stopped:
                         continue
                     font = cell.font
+                    bold = bool(font and font.bold) or any(
+                        cell.coordinate in rng for rng in bold_cf)
                     need = gate.text_px(
-                        value, bool(font and font.bold),
+                        value, bold,
                         float(font.size or 11) if font else 11.0) + 4
                     if need > avail + gate.TOLERANCE_PX:
                         hits.append((name, cell.coordinate,
@@ -820,7 +914,9 @@ def main():
         # ---- RB2-R2-002 round 5: sizing must measure the (blank) marker -----
         blank_widths = {}
         shapes = (("blank", BLANK_SCHEMA, BLANK_A, BLANK_B),
-                  ("mixed", MIXED_SCHEMA, MIXED_A, MIXED_B))
+                  ("mixed", MIXED_SCHEMA, MIXED_A, MIXED_B),
+                  ("bold", BOLD_SCHEMA, BOLD_A, BOLD_B),
+                  ("total", TOTAL_SCHEMA, TOTAL_A, TOTAL_B))
         for mode in ("values", "formulas"):
           for tag, schema, ra, rb in shapes:
             path = Path(tmp) / f"{tag}-{mode}.xlsx"
@@ -836,7 +932,19 @@ def main():
                               f"{h['short_by_px']}px" for h in hits[:4])
                     + "; ".join(f"{s}!{coord} short {short}px"
                                 for s, coord, short, _x in run_hits[:4]))
-            vcol = _column_of(path, "Comparison", "Value")
+            # Conditional formatting renders a differing value BOLD, so
+            # the column must fit it bold -- checked against the
+            # product's own metric, the only one that can see it.
+            if mode == "values":
+                over = _bold_overflow(path, "Comparison",
+                                      schema.header[-1])
+                c.check(f"{tag}: the field column fits its value rendered "
+                        "BOLD, the way a difference is displayed",
+                        not over,
+                        "; ".join(f"Comparison!{coord} short {short}px"
+                                  for coord, short in over[:4]))
+            vcol = (_column_of(path, "Comparison", "Value")
+                    or _column_of(path, "Comparison", "Category"))
             from openpyxl.utils import get_column_letter as _gcl
             blank_widths[(tag, mode)] = _stored_width(
                 path, "Comparison", _gcl(vcol))
