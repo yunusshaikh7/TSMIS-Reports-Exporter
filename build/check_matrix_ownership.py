@@ -420,9 +420,9 @@ def evidence_identity_checks(root):
     rec = {}
 
     def fake_efc(dest, row, cell, base, events, tsn_files=None, examples=None,
-                 layout=None, commit_guard=None):
+                 layout=None, commit_guard=None, mode_id="tsn"):
         rec.update(dest=str(dest), base=base, tsn=tsn_files, examples=examples,
-                   layout=layout)
+                   layout=layout, mode_id=mode_id)
         return _ok_result()
 
     def fake_efd(source, date, row, dest, events, tsn_files=None, examples=None,

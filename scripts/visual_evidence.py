@@ -441,7 +441,7 @@ def _snapshot_read_set(tsmis_paths, tsn_paths, extra=(), buckets=None):
                 src = Path(src)
                 try:
                     st = src.stat()
-                except OSError:
+                except OSError:   # silent-ok: a missing source is absent from the snapshot (the locate step reports the miss)
                     continue
                 if not src.is_file():
                     continue
@@ -836,14 +836,30 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
         refuse_binding(e)
 
     if flavor == FLAVOR_ENV:
-        dir_a = Path(str(side_rec_a.get("selection") or ""))
-        dir_b = Path(str(side_rec_b.get("selection") or ""))
-        if not dir_a.is_dir() or not dir_b.is_dir():
+        # The provenance records each side's run-folder ROOT; the per-route
+        # prints live in the report's subdir beneath it, resolved the ENV
+        # COMPARISON'S OWN way (compare_env._find_input_dir — the same legacy-
+        # layout probing), so evidence can never discover a different set than
+        # the comparison did. The per-file census binding then holds each
+        # rendered print to the recorded members.
+        import compare_env
+        roots = (Path(str(side_rec_a.get("selection") or "")),
+                 Path(str(side_rec_b.get("selection") or "")))
+        if not roots[0].is_dir() or not roots[1].is_dir():
             refuse_binding(EvidenceSourceBindingError(
                 "a compared environment folder the comparison recorded reading "
                 "no longer exists — the evidence sources cannot be bound"))
-        pdfs_a = tuple(sorted(dir_a.glob("*.pdf")))
-        pdfs_b = tuple(sorted(dir_b.glob("*.pdf")))
+        try:
+            dir_a, pdfs_a = compare_env._find_input_dir(roots[0], row_key,
+                                                        "*.pdf")
+            dir_b, pdfs_b = compare_env._find_input_dir(roots[1], row_key,
+                                                        "*.pdf")
+        except ValueError as e:
+            refuse_binding(EvidenceSourceBindingError(
+                f"the compared environment folders cannot be resolved the "
+                f"comparison's way: {e}"))
+        pdfs_a = tuple(sorted(Path(p) for p in pdfs_a))
+        pdfs_b = tuple(sorted(Path(p) for p in pdfs_b))
         if not pdfs_a or not pdfs_b:
             refuse_binding(EvidenceSourceBindingError(
                 f"a compared environment folder holds no {adapter.REPORT_LABEL} "
@@ -870,7 +886,7 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
         for book, rec in ((consolidated, side_rec_a), (tsn_path, side_rec_b)):
             try:
                 digest = artifact_store.content_digest(book)
-            except OSError:
+            except OSError:   # silent-ok: unreadable -> the binding refusal below
                 digest = None
             if not digest or digest != rec.get("sha256"):
                 refuse_binding(EvidenceSourceBindingError(

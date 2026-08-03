@@ -81,8 +81,10 @@ TSN_LIB_REPORTS = ("highway_log", "highway_sequence", "intersection_detail",
 TSN_ROWS = ("highway_log", "highway_log_pdf", "highway_sequence",
             "highway_sequence_pdf", "intersection_detail",
             "intersection_detail_pdf", "ramp_detail", "ramp_detail_pdf")
-SELF_CELLS = tuple((r, "vs_pdf" if not r.endswith("_pdf") else "vs_excel")
-                   for r in TSN_ROWS)
+# The self mode rides each PDF row (`vs_excel`); Highway Log's Excel row also
+# offers the symmetric `vs_pdf` — exactly the audit's observed self sets.
+SELF_CELLS = (("highway_log", "vs_pdf"),) + tuple(
+    (r, "vs_excel") for r in TSN_ROWS if r.endswith("_pdf"))
 # The five Everything ENV PDF-vs-PDF cells (PCOA-FINAL-007), paired the way the
 # audit measured them: ID-PDF against the ars-prod outage substitute, the rest
 # against the 2026-07-09 ssor pull provisioned as ssor-test.
@@ -260,19 +262,35 @@ def _evidence_state(path):
     return state
 
 
-def phase_generate(root, side, tree, run_id):
+def phase_generate(root, side, tree, run_id, kinds=None, label=""):
     side_root = _sandbox(tree, root, side)
     import events as events_mod
     import matrix
     import day_matrix
     import owned_dir
     import consolidation_meta
+    import tsn_library
 
     dest = side_root / "store"
-    log_path = root / "logs" / f"generate-{side}.log"
+    tag = f"{side}-{label}" if label else side
+    log_path = root / "logs" / f"generate-{tag}.log"
     ev = _events(events_mod, log_path)
-    results = {"run_id": run_id, "side": side, "tree": str(tree),
+    results = {"run_id": run_id, "side": side, "tree": str(tree), "label": label,
                "python": sys.version.split()[0], "cells": [], "started": time.time()}
+
+    def kind_on(kind):
+        return kinds is None or kind in kinds
+
+    # The Settings rebuild entry, once per dataset (the owner-plan's "TSN
+    # libraries rebuild once"): a dataset with no consolidated workbook is
+    # BUILT here — the matrix heals stale libraries but never creates one.
+    for report in ("highway_log", "highway_sequence", "intersection_detail",
+                   "ramp_detail"):
+        try:
+            res = tsn_library.build_consolidated(report, events=ev)
+            print(f"  tsn build {report}: {res.status} — {res.message}")
+        except Exception as e:  # noqa: BLE001 — recorded; cells then refuse
+            print(f"  tsn build {report}: EXCEPTION {type(e).__name__}: {e}")
 
     comparisons_lease = owned_dir.require_owned_dir_lease(
         dest / matrix.COMPARISONS_DIRNAME, kind="comparisons")
@@ -305,11 +323,11 @@ def phase_generate(root, side, tree, run_id):
             print(entry["traceback"])
         entry["elapsed_s"] = round(time.time() - started, 1)
         results["cells"].append(entry)
-        write_json(root / "results" / f"generation-{side}.json", results)
+        write_json(root / "results" / f"generation-{tag}.json", results)
         return entry
 
     # 1) Everything vs-TSN cells (evidence toggle ON, worker-parity leases).
-    for row in TSN_ROWS:
+    for row in TSN_ROWS if kind_on("everything-tsn") else ():
         def build_tsn(row=row):
             active["store"] = owned_dir.require_existing_owned_dir_lease(
                 dest / BASELINE, kind="store")
@@ -326,10 +344,10 @@ def phase_generate(root, side, tree, run_id):
         entry["comparison_path"] = str(cmp_path)
         entry["typed"] = _typed_counts(consolidation_meta, cmp_path)
         entry["evidence"] = _evidence_state(cmp_path)
-        write_json(root / "results" / f"generation-{side}.json", results)
+        write_json(root / "results" / f"generation-{tag}.json", results)
 
     # 2) Everything SELF cells (the toggle-driven self decoration).
-    for row, mode_id in SELF_CELLS:
+    for row, mode_id in SELF_CELLS if kind_on("everything-self") else ():
         def build_self(row=row, mode_id=mode_id):
             active["store"] = owned_dir.require_existing_owned_dir_lease(
                 dest / BASELINE, kind="store")
@@ -346,12 +364,12 @@ def phase_generate(root, side, tree, run_id):
         entry["comparison_path"] = str(cmp_path)
         entry["typed"] = _typed_counts(consolidation_meta, cmp_path)
         entry["evidence"] = _evidence_state(cmp_path)
-        write_json(root / "results" / f"generation-{side}.json", results)
+        write_json(root / "results" / f"generation-{tag}.json", results)
 
     # 3) Everything ENV cells — the five PDF-vs-PDF placements (PCOA-FINAL-007).
     #    At base this proves the comparisons run and NO evidence artifact exists;
     #    at head it exercises the new lane end to end.
-    for row, other_env in ENV_CELLS:
+    for row, other_env in ENV_CELLS if kind_on("everything-env") else ():
         def build_env(row=row, other_env=other_env):
             return matrix.build_comparison(
                 str(dest), row, other_env, "env", BASELINE, events=ev,
@@ -363,10 +381,10 @@ def phase_generate(root, side, tree, run_id):
         entry["comparison_path"] = str(cmp_path)
         entry["typed"] = _typed_counts(consolidation_meta, cmp_path)
         entry["evidence"] = _evidence_state(cmp_path)
-        write_json(root / "results" / f"generation-{side}.json", results)
+        write_json(root / "results" / f"generation-{tag}.json", results)
 
     # 4) By Day vs-TSN cells (no commit guard — the day lane is app-private).
-    for row in TSN_ROWS:
+    for row in TSN_ROWS if kind_on("byday") else ():
         def build_day(row=row):
             return day_matrix.build_day_cell(
                 BYDAY_SOURCE, BYDAY_DAY, row, str(dest), ev, tsn_files={},
@@ -377,14 +395,14 @@ def phase_generate(root, side, tree, run_id):
         entry["comparison_path"] = str(cmp_path)
         entry["typed"] = _typed_counts(consolidation_meta, cmp_path)
         entry["evidence"] = _evidence_state(cmp_path)
-        write_json(root / "results" / f"generation-{side}.json", results)
+        write_json(root / "results" / f"generation-{tag}.json", results)
 
     # 5) Silent controls: the classic Compare tab result shape is exercised by
     #    the by-day PDF-vs-Excel matrix (same self comparator, no evidence) —
     #    build one PvE cell per family and assert no evidence sibling appears.
     import pdf_excel_matrix
-    for fam_row in ("highway_log", "highway_sequence", "intersection_detail",
-                    "ramp_detail"):
+    for fam_row in (("highway_log", "highway_sequence", "intersection_detail",
+                     "ramp_detail") if kind_on("pve") else ()):
         def build_pve(fam_row=fam_row):
             return pdf_excel_matrix.build_pve_cell(
                 BYDAY_SOURCE, BYDAY_DAY, fam_row, str(dest), ev,
@@ -398,7 +416,7 @@ def phase_generate(root, side, tree, run_id):
             entry["evidence"] = _evidence_state(cmp_path)
         except Exception as e:  # noqa: BLE001
             entry["path_error"] = f"{type(e).__name__}: {e}"
-        write_json(root / "results" / f"generation-{side}.json", results)
+        write_json(root / "results" / f"generation-{tag}.json", results)
 
     # 6) Whole-tree evidence sweep: every evidence artifact under the side root,
     #    so absences are proved by enumeration, not assumption.
@@ -406,7 +424,7 @@ def phase_generate(root, side, tree, run_id):
     results["evidence_sweep"] = hits
     results["finished"] = time.time()
     results["elapsed_s"] = round(results["finished"] - results["started"], 1)
-    write_json(root / "results" / f"generation-{side}.json", results)
+    write_json(root / "results" / f"generation-{tag}.json", results)
     print(f"generate {side} done in {results['elapsed_s']:.0f}s — "
           f"{len(results['cells'])} cell(s), {len(hits)} evidence path(s)")
 
@@ -478,6 +496,110 @@ def _census_one_root(root_dir, label):
     return sets
 
 
+def phase_cameras(root, side, tree, run_id):
+    """The ON-DEMAND per-cell cameras — the other end-user evidence path: the
+    Everything vs-TSN camera, the By Day camera, and (at head) the HF-10 env
+    camera, each regenerating evidence for an EXISTING comparison under the
+    freshness gates."""
+    side_root = _sandbox(tree, root, side)
+    import events as events_mod
+    import matrix
+    import day_matrix
+    import owned_dir
+    dest = side_root / "store"
+    ev = _events(events_mod, root / "logs" / f"cameras-{side}.log")
+    results = {"run_id": run_id, "side": side, "tree": str(tree), "cells": [],
+               "started": time.time()}
+    lease = owned_dir.require_existing_owned_dir_lease(
+        dest / matrix.COMPARISONS_DIRNAME, kind="comparisons")
+
+    def guard(path=None, *, anchor_path=None, anchor_identity=None,
+              directory_identity=None):
+        if not lease.is_current():
+            return False
+        if path is None:
+            return True
+        return lease.is_safe_descendant(
+            path, anchor_path=anchor_path, anchor_identity=anchor_identity,
+            directory_identity=directory_identity)
+
+    def run(kind, row, cell, fn):
+        entry = {"kind": kind, "row": row, "cell": cell}
+        print(f"=== camera {side} · {kind} · {row} · {cell} ===")
+        started = time.time()
+        try:
+            res = fn()
+            entry["status"] = res.status
+            entry["message"] = getattr(res, "message", "")
+        except Exception as e:  # noqa: BLE001
+            entry["status"] = "exception"
+            entry["error"] = f"{type(e).__name__}: {e}"
+            entry["traceback"] = traceback.format_exc()
+            print(entry["traceback"])
+        entry["elapsed_s"] = round(time.time() - started, 1)
+        results["cells"].append(entry)
+        write_json(root / "results" / f"cameras-{side}.json", results)
+
+    for row in TSN_ROWS:
+        run("camera-tsn", row, BASELINE,
+            lambda row=row: matrix.evidence_for_cell(
+                str(dest), row, BASELINE, BASELINE, ev, tsn_files={},
+                commit_guard=guard))
+        run("camera-byday", row, f"{BYDAY_DAY} {BYDAY_SOURCE}",
+            lambda row=row: day_matrix.evidence_for_day_cell(
+                BYDAY_SOURCE, BYDAY_DAY, row, str(dest), ev, tsn_files={}))
+    if side == "head":
+        for row, other_env in ENV_CELLS:
+            run("camera-env", row, other_env,
+                lambda row=row, other_env=other_env: matrix.evidence_for_cell(
+                    str(dest), row, other_env, BASELINE, ev, tsn_files={},
+                    commit_guard=guard, mode_id="env"))
+    results["elapsed_s"] = round(time.time() - results["started"], 1)
+    write_json(root / "results" / f"cameras-{side}.json", results)
+
+
+def phase_checks_at_base(root, tree, head_tree):
+    """Run the HEAD's extended evidence checks against the BASE scripts tree —
+    the red half of red→green. Every new assertion must fail there with the
+    recorded defect signature; the head run of the same files must pass."""
+    import subprocess
+    base_tree = Path(tree)
+    checks = ("check_visual_evidence.py", "check_evidence_source_role.py",
+              "check_evidence_manifest.py", "check_evidence_excel_columns.py",
+              "check_evidence_literal_cells.py", "check_matrix.py",
+              "check_pdf_excel_matrix.py")
+    stage = root / "base-red"
+    if stage.exists():
+        shutil.rmtree(stage)
+    stage.mkdir(parents=True)
+    # The checks resolve scripts/ relative to their own location, so the stage
+    # mirrors the tree: the BASE runtime (scripts + version.py) with only the
+    # HEAD's check files overlaid into the base build/.
+    shutil.copytree(base_tree / "scripts", stage / "scripts")
+    shutil.copyfile(base_tree / "version.py", stage / "version.py")
+    build_dir = stage / "build"
+    shutil.copytree(base_tree / "build", build_dir)
+    for name in checks + ("_checklib.py",):
+        shutil.copyfile(Path(head_tree) / "build" / name, build_dir / name)
+    out = {"base_tree": str(base_tree), "head_tree": str(head_tree),
+           "results": {}}
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    for name in checks:
+        proc = subprocess.run(
+            [sys.executable, str(build_dir / name)], cwd=str(stage),
+            capture_output=True, text=True, encoding="utf-8",
+            errors="replace", env=env)
+        fails = [ln for ln in (proc.stdout or "").splitlines()
+                 if "FAIL" in ln][:40]
+        tail = (proc.stdout or "").splitlines()[-8:]
+        err_tail = (proc.stderr or "").splitlines()[-6:]
+        out["results"][name] = {"exit": proc.returncode, "fail_lines": fails,
+                                "stdout_tail": tail, "stderr_tail": err_tail}
+        print(f"  base-red {name}: exit={proc.returncode} "
+              f"({len(fails)} FAIL line(s))")
+    write_json(root / "results" / "base-red-checks.json", out)
+
+
 def phase_census(root):
     out = {"audit_everything": _census_one_root(AUDIT_EVERYTHING,
                                                 "audit-everything"),
@@ -507,12 +629,20 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--run-id", default=RUN_ID_DEFAULT)
     ap.add_argument("--phase", required=True,
-                    choices=("provision", "generate", "census"))
+                    choices=("provision", "generate", "cameras", "census",
+                             "checks-at-base"))
     ap.add_argument("--side", choices=("base", "head"),
                     help="generate: which acceptance side to run")
     ap.add_argument("--tree", default=str(REPO),
                     help="generate: the scripts tree under test")
     ap.add_argument("--root", default=str(ROOT_DEFAULT))
+    ap.add_argument("--cells", default="",
+                    help="generate: comma list of cell kinds to run "
+                         "(everything-tsn,everything-self,everything-env,"
+                         "byday,pve); empty = all")
+    ap.add_argument("--label", default="",
+                    help="generate: suffix for the results/log files so a "
+                         "partial re-run never clobbers a prior record")
     args = ap.parse_args(argv)
     root = Path(args.root)
     root.mkdir(parents=True, exist_ok=True)
@@ -525,9 +655,17 @@ def main(argv=None):
     elif args.phase == "generate":
         if not args.side:
             ap.error("--side is required for generate")
-        phase_generate(root, args.side, Path(args.tree), args.run_id)
+        kinds = tuple(k for k in args.cells.split(",") if k) or None
+        phase_generate(root, args.side, Path(args.tree), args.run_id,
+                       kinds=kinds, label=args.label)
+    elif args.phase == "cameras":
+        if not args.side:
+            ap.error("--side is required for cameras")
+        phase_cameras(root, args.side, Path(args.tree), args.run_id)
     elif args.phase == "census":
         phase_census(root)
+    elif args.phase == "checks-at-base":
+        phase_checks_at_base(root, Path(args.tree), REPO)
     print(f"— phase {args.phase} complete at {time.strftime('%F %T')}")
     return 0
 

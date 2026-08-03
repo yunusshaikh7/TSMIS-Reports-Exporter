@@ -85,7 +85,7 @@ def _line_rows_with_boxes(words, left):
         if _NUM_RE.fullmatch(texts[0]):
             try:
                 number = int(texts[0].replace(",", ""))
-            except ValueError:
+            except ValueError:   # silent-ok: a non-count token keeps its label row
                 number = None
             count_word = line_words[0]
             rest = line_words[1:]
@@ -144,7 +144,7 @@ def env_locate(pdf_path, needed_keys):
                 if label_re.match(label):
                     try:
                         number = int(texts[-1].replace(",", ""))
-                    except ValueError:
+                    except ValueError:   # silent-ok: not a count line; geometry stays absent (refusal)
                         continue
                     cells[col] = (line_words[-1], line_words, number)
     rec = {"record": record, "cells": cells, "src": str(pdf_path),
