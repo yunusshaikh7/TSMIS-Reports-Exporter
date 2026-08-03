@@ -3,7 +3,9 @@
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
 RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
 RB-2 is MERGED at `d679f388e0b12ff595751af9edd816674615b7a5`;
-RB-3 / HF-04 is READY on current `main`**
+RB-3 is JOINTLY APPROVED on `hotfix/rb-3-ramp-detail-layout`, with Review 2
+performed against pushed entry head `cebc1a5d` and acceptance runtime
+`dd922f7`**
 
 Last updated: 2026-08-02
 
@@ -15,11 +17,23 @@ first pass.
 
 ## Next action
 
-In a fresh task, run
-[`PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
-with `<BUNDLE_ID> = RB-3` and `<IMPLEMENTER> = Claude`. Stage 4 must create
-`hotfix/rb-3-ramp-detail-layout` from the then-current clean `main`, record that
-exact base SHA in `hotfix-bundles/RB-3/BUNDLE.md`, and only then begin work.
+Complete Prompt 05's final-approval sequence: commit and push the signed Review
+2 record, fetch and confirm `origin/main` remains at the recorded base, merge
+RB-3 without force, run the planned post-merge smoke checks, record the merge
+SHA, push `main`, and remove only the fully merged RB-3 worktree/branch.
+
+Review 1 closed both returned evidence gaps. The fail-closed self-test, cheap
+exact-head verifier, and full corpus/archive verifier all passed; all seven
+HF-04 criteria have exact same-head evidence at runtime `dd922f7`; the focused
+dual-layout, mixed-layout, field-mapping, completion-truth, and same-source
+parity challenges found no contradiction. The signed criterion-by-criterion
+approval is in
+[`hotfix-bundles/RB-3/REVIEW.md`](hotfix-bundles/RB-3/REVIEW.md).
+Review 2 independently rechecked the exact-head/runtime binding and challenged
+what Review 1 could have missed: all-field mixed-layout projection in both
+directions, physical-key raw claims, exact-only null projection, malformed
+layout refusal, and neighboring physical-identity invariance. No contradiction
+remains; both reviews approve.
 
 `RB2-R2-004` was correct to refuse the decision from the reviewer's chair. It
 returned RB-2 to the plan owner over two surfaces the accepted runtime touches:
@@ -75,8 +89,8 @@ did not create a branch, modify product code, or begin an acceptance run.
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-3 READY — NOT STARTED** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-3 NOT STARTED** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-3 IMPLEMENTED — JOINTLY APPROVED** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-3 JOINTLY APPROVED — MERGE IN PROGRESS** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

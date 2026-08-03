@@ -96,6 +96,197 @@ def _comparison(path):
         wb.close()
 
 
+# The July-2026 consolidated layout (HF-04): every label over its own value, no
+# PM-suffix column, OF/TY between R/U and Description. Kept as a literal here
+# (not read from the module) so the check still binds the exact censused
+# header if the module's copy drifts.
+_TSMIS_HDR_2026 = ["Route", "Location", "PRE", "PM", "Date of Record", "HG",
+                   "Area 4", "City Code", "R/U", "OF", "TY", "Description"]
+
+
+def _tsmis_row_2026(route, loc, pre, pm, date, hg, area4, city, ru, of, ty, desc):
+    return [route, loc, pre, pm, date, hg, area4, city, ru, of, ty, desc]
+
+
+def _write_tsmis_2026(path, rows):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = rd.TSMIS_SHEET
+    ws.append(_TSMIS_HDR_2026)
+    for r in rows:
+        ws.append(r)
+    wb.save(path)
+    wb.close()
+
+
+def test_dual_layout_loader():
+    """HF-04 / PCOA-FINAL-001: BOTH censused consolidated layouts load, each by
+    its own position map (OF/TY/Description mapped correctly — the exact
+    mis-mapping hazard the pinned single layout protected against); an unknown
+    third layout refuses with a message that names the real gate instead of
+    misdiagnosing a missing leading 'Route' column."""
+    print("HF-04 — dual-layout consolidated loader:")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_rd_hf04_"))
+    new_path = root / "new.xlsx"
+    # The finding's witness shape: route 001 row 2 (OF=F TY=D) + a null-token
+    # row (the 005 / 025.218 class) + a genuine on-ramp letter.
+    _write_tsmis_2026(new_path, [
+        _tsmis_row_2026("001", "12-ORA-001", "R", "000.606", "02/25/1976", "D",
+                        "Y", "DAPT", "U", "F", "D", "001/NB OFF TO DOHENY PK RD"),
+        _tsmis_row_2026("005", "07-LA-005", "", "025.218", "01/01/2014", "D",
+                        "-", "LA", "U", "-", "-", "NO RAMP LINEAR EVENT"),
+        _tsmis_row_2026("005", "07-LA-005", "R", "026.000", "01/01/2014", "D",
+                        "Y", "LA", "U", "N", "C", "005/NB ON FR X"),
+    ])
+    hdr = ["Route"] + rd.SHARED_HEADER
+    try:
+        rows, has_route = rd._load_tsmis(new_path)
+    except ValueError as e:
+        # The pre-fix tree refuses the July-2026 layout here — with the
+        # misdiagnosing "expected a leading 'Route' column" message the
+        # finding recorded. Degrade to semantic FAILs, never a crash.
+        print(f"     -> pre-fix refusal: {str(e)[:110]}")
+        for name in ("the July-2026 layout is accepted",
+                     "Description read from position 11 (route prefix stripped)",
+                     "OF maps to the On/Off context column",
+                     "TY maps to the Ramp Type context column",
+                     "HG/Area 4/City Code/R/U at the July positions",
+                     "the July layout conserves an empty PM-suffix claim",
+                     "the null-token row loads byte-exact "
+                     "('-' / 'NO RAMP LINEAR EVENT')"):
+            check(name, False)
+    else:
+        check("the July-2026 layout is accepted",
+              has_route is True and len(rows) == 3)
+        by = {str(r[1 + rd.KEY_FIELD]): r for r in rows}
+        r2 = by["0.606"]
+        check("Description read from position 11 (route prefix stripped)",
+              r2[hdr.index("Description")] == "NB OFF TO DOHENY PK RD")
+        check("OF maps to the On/Off context column",
+              r2[hdr.index("On/Off")] == "F")
+        check("TY maps to the Ramp Type context column",
+              r2[hdr.index("Ramp Type")] == "D")
+        check("HG/Area 4/City Code/R/U at the July positions",
+              (r2[hdr.index("HG")], r2[hdr.index("Area 4")],
+               r2[hdr.index("City Code")], r2[hdr.index("R/U")])
+              == ("D", "Y", "DAPT", "U"))
+        check("the July layout conserves an empty PM-suffix claim",
+              dict((c.name, c.value) for c in
+                   r2[1 + rd.KEY_FIELD].physical_identity.raw_claims)
+              ["postmile_suffix"] == "")
+        check("the null-token row loads byte-exact ('-' / 'NO RAMP LINEAR EVENT')",
+              (by["25.218"][hdr.index("Area 4")],
+               by["25.218"][hdr.index("On/Off")],
+               by["25.218"][hdr.index("Description")])
+              == ("-", "-", "NO RAMP LINEAR EVENT"))
+
+    # The classic layout still loads (the existing fixtures above prove the
+    # projection; this pins acceptance through the SAME dispatching loader).
+    old_path = root / "old.xlsx"
+    _write_tsmis(old_path, [
+        _tsmis_row("001", "12-ORA-001", "R", "000.606", "02/25/1976", "D",
+                   "Y", "DAPT", "U", "001/NB OFF TO DOHENY PK RD")])
+    rows_old, _ = rd._load_tsmis(old_path)
+    check("the classic layout still loads through the same gate",
+          len(rows_old) == 1
+          and rows_old[0][hdr.index("Description")] == "NB OFF TO DOHENY PK RD"
+          and rows_old[0][hdr.index("On/Off")] == "")
+
+    # An UNKNOWN third layout refuses, and the message names the real gate: it
+    # must not misdiagnose the leading 'Route' column the workbook has, and it
+    # must name the supported-editions bind (the PCOA-FINAL-001 message fix).
+    unknown = root / "unknown.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = rd.TSMIS_SHEET
+    ws.append(["Route", "Location", "PRE", "PM", "Date of Record", "HG",
+               "Area 4", "City Code", "R/U", "OF", "TY", "XS", "Description"])
+    ws.append(["001", "12-ORA-001", "R", "1.000", "2026-01-01", "D", "Y", "C",
+               "U", "F", "D", "x", "001/DESC"])
+    wb.save(unknown)
+    wb.close()
+    try:
+        rd._load_tsmis(unknown)
+        check("an unknown layout is refused", False)
+    except ValueError as e:
+        msg = str(e)
+        check("an unknown layout is refused", True)
+        check("the refusal names the supported-layout gate",
+              "supported layout" in msg and "July-2026" in msg)
+        check("the refusal no longer misdiagnoses the leading 'Route' column",
+              "expected a leading 'Route' column" not in msg)
+
+    # The consolidator's consumability predicate mirrors the loader's gate.
+    ok_pred = getattr(rd, "consolidated_header_ok", None)
+    check("consolidated_header_ok exists and accepts both editions",
+          ok_pred is not None and ok_pred(rd._TSMIS_HEADER)
+          and ok_pred(_TSMIS_HDR_2026))
+    check("consolidated_header_ok refuses junk",
+          ok_pred is not None
+          and not ok_pred(["Route"] + ["x"] * 11)
+          and not ok_pred(_TSMIS_HDR_2026[:-1]))
+
+
+def test_consolidator_completion_truth():
+    """HF-04 / PCOA-FINAL-001 defect (a): consolidate 126/126-style green for a
+    workbook no comparator accepts must not happen. An unknown-layout input
+    folder consolidates into a kept-for-inspection file but the RESULT is an
+    error with completion=failed; both accepted editions still report
+    ok/complete."""
+    print("HF-04 — consolidator completion agrees with consumability:")
+    import consolidate_ramp_detail as crd
+    import outcome
+    from events import Events
+    root = Path(tempfile.mkdtemp(prefix="tsmis_rd_hf04c_"))
+
+    def consolidate_from(header, row):
+        src = root / f"in_{len(list(root.iterdir()))}"
+        src.mkdir()
+        wb = Workbook()
+        ws = wb.active
+        ws.title = rd.TSMIS_SHEET
+        ws.append(header)
+        ws.append(row)
+        wb.save(src / "tsar_ramp_detail_route_001.xlsx")
+        wb.close()
+        out = src / "consolidated.xlsx"
+        res = crd.consolidate(events=Events(),
+                              confirm_overwrite=lambda _p: True,
+                              input_dir=src, out_path=out)
+        return res, out
+
+    # Unknown layout: the export gained a column this app doesn't know.
+    res, out = consolidate_from(
+        ["Location", "PRE", "PM", "Date of Record", "HG", "Area 4",
+         "City Code", "R/U", "OF", "TY", "XS", "Description"],
+        ["12-ORA-001", "R", "1.000", "2026-01-01", "D", "Y", "C", "U", "F",
+         "D", "x", "001/DESC"])
+    check("an unknown-layout consolidation does NOT report ok",
+          res.status != "ok")
+    check("...and its completion is failed (not comparable, not promotable)",
+          getattr(res, "completion", None) == outcome.FAILED)
+    check("...the combined file is kept for inspection and named in the message",
+          out.exists() and str(out) in (res.message or ""))
+    check("...and the message names the supported editions",
+          "July-2026" in (res.message or ""))
+
+    # Both accepted editions still consolidate green.
+    res_old, _ = consolidate_from(
+        list(rd._TSMIS_HEADER[1:]),
+        ["12-ORA-001", "R", "1.000", "2026-01-01", "", "D", "Y", "C", "U",
+         "001/DESC", ""])
+    check("a classic-layout consolidation reports ok/complete",
+          res_old.status == "ok"
+          and getattr(res_old, "completion", None) == outcome.COMPLETE)
+    res_new, _ = consolidate_from(
+        _TSMIS_HDR_2026[1:],
+        ["12-ORA-001", "R", "1.000", "2026-01-01", "D", "Y", "C", "U", "F",
+         "D", "001/DESC"])
+    check("a July-2026-layout consolidation reports ok/complete",
+          res_new.status == "ok"
+          and getattr(res_new, "completion", None) == outcome.COMPLETE)
+
+
 def test_schema():
     print("schema wiring:")
     sc = rd._SCHEMA
@@ -322,6 +513,8 @@ def main():
     test_end_to_end()
     test_pm_identity_canon()
     test_two_county_and_v3_refusal()
+    test_dual_layout_loader()
+    test_consolidator_completion_truth()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

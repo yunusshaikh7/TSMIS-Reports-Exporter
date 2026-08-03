@@ -148,10 +148,107 @@ def test_side_labels():
               st == "error" and "TSMIS (PDF)" in m)
 
 
+def test_self_check_null_parity():
+    """HF-04 / PCOA-FINAL-012: the same-source PDF-vs-Excel self check over
+    rows carrying the print's null tokens ('-' in Area 4 / OF, 'NO RAMP LINEAR
+    EVENT' in Description) and print On/Off letters on BOTH sides reports ZERO
+    differing cells — the PDF leg has always projected those render artifacts,
+    and the July-2026 Excel export now carries the same tokens, so the Excel
+    leg must project them symmetrically. A classic-layout Excel side (blank
+    cells) stays zero too."""
+    print("same-source null-token symmetry (PCOA-FINAL-012):")
+    from events import Events
+    from openpyxl import load_workbook
+
+    hdr_2026 = ["Route", "Location", "PRE", "PM", "Date of Record", "HG",
+                "Area 4", "City Code", "R/U", "OF", "TY", "Description"]
+    with tempfile.TemporaryDirectory() as d:
+        d = Path(d)
+        # The PDF-consolidated side: one null-token ramp (the 005 / 025.218
+        # class) + one ordinary on-ramp (print letter N).
+        pdf_path = d / "pdf.xlsx"
+        _write(pdf_path, _valid_header(), [
+            ["005", "07-LA-005", "", "25.218", "01/01/2014", "", "D", "-",
+             "LA", "U", "NO RAMP LINEAR EVENT", "", "-", "-"],
+            ["005", "07-LA-005", "R", "26.000", "01/01/2014", "", "D", "Y",
+             "LA", "U", "005/NB ON FR X", "", "N", "C"],
+        ])
+        # The July-2026 Excel side of the SAME report: the same two rows as
+        # the new export renders them ('-' / NRLE / the print letter N).
+        excel_new = d / "excel_new.xlsx"
+        _write(excel_new, hdr_2026, [
+            ["005", "07-LA-005", "", "25.218", "01/01/2014", "D", "-", "LA",
+             "U", "-", "-", "NO RAMP LINEAR EVENT"],
+            ["005", "07-LA-005", "R", "26.000", "01/01/2014", "D", "Y", "LA",
+             "U", "N", "C", "005/NB ON FR X"],
+        ])
+
+        def run(excel_path, tag):
+            out = d / f"cmp_{tag}.xlsx"
+            res = rdp.TSMIS_PDF_VS_EXCEL.compare(
+                str(pdf_path), str(excel_path), str(out), events=Events(),
+                confirm_overwrite=lambda _p: True, mode="values")
+            return res, out
+
+        res, out = run(excel_new, "new")
+        # A pre-fix tree refuses the July-2026 Excel side outright
+        # (PCOA-FINAL-001), so degrade the remaining assertions to clean FAILs
+        # instead of crashing on the never-written workbook.
+        ran = res.status == "ok"
+        check("the self check runs over the July-2026 Excel side", ran)
+        counts = res.comparison_outcome.counts
+        check("ZERO differing cells across a fully-paired same-source pair "
+              "(pre-fix: refused entirely; post-012-regression: 3 per "
+              "null-token row)",
+              ran and counts.known and counts.differing_cells == 0)
+        check("both rows pair (no one-sided rows)",
+              ran and counts.paired_rows == 2 and counts.side_a_only_rows == 0
+              and counts.side_b_only_rows == 0)
+        check("the verdict is a clean match", res.verdict == "match")
+        # The workbook itself: no ≠ marker anywhere, and the On/Off context
+        # column reads the SAME projected letter from both legs.
+        if ran and out.exists():
+            wb = load_workbook(out, read_only=True, data_only=True)
+            body = list(wb["Comparison"].iter_rows(values_only=True))
+            wb.close()
+            header = [("" if c is None else str(c)) for c in body[0]]
+            neq = sum(1 for r in body[1:] for v in r
+                      if isinstance(v, str) and " ≠ " in v)
+            check("no ≠ marker in the Comparison sheet", neq == 0)
+            onoff = [str(r[header.index("On/Off")]) for r in body[1:]]
+            check("On/Off context shows the projected O (print N -> O, both legs)",
+                  "O" in onoff and "N" not in onoff and "-" not in onoff)
+        else:
+            check("no ≠ marker in the Comparison sheet", False)
+            check("On/Off context shows the projected O (print N -> O, both legs)",
+                  False)
+
+        # Regression: a classic-layout Excel side (blank where the print marks
+        # '-') still reports zero — the projection is a no-op on blanks.
+        # Classic row positions: Route, Location, PR, PM, Date, sfx, HG,
+        # Area4, City, R/U, Desc, blank — the null cells are BLANK here.
+        excel_old = d / "excel_old.xlsx"
+        wbk = Workbook()
+        ws = wbk.active
+        ws.title = _rd.TSMIS_SHEET
+        ws.append(["Route"] + list(_rd._TSMIS_HEADER[1:]))
+        ws.append(["005", "07-LA-005", "", "25.218", "01/01/2014", "", "D",
+                   "", "LA", "U", "", ""])
+        ws.append(["005", "07-LA-005", "R", "26.000", "01/01/2014", "", "D",
+                   "Y", "LA", "U", "005/NB ON FR X", ""])
+        wbk.save(excel_old)
+        wbk.close()
+        res_old, _ = run(excel_old, "old")
+        check("the classic Excel side still reports zero differing cells",
+              res_old.status == "ok"
+              and res_old.comparison_outcome.counts.differing_cells == 0)
+
+
 def main():
     test_width_mirror()
     test_gate()
     test_side_labels()
+    test_self_check_null_parity()
     print()
     if _fail:
         print(f"{len(_fail)} CHECK(S) FAILED:")

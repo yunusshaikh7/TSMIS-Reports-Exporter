@@ -1,0 +1,507 @@
+# `RB-3` — Adversarial Review Record
+
+Status: **JOINTLY APPROVED**
+
+## Review 1 verdict — 2026-08-02
+
+**DENIED — EVIDENCE GAP.** Prompt 05 requires every expensive acceptance
+operation to be represented by a retained, hash-bound result before substantive
+review begins. RB-3 records exact base and runtime heads, but the retained set
+does not contain the frozen-input/artifact manifest its implementation record
+names and does not otherwise bind the complete `RB3-A1` claim to one exact
+runtime and frozen input set.
+
+This is the one exact missing item:
+
+> A committed `RB3-A1` acceptance manifest for runtime head
+> `dd922f7b3b726a87912a26e92d7b5d930d90451e`, binding every claimed retained
+> input, deliverable, result, render, gate, and committed witness by exact path,
+> byte size, SHA-256, frozen-source identity, and generation metadata.
+
+The implementation says frozen input identities are recorded in
+`rb3-a1-generation.json / rb3-a1-artifacts.json`. The latter file does not exist
+anywhere under the retained HF-04 root. The generation record contains reused
+paths, counts, outcomes, and timings, but no runtime-head or SHA-256 binding for
+those reused inputs. `rb3-a1-head.txt` separately names `dd922f7…`, while
+`rb3-a1-sweep.json` separately inventories output paths, sizes, and hashes; it
+does not bind the frozen inputs, acceptance-result files, generation metadata,
+or runtime head. The Excel, recount, store-integrity, gate, self-test, render,
+and committed-witness records likewise remain separate claims rather than one
+verifiable exact-head acceptance set.
+
+No reviewer-created manifest, corpus regeneration, installed-Excel rebuild,
+whole-corpus recount, full gate, application build, or replacement acceptance
+run was performed. Prompt 05 requires stopping on this precondition failure and
+returning one bounded item to implementation.
+
+## Review identity and budget
+
+| Field | Value |
+|---|---|
+| Reviewer / pass | Codex / Review 1 |
+| Implemented bundle? | **No** — implementer is Claude |
+| Bundle / work items | `RB-3` / `HF-04` |
+| Branch | `hotfix/rb-3-ramp-detail-layout` |
+| Recorded base / merge base | `194b7ee8da095f0300e7e635bb7e7af78643b685` / exact match |
+| Acceptance runtime head | `dd922f7b3b726a87912a26e92d7b5d930d90451e` |
+| Review-entry / review-record head | `43c6336ce33bddad68c2d07fff6a4bd19e000c94` |
+| Remote branch head on entry | `43c6336ce33bddad68c2d07fff6a4bd19e000c94` — verified with `git ls-remote` |
+| Runtime drift after acceptance | **None** — `dd922f7..43c6336` changes only four committed witnesses and `IMPLEMENTATION.md` |
+| Review 2 | **BLOCKED** — do not run until this return is implemented and Review 1 re-reviews |
+| Merge | **BLOCKED** |
+| Elapsed active review | Approximately 24 minutes |
+| Resource budget | **RESPECTED** — no generation, Excel invocation, build, full gate, full recount, corpus re-hash, or new bulk output; only Git/doc/small-record inspection |
+
+The Windows sandbox ACL helper failed on several ordinary repository reads, so
+the bounded read-only checks were run through the approved host shell. One
+PowerShell small-file hash summary had a syntax error before any hash operation
+started and was not retried. These are reviewer-environment events, not product
+failures.
+
+## Precondition audit
+
+| Prompt 05 precondition | Result | Evidence |
+|---|---|---|
+| Review-1 status is `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW` | **PASS on entry** | The controlling top-level status in `START-HERE.md`, `IMPLEMENTATION-PLAN.md`, `BUNDLE.md`, and `IMPLEMENTATION.md` agreed on entry |
+| Hotfix branch and retained output root exist | **PASS** | Local HEAD, local remote-tracking ref, and remote branch all resolved to `43c6336…`; the HF-04 retained root exists |
+| Exact base SHA is recorded | **PASS** | `194b7ee8…`; `git merge-base` returned that exact commit |
+| Exact acceptance runtime head is recorded | **PASS** | `IMPLEMENTATION.md` and `rb3-a1-head.txt` name `dd922f7…`; later commits are record/witness-only |
+| Every expensive acceptance result is retained and hash-bound to that head and the frozen inputs | **FAIL** | The named `rb3-a1-artifacts.json` is absent; no equivalent complete manifest joins the separate head, input, output, result, render, gate, and witness claims |
+
+Because a precondition failed, no HF-04 acceptance criterion was finally
+adjudicated and no targeted product test was started.
+
+## Evidence inspected and bounded commands
+
+| Evidence / command | Binding / result |
+|---|---|
+| Branch identity | Clean worktree on full head `43c6336ce33…`; `origin/hotfix/rb-3-ramp-detail-layout` and `git ls-remote` agree |
+| Complete diff boundary | Recorded base is the merge base; base-to-entry diff has 18 files, 1,423 insertions / 97 deletions, and `git diff --check` is clean |
+| Runtime lineage | `c9b55b6` implementation, `dd922f7` final runtime/Notes precision, `d7f39cd` witnesses/record, `43c6336` acceptance-head correction; no runtime file changes after `dd922f7` |
+| Retained head marker | `rb3-a1-head.txt`, 41 bytes, names `dd922f7b3b726a87912a26e92d7b5d930d90451e` but is not joined to a complete artifact/result manifest |
+| Retained generation record | `rb3-a1-generation.json`, 46,337 bytes; records paths, counts, outcomes, timings, and 16/16 successful harness steps, but not input hashes or runtime head |
+| Retained output sweep | `rb3-a1-sweep.json`, 10,017 bytes; inventories 27 entries / 25 unique deliverable paths with byte sizes and SHA-256 plus presentation/evidence assertions, but not frozen-input identities, result files, generation metadata, or runtime head |
+| Other retained results | `rb3-a1-excel.json` 19,370 bytes; recount 4,529; pre/post store-integrity 4,488 / 5,060; final gate log 6,586; self-test log 28,008; all located, none covered by an exact-head master manifest |
+| Missing named record | Recursive exact-name and `*artifact*.json` searches under the HF-04 root returned no `rb3-a1-artifacts.json` or alternate artifact manifest |
+| Committed witnesses | Four HF-04 JSON witnesses are present at the review-entry head; their Git identity does not bind the retained local result set or reused frozen inputs to `dd922f7` |
+| Preliminary source challenge | The changed dual-layout dispatch, mixed-layout projection/keying, consumability downgrade, and self-only null projection were inspected only far enough to identify plausible challenge surfaces; no acceptance disposition was issued after the failed precondition |
+
+The deliverable hashes recorded in the sweep and the Git identities above prove
+that individual records exist. They do not cure the missing binding among those
+records, the reused frozen inputs, and one exact execution runtime.
+
+## Acceptance and review-domain matrices
+
+| Criterion / gate | Review 1 result | Exact reason |
+|---|---|---|
+| HF-04 criteria 1–7 | **NOT ADJUDICATED** | Prompt 05 requires stopping at the failed evidence precondition |
+| Values / source truth / discrepancy counts | **RETAINED RESULTS LOCATED; NOT FINALLY ADJUDICATED** | No complete frozen-input and runtime-head binding |
+| Formulas / installed Excel | **RETAINED RESULT LOCATED; NOT FINALLY ADJUDICATED** | Recalculated workbook hashes are separate from the missing complete acceptance manifest |
+| Visual / presentation | **RETAINED RENDERS DESCRIBED; NOT FINALLY ADJUDICATED** | Render coverage is not joined to the exact-head acceptance set |
+| Evidence prohibition / sibling parity | **RETAINED RESULTS LOCATED; NOT FINALLY ADJUDICATED** | Separate sweep/witness claims lack the complete manifest binding |
+| Neighbor regression / full gate / frozen self-test | **RECORDED; NOT FINALLY ADJUDICATED** | Logs exist but are not bound into the complete exact-head claim |
+| Performance / atomic publication / stale cache / failure behavior | **NOT FINALLY ADJUDICATED** | Review stopped at the precondition gap |
+
+## Actionable evidence gap
+
+| ID | Priority | Missing item | Required return |
+|---|---|---|---|
+| `RB3-R1-EG-001` | P1 / blocking | The complete `RB3-A1` acceptance set is not bound to runtime head `dd922f7…` and the reused frozen inputs; the implementation record's named `rb3-a1-artifacts.json` is absent. | On the existing RB-3 branch, supply one committed manifest for `dd922f7…` covering every claimed input, deliverable, result, render, gate, and witness by exact path, byte size, SHA-256, frozen-source identity, and generation metadata. Include a verifier that fails on any missing/mismatched file, source identity, or runtime head. Correct the implementation record's nonexistent-file reference. Existing bulk artifacts may be retained if their exact bytes and sources can be proved; regenerate or rerun only any item that cannot be bound. Then return Prompt 05 for Review 1 re-review. |
+
+**Reviewer signature:** Codex, Review 1 — **DENIED — EVIDENCE GAP** —
+`2026-08-02T20:58:01.7470232-07:00`.
+
+Do not merge and do not begin Review 2. Resume Prompt 04 on the existing
+`hotfix/rb-3-ramp-detail-layout` branch only to supply `RB3-R1-EG-001`.
+
+---
+
+## Review 1 re-review — Codex, 2026-08-02
+
+### Verdict
+
+**DENIED — EVIDENCE GAP.**
+
+`RB3-R1-EG-001` is **CLOSED**. The remedy supplies the previously missing
+complete manifest, binds the retained acceptance set to runtime head
+`dd922f7b3b726a87912a26e92d7b5d930d90451e`, and verifies every present byte
+in both the cheap and full corpus/archive paths.
+
+One narrower blocking item remains:
+
+> **`RB3-R1-EG-002`:** supply a corrected committed verifier that returns
+> nonzero when any declared item covered by an explicitly requested
+> verification mode is absent. The current verifier prints `SKIPPED` and
+> succeeds for missing corpus roots, result files, the TSN raw input, and
+> archives, so it can certify an incomplete acceptance set.
+
+This is one evidence-tooling gap, not a product-code failure. Review 1 stops at
+that Prompt-05 precondition and does not adjudicate HF-04 criteria 1–7.
+
+### Review identity, entry state, and budget
+
+| Field | Re-review record |
+|---|---|
+| Reviewer | Codex, independent non-implementer |
+| Bundle / branch | `RB-3` / `hotfix/rb-3-ramp-detail-layout` |
+| Bundle base | `194b7ee8da095f0300e7e635bb7e7af78643b685` |
+| Acceptance runtime | `dd922f7b3b726a87912a26e92d7b5d930d90451e` |
+| Initial denial record | `df5c6fc18710c5e82b2626d337982f3eb3716489` |
+| Remedy / review-entry head | `69231d37765f10b2d48491a6abef6f2bce2f3c45` |
+| Pushed-head check | Local `HEAD`, remote-tracking ref, and `git ls-remote` all matched `69231d3…`; entry worktree was clean |
+| Remedy scope | Ten evidence/status files; no product/runtime file changed after `dd922f7…` |
+| Active review time | Approximately 13 minutes; within the 30-minute Prompt-05 cap |
+| Resource budget | No Excel launch, regeneration, render pass, or acceptance rerun; verifier operations each completed in under 30 seconds |
+
+The remedy range `df5c6fc…69231d3` passed `git diff --check`. Its runtime tree
+remains the exact accepted `dd922f7…` tree; all later commits are evidence and
+status records.
+
+### `RB3-R1-EG-001` disposition
+
+| Item | Exact identity / result |
+|---|---|
+| Complete manifest | `rb3-a1-artifacts.json`; 344,312 bytes; SHA-256 `F63F4A3682D5F8585C71EA3A9C60B02B56AC7F98A1CB1BC42366C24A247E5BB1` |
+| Committed verifier | `rb3-verify-manifest.py`; 16,327 bytes; SHA-256 `93D736D74B9E8FC4346A87C9122E1D4E461379E8961BB68CA6AE3BC1C99839EB` |
+| Cheap exact-head verification | Exit 0: 417 runtime files exact, lineage exact with zero later runtime changes, 30 claimed entries at the exact head, four witnesses bound, `VERIFIED — 0 problems` |
+| Full `--corpus --zips` verification | Exit 0: 504 frozen-input files across four roots plus TSN raw, 1,009 replicas, all declared deliverable roots, 30 results, 10 harness records, and both 252-member archives rehashed; `VERIFIED — 0 problems` |
+
+These results close the original missing-manifest gap and establish that every
+item which is present matches the committed claim. Existing bulk artifacts can
+be retained.
+
+### Adversarial fail-closed challenge
+
+A bounded in-memory negative probe called the committed verifier's
+`rehash_block` with a definitely absent requested root. The observed output
+was:
+
+```text
+SKIPPED missing-root-probe not present
+failure_count 0
+```
+
+The probe wrapper rejected that result, but the committed verifier itself
+recorded no failure. Source inspection shows the same mechanism at each
+relevant boundary:
+
+| Verifier surface | Committed behavior | Re-review result |
+|---|---|---|
+| `rehash_block`, lines 260–264 | Missing declared root prints `SKIPPED` and returns without adding a problem | **FAIL — reproduced false pass** |
+| TSN raw input, lines 293–299 | Missing declared raw input prints `SKIPPED` | **FAIL — static path has no failure** |
+| Results, lines 314–320 | Missing declared result prints `SKIPPED` and continues | **FAIL — static path has no failure** |
+| Archives, lines 331–335 | Missing requested archive prints `SKIPPED` and continues | **FAIL — static path has no failure** |
+
+The successful full run proves current bytes, but cannot prove the verifier's
+required failure behavior. Because Prompt 05 and `RB3-R1-EG-001` require a
+verifier that fails on **any missing or mismatched file**, a success exit with a
+declared item removed is a blocking false negative.
+
+### Acceptance and review-domain matrices
+
+| Criterion / gate | Review 1 re-review result | Exact reason |
+|---|---|---|
+| HF-04 criteria 1–7 | **NOT ADJUDICATED** | Prompt 05 stops at the fail-closed evidence precondition |
+| Values / source truth / discrepancy counts | **RETAINED RESULTS VERIFIED; NOT FINALLY ADJUDICATED** | Present bytes are exact; missing-item detection is incomplete |
+| Formulas / installed Excel | **RETAINED RESULT VERIFIED; NOT FINALLY ADJUDICATED** | No recalculation rerun was required for this bounded return |
+| Visual / presentation | **RETAINED RESULTS VERIFIED; NOT FINALLY ADJUDICATED** | The re-review did not proceed beyond the evidence precondition |
+| Evidence prohibition / sibling parity | **RETAINED RESULTS VERIFIED; NOT FINALLY ADJUDICATED** | The manifest binding is fixed; the verifier still does not fail closed |
+| Neighbor regression / full gate / frozen self-test | **RETAINED RESULTS VERIFIED; NOT FINALLY ADJUDICATED** | Runtime and retained results did not drift |
+| Product implementation | **NO FAILURE IDENTIFIED IN THIS RE-REVIEW** | The denial is confined to committed evidence-verifier behavior |
+
+### Actionable evidence gap
+
+| ID | Priority | Missing item | Required return |
+|---|---|---|---|
+| `RB3-R1-EG-002` | P1 / blocking | The committed verifier can return success when explicitly requested declared evidence is absent. | On the existing RB-3 branch, make requested corpus/archive verification fail nonzero for every absent declared corpus root, replica root, TSN raw input, result, harness record, or archive. Add bounded negative checks covering the missing-root, missing-result/raw, and missing-archive paths, then rerun the existing cheap and full verifier commands. Preserve the current manifest, frozen corpus, deliverables, witnesses, and `dd922f7…` acceptance runtime unless any byte changes; do not regenerate or rerun Excel/gates merely to satisfy this return. |
+
+### Reviewer environment notes
+
+The Windows sandbox ACL helper failed before one read-only inspection and before
+the required patch mechanism could read the files. The inspection and a
+sandbox-blocked negative probe were rerun through the approved host shell. The
+review/status edits used narrow atomic UTF-8 `git apply` patches after
+`apply_patch` failed at the ACL boundary. These were reviewer-environment
+events, not product or acceptance failures.
+
+**Reviewer signature:** Codex, Review 1 re-review —
+**DENIED — EVIDENCE GAP** — `2026-08-02T21:23:12.2917858-07:00`.
+
+Do not merge and do not begin Review 2. Resume Prompt 04 on the existing
+`hotfix/rb-3-ramp-detail-layout` branch only to supply `RB3-R1-EG-002`.
+
+---
+
+## Review 1 second re-review — Codex, 2026-08-02
+
+### Verdict
+
+**APPROVED.**
+
+Both returned evidence gaps are closed:
+
+- `RB3-R1-EG-001`: the committed manifest binds the complete retained
+  acceptance set to exact runtime head `dd922f7…` and frozen inputs.
+- `RB3-R1-EG-002`: the corrected committed verifier now fails nonzero for
+  every absent declared item covered by `--corpus` / `--zips`, and its
+  bounded negative suite passes.
+
+All seven HF-04 criteria have exact same-head evidence. Independent source
+inspection and focused challenges found no implementation contradiction and
+no actionable failure.
+
+### Review identity, entry state, and budget
+
+| Field | Approval record |
+|---|---|
+| Reviewer / pass | Codex / Review 1 second re-review |
+| Implemented bundle? | **No** — implementer is Claude |
+| Bundle / branch | `RB-3` / `hotfix/rb-3-ramp-detail-layout` |
+| Recorded base | `194b7ee8da095f0300e7e635bb7e7af78643b685` |
+| Implementation commit | `c9b55b6c6e9ca898af935bc2c070a435f39b2588` |
+| Acceptance runtime | `dd922f7b3b726a87912a26e92d7b5d930d90451e` |
+| Prior denial commit | `0554a8f30921485bf0679862fbe55497c7b01a75` |
+| Review-entry / review-record head | `df9af191464eded735b29ce63635dafae5b140e2` |
+| Pushed-head check | Local `HEAD`, remote-tracking ref, and `git ls-remote` all matched `df9af19…`; entry worktree was clean |
+| Runtime drift | **None** — the verifier re-derived 417 runtime files and zero later runtime changes |
+| Elapsed active review | Approximately 14 minutes; within the 30-minute ceiling |
+| Resource budget | **RESPECTED** — no generation, installed Excel, render, full gate, application build, or whole-source recount; no operation exceeded 23 seconds or produced bulk output |
+
+The complete branch diff from the recorded base contains the four authorized
+Ramp Detail scripts, the named focused/neighbor checks, and required
+evidence/status records only. The `0554a8f…df9af19` return is verifier/status
+only; it does not alter the manifest, accepted runtime, corpus, deliverables,
+results, or witnesses. Both the remedy range and complete branch passed
+`git diff --check`.
+
+### Bound evidence reused
+
+| Evidence | Exact identity / verified result |
+|---|---|
+| Complete manifest | `rb3-a1-artifacts.json`; 344,312 bytes; SHA-256 `F63F4A3682D5F8585C71EA3A9C60B02B56AC7F98A1CB1BC42366C24A247E5BB1` |
+| Corrected verifier | `rb3-verify-manifest.py`; 22,952 bytes; SHA-256 `AD906476C14175352515A7B4A66A1929000BDDE749EA2499EAD98BAA77A61859` |
+| Runtime identity | 417 files; digest `4350EB8A2C83C859A4BA8FA845BC6CD96094F095570B088591981EB629DB97AF`; exact at `dd922f7…` |
+| Acceptance result set | 30 exact-head claims, including 26 retained local results and four committed witnesses |
+| Frozen inputs / replicas | 504 per-route frozen files + TSN raw; 1,009 provisioned replicas, all rehashed and source-equal |
+| Deliverables / harness | Every declared deliverable root; 26/26 local results; 10/10 harness records |
+| Frozen archives | Both archives exact; 252/252 Ramp Detail members bound in each |
+| Gate / application | Hash-bound `gate_log_final.txt`: 158/158; hash-bound frozen `selftest_log.txt`: PASS |
+
+### Reviewer commands and adversarial challenge
+
+| Challenge | Result |
+|---|---|
+| `rb3-verify-manifest.py --self-test` | **PASS** — clean fixture verified; missing root/file/raw/result/archive, changed bytes, divergent replica, wrong head, and unstamped entry all failed |
+| Cheap exact-head verifier | **VERIFIED — 0 problems** |
+| Full `--corpus --zips` verifier | **VERIFIED — 0 problems**; every declared present item and both archives rehashed |
+| `check_compare_ramp_detail.py` at head | **PASS** — same-edition, mixed-edition, identical-data, PM-key, and unknown-layout paths |
+| `check_compare_ramp_detail_tsn.py` at head | **ALL PASS** — edition dispatch, July position map, OF/TY/Description, unknown refusal, and consolidation completion truth |
+| Same TSN check against archived base `194b7ee…` | **EXPECTED RED** — exit 1 with exactly 15 HF-04 failures; all pre-existing assertions remained green |
+| `check_compare_ramp_detail_pdf.py` | Product assertions reached and passed July load, zero differences, full pairing, and clean verdict; the reviewer console then raised a CP1252 `UnicodeEncodeError` while printing the literal `≠` and was not retried |
+| Native-scale retained render spot-check | **PASS** — July consolidated header/rows, mixed Summary/Comparison/Notes, and self Summary inspected at original resolution; selected risk text/counts are readable and show no label/value drift |
+
+The most plausible product false-pass was the same-width July layout being
+read with classic positions, or the mixed projection treating edition-only
+`PM Suffix` / `OF` / `TY` as compared fields and miskeying `HG` as a
+suffix. Source inspection found exact-header dispatch to separate position
+maps, name-keyed mixed reprojection, name-resolved prefix/suffix identity, and
+those three edition-only fields explicitly marked context. The focused head
+checks plus the retained reverse mixed lane exercised both directions, a
+genuine Description difference, a genuine OF change, identical shared data,
+unknown layouts, and completion downgrade. The archived-base run reproduced
+the original defect signature.
+
+The PDF harness interruption is a reviewer-environment event: the comparison
+had already returned zero differing cells, two paired rows, no one-sided rows,
+and a clean verdict before Python attempted to print the Unicode label. The
+same-head `self-check-zero.json`, three retained 15,213-row self placements,
+installed-Excel results, and the hash-bound 158/158 gate independently cover
+the remaining workbook-marker, projected On/Off, and classic-control
+assertions.
+
+The Windows image ACL helper also refused the retained render paths before
+opening a file. Five selected PNGs were copied byte-for-byte to the session's
+writable visualization area, their source/copy SHA-256 values were matched,
+and those copies were inspected at original resolution. This was a
+reviewer-environment workaround, not regeneration or a product failure.
+
+### Criterion-by-criterion disposition
+
+| # | HF-04 criterion | Review 1 disposition |
+|---:|---|---|
+| 1 | Eight topology decisions plus by-day PDF-vs-Excel produce both twins | **PASS** — 16/16 generation steps; all required placements produced, with 11 formulas twins |
+| 2 | Route 001 row 2 maps `OF`, `TY`, and `Description` correctly | **PASS** — raw-to-projection-to-published-row witness; all five mapping checks true |
+| 3 | An unconsumable consolidation cannot report `ok` | **PASS** — focused head check returns error / FAILED, keeps and names the file; both accepted layouts remain ok / complete |
+| 4 | Self check has zero differences across all 15,213 rows | **PASS** — Direct, Everything SELF, and by-day PDF-vs-Excel each pair 15,213 / 0 one-sided / 0 differing; independent recount agrees |
+| 5 | Classic layout still compares; unknown layout refuses | **PASS** — focused same/mixed checks and retained classic placements; unknown produces no workbook |
+| 6 | RD-PDF-vs-TSN counts unchanged | **PASS** — base/head counts 15,204 paired / 9 A-only / 206 B-only / 468 diff rows / 619 diff cells; Comparison sheets cell-identical |
+| 7 | Full gate green; every new assertion red pre-fix | **PASS** — retained 158/158 gate and frozen app self-test; reviewer archived-base challenge reproduced 15 exact HF-04 failures |
+
+### Exact deliverable and discrepancy results
+
+| Lane | Paired | A-only | B-only | Diff rows | Diff cells |
+|---|---:|---:|---:|---:|---:|
+| Direct / By Day / Everything vs TSN | 15,204 | 9 | 206 | 431 | 508 |
+| Direct RD-PDF vs TSN control | 15,204 | 9 | 206 | 468 | 619 |
+| Direct / Everything / by-day self | 15,213 | 0 | 0 | 0 | 0 |
+| Mixed classic-env / Baseline / Everything ENV | 15,208 | 5 | 8 | 352 | 408 |
+| Reverse mixed classic-env | 15,208 | 8 | 5 | 352 | 408 |
+
+The app-free recount reproduced 507 singleton vs-TSN differences plus the one
+duplicate-key assignment difference, and 406 singleton mixed-env differences
+plus two in the duplicate group. Route and per-field totals agree with the
+published workbooks.
+
+### Values, formulas, visual, evidence, and regression matrices
+
+| Domain | Review 1 result |
+|---|---|
+| Values / source truth | **PASS** — generated counts, independent raw recount, workbook counts, and four committed witnesses agree |
+| Formulas / installed Excel | **PASS** — 11/11 recalculated; 10/10 SELF-CHECK rows each; zero error cells; live verdicts match values twins |
+| Visual / presentation | **PASS** — reviewer inspected five original-resolution risk pages; July rows/headers, mixed counts/keys/context/Notes, and the 15,213-row zero-difference self Summary are readable; sweep confirms the complete 12-column/context inventory |
+| Evidence eligibility | **PASS** — zero `*evidence*` artifacts across both declared output roots; prohibited RD classes remain prohibited |
+| Neighboring behavior | **PASS** — RD-PDF-vs-TSN is cell-identical base/head; retained named neighbor checks and full gate pass; Highway Detail untouched |
+| Performance / atomic publication / stale cache / failure | **PASS** — bounded generation timings retained; store-integrity pre/post records exact; unknown consolidation is FAILED and unpromotable; all declared failure paths are hash-bound |
+
+### Failures and reviewer sign-off
+
+**Actionable failures: none.** No acceptance criterion, retained artifact,
+runtime identity, or adversarial probe remains unresolved.
+
+**Reviewer signature:** Codex, Review 1 second re-review —
+**APPROVED** — `2026-08-02T21:50:17.0702481-07:00`.
+
+Mark RB-3 **REVIEW 1 APPROVED — AWAITING REVIEW 2**. Do not merge. Review 2
+must run in a separate fresh task against the pushed approval head, challenge
+this review independently, and approve before RB-3 becomes mergeable.
+
+---
+
+## Review 2 — Codex, 2026-08-02
+
+### Verdict
+
+**APPROVED.**
+
+All seven HF-04 criteria retain exact same-head evidence, the acceptance
+runtime is unchanged, and the independent Review 2 challenge found no product,
+evidence, presentation, or regression contradiction. Review 1 and Review 2
+both approve; Codex did not implement the bundle.
+
+### Review identity, entry state, and budget
+
+| Field | Review 2 record |
+|---|---|
+| Reviewer / pass | Codex / Review 2 |
+| Implemented bundle? | **No** — implementer is Claude |
+| Bundle / work items | `RB-3` / `HF-04` |
+| Branch | `hotfix/rb-3-ramp-detail-layout` |
+| Recorded base / merge base | `194b7ee8da095f0300e7e635bb7e7af78643b685` / exact match |
+| Implementation commit | `c9b55b6c6e9ca898af935bc2c070a435f39b2588` |
+| Acceptance runtime head | `dd922f7b3b726a87912a26e92d7b5d930d90451e` |
+| Review-entry / review-record parent | `cebc1a5d96e43fa0a0610cdf56bcd8b67bf0a58a` |
+| Pushed-head check | Local `HEAD`, tracking ref, and `git ls-remote` all matched `cebc1a5d…`; `origin/main` remained `194b7ee…`; entry worktree was clean |
+| Runtime drift after acceptance | **None** — 417 runtime files re-derived; zero runtime changes after `dd922f7…` |
+| Elapsed active review | Approximately 9 minutes; within the 30-minute ceiling and shorter than implementation |
+| Resource budget | **RESPECTED** — no generation, installed Excel, full gate, application build, whole-corpus recount, or archive re-hash; no process approached 2 GB, 5 minutes, or 500 MB |
+
+The complete base-to-entry diff contains the four authorized Ramp Detail
+scripts, the focused/neighbor checks required by their exact wiring, and the
+required evidence/status records. The recorded base is the exact merge base,
+and `git diff --check` is clean.
+
+### Bound evidence reused and independently verified
+
+| Evidence | Exact identity / Review 2 result |
+|---|---|
+| Complete manifest | `rb3-a1-artifacts.json`; 344,312 bytes; SHA-256 `F63F4A3682D5F8585C71EA3A9C60B02B56AC7F98A1CB1BC42366C24A247E5BB1` |
+| Corrected verifier | `rb3-verify-manifest.py`; 22,952 bytes; SHA-256 `AD906476C14175352515A7B4A66A1929000BDDE749EA2499EAD98BAA77A61859` |
+| Verifier negative suite | **PASS** — clean fixture verified; missing root/file/raw/result/archive, changed bytes, divergent replica, wrong head, and unstamped claim all failed closed |
+| Cheap exact-head verifier | **VERIFIED — 0 problems** — 417 runtime files/digest exact; zero later runtime changes; 30/30 claims name `dd922f7…`; four witnesses bound |
+| Review 1 signed evidence | **REUSED** — Review 1 approval at `2026-08-02T21:50:17.0702481-07:00`, including its full corpus/archive re-hash and native-scale render inspection |
+| Frozen inputs / replicas | Review 1's same-head verifier matched 504 frozen input files + TSN raw, 1,009 replicas, and both 252-member archives; Review 2 did not duplicate that expensive run |
+| Acceptance results | 16/16 generation steps `ok`; 11/11 installed-Excel formulas twins with 10/10 SELF-CHECK rows and zero error cells; both 14-artifact store-integrity records `all_ok=true` |
+| Full gate / app self-test | Hash-bound `gate_log_final.txt` SHA-256 `01DE2B93B6313ACBBC11AE4F7859A3DCC7CBEA2213ED79847B3123DE98E2A0A5` records 158/158; hash-bound `selftest_log.txt` SHA-256 `D626868831B0EAD48B224CC090C7807DE93E8DE2A1E4803687FCC5FF1F2580CA` records PASS |
+| Evidence / presentation sweep | Zero `*evidence*` artifacts across both declared roots; July header labels and mixed PM-Suffix/OF/TY context inventory all true |
+
+### Review 2 challenge to Review 1
+
+Review 1's strongest product challenge covered exact-header dispatch, mixed
+layout handling, completion truth, and same-source null parity. Review 2 tested
+four narrower false-pass mechanisms that could survive that review:
+
+1. **Partial mixed reprojection.** A sentinel row with a unique value in every
+   classic and July column was projected in both side orders. All nine shared
+   fields and all three context fields landed exactly; classic PM suffix was
+   conserved and July PM suffix remained empty in the physical-key raw claims.
+2. **Over-broad null suppression.** The self-check projection normalized only
+   exact `-`, `NO RAMP LINEAR EVENT`, and On/Off `N` tokens at their authorized
+   fields. Near-miss Description/Area-4/On-Off values, HG, and Ramp Type were
+   preserved, so a genuine disagreement is not silently erased.
+3. **Generic-hook blast radius.** `check_compare_env_flat_schema.py` passed the
+   recognized/malformed/reordered matrix for Ramp Detail and neighboring flat
+   families; `check_compare_physical_identity.py` passed all 11 identity gates.
+   The opt-in layout merger remains inert outside Ramp Detail.
+4. **Evidence-tool false pass recurrence.** The committed verifier's negative
+   suite and cheap exact-head command both passed, closing the precise mechanism
+   behind Review 1's two earlier evidence returns.
+
+The exact base still carries all three durable defect signatures: the false
+leading-Route instruction, an Excel self loader with no null projection, and an
+unconditional Ramp Detail `return consolidate_xlsx(...)`. No new base run was
+needed because Review 1 already reproduced the expected-red assertions and the
+base source identities remain exact.
+
+One native-scale retained PNG could not be opened because the Windows sandbox
+ACL helper failed before image loading. Per the one-attempt rule it was not
+retried or regenerated. This is a reviewer-environment event, not a product
+failure; Review 2 relied on the hash-bound render set and Review 1's signed
+original-resolution inspection.
+
+### Criterion-by-criterion disposition
+
+| # | HF-04 criterion | Review 2 disposition |
+|---:|---|---|
+| 1 | Eight topology decisions plus by-day PDF-vs-Excel produce both twins | **PASS** — all required lanes are present in the 16/16 retained generation record; 11 formulas twins retained |
+| 2 | Route 001 row 2 maps `OF`, `TY`, and `Description` correctly | **PASS** — exact raw/projection/published-row witness; all five mapping checks true; all-field sentinel probe adds independent position coverage |
+| 3 | An unconsumable consolidation cannot report `ok` | **PASS** — shared comparator predicate controls the downgrade; retained focused failure check and source inspection agree |
+| 4 | Self check has zero differences across all 15,213 rows | **PASS** — three placements pair 15,213 / 0 one-sided / 0 differing; app-free recount agrees; anti-suppression probe found no over-broad normalization |
+| 5 | Classic layout still compares; unknown layout refuses | **PASS** — retained classic/mixed lanes plus Review 2's malformed/truncated/reordered focused gate |
+| 6 | RD-PDF-vs-TSN counts unchanged | **PASS** — base/head 15,204 paired / 9 A-only / 206 B-only / 468 diff rows / 619 diff cells; Comparison sheets cell-identical |
+| 7 | Full gate green; every new assertion red pre-fix | **PASS** — hash-bound 158/158 gate and frozen app self-test; Review 1's exact-base red run plus Review 2's three source-signature probes |
+
+### Exact deliverable and discrepancy results
+
+| Lane | Paired | A-only | B-only | Diff rows | Diff cells |
+|---|---:|---:|---:|---:|---:|
+| Direct / By Day / Everything vs TSN | 15,204 | 9 | 206 | 431 | 508 |
+| Direct RD-PDF vs TSN control | 15,204 | 9 | 206 | 468 | 619 |
+| Direct / Everything / by-day self | 15,213 | 0 | 0 | 0 | 0 |
+| Mixed classic-env / Baseline / Everything ENV | 15,208 | 5 | 8 | 352 | 408 |
+| Reverse mixed classic-env | 15,208 | 8 | 5 | 352 | 408 |
+
+The independent recount reproduces 507 singleton vs-TSN differences plus one
+duplicate-key assignment difference and 406 singleton mixed-env differences
+plus two in the duplicate group. Workbook totals and per-field totals agree.
+
+### Values, formulas, visual, evidence, and regression matrices
+
+| Domain | Review 2 result |
+|---|---|
+| Values / source truth | **PASS** — retained generation, raw recount, route-field witness, workbook totals, and Review 2 sentinel projection agree |
+| Formulas / installed Excel | **PASS** — 11/11 recalculated; every workbook has 10/10 SELF-CHECK rows, zero error cells, and a verdict matching its values twin |
+| Visual / presentation | **PASS ON RETAINED EVIDENCE** — manifest-bound native-scale pages cover July consolidated, mixed Summary/Comparison/Notes, direct Summary, and self Summary/Notes; Review 1 inspected the named risk pages at original resolution |
+| Evidence eligibility | **PASS** — zero prohibited evidence artifacts in both declared roots |
+| Neighboring behavior | **PASS** — RD-PDF-vs-TSN is cell-identical base/head; focused flat-schema and physical-identity gates pass; Highway Detail remains untouched |
+| Performance / atomic publication / stale cache / failure | **PASS** — retained timings are bounded; pre/post store-integrity records are all green; unknown layout returns error/FAILED and cannot be promoted; exact-head verifier fails closed |
+
+### Failures and reviewer sign-off
+
+**Actionable failures: none.** No criterion, runtime identity, retained artifact,
+or bounded adversarial probe remains unresolved.
+
+**Reviewer signature:** Codex, Review 2 — **APPROVED** —
+`2026-08-02T22:17:58.3662409-07:00`.
+
+Mark RB-3 **JOINTLY APPROVED** and complete Prompt 05's fetch, non-force merge,
+post-merge smoke, merge-record push, and bounded cleanup sequence.

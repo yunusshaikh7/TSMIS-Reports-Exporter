@@ -313,10 +313,11 @@ def test_ramp_env_county_identity():
     # rows corpus-wide, and TSN's 313 print suffixes have no TSMIS
     # counterpart — gluing either would fabricate one-sided rows out of
     # physically identical ramps.
-    header = [
-        "Location", "(col B)", "PM", "Date of Record", "(col E)", "HG",
-        "Area 4", "(col H)", "City Code", "R/U", "Description",
-    ]
+    # HF-04: _schema receives the CANONICAL display header (the canonicalizer
+    # maps the classic raw layout to the CMP-AUD-046 corrected labels before
+    # _schema runs), and the key builder resolves the PM prefix/suffix columns
+    # by NAME on it — same positions, same conserved claims as the raw layout.
+    header = list(compare_env._RD_ENV_HEADER)
     schema = compare_env.RAMP_DETAIL._schema(header, "A", "B")
     rows_a = [
         ["101", "01-DN-101", "R", "001.000", "2026-01-01", "E", "D", "Y", "", "A", "U", "DESC-A"],

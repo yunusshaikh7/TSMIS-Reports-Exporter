@@ -1,6 +1,8 @@
 # `RB-3` — Bundle Contract
 
-Status: **READY**
+Status: **JOINTLY APPROVED** — both Codex reviews approved all seven HF-04
+criteria; Review 2 entered at pushed head `cebc1a5d`, and the acceptance
+runtime remains `dd922f7`. The signed approvals are in [REVIEW.md](REVIEW.md).
 
 > This RB-level contract carries work item **HF-04** and transcribes the frozen
 > work-item section from
@@ -16,7 +18,7 @@ Status: **READY**
 | Theme | Ramp Detail layout compatibility and same-source null parity — restores nine comparison placements that produce nothing today |
 | Branch | `hotfix/rb-3-ramp-detail-layout` |
 | Readiness source `main` | `4c199d3feb209832076e43af6a7caa34a8da0c1b` — RB-2 merged, its post-merge checks passed, its merge record was committed, and this state was pushed to `origin/main` before readiness preparation |
-| Base `main` commit | **PENDING** — Stage 4 must create the branch from the then-latest clean `main` and replace this cell with that exact SHA |
+| Base `main` commit | `194b7ee8da095f0300e7e635bb7e7af78643b685` — v0.33.1; verified clean and identical to `origin/main` before `hotfix/rb-3-ramp-detail-layout` was created from it (Stage 4, 2026-08-02) |
 | Canonical finding IDs | **PCOA-FINAL-001, -012** |
 | Implementer | **Claude** (owner decision 2026-07-26) |
 | First reviewer | **Codex** — independent non-implementer; holds `ramp-detail-pdf-excel-sibling-parity.json` and the header-census run ledgers |
@@ -76,7 +78,7 @@ or GUI transactions, installed-Excel results, and retained witness hashes:
 | Implementer | Claude |
 | Review 1 | **Codex** (holds `ramp-detail-pdf-excel-sibling-parity.json` and the header-census run ledgers) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-3: READY** |
+| Status | **Inherits RB-3: JOINTLY APPROVED** |
 
 **Exact scope.** Ramp Detail, both editions: the 8 topology decisions the Excel
 edition currently cannot produce (classic env, Direct/By Day/Everything vs TSN,

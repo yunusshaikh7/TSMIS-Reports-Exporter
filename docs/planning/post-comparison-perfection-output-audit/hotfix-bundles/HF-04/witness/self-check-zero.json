@@ -1,0 +1,15 @@
+{
+ "pdf_consolidated": "C:\\Users\\Yunus\\Projects\\wt-rb3\\output\\2026-07-23 ssor-prod\\consolidated\\tsmis_ramp_detail_pdf_consolidated 2026-07-23 ssor-prod.xlsx",
+ "excel_consolidated": "C:\\Users\\Yunus\\Projects\\wt-rb3\\output\\2026-07-23 ssor-prod\\consolidated\\tsar_ramp_detail_consolidated 2026-07-23 ssor-prod.xlsx",
+ "excel_rows": 15213,
+ "paired": 15213,
+ "keys_only_one_side": 0,
+ "multiplicity_mismatch_keys": 0,
+ "differing_cells": 0,
+ "per_field": {},
+ "bound_to_acceptance_head": "dd922f7b3b726a87912a26e92d7b5d930d90451e",
+ "produced_by": {
+  "script": "acc_rb3_recount.py",
+  "script_sha256": "27E8F2A948C73723CDC51BEF85E716796E22CDD0016C8C99240E86744CF22711"
+ }
+}

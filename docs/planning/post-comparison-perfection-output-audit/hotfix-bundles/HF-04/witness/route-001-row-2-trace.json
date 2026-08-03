@@ -1,0 +1,61 @@
+{
+ "raw_row2": [
+  "12-ORA-001",
+  "R",
+  "000.606",
+  "02/25/1976",
+  "D",
+  "Y",
+  "DAPT",
+  "U",
+  "F",
+  "D",
+  "001/NB OFF TO DOHENY PK RD"
+ ],
+ "projected": {
+  "route": "001",
+  "county": "ORA",
+  "pm": "0.606",
+  "PR": "R",
+  "District": "12",
+  "Date of Record": "1976-02-25",
+  "HG": "D",
+  "Area 4": "Y",
+  "City Code": "DAPT",
+  "R/U": "U",
+  "Description": "NB OFF TO DOHENY PK RD",
+  "OF": "F",
+  "TY": "D"
+ },
+ "workbook_tsmis_row": {
+  "Comparison row": "",
+  "Route": "001",
+  "PR": "R",
+  "PM": "0.606",
+  "District": "12",
+  "Date of Record": "1976-02-25",
+  "HG": "D",
+  "Area 4": "Y",
+  "City Code": "DAPT",
+  "R/U": "U",
+  "Description": "NB OFF TO DOHENY PK RD",
+  "Ramp Name": "",
+  "On/Off": "F",
+  "Ramp Type": "D",
+  "ADT": "",
+  "Key (helper)": "__CMP_E2_KEY_V1_00000001",
+  "__CMP_E2_BUILD_FRESH_V1_C001_B_P": ""
+ },
+ "workbook_checks": {
+  "On/Off == raw OF (F)": true,
+  "Ramp Type == raw TY (D)": true,
+  "Description == raw minus route prefix": true,
+  "HG/Area4/City/R-U at July positions": true,
+  "PR from PRE": true
+ },
+ "bound_to_acceptance_head": "dd922f7b3b726a87912a26e92d7b5d930d90451e",
+ "produced_by": {
+  "script": "acc_rb3_recount.py",
+  "script_sha256": "27E8F2A948C73723CDC51BEF85E716796E22CDD0016C8C99240E86744CF22711"
+ }
+}
