@@ -225,11 +225,188 @@ def test_missing_key_column_fails_closed():
         shutil.rmtree(root, ignore_errors=True)
 
 
+# --------------------------------------------------------------------------- #
+# HF-04 — dual-layout cross-environment support (PCOA-FINAL-001)
+# --------------------------------------------------------------------------- #
+# getattr so a pre-fix tree runs these tests to SEMANTIC failures (the exact
+# defect signatures) instead of crashing at import.
+RD_HEADER_2026 = list(getattr(_rd, "_TSMIS_HEADER_2026",
+                              ["Route", "Location", "PRE", "PM",
+                               "Date of Record", "HG", "Area 4", "City Code",
+                               "R/U", "OF", "TY", "Description"])[1:])
+
+
+def _rd_row_valuepos(pm, desc, hg=""):
+    """A classic-layout row at the export's true VALUE positions (census: the
+    labels shift right of the values, so Description's VALUE sits at raw
+    position 9 under the 'R/U' label and position 10 is empty). `_rd_row`
+    above deliberately mirrors the LABEL positions for the positional
+    same-layout tests; mixed-pair tests need the real shape, because the
+    name-keyed projection reads the value positions the way CMP-AUD-046
+    corrected them."""
+    row = [""] * len(RD_HEADER)
+    row[0] = "12-ORA-001"                       # Location
+    row[1] = "R"                                # PM prefix value
+    row[2] = pm                                 # PM value
+    row[5] = hg                                 # HG value
+    row[9] = desc                               # Description VALUE (under 'R/U')
+    return row
+
+
+def _rd_row_2026(pm, desc, of="F", ty="D", hg="D"):
+    row = [""] * len(RD_HEADER_2026)
+    row[0] = "12-ORA-001"
+    row[RD_HEADER_2026.index("PRE")] = "R"
+    row[RD_HEADER_2026.index("PM")] = pm
+    row[RD_HEADER_2026.index("HG")] = hg
+    row[RD_HEADER_2026.index("OF")] = of
+    row[RD_HEADER_2026.index("TY")] = ty
+    row[RD_HEADER_2026.index("Description")] = desc
+    return row
+
+
+def _run_env(root, data_a, header_a, data_b, header_b, mode="values"):
+    sheet = compare_env.RAMP_DETAIL.sheet_name
+    a = root / "2026-07-09 ssor-prod" / "ramp_detail"
+    b = root / "2026-07-23 ssor-prod" / "ramp_detail"
+    a.mkdir(parents=True)
+    b.mkdir(parents=True)
+    _write_route_file(a / f"ramp_detail_route_{ROUTE}.xlsx", sheet, header_a, data_a)
+    _write_route_file(b / f"ramp_detail_route_{ROUTE}.xlsx", sheet, header_b, data_b)
+    out = root / "cmp.xlsx"
+    res = compare_env.RAMP_DETAIL.compare_folders(
+        a.parent, b.parent, out, events=Events(),
+        confirm_overwrite=lambda _p: True, mode=mode)
+    return res, out
+
+
+def test_new_layout_end_to_end():
+    """A July-2026 pair compares with the export's own labels — OF/TY are
+    LABELLED columns and compared like any other same-edition column."""
+    root = Path(tempfile.mkdtemp())
+    try:
+        data_a = [_rd_row_2026("1.000", "001/ON-A"), _rd_row_2026("2.000", "001/OFF-B")]
+        data_b = [_rd_row_2026("1.000", "001/ON-A"),
+                  _rd_row_2026("2.000", "001/OFF-B", of="N")]   # a genuine OF change
+        res, out = _run_env(root, data_a, RD_HEADER_2026, data_b, RD_HEADER_2026)
+        assert res.status == "ok", (res.status, res.message)
+        wb = load_workbook(out, read_only=True, data_only=True)
+        body = list(wb["Comparison"].iter_rows(values_only=True))
+        wb.close()
+        header = [("" if c is None else str(c)) for c in body[0]]
+        assert "OF" in header and "TY" in header and "PRE" in header, \
+            ("the July-2026 pair must display the export's own labels", header)
+        of_col = header.index("OF")
+        rows = body[1:]
+        marked = [r for r in rows
+                  if isinstance(r[of_col], str) and _DIFF_MARK in r[of_col]]
+        assert len(marked) == 1, \
+            ("a genuine OF change on a same-edition pair must count", len(marked))
+        assert res.comparison_outcome.counts.differing_cells == 1, \
+            res.comparison_outcome.counts
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_mixed_layout_end_to_end():
+    """HF-04's controlling decision: a MIXED classic/July-2026 pair compares
+    correctly — the shared columns by NAME (a real Description change counts;
+    identical data counts zero), the edition-specific columns as CONTEXT
+    (never a diff, the exporting side's value shown), and the Notes sheet
+    documents the projection."""
+    root = Path(tempfile.mkdtemp())
+    try:
+        # Same underlying data in both editions + one REAL Description change
+        # at PM 2.000; the July side carries OF/TY letters the classic cannot.
+        data_old = [_rd_row_valuepos("1.000", "001/ON-A"),
+                    _rd_row_valuepos("2.000", "001/OFF-B")]
+        data_new = [_rd_row_2026("1.000", "001/ON-A", hg=""),
+                    _rd_row_2026("2.000", "001/OFF-CHANGED", hg="")]
+        res, out = _run_env(root, data_old, RD_HEADER, data_new, RD_HEADER_2026)
+        assert res.status == "ok", (res.status, res.message)
+        wb = load_workbook(out, read_only=True, data_only=True)
+        sheets = wb.sheetnames
+        body = list(wb["Comparison"].iter_rows(values_only=True))
+        notes = ([str(r[0]) for r in wb["Notes"].iter_rows(values_only=True) if r and r[0]]
+                 if "Notes" in sheets else [])
+        wb.close()
+        header = [("" if c is None else str(c)) for c in body[0]]
+        for name in ("Location", "PR", "PM", "Date of Record", "HG", "Area 4",
+                     "City Code", "R/U", "Description", "PM Suffix", "OF", "TY"):
+            assert name in header, ("the mixed display header", name, header)
+        rows = body[1:]
+        desc_col = header.index("Description")
+        of_col, ty_col = header.index("OF"), header.index("TY")
+        marked = [(r[0], i) for r in rows for i, v in enumerate(r)
+                  if isinstance(v, str) and _DIFF_MARK in v]
+        assert len(marked) == 1 and marked[0][1] == desc_col, \
+            ("exactly the one real Description change may count", marked)
+        assert res.comparison_outcome.counts.differing_cells == 1, \
+            res.comparison_outcome.counts
+        # Context: OF/TY display the July side's letters, never a diff marker.
+        # The key column shows the canonical route/county/postmile identity
+        # display (CMP-AUD-045), decimal-canonical postmile included.
+        by_pm = {str(r[header.index("PM")]): r for r in rows}
+        k1 = "001 / ORA / 1"
+        assert k1 in by_pm, ("canonical key display expected", sorted(by_pm))
+        assert by_pm[k1][of_col] == "F" and by_pm[k1][ty_col] == "D", \
+            ("context OF/TY must show the exporting side's value",
+             by_pm[k1][of_col], by_pm[k1][ty_col])
+        assert any("mixed export layouts" in n for n in notes), \
+            ("the mixed pair documents itself in Notes", notes[:3])
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_mixed_identical_data_is_clean():
+    """A mixed pair over identical shared data reports a clean MATCH — layout
+    drift alone must produce zero differing cells and zero one-sided rows."""
+    root = Path(tempfile.mkdtemp())
+    try:
+        data_old = [_rd_row_valuepos("1.000", "001/ON-A"),
+                    _rd_row_valuepos("2.000", "001/OFF-B")]
+        data_new = [_rd_row_2026("1.000", "001/ON-A", hg=""),
+                    _rd_row_2026("2.000", "001/OFF-B", hg="")]
+        res, _out = _run_env(root, data_old, RD_HEADER, data_new, RD_HEADER_2026)
+        assert res.status == "ok", (res.status, res.message)
+        counts = res.comparison_outcome.counts
+        assert counts.differing_cells == 0 and counts.differing_rows == 0, counts
+        assert counts.side_a_only_rows == 0 and counts.side_b_only_rows == 0, counts
+        assert res.verdict == "match", res.verdict
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_unknown_layout_pairings_still_refuse():
+    """Dual-layout acceptance must not widen into trust: a recognized side
+    paired with an UNKNOWN layout still refuses (the merger vouches only for
+    the two censused editions), and an unknown-vs-unknown pair still refuses."""
+    unknown = ["Location", "PRE", "PM", "Date of Record", "HG", "Area 4",
+               "City Code", "R/U", "OF", "TY", "XS", "Description"]
+    row = ["12-ORA-001", "R", "1.000", "2026-01-01", "D", "Y", "C", "U", "F",
+           "D", "x", "001/DESC"]
+    for tag, header_a, data_a in (
+            ("classic-vs-unknown", RD_HEADER, [_rd_row("1.000", "001/ON-A")]),
+            ("unknown-vs-unknown", unknown, [list(row)])):
+        root = Path(tempfile.mkdtemp())
+        try:
+            res, out = _run_env(root, data_a, header_a, [list(row)], unknown)
+            assert res.status == "error", (tag, res.status, res.message)
+            assert "recognized" in (res.message or ""), (tag, res.message)
+            assert not out.exists(), (tag, "no workbook on a refused layout")
+        finally:
+            shutil.rmtree(root, ignore_errors=True)
+
+
 def main():
     test_config_is_pm_keyed()
     test_pm_key_collapses_coarse_cascade()
     test_end_to_end_values_workbook()
     test_missing_key_column_fails_closed()
+    test_new_layout_end_to_end()
+    test_mixed_layout_end_to_end()
+    test_mixed_identical_data_is_clean()
+    test_unknown_layout_pairings_still_refuse()
     print("OK  COMPARE-RAMP-DETAIL-PM-KEY: Ramp Detail keys on PM; a mid-route "
           "ramp insert that cascades into 5 spurious diff cells under coarse "
           "keying collapses to ONE one-sided ramp / zero diff cells under PM "

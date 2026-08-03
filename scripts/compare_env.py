@@ -901,7 +901,8 @@ class EnvCompare:
                  expected_header=None, base_schema=None, key_col=None,
                  force_header=None, side_loader=None, agg_header=None,
                  flat_pdf_loader=None, physical_key_builder=None,
-                 value_normalizer=None, header_canonicalizer=None):
+                 value_normalizer=None, header_canonicalizer=None,
+                 layout_merger=None):
         self.key = key                        # "ramp_summary" | "ramp_detail" | …
         self.REPORT_NAME = report_name
         self.subdir = subdir
@@ -948,6 +949,14 @@ class EnvCompare:
         # corrected names, while an unrecognized same-width header is refused
         # instead of compared positionally on faith.
         self.header_canonicalizer = header_canonicalizer
+        # HF-04 (opt-in): callable(canon_a, canon_b, rows_a, rows_b) ->
+        # (display header, rows_a, rows_b, schema-extras dict) or None,
+        # consulted only when the two sides canonicalize to DIFFERENT
+        # recognized layouts. Ramp Detail sets it so a mixed classic/July-2026
+        # pair compares name-keyed over the columns both editions export;
+        # every other family (and an unrecognized pairing) keeps the
+        # different-column-layouts refusal.
+        self.layout_merger = layout_merger
 
     def suggest_name(self, dir_a, dir_b):
         la, lb = _side_labels(Path(dir_a), Path(dir_b))
@@ -1136,6 +1145,7 @@ class EnvCompare:
         events.on_log(f"{lb}: {dir_b}")
         events.on_log("")
 
+        layout_extras = None
         try:
             if self.side_loader is not None:  # aggregate per-route XLSX (Intersection Summary)
                 loaded_a = _coerce_loaded_side(
@@ -1184,11 +1194,23 @@ class EnvCompare:
                                      "version."))
                     header, header_b = list(canon_a), list(canon_b)
                 if header != header_b:
-                    return ConsolidateResult(
-                        status="error",
-                        message=(f"The two folders' {self.REPORT_NAME} files "
-                                 "have different column layouts — compare "
-                                 "exports made by the same app version."))
+                    # HF-04: two DIFFERENT recognized layouts may still compare
+                    # when the report supplies a layout merger (Ramp Detail's
+                    # mixed classic/July-2026 pair) — the merger reprojects both
+                    # sides onto one shared display shape by name. Anything it
+                    # does not vouch for keeps the refusal.
+                    merged = (self.layout_merger(header, header_b,
+                                                 loaded_a.rows, loaded_b.rows)
+                              if self.layout_merger is not None else None)
+                    if merged is None:
+                        return ConsolidateResult(
+                            status="error",
+                            message=(f"The two folders' {self.REPORT_NAME} files "
+                                     "have different column layouts — compare "
+                                     "exports made by the same app version."))
+                    header, rows_merged_a, rows_merged_b, layout_extras = merged
+                    loaded_a = replace(loaded_a, rows=rows_merged_a)
+                    loaded_b = replace(loaded_b, rows=rows_merged_b)
                 # rows are consolidated-shape ([route, *row]); the schema
                 # header stays the per-route column list (the engine adds
                 # the Route column itself in the has_route layout).
@@ -1234,6 +1256,10 @@ class EnvCompare:
             # (via _resolve_key_field) refuses a header that lacks it rather
             # than silently keying on column 0 and certifying a false match.
             return ConsolidateResult(status="error", message=str(e))
+        if layout_extras:
+            # HF-04: the layout merger's schema extras (the mixed pair's
+            # context columns + its Notes sheet); inert on every other path.
+            sc = replace(sc, **layout_extras)
         # Default provenance: both sides are per-route TSMIS exports, so name the
         # source file each row came from (from the route prepended at column 0).
         sc = _compose_source_files(sc, self.subdir, rows_a, rows_b, la, lb)
@@ -1294,16 +1320,28 @@ RAMP_SUMMARY = EnvCompare(
 def _ramp_detail_env_keys(header, key_field):
     """CMP-AUD-045: the Ramp Detail cross-env key builder — the same D4
     county-aware PhysicalKey the vs-TSN paths bake into their rows, built here
-    per row from the export's own columns (County from the Location column;
-    the cells before the PM column and after the Date column are the PM prefix
-    and suffix, conserved as raw claims only). Degrades to the plain key column
+    per row from the export's own columns (County from the Location column).
+    HF-04: the PM prefix and suffix columns are resolved by NAME on the
+    canonical display header ('PR'/'PRE'; 'PM Suffix'), not by fixed offsets
+    from the key column — the July-2026 layout has no suffix column at all, so
+    a positional kf+2 read there would conserve HG as a postmile suffix. On the
+    classic and PDF display headers the named columns sit exactly at the old
+    kf-1 / kf+2 offsets, so their conserved claims are unchanged; a header
+    without a suffix column conserves "". Degrades to the plain key column
     (logged) when the layout doesn't expose Location or a usable PM position —
     layout drift falls back to the old behavior rather than crashing, exactly
     like _resolve_key_field."""
     import compare_ramp_detail_tsn as _rd
-    loc_field = next((i for i, name in enumerate(header)
-                      if name is not None
-                      and str(name).strip().casefold() == "location"), None)
+
+    def named(*names):
+        for i, name in enumerate(header):
+            if name is not None and str(name).strip().casefold() in names:
+                return i
+        return None
+
+    loc_field = named("location")
+    prefix_field = named("pr", "pre")
+    suffix_field = named("pm suffix")
     if loc_field is None or key_field == 0:
         log.warning("env compare ramp_detail: no Location column / key column "
                     "in header %r; falling back to the plain PM key", header)
@@ -1316,13 +1354,15 @@ def _ramp_detail_env_keys(header, key_field):
         pm_raw = row[off + kf]
 
         def cell(field):
+            if field is None or not (0 <= field < len(header)):
+                return ""
             i = off + field
-            return _rd._raw_text(row[i]) if 0 <= field < len(header) and i < len(row) else ""
+            return _rd._raw_text(row[i]) if i < len(row) else ""
         return _rd._physical_pm_key(route, county, pm_raw, (
             ("route", route), ("location", loc),
-            ("postmile_prefix", cell(kf - 1)),
+            ("postmile_prefix", cell(prefix_field)),
             ("postmile", _rd._raw_text(pm_raw)),
-            ("postmile_suffix", cell(kf + 2))), f"Location {loc!r}")
+            ("postmile_suffix", cell(suffix_field))), f"Location {loc!r}")
     return normalizer
 
 
@@ -1349,31 +1389,125 @@ def _flat_header_recognizer(header, *raw_layouts):
     return None
 
 
-def _ramp_detail_canonical_header(header):
-    """CMP-AUD-032: recognize the current Ramp Detail export layout (the vs-TSN
-    comparator's _TSMIS_HEADER minus its leading Route — the two/three unnamed
-    columns included) or refuse an unrecognized/legacy layout."""
-    import compare_ramp_detail_tsn as _rd
-    return _flat_header_recognizer(header, list(_rd._TSMIS_HEADER[1:]))
-
-
-# CMP-AUD-046: the Ramp Detail export's header LABELS shift right of their values
-# from City Code onward (pos7 value=City Code under a blank label, pos8 value=R/U
-# under "City Code", pos9 value=Description under "R/U", pos10 empty under
-# "Description"), so a real Description change was reported under R/U. This is the
-# position-authoritative display header — one corrected label per VALUE position
-# (censused against the 7.9 statewide export + the vs-TSN _tsmis_row mapping),
-# applied via force_header exactly like Highway Log's corrected labels. Display
-# only: values are already compared by position, so no difference count changes.
+# CMP-AUD-046: the classic Ramp Detail export's header LABELS shift right of
+# their values from City Code onward (pos7 value=City Code under a blank label,
+# pos8 value=R/U under "City Code", pos9 value=Description under "R/U", pos10
+# empty under "Description"), so a real Description change was reported under
+# R/U. This is the classic layout's position-authoritative display header — one
+# corrected label per VALUE position (censused against the 7.9 statewide export
+# + the vs-TSN _tsmis_row mapping). Display only: values are compared by
+# position, so no difference count changes. HF-04: applied by the canonicalizer
+# (below) instead of a static force_header, because the July-2026 layout is the
+# same 11-column width and a length-matched force_header would relabel it wrongly.
 _RD_ENV_HEADER = ["Location", "PR", "PM", "Date of Record", "PM Suffix", "HG",
                   "Area 4", "City Code", "R/U", "Description", "(unused)"]
+# HF-04: the July-2026 export labels every value itself (PRE over the PM
+# prefix; the PM-suffix column dropped; OF/TY added before Description), so its
+# display header IS the export's own header — labelled, not positional.
+_RD_ENV_HEADER_2026 = ["Location", "PRE", "PM", "Date of Record", "HG",
+                       "Area 4", "City Code", "R/U", "OF", "TY", "Description"]
+
+
+def _ramp_detail_canonical_header(header):
+    """CMP-AUD-032 / HF-04: recognize either censused Ramp Detail Excel export
+    layout and return its DISPLAY header — the classic layout maps to the
+    CMP-AUD-046 corrected labels (the job force_header used to do), the
+    July-2026 layout displays its own labels. None for an unrecognized/legacy
+    layout, which is refused rather than trusted positionally."""
+    import compare_ramp_detail_tsn as _rd
+    if _flat_header_recognizer(header, list(_rd._TSMIS_HEADER[1:])) is not None:
+        return list(_RD_ENV_HEADER)
+    if _flat_header_recognizer(header,
+                               list(_rd._TSMIS_HEADER_2026[1:])) is not None:
+        return list(_RD_ENV_HEADER_2026)
+    return None
+
+
+# HF-04: the shared display shape a MIXED classic/July-2026 pair compares in —
+# cross-environment and Baseline routinely pair two different days, so the two
+# censused editions must compare correctly against each other. The nine fields
+# BOTH editions export are matched by NAME and compared normally; the three
+# edition-specific columns ride as CONTEXT (shown from whichever side carries
+# them, never counted): PM Suffix exists only in the classic layout (blank on
+# every censused row), OF/TY only in the July-2026 layout. A compared
+# blank-vs-value column there would flag every row for a column one edition
+# simply does not export.
+_RD_ENV_MIXED_HEADER = ["Location", "PR", "PM", "Date of Record", "HG",
+                       "Area 4", "City Code", "R/U", "Description",
+                       "PM Suffix", "OF", "TY"]
+_RD_ENV_MIXED_CONTEXT = ("PM Suffix", "OF", "TY")
+_RD_MIXED_NOTES_TITLE = "Ramp Detail — mixed export layouts: comparison notes"
+_RD_MIXED_NOTES = (
+    "The two sides were exported in different site editions: the classic "
+    "layout (blank-labelled PM prefix/suffix columns; no OF/TY) and the "
+    "July-2026 layout (every label over its own value; no PM-suffix column; "
+    "OF and TY added). The columns BOTH editions export are matched by NAME "
+    "and compared exactly like a same-edition pair.",
+    "CONTEXT columns (shown for reference, never counted as a difference): "
+    "PM Suffix exists only in the classic layout, and OF (On/Off) / TY (Ramp "
+    "Type) exist only in the July-2026 layout — a column only one side exports "
+    "cannot be compared, so each shows the exporting side's value.",
+    "The July-2026 edition prints \"-\" (Area 4 / OF / TY) and \"NO RAMP "
+    "LINEAR EVENT\" (Description) where the database is blank; the classic "
+    "edition left those cells empty. Where such a column is compared, those "
+    "render differences ARE counted — the workbook reports exactly what each "
+    "export carries.",
+    "Rows are keyed on Route + County + PM exactly like a same-edition pair.",
+)
+
+
+def _rd_mixed_projection(side_header):
+    """One reprojection map for _ramp_detail_merge_layouts: for each
+    _RD_ENV_MIXED_HEADER field, the source column index in `side_header`
+    (matched by name; PR also answers to the July-2026 'PRE' label), or None
+    when that edition lacks the column."""
+    idx = {}
+    for i, c in enumerate(side_header):
+        idx.setdefault(str(c).strip().casefold(), i)
+
+    def find(*names):
+        for n in names:
+            if n in idx:
+                return idx[n]
+        return None
+    return [find("pr", "pre") if f == "PR" else find(f.casefold())
+            for f in _RD_ENV_MIXED_HEADER]
+
+
+def _ramp_detail_merge_layouts(canon_a, canon_b, rows_a, rows_b):
+    """HF-04: merge a MIXED classic/July-2026 Ramp Detail pair onto the shared
+    display shape above. Returns (display header, rows_a, rows_b, schema
+    extras) with each side's rows reprojected by ITS OWN edition's column
+    names, or None unless the two canonical headers are exactly the two
+    censused editions (one each) — anything else keeps the ordinary
+    different-layouts refusal."""
+    editions = {tuple(_RD_ENV_HEADER): "classic",
+                tuple(_RD_ENV_HEADER_2026): "july2026"}
+    ea, eb = editions.get(tuple(canon_a)), editions.get(tuple(canon_b))
+    if ea is None or eb is None or ea == eb:
+        return None
+
+    def reproject(side_header, rows):
+        proj = _rd_mixed_projection(side_header)
+        return tuple(
+            tuple([r[0]] + [(r[1 + i] if (i is not None and 1 + i < len(r))
+                             else "") for i in proj])
+            for r in rows)
+
+    extras = {
+        "context_fields": _RD_ENV_MIXED_CONTEXT,
+        "legend_writer": ctc.make_notes_writer(_RD_MIXED_NOTES_TITLE,
+                                               _RD_MIXED_NOTES),
+    }
+    return (list(_RD_ENV_MIXED_HEADER), reproject(canon_a, rows_a),
+            reproject(canon_b, rows_b), extras)
 
 
 RAMP_DETAIL = EnvCompare(
     "ramp_detail", "Ramp Detail", "ramp_detail", sheet_name="TSAR - Ramp Detail",
     key_col="PM", physical_key_builder=_ramp_detail_env_keys,
     header_canonicalizer=_ramp_detail_canonical_header,
-    force_header=_RD_ENV_HEADER)
+    layout_merger=_ramp_detail_merge_layouts)
 
 
 def _hsl_unnamed_col(label):

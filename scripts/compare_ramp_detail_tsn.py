@@ -5,9 +5,12 @@ Both sides are XLSX, but in DIFFERENT shapes, so each side has its own loader th
 projects to ONE shared comparison header keyed on PM (postmile):
 
   * TSMIS side — the CONSOLIDATED Ramp Detail workbook (sheet "TSAR - Ramp Detail"
-    with a prepended "Route" column). Its header row has blank/merged cells that
-    shift the City Code / R/U / Description LABELS right of their values, so the
-    columns are read BY POSITION (verified against the real export), not by name.
+    with a prepended "Route" column), in either censused site edition (HF-04):
+    the CLASSIC layout, whose blank/merged header cells shift the City Code /
+    R/U / Description LABELS right of their values, or the JULY-2026 layout
+    (every label over its own value; PM suffix dropped; OF/TY added). Columns
+    are read BY POSITION under whichever edition the header matched (verified
+    against the real exports), never by name across editions.
   * TSN side — the statewide raw DB dump (sheet "Sheet 1", 18 named columns) OR the
     library's normalized workbook ("Route" + the shared header). Route comes from
     LOCATION ("01-DN-101" -> "101").
@@ -40,14 +43,27 @@ REPORT_NAME = "Ramp Detail"
 TSMIS_SHEET = "TSAR - Ramp Detail"       # the consolidated/per-route TSMIS sheet
 TSN_SHEET = "Sheet 1"                     # the raw TSN statewide sheet
 
-# CMP-AUD-034: the EXACT consolidated-TSMIS header (['Route'] + the export's own
-# column-shifted layout, with its two header-less columns as ''). _load_tsmis reads
-# every field by position, so this is bound exactly — a shifted/relabelled/wrong-
-# edition header is refused instead of mis-mapped. Verified statewide-stable and
-# data-source/edition-independent (2026-07-17 census); the Ramp Detail (PDF)
-# workbook uses its OWN wider gate (On/Off + Ramp Type), so this is Excel-only.
+# CMP-AUD-034 / HF-04: the EXACT consolidated-TSMIS headers, one per censused
+# site edition. _load_tsmis reads every field by position, so each edition is
+# bound exactly — a shifted/relabelled/unknown-edition header is refused instead
+# of mis-mapped. The Ramp Detail (PDF) workbook uses its OWN wider gate
+# (On/Off + Ramp Type), so these are Excel-only.
+#
+# CLASSIC (through the 2026-07-09 pull): the export's column-shifted layout —
+# blank header cells over the PM-prefix and PM-suffix values, and the City
+# Code / R/U / Description LABELS sitting one cell right of their values.
 _TSMIS_HEADER = ["Route", "Location", "", "PM", "Date of Record", "", "HG",
                  "Area 4", "", "City Code", "R/U", "Description"]
+# JULY-2026 (first censused on the 2026-07-23 pull, statewide-stable across all
+# 126 routes): the blank labels are gone, every label sits over its own value,
+# the PM-suffix column is dropped, and the two previously print-only columns
+# (OF = On/Off, TY = Ramp Type) are now IN the Excel export. Values MOVED, not
+# merely relabelled — HG..Description shift one left and Description lands at
+# position 11 — so this edition needs its own position map, not a second label
+# row over the classic one (the Intersection Detail same-positions precedent
+# does not apply here).
+_TSMIS_HEADER_2026 = ["Route", "Location", "PRE", "PM", "Date of Record", "HG",
+                      "Area 4", "City Code", "R/U", "OF", "TY", "Description"]
 
 # The shared comparison header (key + fields), in display order. PM is the key.
 # Compared fields assert; CONTEXT_FIELDS are shown but never counted as a diff.
@@ -101,9 +117,17 @@ _write_notes_sheet = ctc.make_notes_writer(
         "only text EDGES are trimmed on both sides (two statewide TSN rows "
         "carry trailing tabs no representation prints).",
         "CONTEXT columns (shown for reference, never counted as a difference): "
-        "Ramp Name, On/Off, Ramp Type and ADT are TSN database columns with no "
-        "TSMIS counterpart — counting them would flood the workbook with one-sided "
-        "cells that say nothing about agreement.",
+        "Ramp Name, On/Off, Ramp Type and ADT are TSN database columns the "
+        "classic Excel export has no counterpart for — counting them would flood "
+        "the workbook with one-sided cells that say nothing about agreement. The "
+        "July-2026 site export DOES carry On/Off (OF) and Ramp Type (TY); those "
+        "cells display on the TSMIS side exactly as exported (the print-letter "
+        "convention, N = on), still for reference only.",
+        "The July-2026 export also prints \"-\" (Area 4) and \"NO RAMP LINEAR "
+        "EVENT\" (Description) where the database is blank; the classic export "
+        "left those cells empty. The workbook reports exactly what each source "
+        "carries, so vs TSN's blank cells these export-printed tokens DO count "
+        "as differences.",
         "One-sided rows are ramps one system lists at a physical location "
         "(route + county + postmile) the other doesn't.",
     ))
@@ -346,14 +370,19 @@ def _load_tsn(path):
 # --------------------------------------------------------------------------- #
 # TSMIS side: the consolidated Ramp Detail workbook (columns read BY POSITION)
 # --------------------------------------------------------------------------- #
-# Consolidated value positions (Route prepended): Route0 Location1 PR2 PM3 Date4
-# suffix5 HG6 Area4 7 City8 R/U9 Description10 (blank11). The header LABELS shift
-# right of City Code/R/U/Description, so position — not name — is authoritative.
-# ONE table, read by _tsmis_row AND exposed through the evidence adapter
-# (evidence_ramp_detail.excel_column_for), so the comparison and its Excel-side
-# evidence can never resolve a column differently.
+# CLASSIC consolidated value positions (Route prepended): Route0 Location1 PR2
+# PM3 Date4 suffix5 HG6 Area4 7 City8 R/U9 Description10 (blank11). The header
+# LABELS shift right of City Code/R/U/Description, so position — not name — is
+# authoritative. ONE table, read by _tsmis_row AND exposed through the evidence
+# adapter (evidence_ramp_detail.excel_column_for), so the comparison and its
+# Excel-side evidence can never resolve a column differently.
 _TSMIS_POS = {"Location": 1, "PR": 2, "PM": 3, "Date of Record": 4, "PS": 5,
               "HG": 6, "Area 4": 7, "City Code": 8, "R/U": 9, "Description": 10}
+# JULY-2026 consolidated value positions: every label over its own value, no
+# PM-suffix column, OF/TY between R/U and Description.
+_TSMIS_POS_2026 = {"Location": 1, "PR": 2, "PM": 3, "Date of Record": 4,
+                   "HG": 5, "Area 4": 6, "City Code": 7, "R/U": 8,
+                   "OF": 9, "TY": 10, "Description": 11}
 
 
 def _tsmis_row(r):
@@ -376,21 +405,92 @@ def _tsmis_row(r):
             "", "", "", ""]                                  # TSN-only context: blank here
 
 
+def _tsmis_row_2026(r):
+    """One July-2026-layout consolidated row onto the shared shape. Same
+    projections as _tsmis_row at this edition's own positions; the layout
+    carries no PM-suffix column, so that raw claim is conserved as "". OF and
+    TY land in the On/Off / Ramp Type CONTEXT columns exactly as exported
+    (the print-letter convention, N = on) — displayed, never counted."""
+    def at(i):
+        return r[i] if i < len(r) else None
+    route = _norm_route(at(0))
+    loc = _raw_text(at(_TSMIS_POS_2026["Location"])).strip()
+    district, county = _dist_cnty(loc)
+    key = _physical_pm_key(route, county, at(_TSMIS_POS_2026["PM"]), (
+        ("route", route), ("location", loc),
+        ("postmile_prefix", _raw_text(at(_TSMIS_POS_2026["PR"]))),
+        ("postmile", _raw_text(at(_TSMIS_POS_2026["PM"]))),
+        ("postmile_suffix", "")), f"Location {loc!r}")
+    return [route,
+            _v(at(_TSMIS_POS_2026["PR"])), key, district,
+            _iso_date(at(_TSMIS_POS_2026["Date of Record"])),
+            _v(at(_TSMIS_POS_2026["HG"])), _v(at(_TSMIS_POS_2026["Area 4"])),
+            _v(at(_TSMIS_POS_2026["City Code"])), _v(at(_TSMIS_POS_2026["R/U"])),
+            _strip_desc_prefix(at(_TSMIS_POS_2026["Description"]), route),
+            "",                                              # Ramp Name: TSN-only
+            _v(at(_TSMIS_POS_2026["OF"])),                   # On/Off (as exported)
+            _v(at(_TSMIS_POS_2026["TY"])),                   # Ramp Type (as exported)
+            ""]                                              # ADT: TSN-only
+
+
+# The accepted consolidated editions, each bound to its own by-position row
+# transform. Order matters only for documentation: classic first, then
+# July-2026. `consolidated_header_ok` is the ONE public consumability predicate
+# — the consolidator's completion gate consults it so "consolidation reports
+# ok" and "a comparator will accept the workbook" can never drift apart.
+_TSMIS_LAYOUTS = ((_TSMIS_HEADER, _tsmis_row),
+                  (_TSMIS_HEADER_2026, _tsmis_row_2026))
+_BAD_HEADER_MSG = (
+    "isn't a consolidated Ramp Detail workbook in a supported layout. The "
+    "comparison reads columns by position, so the workbook's header row must "
+    "exactly match a supported site edition: a leading 'Route' column plus "
+    "either the classic export layout or the July-2026 export layout "
+    "(PRE/OF/TY). Consolidate the per-route exports with this app first; if "
+    "they already are consolidated, the site's export format has changed "
+    "again and this app needs an update before Ramp Detail can compare.")
+
+
+def consolidated_header_ok(header):
+    """True when `header` is one of the accepted consolidated editions (the
+    same normalization exact_consolidated_header_ok applies)."""
+    return any(ctc.exact_consolidated_header_ok(h)(header)
+               for h, _t in _TSMIS_LAYOUTS)
+
+
+class _LayoutDispatch:
+    """Bind load_consolidated_rows' header gate to its row transform: header_ok
+    records WHICH accepted edition matched, transform reads rows with that
+    edition's own position map. One instance per load — the two calls are
+    sequential within one loader call, so there is no shared state."""
+
+    def __init__(self, layouts):
+        self._layouts = layouts
+        self._active = None
+
+    def header_ok(self, header):
+        for expected, transform in self._layouts:
+            if ctc.exact_consolidated_header_ok(expected)(header):
+                self._active = transform
+                return True
+        return False
+
+    def transform(self, row):
+        return self._active(row)
+
+
 def _load_tsmis(path):
-    """TSMIS side -> (rows, has_route=True). The CONSOLIDATED Ramp Detail workbook
-    (a leading 'Route' column). Columns are read by position (the export's header
-    row is column-shifted); a header sanity-check guards against layout drift."""
+    """TSMIS side -> (rows, has_route=True). The CONSOLIDATED Ramp Detail
+    workbook (a leading 'Route' column). Columns are read by position under the
+    edition the header matched (HF-04: both censused site layouts load; an
+    unknown layout is refused with the real gate named, since a shifted/
+    relabelled/unknown-edition header must never be reinterpreted)."""
+    dispatch = _LayoutDispatch(_TSMIS_LAYOUTS)
     return load_consolidated_rows(
         path, TSMIS_SHEET,
         missing_sheet_hint="pick the consolidated TSMIS Ramp Detail workbook.",
-        bad_header_msg="isn't a CONSOLIDATED Ramp Detail workbook "
-                       "(expected a leading 'Route' column) — consolidate the "
-                       "per-route exports first.",
-        # CMP-AUD-034: bind the CONSOLIDATED header EXACTLY (read BY POSITION
-        # above, so a shifted/relabelled/wrong-edition header must be refused,
-        # not reinterpreted). Replaces the old "PM in first 5 + width >= 11" gate.
-        header_ok=ctc.exact_consolidated_header_ok(_TSMIS_HEADER),
-        row_transform=_tsmis_row)
+        bad_header_msg=_BAD_HEADER_MSG,
+        header_ok=dispatch.header_ok,
+        row_transform=dispatch.transform)
 
 
 # --------------------------------------------------------------------------- #

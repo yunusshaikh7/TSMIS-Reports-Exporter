@@ -15,8 +15,12 @@ database also carries — so the PDF side compares RICHER than the Excel side:
   * TSMIS_PDF_VS_EXCEL — TSMIS (PDF) vs TSMIS (Excel). Diffs the two TSMIS
     renders of the SAME report to prove both exports carry the same data (and
     to pinpoint exactly where they disagree when they don't). On/Off and Ramp
-    Type stay CONTEXT here (the Excel side genuinely lacks them — the workbook
-    shows the print's values for reference, never counts them).
+    Type stay CONTEXT here (the classic Excel export lacks them entirely; the
+    July-2026 export carries them as OF/TY — shown for reference either way,
+    never counted). HF-04: the Excel leg projects the print's null-render
+    tokens and On/Off letters the same way the PDF leg always has, so the
+    July-2026 export's "-" / "NO RAMP LINEAR EVENT" cells can never read as
+    the same report disagreeing with itself.
 
 The PDF side's loader projects the print's CENSUSED render artifacts at compare
 time (the workbook itself stays verbatim):
@@ -152,9 +156,31 @@ def _load_tsn_collapsed(path):
     return _collapse_desc_rows(rows), has_route
 
 
+# HF-04 / PCOA-FINAL-012: the July-2026 Excel export carries the print's
+# null-render tokens ("-" in Area 4 / OF, "NO RAMP LINEAR EVENT" in
+# Description) and the print's On/Off letters (N = on) — data the classic
+# export left blank. _pdf_row already projects exactly those render artifacts
+# on the PDF leg, so a same-source self check would publish one row of false
+# discrepancies per null-token ramp unless the Excel leg projects them the
+# SAME way. Applied only on the self check's Excel leg (below); the vs-TSN
+# comparator keeps its byte-exact reading of the export.
+_AREA4_I = 1 + _rd.SHARED_HEADER.index("Area 4")
+_ONOFF_I = 1 + _rd.SHARED_HEADER.index("On/Off")
+
+
+def _null_blank_excel_rows(rows):
+    for r in rows:
+        r[_AREA4_I] = _null_blank(r[_AREA4_I])
+        if r[_DESC_I] == _NULL_DESC:
+            r[_DESC_I] = ""
+        onoff = _null_blank(r[_ONOFF_I])
+        r[_ONOFF_I] = "O" if onoff == "N" else onoff
+    return rows
+
+
 def _load_excel_collapsed(path):
     rows, has_route = _rd._load_tsmis(path)
-    return _collapse_desc_rows(rows), has_route
+    return _null_blank_excel_rows(_collapse_desc_rows(rows)), has_route
 
 
 # --------------------------------------------------------------------------- #
@@ -197,14 +223,19 @@ _NOTES_PDF_VS_EXCEL = ctc.make_notes_writer(
         "the Excel export carries the database's literal double spaces "
         "(\"SB ON  AVERY PKWY\") that the print's HTML render collapses — padding "
         "never counts as a difference.",
-        "The print renders an EMPTY field visibly where the Excel export leaves the "
-        "cell blank: \"-\" in Area 4 / On/Off and the Description message "
-        "\"NO RAMP LINEAR EVENT\" (59 statewide rows — TSAR ramp points without "
-        "linework, the count Ramp Summary prints per route). Those project to "
-        "blank before comparing.",
-        "On/Off and Ramp Type are PRINT-ONLY columns the Excel export drops — shown "
-        "as context for reference (blank on the Excel side), never counted as a "
-        "difference.",
+        "The print renders an EMPTY field visibly — \"-\" in Area 4 / On/Off and "
+        "the Description message \"NO RAMP LINEAR EVENT\" (TSAR ramp points "
+        "without linework, the count Ramp Summary prints per route). The classic "
+        "Excel export leaves those cells blank; the July-2026 Excel export "
+        "prints the SAME tokens. Whichever side carries them, they project to "
+        "blank before comparing — the same report may never disagree with "
+        "itself over how it renders an empty field.",
+        "On/Off and Ramp Type are shown as context for reference, never counted "
+        "as a difference. The classic Excel export drops both (blank on the "
+        "Excel side); the July-2026 export carries them as OF / TY, and the "
+        "Excel side's On/Off letters are projected to the same O / F / Z "
+        "convention as the print's, so a same-source pair reads identically on "
+        "both sides.",
         "The same-source rule decodes the Excel export's OOXML escapes (a handful "
         "of cells carry an encoded line break, \"_x000d_\" — 4 statewide: route "
         "010's rest-area ramps) and ignores edge tab padding — encoding artifacts "

@@ -52,30 +52,39 @@ def _relabel(raw):
 
 
 def _families():
-    """(family, recognizer, raw_current_header_without_route)."""
+    """(family, recognizer, raw_current_header_without_route, expect).
+    `expect` is the exact canonical header the recognizer must return for that
+    layout, or None where the canonicalizer echoes the loader-normalized
+    header. Ramp Detail returns its corrected DISPLAY labels since HF-04 (the
+    CMP-AUD-046 relabel moved from force_header into the canonicalizer so the
+    July-2026 layout can display its own labels instead)."""
     import compare_ramp_detail_tsn as rd
     import compare_highway_sequence_tsn as hsl
     import compare_intersection_detail_tsn as idt
     import highway_detail_columns as hdc
     return [
         ("Ramp Detail", compare_env._ramp_detail_canonical_header,
-         list(rd._TSMIS_HEADER[1:])),
+         list(rd._TSMIS_HEADER[1:]), list(compare_env._RD_ENV_HEADER)),
+        ("Ramp Detail (July-2026)", compare_env._ramp_detail_canonical_header,
+         list(rd._TSMIS_HEADER_2026[1:]),
+         list(compare_env._RD_ENV_HEADER_2026)),
         ("Highway Sequence", compare_env._highway_sequence_canonical_header,
-         list(hsl._TSMIS_HEADER[1:])),
+         list(hsl._TSMIS_HEADER[1:]), None),
         ("Highway Detail", compare_env._highway_detail_canonical_header,
-         list(hdc.HEADER)),
+         list(hdc.HEADER), None),
         ("Intersection Detail", compare_env._id_canonical_header,
-         list(idt._TSMIS_HEADER[1:])),
+         list(idt._TSMIS_HEADER[1:]), None),
     ]
 
 
 def test_recognizers():
     print("Recognizer matrix (current recognized; malformed/legacy/truncated/reordered refused):")
-    for name, canon, raw in _families():
+    for name, canon, raw, expect in _families():
         loaded = _relabel(raw)               # what the loader hands the canonicalizer
         got = canon(list(loaded))
         check(f"{name}: current export layout is recognized",
-              got is not None and got == loaded)
+              got is not None and got == (expect if expect is not None
+                                          else loaded))
         check(f"{name}: a bogus 2-column layout is refused",
               canon(["PM", "Bogus"]) is None)
         check(f"{name}: a truncated layout (one column dropped) is refused",

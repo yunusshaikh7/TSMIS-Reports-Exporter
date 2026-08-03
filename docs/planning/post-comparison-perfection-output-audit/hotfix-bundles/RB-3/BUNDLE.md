@@ -16,7 +16,7 @@ Status: **READY**
 | Theme | Ramp Detail layout compatibility and same-source null parity — restores nine comparison placements that produce nothing today |
 | Branch | `hotfix/rb-3-ramp-detail-layout` |
 | Readiness source `main` | `4c199d3feb209832076e43af6a7caa34a8da0c1b` — RB-2 merged, its post-merge checks passed, its merge record was committed, and this state was pushed to `origin/main` before readiness preparation |
-| Base `main` commit | **PENDING** — Stage 4 must create the branch from the then-latest clean `main` and replace this cell with that exact SHA |
+| Base `main` commit | `194b7ee8da095f0300e7e635bb7e7af78643b685` — v0.33.1; verified clean and identical to `origin/main` before `hotfix/rb-3-ramp-detail-layout` was created from it (Stage 4, 2026-08-02) |
 | Canonical finding IDs | **PCOA-FINAL-001, -012** |
 | Implementer | **Claude** (owner decision 2026-07-26) |
 | First reviewer | **Codex** — independent non-implementer; holds `ramp-detail-pdf-excel-sibling-parity.json` and the header-census run ledgers |

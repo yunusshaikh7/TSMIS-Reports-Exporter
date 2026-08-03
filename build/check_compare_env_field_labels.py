@@ -48,8 +48,16 @@ _RD_CORRECT = ["Location", "PR", "PM", "Date of Record", "PM Suffix", "HG",
 
 def test_config_wiring():
     print("Config wiring (force_header / canonicalizer per family):")
-    check("Ramp Detail force_header = the corrected labels",
-          list(compare_env.RAMP_DETAIL.force_header) == _RD_CORRECT)
+    # HF-04: the Excel Ramp Detail relabel moved from a static force_header
+    # into the canonicalizer (a length-matched force_header would mislabel the
+    # same-width July-2026 layout); the CMP-AUD-046 guarantee is unchanged —
+    # the classic raw layout still canonicalizes to the corrected labels.
+    import compare_ramp_detail_tsn as _rd
+    check("Ramp Detail classic layout canonicalizes to the corrected labels",
+          compare_env._ramp_detail_canonical_header(
+              list(_rd._TSMIS_HEADER[1:])) == _RD_CORRECT)
+    check("Ramp Detail no longer pins a static force_header (dual-layout)",
+          compare_env.RAMP_DETAIL.force_header is None)
     check("Ramp Detail (PDF) force_header = corrected + the two print columns",
           list(compare_env.RAMP_DETAIL_PDF.force_header)
           == _RD_CORRECT + ["On/Off", "Ramp Type"])
