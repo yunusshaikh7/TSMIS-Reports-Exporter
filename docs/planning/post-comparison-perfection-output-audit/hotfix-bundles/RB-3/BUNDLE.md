@@ -1,8 +1,9 @@
 # `RB-3` — Bundle Contract
 
-Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (implementation
-`c9b55b6` on `hotfix/rb-3-ramp-detail-layout`; see
-[IMPLEMENTATION.md](IMPLEMENTATION.md))
+Status: **DENIED — RETURN TO IMPLEMENTATION** — Codex Review 1 found one
+precondition evidence gap: the complete `RB3-A1` set is not bound to its exact
+runtime head and frozen inputs by the manifest the implementation record names.
+The bounded return is in [REVIEW.md](REVIEW.md).
 
 > This RB-level contract carries work item **HF-04** and transcribes the frozen
 > work-item section from
@@ -78,7 +79,7 @@ or GUI transactions, installed-Excel results, and retained witness hashes:
 | Implementer | Claude |
 | Review 1 | **Codex** (holds `ramp-detail-pdf-excel-sibling-parity.json` and the header-census run ledgers) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-3: READY** |
+| Status | **Inherits RB-3: DENIED — RETURN TO IMPLEMENTATION** |
 
 **Exact scope.** Ramp Detail, both editions: the 8 topology decisions the Excel
 edition currently cannot produce (classic env, Direct/By Day/Everything vs TSN,

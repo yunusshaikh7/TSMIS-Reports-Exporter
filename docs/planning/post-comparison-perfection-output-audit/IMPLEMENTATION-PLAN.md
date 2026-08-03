@@ -179,7 +179,7 @@ Two layers, because the owner wants **fewer branches, reviews and releases**
 |---:|---|---|---|---|---|---|
 | 1 | **RB-1** | HF-01 | Clean Road source truth — the owner's immediate need | None | `hotfix/rb-1-clean-road-source-truth` | **MERGED** — `560ea5e501fdd76003985753ba7fc9ff0a551320` |
 | 2 | **RB-2** | HF-02 + HF-03 | The deliverable looks right and describes itself truthfully — **56 of the 68 denials** | None (RB-1 for the Clean Road witness) | `hotfix/rb-2-deliverable-presentation` | **MERGED** — `d679f388e0b12ff595751af9edd816674615b7a5` |
-| 3 | **RB-3** | HF-04 | Ramp Detail — restores 9 comparison placements that produce nothing today | None | `hotfix/rb-3-ramp-detail-layout` | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| 3 | **RB-3** | HF-04 | Ramp Detail — restores 9 comparison placements that produce nothing today | None | `hotfix/rb-3-ramp-detail-layout` | **DENIED — RETURN TO IMPLEMENTATION** |
 | 4 | **RB-4** | HF-05 + HF-10 | Evidence, end to end: eligibility, binding, panels, and the missing cross-environment lane | None | `hotfix/rb-4-evidence` | BLOCKED |
 | 5 | **RB-5** | HF-06 + HF-09 | Difference classification — the two opposite rulings applied to the right classes | RB-1, RB-2 | `hotfix/rb-5-difference-classification` | BLOCKED |
 | 6 | **RB-6** | HF-07 + HF-08 + HF-11 | Engine hygiene, coverage truth, and the closeout guards | RB-2, RB-3, RB-5 | `hotfix/rb-6-hygiene-and-guards` | BLOCKED |
@@ -480,7 +480,7 @@ mapping also proves one primary implementation/review bundle per finding:
 |---|---|---|---:|---|
 | **RB-1** | HF-01 | 010 | 1 | **MERGED** — `560ea5e501fdd76003985753ba7fc9ff0a551320` |
 | **RB-2** | HF-02, HF-03 | 002, 003, 008, 009, 014, 016, 019 | 7 | **MERGED** — `d679f388e0b12ff595751af9edd816674615b7a5` |
-| **RB-3** | HF-04 | 001, 012 | 2 | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| **RB-3** | HF-04 | 001, 012 | 2 | **DENIED — RETURN TO IMPLEMENTATION** |
 | **RB-4** | HF-05, HF-10 | 004, 005, 006, 007 | 4 | BLOCKED |
 | **RB-5** | HF-06, HF-09 | 011, 013 | 2 | BLOCKED |
 | **RB-6** | HF-07, HF-08, HF-11 | 015, 017, 018, 020, 021, 022 | 6 | BLOCKED |
@@ -1068,7 +1068,7 @@ classification and the temp-directory lifecycle log.
 | Implementer | Claude |
 | Review 1 | **Codex** (holds `ramp-detail-pdf-excel-sibling-parity.json` and the header-census run ledgers) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-3: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| Status | **Inherits RB-3: DENIED — RETURN TO IMPLEMENTATION** |
 
 **Exact scope.** Ramp Detail, both editions: the 8 topology decisions the Excel
 edition currently cannot produce (classic env, Direct/By Day/Everything vs TSN,
@@ -2134,8 +2134,9 @@ rebound. Review 2 independently verified the two controlling scope copies,
 exact-head runtime identity, and retained manifest, found no remaining
 contradiction, and approved. RB-2 merged without force as
 `d679f388e0b12ff595751af9edd816674615b7a5`; the post-merge gate passed 158/158
-and the frozen application self-test passed. RB-3 is the next eligible bundle;
-its HF-04 contract is transcribed without weakening into
-`hotfix-bundles/RB-3/BUNDLE.md`, so RB-3 is **READY**. This review closeout did
-not create the implementation branch, change product code, or begin an
-acceptance run; invoke Prompt 04 separately with Claude as implementer.
+and the frozen application self-test passed. RB-3 was implemented, but Codex
+Review 1 denied it on `RB3-R1-EG-001`: the complete retained `RB3-A1` set is not
+bound to runtime head `dd922f7` and the frozen inputs by one path/size/SHA-256/
+source/generation manifest; the implementation record's named
+`rb3-a1-artifacts.json` does not exist. Resume Prompt 04 on the existing RB-3
+branch and do not begin Review 2.
