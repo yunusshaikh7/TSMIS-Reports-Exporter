@@ -180,7 +180,7 @@ Two layers, because the owner wants **fewer branches, reviews and releases**
 | 1 | **RB-1** | HF-01 | Clean Road source truth — the owner's immediate need | None | `hotfix/rb-1-clean-road-source-truth` | **MERGED** — `560ea5e501fdd76003985753ba7fc9ff0a551320` |
 | 2 | **RB-2** | HF-02 + HF-03 | The deliverable looks right and describes itself truthfully — **56 of the 68 denials** | None (RB-1 for the Clean Road witness) | `hotfix/rb-2-deliverable-presentation` | **MERGED** — `d679f388e0b12ff595751af9edd816674615b7a5` |
 | 3 | **RB-3** | HF-04 | Ramp Detail — restores 9 comparison placements that produce nothing today | None | `hotfix/rb-3-ramp-detail-layout` | **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc` |
-| 4 | **RB-4** | HF-05 + HF-10 | Evidence, end to end: eligibility, binding, panels, and the missing cross-environment lane | None | `hotfix/rb-4-evidence` | BLOCKED |
+| 4 | **RB-4** | HF-05 + HF-10 | Evidence, end to end: eligibility, binding, panels, and the missing cross-environment lane | None | `hotfix/rb-4-evidence` | **READY** |
 | 5 | **RB-5** | HF-06 + HF-09 | Difference classification — the two opposite rulings applied to the right classes | RB-1, RB-2 | `hotfix/rb-5-difference-classification` | BLOCKED |
 | 6 | **RB-6** | HF-07 + HF-08 + HF-11 | Engine hygiene, coverage truth, and the closeout guards | RB-2, RB-3, RB-5 | `hotfix/rb-6-hygiene-and-guards` | BLOCKED |
 
@@ -481,7 +481,7 @@ mapping also proves one primary implementation/review bundle per finding:
 | **RB-1** | HF-01 | 010 | 1 | **MERGED** — `560ea5e501fdd76003985753ba7fc9ff0a551320` |
 | **RB-2** | HF-02, HF-03 | 002, 003, 008, 009, 014, 016, 019 | 7 | **MERGED** — `d679f388e0b12ff595751af9edd816674615b7a5` |
 | **RB-3** | HF-04 | 001, 012 | 2 | **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc` |
-| **RB-4** | HF-05, HF-10 | 004, 005, 006, 007 | 4 | BLOCKED |
+| **RB-4** | HF-05, HF-10 | 004, 005, 006, 007 | 4 | **READY** |
 | **RB-5** | HF-06, HF-09 | 011, 013 | 2 | BLOCKED |
 | **RB-6** | HF-07, HF-08, HF-11 | 015, 017, 018, 020, 021, 022 | 6 | BLOCKED |
 | **Total** | 11 work items | 22 unique findings | **22** | |
@@ -510,7 +510,8 @@ bundle is marked `READY`, combine all of its included sections into
 [the template](hotfix-bundles/TEMPLATE/BUNDLE.md), filling the base `main` SHA
 only when Stage 4 creates the branch. The BUNDLE.md must not diverge from these
 sections; where they disagree, this file wins. RB-1 and RB-2 are complete, and
-`RB-3/BUNDLE.md` now exists because RB-3 is `READY`.
+RB-1 through RB-3 are complete, and `RB-4/BUNDLE.md` now exists because RB-4
+is `READY`.
 
 The `Split fallback branch` rows below are dormant names reserved only if the
 owner invokes the documented split fallback. The controlling branch for the
@@ -1191,7 +1192,7 @@ row-2 field trace and the self-check zero proof.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to its five `source-audit/*evidence*` review ledgers and `visual-review/evidence-review/`, plus Claude's `visual_evidence.py:1270` census and the RC-2 `FT_3_stacked.png` reproduction |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | Inherits RB-4: BLOCKED |
+| Status | **Inherits RB-4: READY** |
 
 **Exact scope.** The visual-evidence renderer's eligibility rule, per-side source
 binding, target geometry and Excel-panel fidelity, across every path that emits
@@ -1825,7 +1826,7 @@ the disclosure/count table.
 | Implementer | Claude |
 | Review 1 | **Codex** (found the five absent-but-required cells) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | Inherits RB-4: BLOCKED |
+| Status | **Inherits RB-4: READY** |
 
 **Exact scope.** Evidence for the five Everything ENV cells that compare PDF
 against PDF — Ramp Summary, Ramp Detail (PDF), Intersection Detail (PDF),
@@ -2153,3 +2154,8 @@ RB-3 merged without force as
 `61fcac611de255c56759551a95ccd2e552287bfc` after remote `main` was verified
 unchanged. The post-merge full gate passed 158/158, and the frozen application
 self-test passed.
+
+The RB-3 closeout then prepared RB-4's combined HF-05/HF-10 scope contract from
+`main` at `ff780af4b1e3845ba30d120e3c3a0b2f7c47665b` and marked RB-4
+`READY`. It did not create the RB-4 branch, modify product code, generate
+evidence, or begin `RB4-A1`.

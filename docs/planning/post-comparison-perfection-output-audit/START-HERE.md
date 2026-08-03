@@ -4,7 +4,9 @@ Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
 RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
 RB-2 is MERGED at `d679f388e0b12ff595751af9edd816674615b7a5`;
 RB-3 is MERGED at `61fcac611de255c56759551a95ccd2e552287bfc`; its 158/158
-post-merge gate and frozen application self-test both passed**
+post-merge gate and frozen application self-test both passed;
+RB-4 is READY from `main` at `ff780af4b1e3845ba30d120e3c3a0b2f7c47665b`;
+no RB-4 branch, product change, generation, or acceptance run has begun**
 
 Last updated: 2026-08-02
 
@@ -16,9 +18,12 @@ first pass.
 
 ## Next action
 
-Prepare RB-4's combined scope-only readiness contract from this closed-out
-`main`. Do not create its branch, modify product code, or begin its expensive
-acceptance run in the RB-3 review closeout.
+Invoke
+[`PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
+in a fresh task with `<BUNDLE_ID> = RB-4` and `<IMPLEMENTER> = Claude`.
+Create `hotfix/rb-4-evidence` only after Prompt 04 verifies the exact clean,
+pushed `main` base; then execute the single combined `RB4-A1` contract. Do
+not split or sample its HF-05/HF-10 acceptance unless the documented fallback applies.
 
 Review 1 closed both returned evidence gaps. The fail-closed self-test, cheap
 exact-head verifier, and full corpus/archive verifier all passed; all seven
@@ -87,8 +92,8 @@ did not create a branch, modify product code, or begin an acceptance run.
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-3 MERGED; RB-4 READINESS PENDING** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-3 COMPLETE** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-4 READY — IMPLEMENTATION NOT STARTED** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-3 COMPLETE; RB-4 NOT STARTED** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.
