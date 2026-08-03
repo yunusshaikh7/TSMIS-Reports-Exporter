@@ -424,8 +424,9 @@ def phase_generate(root, side, tree, run_id, kinds=None, label=""):
     #    the by-day PDF-vs-Excel matrix (same self comparator, no evidence) —
     #    build one PvE cell per family and assert no evidence sibling appears.
     import pdf_excel_matrix
-    for fam_row in (("highway_log", "highway_sequence", "intersection_detail",
-                     "ramp_detail") if kind_on("pve") else ()):
+    for fam_row in (("highway_log_pdf", "highway_sequence_pdf",
+                     "intersection_detail_pdf", "ramp_detail_pdf")
+                    if kind_on("pve") else ()):
         def build_pve(fam_row=fam_row):
             return pdf_excel_matrix.build_pve_cell(
                 BYDAY_SOURCE, BYDAY_DAY, fam_row, str(dest), ev,
