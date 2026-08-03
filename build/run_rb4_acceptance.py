@@ -115,6 +115,29 @@ def write_json(path, payload):
     print(f"  wrote {path}")
 
 
+def tree_stamp(tree):
+    """The tree-under-test's exact git head + runtime dirty state — the
+    self-stamp every retained result carries so exact-head identity lives in
+    the record itself (the RB-2 lesson), not only in the manifest's assertion.
+    An exported base tree has no .git: (None, None). Dirtiness is judged over
+    the RUNTIME roots only, so docs-side edits never poison a head stamp."""
+    import subprocess
+    try:
+        head = subprocess.run(("git", "-C", str(tree), "rev-parse", "HEAD"),
+                              capture_output=True, text=True)
+        if head.returncode != 0:
+            return None, None
+        status = subprocess.run(
+            ("git", "-C", str(tree), "status", "--porcelain", "--",
+             "scripts", "version.py", "requirements.txt", "build"),
+            capture_output=True, text=True)
+        dirty = (bool(status.stdout.strip()) if status.returncode == 0
+                 else None)
+        return head.stdout.strip(), dirty
+    except OSError:
+        return None, None
+
+
 class Tee:
     """Mirror stdout/stderr into the retained per-phase log."""
 
@@ -282,7 +305,9 @@ def phase_generate(root, side, tree, run_id, kinds=None, label=""):
     tag = f"{side}-{label}" if label else side
     log_path = root / "logs" / f"generate-{tag}.log"
     ev = _events(events_mod, log_path)
+    commit, dirty = tree_stamp(tree)
     results = {"run_id": run_id, "side": side, "tree": str(tree), "label": label,
+               "tree_commit": commit, "tree_runtime_dirty": dirty,
                "python": sys.version.split()[0], "cells": [], "started": time.time()}
 
     def kind_on(kind):
@@ -532,7 +557,9 @@ def phase_cameras(root, side, tree, run_id):
     import owned_dir
     dest = side_root / "store"
     ev = _events(events_mod, root / "logs" / f"cameras-{side}.log")
+    commit, dirty = tree_stamp(tree)
     results = {"run_id": run_id, "side": side, "tree": str(tree), "cells": [],
+               "tree_commit": commit, "tree_runtime_dirty": dirty,
                "started": time.time()}
     lease = owned_dir.require_existing_owned_dir_lease(
         dest / matrix.COMPARISONS_DIRNAME, kind="comparisons")
@@ -620,7 +647,9 @@ def phase_counts(root, side, tree, run_id):
     import consolidation_meta
     import day_matrix
     store = side_root / "store"
-    out = {"run_id": run_id, "side": side, "cells": {}}
+    commit, dirty = tree_stamp(tree)
+    out = {"run_id": run_id, "side": side, "tree": str(tree),
+           "tree_commit": commit, "tree_runtime_dirty": dirty, "cells": {}}
     for row in TSN_ROWS:
         p = store / "comparisons" / "tsn" / f"{BASELINE}_{row}_tsn.xlsx"
         out["cells"][f"everything-tsn|{row}"] = _typed_counts(
@@ -645,15 +674,15 @@ def phase_validate(root, side, tree, run_id):
     comparison's own provenance, truthful source lines + legends, panel-text
     fidelity census, env geometry re-derivation, and the silent-lane sweep."""
     side_root = _sandbox(tree, root, side)
-    import compare_core
     import compare_env
     import compare_tsn_common as ctc
     import evidence_manifest as em
-    import published_comparison as pc
     import visual_evidence as ve
 
     problems = []
-    out = {"run_id": run_id, "side": side, "tree": str(tree), "sets": [],
+    commit, dirty = tree_stamp(tree)
+    out = {"run_id": run_id, "side": side, "tree": str(tree),
+           "tree_commit": commit, "tree_runtime_dirty": dirty, "sets": [],
            "problems": problems}
 
     def note(setrec, cond, what):
@@ -708,8 +737,6 @@ def phase_validate(root, side, tree, run_id):
                  f"(got {len(got)} member(s))")
         if man.state != em.STATE_RENDERED:
             return
-        src_lines, legends, rows, has_ledger = _summary_rows_of(
-            Path(man.workbook.name) if man.workbook else cmp_path)
         wb_path = ve.sibling_paths(cmp_path)[0]
         src_lines, legends, rows, has_ledger = _summary_rows_of(wb_path)
         note(rec, has_ledger, "Ledger sheet present")
@@ -721,26 +748,28 @@ def phase_validate(root, side, tree, run_id):
         note(rec, all(lg == want_legend for lg in legends),
              "image-sheet legends state the true sources")
         rec["examples"] = len(rows)
-        over = [v for _f, _a, va, vb in rows for v in (va, vb)
-                if len(v) > ve.PANEL_TEXT_MAX]
-        rec["elided_values"] = len(over)
-        note(rec, not over,
-             "no drawn value exceeds the panel bound (none elided)")
+        # Panel-text fidelity census: values past the panel bound draw as a
+        # visibly elided prefix (panel_cell_text) — legal under HF-05, so the
+        # over-limit examples are LISTED for the native-scale image inspection
+        # rather than failed; the drawn-string decision itself is unit-locked
+        # in check_visual_evidence.
+        rec["elided_examples"] = [
+            [f, a] for f, a, va, vb in rows
+            if len(va) > ve.PANEL_TEXT_MAX or len(vb) > ve.PANEL_TEXT_MAX]
         rec["values_over_26"] = sum(
             1 for _f, _a, va, vb in rows for v in (va, vb) if len(v) > 26)
         if flavor == "env":
             adapter = ve.env_adapter_for(row_key)
-            geo_ok = 0
+            rederived = 0
             for field, at, va, vb in rows:
-                route_key = at.split(" @ ")
-                route = route_key[0]
-                key = route_key[1] if len(route_key) > 1 else route
+                route, _, key = at.partition(" @ ")
+                key = key or route
                 vals = []
                 boxes_ok = True
                 for d, _census in resolved:
                     pdf = adapter.tsmis_pdf_path(d, route)
                     recs = adapter.env_locate(Path(pdf), {key})
-                    got_recs = recs.get(key) or recs.get(route, [])
+                    got_recs = recs.get(key) or recs.get(route) or []
                     if len(got_recs) != 1:
                         boxes_ok = False
                         break
@@ -754,15 +783,11 @@ def phase_validate(root, side, tree, run_id):
                         boxes_ok = False
                         break
                     vals.append(adapter.env_value(r0, field))
-                if boxes_ok and vals and (vals[0] or "(blank)"):
-                    composed = (f"{vals[0] or compare_core._BLANK_MARK}"
-                                f"{compare_core._DIFF_MARK}"
-                                f"{vals[1] or compare_core._BLANK_MARK}")
-                    if (vals[0], vals[1]) == (va, vb) or composed:
-                        geo_ok += 1
-                note(rec, boxes_ok and vals[0] == va and vals[1] == vb,
-                     f"env re-derivation matches ({field} @ {at})")
-            rec["env_rederived"] = geo_ok
+                match = (boxes_ok and (vals[0] or "") == va
+                         and (vals[1] or "") == vb)
+                note(rec, match, f"env re-derivation matches ({field} @ {at})")
+                rederived += bool(match)
+            rec["env_rederived"] = rederived
         return
 
     store = side_root / "store"
@@ -805,7 +830,10 @@ def phase_excel(root, side, tree, run_id):
     import win32com.client  # type: ignore
     books = sorted((side_root / "store" / "comparisons").rglob("*(evidence).xlsx"))
     books += sorted((side_root / "output" / "comparisons").rglob("*(evidence).xlsx"))
-    out = {"run_id": run_id, "side": side, "books": [], "problems": []}
+    commit, dirty = tree_stamp(tree)
+    out = {"run_id": run_id, "side": side, "tree": str(tree),
+           "tree_commit": commit, "tree_runtime_dirty": dirty,
+           "books": [], "problems": []}
     excel = win32com.client.DispatchEx("Excel.Application")
     excel.Visible = False
     excel.DisplayAlerts = False
@@ -860,7 +888,9 @@ def phase_checks_at_base(root, tree, head_tree):
     shutil.copytree(base_tree / "build", build_dir)
     for name in checks + ("_checklib.py",):
         shutil.copyfile(Path(head_tree) / "build" / name, build_dir / name)
+    commit, dirty = tree_stamp(head_tree)
     out = {"base_tree": str(base_tree), "head_tree": str(head_tree),
+           "head_tree_commit": commit, "head_tree_runtime_dirty": dirty,
            "results": {}}
     env = dict(os.environ, PYTHONIOENCODING="utf-8")
     for name in checks:
