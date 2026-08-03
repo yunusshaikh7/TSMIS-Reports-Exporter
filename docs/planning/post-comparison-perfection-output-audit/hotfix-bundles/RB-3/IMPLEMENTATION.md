@@ -1,6 +1,6 @@
 # `RB-3` — Implementation Record
 
-Status: **JOINTLY APPROVED**
+Status: **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc`
 
 | Field | Value |
 |---|---|
@@ -433,3 +433,13 @@ byte-untouched, per the return's own boundary.
    --corpus --zips` run — **VERIFIED — 0 problem(s)** (504 frozen inputs +
    TSN raw, 1,009 replicas, all deliverable roots, 30/30 results, 10 harness
    records, both 252-member archives).
+
+## Merge closeout
+
+- Both Codex reviews approved all seven HF-04 criteria.
+- `origin/main` was fetched and remained at the recorded base
+  `194b7ee8da095f0300e7e635bb7e7af78643b685`.
+- RB-3 merged without force as
+  `61fcac611de255c56759551a95ccd2e552287bfc`.
+- The post-merge full gate passed 158/158.
+- The post-merge frozen application self-test passed.

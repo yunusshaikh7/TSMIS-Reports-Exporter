@@ -1,15 +1,16 @@
 # `RB-3` — Bundle Contract
 
-Status: **JOINTLY APPROVED** — both Codex reviews approved all seven HF-04
-criteria; Review 2 entered at pushed head `cebc1a5d`, and the acceptance
-runtime remains `dd922f7`. The signed approvals are in [REVIEW.md](REVIEW.md).
+Status: **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc`.
+Both Codex reviews approved all seven HF-04 criteria; Review 2 entered at pushed
+head `cebc1a5d`, and the acceptance runtime remains `dd922f7`. The signed
+approvals are in [REVIEW.md](REVIEW.md).
 
 > This RB-level contract carries work item **HF-04** and transcribes the frozen
 > work-item section from
 > [IMPLEMENTATION-PLAN.md](../../IMPLEMENTATION-PLAN.md). The plan is
 > authoritative; where this record and the plan disagree, the plan wins. The
-> readiness step freezes scope only. No RB-3 branch, implementation, generation,
-> recalculation, or acceptance run has started.
+> readiness step froze scope only; at readiness, no RB-3 branch, implementation,
+> generation, recalculation, or acceptance run had started.
 
 | Field | Value |
 |---|---|
@@ -78,7 +79,7 @@ or GUI transactions, installed-Excel results, and retained witness hashes:
 | Implementer | Claude |
 | Review 1 | **Codex** (holds `ramp-detail-pdf-excel-sibling-parity.json` and the header-census run ledgers) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-3: JOINTLY APPROVED** |
+| Status | **Inherits RB-3: MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc` |
 
 **Exact scope.** Ramp Detail, both editions: the 8 topology decisions the Excel
 edition currently cannot produce (classic env, Direct/By Day/Everything vs TSN,
@@ -191,13 +192,12 @@ row-2 field trace and the self-check zero proof.
 
 ## Bundle-level dependencies and rollback
 
-- Queue dependency: none. RB-1 and RB-2 are merged; RB-2 merge
+- Queue dependency: none. RB-1, RB-2, and RB-3 are merged; RB-2 merge
   `d679f388e0b12ff595751af9edd816674615b7a5` supplies the presentation base
   explicitly required by HF-04.
-- Rollback: revert RB-3's future merge commit. The exact HF-04 rollback clause
+- Rollback: revert merge `61fcac611de255c56759551a95ccd2e552287bfc`. The exact HF-04 rollback clause
   above remains controlling.
-- Readiness does not authorize Stage 4 inside this review closeout. Stage 4
-  must fill the exact base SHA before changing code.
+- Merge closeout preserved the retained acceptance and review records.
 
 ## Scope approval
 

@@ -1,6 +1,6 @@
 # `RB-3` — Adversarial Review Record
 
-Status: **JOINTLY APPROVED**
+Status: **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc`
 
 ## Review 1 verdict — 2026-08-02
 
@@ -503,5 +503,13 @@ or bounded adversarial probe remains unresolved.
 **Reviewer signature:** Codex, Review 2 — **APPROVED** —
 `2026-08-02T22:17:58.3662409-07:00`.
 
-Mark RB-3 **JOINTLY APPROVED** and complete Prompt 05's fetch, non-force merge,
-post-merge smoke, merge-record push, and bounded cleanup sequence.
+## Merge closeout
+
+- Both independent Codex reviews approved; neither reviewer implemented RB-3.
+- Remote `main` remained at the recorded base before merge.
+- RB-3 merged without force as
+  `61fcac611de255c56759551a95ccd2e552287bfc`.
+- Post-merge smoke: full gate **158/158 PASS**; frozen application self-test
+  **PASS**.
+- Branch/worktree cleanup follows only after the merge record and updated
+  readiness state are pushed.
