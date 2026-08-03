@@ -377,14 +377,30 @@ def phase_generate(root, side, tree, run_id, kinds=None, label=""):
     #    At base this proves the comparisons run and NO evidence artifact exists;
     #    at head it exercises the new lane end to end.
     for row, other_env in ENV_CELLS if kind_on("everything-env") else ():
+        cmp_path = (dest / matrix.COMPARISONS_DIRNAME / BASELINE
+                    / f"{other_env}_{row}.xlsx")
+        if side == "head":
+            # HF-10 criterion 3: the env comparison's counts are identical with
+            # evidence on and off. The OFF pass runs FIRST so the final store
+            # state (and every evidence binding) belongs to the ON pass.
+            def build_env_off(row=row, other_env=other_env):
+                return matrix.build_comparison(
+                    str(dest), row, other_env, "env", BASELINE, events=ev,
+                    tsn_files={}, also_formulas=True,
+                    evidence=None, commit_guard=target_guard)
+            entry = run_cell("everything-env-off", row, other_env, "env",
+                             build_env_off)
+            entry["comparison_path"] = str(cmp_path)
+            entry["typed"] = _typed_counts(consolidation_meta, cmp_path)
+            entry["evidence"] = _evidence_state(cmp_path)
+            write_json(root / "results" / f"generation-{tag}.json", results)
+
         def build_env(row=row, other_env=other_env):
             return matrix.build_comparison(
                 str(dest), row, other_env, "env", BASELINE, events=ev,
                 tsn_files={}, also_formulas=True,
                 evidence=dict(EVIDENCE_REQUEST), commit_guard=target_guard)
         entry = run_cell("everything-env", row, other_env, "env", build_env)
-        cmp_path = (dest / matrix.COMPARISONS_DIRNAME / BASELINE
-                    / f"{other_env}_{row}.xlsx")
         entry["comparison_path"] = str(cmp_path)
         entry["typed"] = _typed_counts(consolidation_meta, cmp_path)
         entry["evidence"] = _evidence_state(cmp_path)
