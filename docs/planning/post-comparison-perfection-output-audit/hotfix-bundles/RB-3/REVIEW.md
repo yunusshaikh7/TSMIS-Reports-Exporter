@@ -1,6 +1,6 @@
 # `RB-3` — Adversarial Review Record
 
-Status: **DENIED — RETURN TO IMPLEMENTATION**
+Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
 
 ## Review 1 verdict — 2026-08-02
 
@@ -229,3 +229,148 @@ events, not product or acceptance failures.
 
 Do not merge and do not begin Review 2. Resume Prompt 04 on the existing
 `hotfix/rb-3-ramp-detail-layout` branch only to supply `RB3-R1-EG-002`.
+
+---
+
+## Review 1 second re-review — Codex, 2026-08-02
+
+### Verdict
+
+**APPROVED.**
+
+Both returned evidence gaps are closed:
+
+- `RB3-R1-EG-001`: the committed manifest binds the complete retained
+  acceptance set to exact runtime head `dd922f7…` and frozen inputs.
+- `RB3-R1-EG-002`: the corrected committed verifier now fails nonzero for
+  every absent declared item covered by `--corpus` / `--zips`, and its
+  bounded negative suite passes.
+
+All seven HF-04 criteria have exact same-head evidence. Independent source
+inspection and focused challenges found no implementation contradiction and
+no actionable failure.
+
+### Review identity, entry state, and budget
+
+| Field | Approval record |
+|---|---|
+| Reviewer / pass | Codex / Review 1 second re-review |
+| Implemented bundle? | **No** — implementer is Claude |
+| Bundle / branch | `RB-3` / `hotfix/rb-3-ramp-detail-layout` |
+| Recorded base | `194b7ee8da095f0300e7e635bb7e7af78643b685` |
+| Implementation commit | `c9b55b6c6e9ca898af935bc2c070a435f39b2588` |
+| Acceptance runtime | `dd922f7b3b726a87912a26e92d7b5d930d90451e` |
+| Prior denial commit | `0554a8f30921485bf0679862fbe55497c7b01a75` |
+| Review-entry / review-record head | `df9af191464eded735b29ce63635dafae5b140e2` |
+| Pushed-head check | Local `HEAD`, remote-tracking ref, and `git ls-remote` all matched `df9af19…`; entry worktree was clean |
+| Runtime drift | **None** — the verifier re-derived 417 runtime files and zero later runtime changes |
+| Elapsed active review | Approximately 14 minutes; within the 30-minute ceiling |
+| Resource budget | **RESPECTED** — no generation, installed Excel, render, full gate, application build, or whole-source recount; no operation exceeded 23 seconds or produced bulk output |
+
+The complete branch diff from the recorded base contains the four authorized
+Ramp Detail scripts, the named focused/neighbor checks, and required
+evidence/status records only. The `0554a8f…df9af19` return is verifier/status
+only; it does not alter the manifest, accepted runtime, corpus, deliverables,
+results, or witnesses. Both the remedy range and complete branch passed
+`git diff --check`.
+
+### Bound evidence reused
+
+| Evidence | Exact identity / verified result |
+|---|---|
+| Complete manifest | `rb3-a1-artifacts.json`; 344,312 bytes; SHA-256 `F63F4A3682D5F8585C71EA3A9C60B02B56AC7F98A1CB1BC42366C24A247E5BB1` |
+| Corrected verifier | `rb3-verify-manifest.py`; 22,952 bytes; SHA-256 `AD906476C14175352515A7B4A66A1929000BDDE749EA2499EAD98BAA77A61859` |
+| Runtime identity | 417 files; digest `4350EB8A2C83C859A4BA8FA845BC6CD96094F095570B088591981EB629DB97AF`; exact at `dd922f7…` |
+| Acceptance result set | 30 exact-head claims, including 26 retained local results and four committed witnesses |
+| Frozen inputs / replicas | 504 per-route frozen files + TSN raw; 1,009 provisioned replicas, all rehashed and source-equal |
+| Deliverables / harness | Every declared deliverable root; 26/26 local results; 10/10 harness records |
+| Frozen archives | Both archives exact; 252/252 Ramp Detail members bound in each |
+| Gate / application | Hash-bound `gate_log_final.txt`: 158/158; hash-bound frozen `selftest_log.txt`: PASS |
+
+### Reviewer commands and adversarial challenge
+
+| Challenge | Result |
+|---|---|
+| `rb3-verify-manifest.py --self-test` | **PASS** — clean fixture verified; missing root/file/raw/result/archive, changed bytes, divergent replica, wrong head, and unstamped entry all failed |
+| Cheap exact-head verifier | **VERIFIED — 0 problems** |
+| Full `--corpus --zips` verifier | **VERIFIED — 0 problems**; every declared present item and both archives rehashed |
+| `check_compare_ramp_detail.py` at head | **PASS** — same-edition, mixed-edition, identical-data, PM-key, and unknown-layout paths |
+| `check_compare_ramp_detail_tsn.py` at head | **ALL PASS** — edition dispatch, July position map, OF/TY/Description, unknown refusal, and consolidation completion truth |
+| Same TSN check against archived base `194b7ee…` | **EXPECTED RED** — exit 1 with exactly 15 HF-04 failures; all pre-existing assertions remained green |
+| `check_compare_ramp_detail_pdf.py` | Product assertions reached and passed July load, zero differences, full pairing, and clean verdict; the reviewer console then raised a CP1252 `UnicodeEncodeError` while printing the literal `≠` and was not retried |
+| Native-scale retained render spot-check | **PASS** — July consolidated header/rows, mixed Summary/Comparison/Notes, and self Summary inspected at original resolution; selected risk text/counts are readable and show no label/value drift |
+
+The most plausible product false-pass was the same-width July layout being
+read with classic positions, or the mixed projection treating edition-only
+`PM Suffix` / `OF` / `TY` as compared fields and miskeying `HG` as a
+suffix. Source inspection found exact-header dispatch to separate position
+maps, name-keyed mixed reprojection, name-resolved prefix/suffix identity, and
+those three edition-only fields explicitly marked context. The focused head
+checks plus the retained reverse mixed lane exercised both directions, a
+genuine Description difference, a genuine OF change, identical shared data,
+unknown layouts, and completion downgrade. The archived-base run reproduced
+the original defect signature.
+
+The PDF harness interruption is a reviewer-environment event: the comparison
+had already returned zero differing cells, two paired rows, no one-sided rows,
+and a clean verdict before Python attempted to print the Unicode label. The
+same-head `self-check-zero.json`, three retained 15,213-row self placements,
+installed-Excel results, and the hash-bound 158/158 gate independently cover
+the remaining workbook-marker, projected On/Off, and classic-control
+assertions.
+
+The Windows image ACL helper also refused the retained render paths before
+opening a file. Five selected PNGs were copied byte-for-byte to the session's
+writable visualization area, their source/copy SHA-256 values were matched,
+and those copies were inspected at original resolution. This was a
+reviewer-environment workaround, not regeneration or a product failure.
+
+### Criterion-by-criterion disposition
+
+| # | HF-04 criterion | Review 1 disposition |
+|---:|---|---|
+| 1 | Eight topology decisions plus by-day PDF-vs-Excel produce both twins | **PASS** — 16/16 generation steps; all required placements produced, with 11 formulas twins |
+| 2 | Route 001 row 2 maps `OF`, `TY`, and `Description` correctly | **PASS** — raw-to-projection-to-published-row witness; all five mapping checks true |
+| 3 | An unconsumable consolidation cannot report `ok` | **PASS** — focused head check returns error / FAILED, keeps and names the file; both accepted layouts remain ok / complete |
+| 4 | Self check has zero differences across all 15,213 rows | **PASS** — Direct, Everything SELF, and by-day PDF-vs-Excel each pair 15,213 / 0 one-sided / 0 differing; independent recount agrees |
+| 5 | Classic layout still compares; unknown layout refuses | **PASS** — focused same/mixed checks and retained classic placements; unknown produces no workbook |
+| 6 | RD-PDF-vs-TSN counts unchanged | **PASS** — base/head counts 15,204 paired / 9 A-only / 206 B-only / 468 diff rows / 619 diff cells; Comparison sheets cell-identical |
+| 7 | Full gate green; every new assertion red pre-fix | **PASS** — retained 158/158 gate and frozen app self-test; reviewer archived-base challenge reproduced 15 exact HF-04 failures |
+
+### Exact deliverable and discrepancy results
+
+| Lane | Paired | A-only | B-only | Diff rows | Diff cells |
+|---|---:|---:|---:|---:|---:|
+| Direct / By Day / Everything vs TSN | 15,204 | 9 | 206 | 431 | 508 |
+| Direct RD-PDF vs TSN control | 15,204 | 9 | 206 | 468 | 619 |
+| Direct / Everything / by-day self | 15,213 | 0 | 0 | 0 | 0 |
+| Mixed classic-env / Baseline / Everything ENV | 15,208 | 5 | 8 | 352 | 408 |
+| Reverse mixed classic-env | 15,208 | 8 | 5 | 352 | 408 |
+
+The app-free recount reproduced 507 singleton vs-TSN differences plus the one
+duplicate-key assignment difference, and 406 singleton mixed-env differences
+plus two in the duplicate group. Route and per-field totals agree with the
+published workbooks.
+
+### Values, formulas, visual, evidence, and regression matrices
+
+| Domain | Review 1 result |
+|---|---|
+| Values / source truth | **PASS** — generated counts, independent raw recount, workbook counts, and four committed witnesses agree |
+| Formulas / installed Excel | **PASS** — 11/11 recalculated; 10/10 SELF-CHECK rows each; zero error cells; live verdicts match values twins |
+| Visual / presentation | **PASS** — reviewer inspected five original-resolution risk pages; July rows/headers, mixed counts/keys/context/Notes, and the 15,213-row zero-difference self Summary are readable; sweep confirms the complete 12-column/context inventory |
+| Evidence eligibility | **PASS** — zero `*evidence*` artifacts across both declared output roots; prohibited RD classes remain prohibited |
+| Neighboring behavior | **PASS** — RD-PDF-vs-TSN is cell-identical base/head; retained named neighbor checks and full gate pass; Highway Detail untouched |
+| Performance / atomic publication / stale cache / failure | **PASS** — bounded generation timings retained; store-integrity pre/post records exact; unknown consolidation is FAILED and unpromotable; all declared failure paths are hash-bound |
+
+### Failures and reviewer sign-off
+
+**Actionable failures: none.** No acceptance criterion, retained artifact,
+runtime identity, or adversarial probe remains unresolved.
+
+**Reviewer signature:** Codex, Review 1 second re-review —
+**APPROVED** — `2026-08-02T21:50:17.0702481-07:00`.
+
+Mark RB-3 **REVIEW 1 APPROVED — AWAITING REVIEW 2**. Do not merge. Review 2
+must run in a separate fresh task against the pushed approval head, challenge
+this review independently, and approve before RB-3 becomes mergeable.
