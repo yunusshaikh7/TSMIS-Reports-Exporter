@@ -1,6 +1,7 @@
 # `RB-3` — Implementation Record
 
-Status: **DENIED — RETURN TO IMPLEMENTATION**
+Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (Review 1's
+`RB3-R1-EG-001` remedied — see the return and remedy sections at the end)
 
 | Field | Value |
 |---|---|
@@ -109,8 +110,16 @@ at `c9b55b6` itself was fully wiped and regenerated so no artifact spans two
 runtimes). Commits after `dd922f7` are documentation/witness-only — zero
 runtime delta.
 
-**Frozen inputs** (identities recorded in `rb3-a1-generation.json` /
-`rb3-a1-artifacts.json`):
+**Frozen inputs** (every input, deliverable, result, render, gate log and
+committed witness is bound by exact path, byte size, SHA-256, frozen-source
+identity and generation metadata to the acceptance head in the COMMITTED
+manifest
+[`rb3-a1-artifacts.json`](../../rb3-a1-artifacts.json), checked by the
+committed independent verifier
+[`rb3-verify-manifest.py`](../../rb3-verify-manifest.py) — run
+`rb3-verify-manifest.py rb3-a1-artifacts.json --tree <repo> --at dd922f7
+--corpus --zips`; a byte-identical retained copy sits in the HF-04 output
+root):
 
 | Input | Identity |
 |---|---|
@@ -319,3 +328,64 @@ reverted tree (no schema/sidecar migration was introduced).
 
 Do not merge this branch. Run **Prompt 05** (`<BUNDLE_ID> = RB-3`,
 `<REVIEWER> = Codex`) against the pushed head.
+
+## Review 1 return — Codex, 2026-08-02 (`RB3-R1-EG-001`)
+
+Review 1 **DENIED — EVIDENCE GAP** at review-entry head `43c6336`: this record
+named `rb3-a1-artifacts.json` as an identity record, but no such file existed,
+and no single manifest bound the complete RB3-A1 set — frozen inputs, reused
+replicas, deliverables, results, renders, gates, and committed witnesses — to
+the one exact runtime head `dd922f7` by path, byte size, SHA-256,
+frozen-source identity, and generation metadata. Per Prompt 05 the review
+stopped at the precondition; no acceptance criterion was adjudicated. The
+signed record is [REVIEW.md](REVIEW.md); the denial commit is `df5c6fc`.
+
+## Review 1 remedy — Claude, 2026-08-02 (`RB3-R1-EG-001` CLOSED)
+
+The missing item is supplied as ONE committed manifest plus ONE committed
+independent verifier, following the RB-2 remedy precedent and its Review-2
+lesson (runtime-digest equality is NOT head identity — every claimed entry
+must name the exact commit):
+
+1. **[`rb3-a1-artifacts.json`](../../rb3-a1-artifacts.json)** (committed at
+   the audit root; byte-identical retained copy in the HF-04 output root)
+   binds, for acceptance head `dd922f7b3b726a87912a26e92d7b5d930d90451e`:
+   the per-file LF-normalized runtime set and rolled digest at that commit;
+   the git lineage (that commit IS the last runtime-touching commit; the
+   later commits are record/review/witness-only); all **504** frozen input
+   files + the TSN raw extract by path/bytes/SHA-256 with their
+   frozen-source identities; all **1,009** provisioned replica files, each
+   required to hash equal to its recorded frozen source; all **106**
+   deliverable files (workbooks, twins post-recalculation, sidecars,
+   consolidated and normalized-TSN workbooks, the base-vs-head control
+   pair); all **30** result/render/witness entries, each carrying
+   `runtime_head_commit = dd922f7…`; and the ten acceptance-harness scripts
+   bound by content.
+2. **Frozen-source identity is proved against the ORIGINAL archives**, not
+   asserted: every Ramp Detail member of the retained frozen
+   `_inbox\2026-07-23 ssor-prod.zip` (252 files) and of
+   `ground-truth\All Reports 7.9\All Reports 7.9.zip` (252 files) was
+   decompressed and hash-matched against the exact files the acceptance
+   read — 504/504 matched, zero mismatches, zero unaccounted files.
+3. **The four committed HF-04 witnesses now carry the binding in their own
+   content** (`bound_to_acceptance_head` + the producing script and its
+   SHA-256), so a committed witness can no longer be a free-floating claim.
+4. **[`rb3-verify-manifest.py`](../../rb3-verify-manifest.py)** (committed)
+   re-derives everything from git and from bytes — it fails on any missing
+   or mismatched file, any replica that does not equal its frozen source,
+   any claimed entry not naming the exact acceptance head, any runtime file
+   changed after that head, any unstamped committed witness, and any
+   archive-binding mismatch. Run at the reviewed head:
+
+   `rb3-verify-manifest.py rb3-a1-artifacts.json --tree <repo> --at dd922f7
+   --corpus --zips` → **VERIFIED — 0 problem(s)** (runtime re-derived at
+   `dd922f7` matches; lineage clean; 30/30 claimed entries name the head;
+   4/4 witnesses bound; 1,138 corpus files re-hashed; 504 archive members
+   re-bound).
+
+No product file, deliverable, result, or count changed in this remedy: the
+diff is the manifest, the verifier, the four witness stamps, and the status/
+record text. The retained bulk artifacts were BOUND, not regenerated — the
+return's "existing bulk artifacts may be retained if their exact bytes and
+sources can be proved" branch, which the archive bindings and replica
+equality checks prove.

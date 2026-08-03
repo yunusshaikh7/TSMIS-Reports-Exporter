@@ -74,5 +74,10 @@
     "NO RAMP LINEAR EVENT": 36
    }
   }
+ },
+ "bound_to_acceptance_head": "dd922f7b3b726a87912a26e92d7b5d930d90451e",
+ "produced_by": {
+  "script": "census_rd_layouts.py",
+  "script_sha256": "77D696CB96AF125E54C89EC497C27C0C439A6AFB787BE3DD5CF340E9F3AF0559"
  }
 }

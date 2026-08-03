@@ -52,5 +52,10 @@
   "Description == raw minus route prefix": true,
   "HG/Area4/City/R-U at July positions": true,
   "PR from PRE": true
+ },
+ "bound_to_acceptance_head": "dd922f7b3b726a87912a26e92d7b5d930d90451e",
+ "produced_by": {
+  "script": "acc_rb3_recount.py",
+  "script_sha256": "27E8F2A948C73723CDC51BEF85E716796E22CDD0016C8C99240E86744CF22711"
  }
 }

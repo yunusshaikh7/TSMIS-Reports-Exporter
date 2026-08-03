@@ -47,5 +47,10 @@
   }
  },
  "counts_identical": true,
- "comparison_sheet_cell_diffs": 0
+ "comparison_sheet_cell_diffs": 0,
+ "bound_to_acceptance_head": "dd922f7b3b726a87912a26e92d7b5d930d90451e",
+ "produced_by": {
+  "script": "acc_rb3_rdpdf_base.py",
+  "script_sha256": "401588E0255AF11F622B7C7ABC5C0C1057C77738AE44D0C07AC422FD090A6276"
+ }
 }
