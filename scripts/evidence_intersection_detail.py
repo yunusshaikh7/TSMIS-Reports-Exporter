@@ -382,9 +382,13 @@ def tsmis_box(rec, field):
     """(page_no, cell_box, record_yspan, table_xspan) for `field`'s cell.
     Rejects (returns None) a record whose two lines landed on different pages —
     a single-page strip can't show both, and the record box would be wrong."""
+    return _box_at(rec, _TSMIS_CELL[field])
+
+
+def _box_at(rec, cell):
     if rec["m1"]["page"] != rec["m2"]["page"]:
         return None
-    line, idx = _TSMIS_CELL[field]
+    line, idx = cell
     meta = rec["m1"] if line == 1 else rec["m2"]
     lo, hi = meta["win"][idx]
     hits = [c for c in meta["chars"] if lo <= (c["x0"] + c["x1"]) / 2 < hi]
@@ -667,9 +671,19 @@ def env_project(field, raw):
     return _xl_trim("" if raw is None else str(raw))
 
 
+# The two env display columns OUTSIDE the vs-TSN shared map that the print
+# nevertheless carries as real grid cells: the postmile L/R marker (rowA window
+# 2, between Post Mile and Location) and the intersecting route's marker (rowB
+# window 13 — _make_row's b[13] -> col 29). Verified against the grid the same
+# way _TSMIS_CELL was; their values read positionally off the 35-column row.
+_ENV_CELL_EXTRA = {"PS": (1, 2), "Intrte S": (2, 13)}
+
+
 def env_value(rec, field):
     if field == "Location":
         return env_project(field, rec["row"][3])
+    if field in _ENV_CELL_EXTRA:
+        return env_project(field, rec["row"][idt._TSMIS_HEADER.index(field) - 1])
     shared = _ENV_TO_SHARED.get(field)
     if shared is None:
         return ""
@@ -679,6 +693,9 @@ def env_value(rec, field):
 def env_box(rec, field):
     if field == "Location":
         return tsmis_box(rec, "District")     # District boxes the Location cell
+    extra = _ENV_CELL_EXTRA.get(field)
+    if extra is not None:
+        return _box_at(rec, extra)
     shared = _ENV_TO_SHARED.get(field)
     if shared is None:
         return None                # no single print cell for this site column

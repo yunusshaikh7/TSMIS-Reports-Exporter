@@ -1800,9 +1800,13 @@ class _Ledger5:
 _pub = _Pub([_PubRow(7, "", "001", 1, "DE", ("1 ≠ 2", "9"), "tok1"),
              _PubRow(8, "003", "K2", 1, "ED", ("5", "7 ≠ 8"), "tok2")])
 _cand, _misses = ve._env_candidates(_pub, ["F", "G"], _Ledger5())
-check("solo differing rows become candidates carrying the published identity",
-      [e["route"] for e in _cand["F"]] == [""]
+check("solo differing rows become candidates carrying the published identity; "
+      "a route-keyed row (no route column — Ramp Summary) carries its key as "
+      "the print-resolution route",
+      [e["route"] for e in _cand["F"]] == ["001"]
+      and _cand["F"][0]["key"] == "001"
       and _cand["F"][0]["published_token"] == "tok1"
+      and _cand["G"][0]["route"] == "003"
       and _cand["G"][0]["display"] == "7 ≠ 8")
 
 # env_fields pins: each adapter's list is DERIVED from the env comparison's own

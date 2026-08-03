@@ -638,9 +638,21 @@ def env_fields():
 
 def env_locate(pdf_path, needed_keys):
     """{published_key: [record]} in one per-route print. The env comparison
-    keys rows on the same normalized PM text the vs-TSN locator uses, so the
-    LOCKSTEP parse serves both flavors unchanged."""
-    return locate_tsmis(pdf_path, needed_keys)
+    publishes the export's RAW padded PM text ('043.274') while the LOCKSTEP
+    walk keys on the normalized PM the vs-TSN convention uses ('43.274'), so
+    the published keys are normalized for the walk and the result re-keyed by
+    the published text. Two published texts that collapse onto one normalized
+    PM are excluded (ambiguous occurrence) rather than guessed."""
+    by_norm = {}
+    for k in needed_keys:
+        by_norm.setdefault(rd._norm_pm(k), []).append(k)
+    found = locate_tsmis(pdf_path, set(by_norm))
+    out = {}
+    for norm, recs in found.items():
+        published = by_norm.get(norm) or []
+        if len(published) == 1:
+            out[published[0]] = recs
+    return out
 
 
 def env_project(field, raw):

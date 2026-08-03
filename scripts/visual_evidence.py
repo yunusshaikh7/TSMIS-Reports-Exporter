@@ -682,7 +682,11 @@ def _env_candidates(published, fields_with_diffs, ledger):
                 continue
             if row.state(pos) != pc.STATE_DIFFERENT:
                 continue
-            pool.append({"field": f, "route": row.route, "key": row.key,
+            # A route-keyed comparison (Ramp Summary) publishes no separate
+            # route column — the key IS the route token the per-route print
+            # files carry, so it serves as the route for print resolution too.
+            pool.append({"field": f, "route": row.route or row.key,
+                         "key": row.key,
                          "display": row.value(pos),
                          "published_row": row.excel_row,
                          "published_occurrence": row.occurrence,
