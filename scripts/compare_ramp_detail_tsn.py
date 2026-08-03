@@ -123,11 +123,11 @@ _write_notes_sheet = ctc.make_notes_writer(
         "July-2026 site export DOES carry On/Off (OF) and Ramp Type (TY); those "
         "cells display on the TSMIS side exactly as exported (the print-letter "
         "convention, N = on), still for reference only.",
-        "The July-2026 export also prints \"-\" (Area 4) and \"NO RAMP LINEAR "
-        "EVENT\" (Description) where the database is blank; the classic export "
-        "left those cells empty. The workbook reports exactly what each source "
-        "carries, so vs TSN's blank cells these export-printed tokens DO count "
-        "as differences.",
+        "The July-2026 export prints \"-\" (Area 4) and \"NO RAMP LINEAR "
+        "EVENT\" (Description) on its no-linework ramp rows; the classic "
+        "export left those cells empty. The workbook reports exactly what "
+        "each source carries, so those export-printed tokens DO count as "
+        "differences against whatever TSN records there (a value or a blank).",
         "One-sided rows are ramps one system lists at a physical location "
         "(route + county + postmile) the other doesn't.",
     ))

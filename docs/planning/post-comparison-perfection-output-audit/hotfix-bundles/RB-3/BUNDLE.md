@@ -1,6 +1,8 @@
 # `RB-3` — Bundle Contract
 
-Status: **READY**
+Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (implementation
+`c9b55b6` on `hotfix/rb-3-ramp-detail-layout`; see
+[IMPLEMENTATION.md](IMPLEMENTATION.md))
 
 > This RB-level contract carries work item **HF-04** and transcribes the frozen
 > work-item section from

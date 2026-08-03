@@ -3,7 +3,8 @@
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
 RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
 RB-2 is MERGED at `d679f388e0b12ff595751af9edd816674615b7a5`;
-RB-3 / HF-04 is READY on current `main`**
+RB-3 / HF-04 is IMPLEMENTED — AWAITING ADVERSARIAL REVIEW at `c9b55b6` on
+`hotfix/rb-3-ramp-detail-layout` (base `194b7ee`)**
 
 Last updated: 2026-08-02
 
@@ -16,10 +17,12 @@ first pass.
 ## Next action
 
 In a fresh task, run
-[`PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
-with `<BUNDLE_ID> = RB-3` and `<IMPLEMENTER> = Claude`. Stage 4 must create
-`hotfix/rb-3-ramp-detail-layout` from the then-current clean `main`, record that
-exact base SHA in `hotfix-bundles/RB-3/BUNDLE.md`, and only then begin work.
+[`PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md)
+with `<BUNDLE_ID> = RB-3` and `<REVIEWER> = Codex` (Review 1) against the
+pushed head of `hotfix/rb-3-ramp-detail-layout`. The implementation record is
+[`hotfix-bundles/RB-3/IMPLEMENTATION.md`](hotfix-bundles/RB-3/IMPLEMENTATION.md);
+generated outputs and the RB3-A1 witnesses are retained under
+`C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-04\`.
 
 `RB2-R2-004` was correct to refuse the decision from the reviewer's chair. It
 returned RB-2 to the plan owner over two surfaces the accepted runtime touches:
@@ -75,8 +78,8 @@ did not create a branch, modify product code, or begin an acceptance run.
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-3 READY — NOT STARTED** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-3 NOT STARTED** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-3 IMPLEMENTED** (`c9b55b6`) | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-3 AWAITING REVIEW 1** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.
