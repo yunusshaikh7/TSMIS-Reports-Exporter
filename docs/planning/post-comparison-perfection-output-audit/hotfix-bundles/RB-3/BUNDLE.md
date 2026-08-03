@@ -1,8 +1,12 @@
 # `RB-3` — Bundle Contract
 
-Status: **DENIED — RETURN TO IMPLEMENTATION** — Codex Review 1 re-review found
-one fail-closed evidence-verifier gap, `RB3-R1-EG-002`. The bounded return is in
-[`REVIEW.md`](REVIEW.md).
+Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** — Review 1's
+`RB3-R1-EG-001` (closed at the re-review) and `RB3-R1-EG-002` (the committed
+verifier now fails closed on every requested declared item, with committed
+negative checks — `--self-test` — plus a live missing-deliverable probe; the
+cheap and full `--corpus --zips` runs re-ran VERIFIED — 0 problems) are both
+remedied. See [IMPLEMENTATION.md](IMPLEMENTATION.md) and [REVIEW.md](REVIEW.md).
+Awaiting Review 1 re-review.
 
 > This RB-level contract carries work item **HF-04** and transcribes the frozen
 > work-item section from
@@ -78,7 +82,7 @@ or GUI transactions, installed-Excel results, and retained witness hashes:
 | Implementer | Claude |
 | Review 1 | **Codex** (holds `ramp-detail-pdf-excel-sibling-parity.json` and the header-census run ledgers) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-3: DENIED — RETURN TO IMPLEMENTATION** (`RB3-R1-EG-002`) |
+| Status | **Inherits RB-3: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
 
 **Exact scope.** Ramp Detail, both editions: the 8 topology decisions the Excel
 edition currently cannot produce (classic env, Direct/By Day/Everything vs TSN,

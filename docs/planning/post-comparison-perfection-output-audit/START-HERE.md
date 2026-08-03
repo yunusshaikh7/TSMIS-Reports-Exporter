@@ -3,8 +3,12 @@
 Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
 RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
 RB-2 is MERGED at `d679f388e0b12ff595751af9edd816674615b7a5`;
-RB-3 Review 1 re-review is DENIED — EVIDENCE GAP on
-`hotfix/rb-3-ramp-detail-layout`, reviewed through `69231d3`**
+RB-3 is IMPLEMENTED — AWAITING ADVERSARIAL REVIEW (second re-review) on
+`hotfix/rb-3-ramp-detail-layout`: `RB3-R1-EG-001` closed at the first
+re-review; `RB3-R1-EG-002` remedied — the committed verifier now fails closed
+on every requested declared item, with committed negative checks
+(`--self-test`) and a live missing-deliverable probe, and both standard runs
+re-ran VERIFIED — 0 problems**
 
 Last updated: 2026-08-02
 
@@ -16,23 +20,27 @@ first pass.
 
 ## Next action
 
-Resume
-[`PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
-on the existing `hotfix/rb-3-ramp-detail-layout` branch with
-`<BUNDLE_ID> = RB-3` and `<IMPLEMENTER> = Claude`.
+Run
+[`PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md)
+with `<BUNDLE_ID> = RB-3` and `<REVIEWER> = Codex` — Review 1 **re-review**
+against the pushed head of `hotfix/rb-3-ramp-detail-layout`.
 
-Codex Review 1 re-review closed `RB3-R1-EG-001`: the committed manifest binds
-the retained acceptance set, and both the cheap and full present-byte checks
-pass. It denied one narrower evidence gap, `RB3-R1-EG-002`. The verifier
-explicitly requested with `--corpus --zips` prints `SKIPPED` and returns success
-when a declared corpus root, result, TSN raw input, or archive is absent. A
-bounded negative probe reproduced the false pass. Correct the verifier to fail
-closed on every requested declared item and add negative checks; retain the
-existing manifest, corpus, deliverables, and acceptance head unless their bytes
-change. The signed denial and bounded return are in
-[`hotfix-bundles/RB-3/REVIEW.md`](hotfix-bundles/RB-3/REVIEW.md).
-Do not merge or begin Review 2 until the return is implemented and Review 1
-approves.
+`RB3-R1-EG-001` was closed at the first re-review. `RB3-R1-EG-002` (the
+committed verifier printed `SKIPPED` and returned success when explicitly
+requested declared evidence was absent) is remedied verifier-only: with
+`--corpus`/`--zips`, an absent declared corpus root, frozen-source file, TSN
+raw input, replica, deliverable, result, harness record, or archive is now a
+nonzero FAILURE; the bounded negative checks are committed in the verifier
+itself (`rb3-verify-manifest.py --self-test` — missing-root, missing-file,
+changed-bytes, replica-vs-source, missing-raw/result/archive, wrong-head and
+unstamped-entry cases all FAIL; clean fixture verifies), a live probe with one
+real deliverable renamed away returned `FAILED — 1 problem(s)` (then restored),
+and the existing cheap and full commands re-ran **VERIFIED — 0 problems**. The
+manifest, corpus, deliverables, witnesses, and the `dd922f7` acceptance
+runtime are byte-untouched. Records:
+[`hotfix-bundles/RB-3/IMPLEMENTATION.md`](hotfix-bundles/RB-3/IMPLEMENTATION.md)
+and [`hotfix-bundles/RB-3/REVIEW.md`](hotfix-bundles/RB-3/REVIEW.md).
+Do not merge or begin Review 2 until Review 1 approves.
 
 `RB2-R2-004` was correct to refuse the decision from the reviewer's chair. It
 returned RB-2 to the plan owner over two surfaces the accepted runtime touches:
@@ -88,8 +96,8 @@ did not create a branch, modify product code, or begin an acceptance run.
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-3 DENIED — RETURN TO IMPLEMENTATION** (`RB3-R1-EG-002`) | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-3 REVIEW 1 RE-REVIEW DENIED — EVIDENCE GAP** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-3 IMPLEMENTED** (`RB3-R1-EG-001` + `-EG-002` remedied) | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-3 AWAITING REVIEW 1 RE-REVIEW** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

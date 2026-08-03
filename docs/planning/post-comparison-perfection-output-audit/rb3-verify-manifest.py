@@ -30,15 +30,23 @@ Checks, each reported separately:
              manifest's harness block.
   CORPUS     (--corpus) re-hash the frozen inputs, the provisioned replicas
              (each file must equal its recorded frozen source byte-for-byte),
-             the deliverables, the retained results, and the harness. Bulk
-             and local-only; SKIPPED, and reported as skipped, when a root is
-             not present. (--zips additionally re-matches every Ramp Detail
-             member of the two retained frozen archives against the recorded
-             input hashes.)
+             the deliverables, the retained results, and the harness.
+             FAIL-CLOSED (RB3-R1-EG-002): once requested, every declared
+             root, file, raw input, result, harness record — and with --zips
+             every frozen archive — MUST be present and match; any absence is
+             a nonzero failure, never a skip. (--zips additionally re-matches
+             every Ramp Detail member of the two retained frozen archives
+             against the recorded input hashes.)
+  SELF-TEST  (--self-test) bounded NEGATIVE checks over fabricated fixtures:
+             a missing declared root/file/raw-input/result/archive, changed
+             bytes, a replica diverging from its frozen source, and a
+             wrong-head or unstamped claimed entry must each FAIL; a clean
+             fixture must verify. Exits nonzero if any negative case passes.
 
 Usage:
   rb3-verify-manifest.py <manifest.json> [--tree <repo>] [--at <commit>]
                          [--corpus] [--zips]
+  rb3-verify-manifest.py --self-test
 """
 import hashlib
 import json
@@ -258,9 +266,13 @@ def check_witnesses(manifest, tree, fail):
 
 
 def rehash_block(label, root, recorded, fail, sources=None):
+    """Re-hash one declared root. FAIL-CLOSED (RB3-R1-EG-002): when the caller
+    requested this verification, an ABSENT declared root or file is a failure,
+    never a skip — a verifier that succeeds with declared evidence removed
+    certifies an incomplete acceptance set."""
     root = Path(root)
     if not root.exists():
-        print(f"  SKIPPED {label:<28} not present")
+        fail(f"{label}: declared root is MISSING: {root}")
         return
     bad = 0
     for rel, want in recorded.items():
@@ -284,19 +296,24 @@ def rehash_block(label, root, recorded, fail, sources=None):
 
 
 def check_corpus(manifest, fail, zips):
-    print("\nCORPUS — frozen inputs, replicas, deliverables, results")
+    """Requested with --corpus, so EVERY declared item must be present and
+    match: frozen roots, the TSN raw input, replica roots (each file equal to
+    its frozen source), deliverable roots, every retained result, and every
+    harness record. --zips extends the same rule to the frozen archives."""
+    print("\nCORPUS — frozen inputs, replicas, deliverables, results "
+          "(fail-closed: absence is a failure)")
     fs = manifest["frozen_sources"]
     for row in fs["roots"]:
         rehash_block(row["label"], row["path"], fs["files"][row["label"]],
                      fail)
     raw = fs["tsn_raw"]
     p = Path(raw["path"])
-    if p.is_file() and file_sha256(p) == raw["sha256"]:
-        print(f"  ok  {'tsn-raw-master':<28}     1 file(s) re-hashed")
-    elif p.is_file():
+    if not p.is_file():
+        fail(f"tsn-raw-master: declared input is MISSING: {p}")
+    elif file_sha256(p) != raw["sha256"]:
         fail("tsn-raw-master: content changed")
     else:
-        print(f"  SKIPPED {'tsn-raw-master':<28} not present")
+        print(f"  ok  {'tsn-raw-master':<28}     1 file(s) re-hashed")
     reps = manifest["input_replicas"]
     for row in reps["roots"]:
         src = (fs["files"].get(row["copied_from"])
@@ -311,27 +328,30 @@ def check_corpus(manifest, fail, zips):
     for row in dl["roots"]:
         rehash_block(row["label"], row["path"], dl["files"][row["label"]],
                      fail)
+    present = 0
     for rec in manifest["results"]["entries"]:
         p = Path(rec["path"])
         if rec.get("role") == "committed-witness":
             continue                      # checked against the repo above
         if not p.is_file():
-            print(f"  SKIPPED result {p.name:<32} not present")
+            fail(f"result MISSING: {p}")
             continue
         if file_sha256(p) != rec["sha256"]:
             fail(f"result changed: {p}")
-    print(f"  ok  results re-hashed              "
-          f"{sum(1 for r in manifest['results']['entries'] if Path(r['path']).is_file())}")
+            continue
+        present += 1
+    expected = sum(1 for r in manifest["results"]["entries"]
+                   if r.get("role") != "committed-witness")
+    print(f"  results re-hashed                  {present}/{expected}")
     hz = manifest["harness"]
-    loc = Path(hz["location"])
-    rehash_block("harness", loc, {n: rec for n, rec in hz["files"].items()},
-                 fail)
+    rehash_block("harness", Path(hz["location"]),
+                 {n: rec for n, rec in hz["files"].items()}, fail)
     if zips:
         print("  re-matching the frozen archives…")
         for b in fs["archive_bindings"]:
             zp = Path(b["archive"])
             if not zp.is_file():
-                print(f"  SKIPPED archive {zp.name} not present")
+                fail(f"archive MISSING: {zp}")
                 continue
             if file_sha256(zp) != b["sha256"]:
                 fail(f"archive changed: {zp}")
@@ -343,10 +363,128 @@ def check_corpus(manifest, fail, zips):
             print(f"  ok  {zp.name:<28} {b['matched']:>5} member(s) bound")
 
 
+# --------------------------------------------------------------------------- #
+# --self-test: bounded NEGATIVE checks (RB3-R1-EG-002)
+# --------------------------------------------------------------------------- #
+def self_test():
+    """Prove the fail-closed behavior with fabricated fixtures — no real
+    corpus is read or touched. Each case removes or corrupts exactly one
+    declared item and requires the corresponding check to record a failure;
+    a clean fixture must verify with none. Exits nonzero if ANY negative case
+    passes silently."""
+    import tempfile
+
+    problems = []
+
+    def expect(name, fn, wants_failure, needle=""):
+        failures = []
+        fn(failures.append)
+        ok = bool(failures) == wants_failure and \
+            (not needle or any(needle in f for f in failures))
+        print(f"  [{'OK ' if ok else 'BAD'}] {name}"
+              + (f"  ({failures[0][:70]})" if failures else ""))
+        if not ok:
+            problems.append(name)
+
+    with tempfile.TemporaryDirectory(prefix="rb3_selftest_") as td:
+        td = Path(td)
+        root = td / "root"
+        root.mkdir()
+        (root / "a.bin").write_bytes(b"alpha")
+        rec = {"a.bin": {"bytes": 5, "sha256": file_sha256(root / "a.bin")}}
+
+        print("negative checks — rehash_block")
+        expect("clean root verifies with zero failures",
+               lambda f: rehash_block("t", root, rec, f), False)
+        expect("a MISSING declared root fails",
+               lambda f: rehash_block("t", td / "absent", rec, f),
+               True, "MISSING")
+        expect("a missing declared file fails",
+               lambda f: rehash_block("t", root,
+                                      {**rec, "gone.bin": rec["a.bin"]}, f),
+               True, "missing gone.bin")
+        (root / "b.bin").write_bytes(b"beta")
+        expect("changed bytes fail",
+               lambda f: rehash_block(
+                   "t", root, {"b.bin": {"bytes": 4,
+                                         "sha256": "0" * 64}}, f),
+               True, "content changed")
+        expect("a replica that does not equal its frozen source fails",
+               lambda f: rehash_block("t", root, rec, f,
+                                      sources={"a.bin": {"sha256": "0" * 64}}),
+               True, "frozen source")
+
+        print("negative checks — check_corpus (missing raw / result / archive)")
+        zp = td / "arch.zip"
+        with zipfile.ZipFile(zp, "w") as zf:
+            zf.writestr("x/ramp_detail/r.xlsx", b"zzz")
+        mani = {
+            "frozen_sources": {
+                "roots": [{"label": "t", "path": str(root)}],
+                "files": {"t": rec},
+                "tsn_raw": {"path": str(td / "raw.xlsx"), "bytes": 1,
+                            "sha256": "0" * 64},
+                "archive_bindings": [{"archive": str(td / "no.zip"),
+                                      "bytes": 1, "sha256": "0" * 64,
+                                      "matched": 1, "mismatched": [],
+                                      "extract_files_not_in_archive": []}],
+            },
+            "input_replicas": {"roots": [], "files": {}, "mismatches": []},
+            "deliverables": {"roots": [], "files": {}},
+            "results": {"entries": [
+                {"path": str(td / "missing-result.json"), "bytes": 1,
+                 "sha256": "0" * 64, "class": "acceptance", "role": "x",
+                 "runtime_head_commit": "f" * 40}]},
+            "harness": {"location": str(root), "files": {}},
+        }
+        expect("a missing TSN raw input + result + archive all fail",
+               lambda f: check_corpus(mani, f, zips=True), True, "MISSING")
+        failures = []
+        check_corpus(mani, failures.append, zips=True)
+        for needle in ("tsn-raw-master", "result MISSING", "archive MISSING"):
+            hit = any(needle in f for f in failures)
+            print(f"  [{'OK ' if hit else 'BAD'}] …including the "
+                  f"'{needle}' path")
+            if not hit:
+                problems.append(needle)
+
+        print("negative checks — exact head")
+        bad_results = {
+            "acceptance_head": {"commit": "a" * 40},
+            "results": {"entries": [
+                {"path": "p1", "class": "acceptance",
+                 "runtime_head_commit": "b" * 40},
+                {"path": "p2", "class": "acceptance"}],
+                "all_claimed_same_head": False},
+        }
+
+        def run_exact(f):
+            entries = bad_results["results"]["entries"]
+            head = bad_results["acceptance_head"]["commit"]
+            for r in entries:
+                got = r.get("runtime_head_commit")
+                if not got:
+                    f(f"claimed entry names no exact head: {r['path']}")
+                elif got != head:
+                    f(f"claimed entry names {got[:12]}, not {head[:12]}: "
+                      f"{r['path']}")
+            if not bad_results["results"].get("all_claimed_same_head"):
+                f("the manifest does not assert same-head")
+        expect("a wrong-head and an unstamped claimed entry both fail",
+               run_exact, True)
+
+    print(f"\nSELF-TEST {'FAILED' if problems else 'PASSED'} — "
+          f"{len(problems)} problem(s)")
+    sys.exit(1 if problems else 0)
+
+
 def main():
     args = sys.argv[1:]
     if not args:
         raise SystemExit(__doc__)
+    if args[0] == "--self-test":
+        self_test()
+        return
     manifest = json.loads(Path(args[0]).read_text(encoding="utf-8"))
     tree = Path(".")
     commit = None

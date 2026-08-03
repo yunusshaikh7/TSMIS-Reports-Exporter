@@ -1,6 +1,8 @@
 # `RB-3` — Implementation Record
 
-Status: **DENIED — RETURN TO IMPLEMENTATION** (`RB3-R1-EG-002`)
+Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (Review 1's
+`RB3-R1-EG-001` and `RB3-R1-EG-002` both remedied — see the return and remedy
+sections at the end)
 
 | Field | Value |
 |---|---|
@@ -388,3 +390,48 @@ record text. The retained bulk artifacts were BOUND, not regenerated — the
 return's "existing bulk artifacts may be retained if their exact bytes and
 sources can be proved" branch, which the archive bindings and replica
 equality checks prove.
+
+## Review 1 re-review return — Codex, 2026-08-02 (`RB3-R1-EG-002`)
+
+The re-review **CLOSED `RB3-R1-EG-001`** — both the cheap and the full
+`--corpus --zips` verifier runs passed against the committed manifest — and
+denied on one narrower gap: the committed verifier printed `SKIPPED` and
+returned SUCCESS when an explicitly requested declared item was absent
+(corpus roots, result files, the TSN raw input, archives), so it could
+certify an incomplete acceptance set. A bounded negative probe reproduced
+the false pass. No product criterion was failed or adjudicated; the denial
+commit is `0554a8f`.
+
+## Review 1 re-review remedy — Claude, 2026-08-02 (`RB3-R1-EG-002` CLOSED)
+
+Verifier-only change (`rb3-verify-manifest.py`); the manifest, corpus,
+deliverables, witnesses, and the `dd922f7` acceptance runtime are all
+byte-untouched, per the return's own boundary.
+
+1. **Fail-closed on every requested declared item**: with `--corpus`, an
+   absent declared corpus root, frozen-source file, TSN raw input, replica
+   root/file, deliverable root/file, retained result, or harness record is a
+   recorded FAILURE (nonzero exit), never a skip; with `--zips`, so is an
+   absent frozen archive. The `SKIPPED` vocabulary is gone from the corpus
+   path entirely — the only remaining "not requested" wording is the
+   explicit no-`--corpus` summary line, which is a mode statement, not a
+   silent pass.
+2. **Bounded negative checks are committed in the verifier itself**
+   (`--self-test`): fabricated fixtures prove a missing declared root, a
+   missing declared file, changed bytes, a replica diverging from its frozen
+   source, a missing TSN raw input, a missing result, a missing archive, and
+   a wrong-head or unstamped claimed entry each FAIL, and a clean fixture
+   verifies with zero failures. Run: **SELF-TEST PASSED — 0 problem(s)**,
+   covering exactly the reviewer's missing-root, missing-result/raw, and
+   missing-archive paths.
+3. **A live negative probe against the real corpus** was also run and
+   restored: with one deliverable (`direct/ramp_detail vs tsn
+   (values).xlsx`) temporarily renamed away, the full run reported
+   `FAIL direct: missing …` and **FAILED — 1 problem(s)**; after restoring
+   the file both standard commands pass again.
+4. **The existing commands re-ran with the corrected verifier**: the cheap
+   run (exit 0) and the full
+   `rb3-verify-manifest.py rb3-a1-artifacts.json --tree <repo> --at dd922f7
+   --corpus --zips` run — **VERIFIED — 0 problem(s)** (504 frozen inputs +
+   TSN raw, 1,009 replicas, all deliverable roots, 30/30 results, 10 harness
+   records, both 252-member archives).
