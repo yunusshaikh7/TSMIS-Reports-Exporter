@@ -181,6 +181,11 @@ def test_build_records_cache():
         cmp = snap["cells"]["highway_log_pdf"]["2026-07-22"]["cmp"]
         check("the snapshot now reads the cell built (has a verdict, not stale)",
               cmp.get("verdict") is not None and not cmp.get("stale"))
+        # HF-05 acceptance criterion 5: the PDF-vs-Excel by-day matrix is one of
+        # the two already-correct SILENT paths — a build must write no evidence
+        # artifact of any kind anywhere under its tree.
+        check("the by-day PDF-vs-Excel lane writes ZERO evidence artifacts",
+              not list(out.parent.rglob("*evidence*")))
     finally:
         paths.OUTPUT_ROOT = saved
         shutil.rmtree(tmp, ignore_errors=True)

@@ -62,8 +62,12 @@ def test_evidence_workbook_literals():
                 "comparison": "@comparison name",
                 "examples": len(entries),
                 "seed": "-seed",
-                "tsmis_dir": "+tsmis path",
-                "tsn_dir": "=tsn path",
+                # HF-05: the truthful source declaration — each side's recorded
+                # selection, with source-controlled text in every slot.
+                "source_lines": [("=side A", "+selection a"),
+                                 ("@side B", "=selection b")],
+                "legend": "fixture legend",
+                "sides": ("TSMIS", "TSN"),
             },
             layout="both",           # exercise BOTH per-column tab writers
         )
@@ -73,15 +77,19 @@ def test_evidence_workbook_literals():
         summary = wb["Summary"]
         _assert_text(summary["A1"], "=report label — visual evidence",
                      "summary title")
+        _assert_text(summary["A3"], "Compared =side A: +selection a",
+                     "summary source line A")
+        _assert_text(summary["A4"], "Compared @side B: =selection b",
+                     "summary source line B")
 
-        for offset, value in enumerate(UNSAFE_LITERALS, start=6):
+        for offset, value in enumerate(UNSAFE_LITERALS, start=7):
             _assert_text(summary.cell(offset, 1), value, "summary field")
             _assert_text(summary.cell(offset, 2), f"{value} @ K",
                          "summary route/key")
             _assert_text(summary.cell(offset, 3), value, "summary TSMIS value")
             _assert_text(summary.cell(offset, 4), value, "summary TSN value")
 
-        miss_row = 6 + len(UNSAFE_LITERALS)
+        miss_row = 7 + len(UNSAFE_LITERALS)
         _assert_text(summary.cell(miss_row, 1), "=missing field",
                      "summary missing-field caption")
 

@@ -1237,11 +1237,33 @@ PDF baseline.
   workbook — and the gui_api bridge incl. the shared queue). **Owed on the work PC:** two real days
   vs a real baseline end-to-end.
 
-## 13. Visual evidence (`scripts/visual_evidence.py` + the per-report adapters, v0.21.0; Intersection Detail joined in v0.22.0, Highway Log in v0.24.0, Highway Sequence in v0.25.0, Ramp Detail in v0.26.0)
+## 13. Visual evidence (`scripts/visual_evidence.py` + the per-report adapters, v0.21.0; Intersection Detail joined in v0.22.0, Highway Log in v0.24.0, Highway Sequence in v0.25.0, Ramp Detail in v0.26.0; the exact-source rebuild + the cross-environment lane in RB-4/HF-05+HF-10)
 
-The manual "screenshot the cell in both PDFs and circle it" workflow, automated, as a
-**decoration of a finished vs-TSN comparison** — it never changes the comparison's
+The manual "screenshot the cell in both sources and circle it" workflow, automated, as a
+**decoration of a finished comparison** — it never changes the comparison's
 status/completion/counts, and any evidence failure only logs + adds a summary note.
+
+**The exact-source rule (PCOA-FINAL-004, owner ruling 2026-07-26; shipped in
+RB-4):** each side of every evidence image renders from the EXACT document that
+side was compared from, bound to the comparison's own recorded provenance
+before anything renders. The vs-TSN and self comparisons read two WORKBOOKS
+(the consolidated export — Excel or PDF edition — and the normalized TSN
+workbook / the sibling consolidated edition), so both panels are cell strips of
+those exact workbooks; a raw district/statewide print that merely PRODUCED a
+compared workbook is never rendered or declared. The five cross-environment
+PDF-vs-PDF cells (`FLAVOR_ENV`, HF-10: Ramp Summary + the four `_pdf` rows)
+genuinely parse both run folders' per-route prints at compare time, so their
+panels are highlighted crops of those exact prints — the run folders resolved
+from the comparison's own `.provenance.json`, never a caller's guess. `generate`
+digests its sources against the recorded per-side sha256 (file inputs) or the
+recorded folder census (env inputs); a pair that cannot bind retires any prior
+evidence set and raises `EvidenceSourceBindingError` with NOTHING published —
+no workbook, no images, no manifest. Panel strings draw the FULL compared value
+or a visibly `…`-elided prefix (`panel_cell_text`; PCOA-FINAL-006 retired the
+silent 26-char cut), and a blank-side target with no cell rectangle inside the
+record's own printed lines REFUSES instead of guessing (PCOA-FINAL-005; the
+engine additionally refuses any env target outside the captioned record's
+lines).
 Five reports so far, each via its own adapter over the shared engine:
 `evidence_highway_detail` (district TSN prints), `evidence_intersection_detail` and
 `evidence_ramp_detail` (each ONE statewide TSN print), `evidence_highway_log` and
@@ -1378,27 +1400,24 @@ columns THAT row's comparison counts (pinned in `check_visual_evidence`).
     and record what the run found, so a restart, a rebuild with the toggle off, a torn set and
     "evidence never ran" are all distinguishable.
   - Gate: `build/check_evidence_manifest.py` + `build/check_evidence_source_role.py`.
-- **Sources:** TSMIS side = the per-route **(PDF)-edition** export of the report (the Everything
-  matrix resolves the row's cell store, the by-day matrix that day's `*_pdf/` run folder);
-  TSN side = the prints in the report's `tsn_library/<report>/pdf/` folder — Highway Detail
-  takes the 12 **district prints** (the district is read from each file's own DIST-CNTY-ROUTE
-  header), Intersection Detail the ONE **statewide print** (district/county read per record
-  from `LOCATION`); filenames never matter. **Highway Log and Highway Sequence are the
-  raw-sourced exceptions (v0.24.0 / v0.25.0):** their TSN libraries are BUILT from the
-  district prints, so evidence reads the SAME files from `tsn_library/highway_log/raw/` /
-  `…/highway_sequence/raw/` (`visual_evidence._TSN_PDFS_IN_RAW`; availability
-  reports `source: "raw"`) — no duplicate pdf/ drop, and a user with a working vs-TSN
-  comparison for those reports already has evidence ready. The pdf/ folders are **created + hinted by
-  `tsn_library.ensure_layout`** (v0.21.1 — driven by the catalog's `TsnEntry.evidence_pdfs`
-  flag; v0.21.0 never created it, so an updated install had nowhere to drop the prints), and
-  re-entering a matrix tab re-pushes the state so the toggle re-probes and un-greys without a
-  restart. **Ramp Detail follows the ID statewide-print pattern** (v0.26.0): ONE TASAS print in
-  `tsn_library/ramp_detail/pdf/`, district/county read per record from LOCATION. The
-  **normalized TSN library appends TSN District/County sidecar columns** (HD since
-  its v2, ID since its v3, RD since its v3 — `tsn_load_*.SIDECAR_HEADER`) so evidence can find
-  a row's print; `_normalized_row` slices to the shared width, so the comparison itself never
-  sees them (a pre-sidecar library is refused with a rebuild hint, and the D2 version bump
-  rebuilds it automatically).
+- **Sources (post-RB-4):** vs-TSN and self flavors read ONLY the two compared
+  workbooks — side A the consolidated edition the row compared (Excel or PDF
+  edition, addressed through `excel_column_for` / `pdf_excel_column_for`),
+  side B the normalized TSN workbook (`tsn_excel_column_for`/`tsn_project`) or
+  the sibling consolidated edition on a self check. The manifest read set is
+  exactly those two documents, named by their DURABLE selections from the
+  comparison's provenance (a private TSN capture path never appears —
+  PCOA-FINAL-003 discipline). The env flavor reads the needed per-route prints
+  of BOTH run folders (snapshot buckets `side_a`/`side_b`; each rendered file
+  must be a member of that side's recorded folder census). The TSN-library
+  print folders (`tsn_library/<report>/pdf/` + the HL/HSL `raw/` prints) are no
+  longer an evidence input on any lane; they remain the TSN LIBRARY's own
+  sources/drop zones (`tsn_library.ensure_layout` still creates + hints them),
+  and `availability()` keeps reporting their counts as library facts while
+  `ready` is the imaging deps alone. The **normalized TSN library's sidecar
+  columns** (`tsn_load_*.SIDECAR_HEADER`) still ride behind the shared width
+  for the adapters' load paths; a pre-sidecar library is refused with a rebuild
+  hint, and the D2 version bump rebuilds it automatically.
 - **Locators:** each TSMIS locator mirrors its PDF consolidator's parse step for step while
   capturing positions — **keep them in LOCKSTEP** (HD: per-page windows, row groups, the
   postmile test, the date-token guard, cross-page carry, fallback-grid/straddling records
@@ -1448,22 +1467,26 @@ columns THAT row's comparison counts (pinned in `check_visual_evidence`).
   can never enumerate as examples. Costs a full
   route-filtered scan of the district prints per run (minutes, like the TSN consolidation) —
   the district-parse cache stays on the roadmap alongside HD's.
-- **Evidence UX (v0.24.0):** the toggle on both matrix pages lists per report what it will
-  do — a ✓ "will generate (N TSN prints)" line, a ○ "needs its TSN PDFs in <dir>" line, and
-  one line naming the rows with **no evidence support** (`_evidence_view` derives them from
-  `reports.matrix_rows()` × `visual_evidence.capable`, one entry per report family, pushed as
-  `evidence.unsupported`). Supported rows also carry a small camera badge on their row header
-  in both matrices (lit = prints in place, dimmed = tooltip names the drop folder).
+- **Evidence UX (v0.24.0; re-truthed in RB-4):** the toggle on both matrix pages
+  states what evidence renders FROM — one ✓ line for the vs-TSN/self lanes (each
+  side's own compared workbook), one ✓ line for the five cross-environment
+  PDF-vs-PDF cells (both environments' own prints, checked per cell against the
+  comparison's recorded read set), and one line naming the rows with **no
+  evidence support** (`_evidence_view` derives them from `reports.matrix_rows()`
+  × `visual_evidence.capable` OR `env_capable`, one entry per report family,
+  pushed as `evidence.unsupported`). Supported rows carry a small camera badge
+  on their row header in both matrices — always lit when the imaging deps are
+  present, since no lane needs TSN prints anymore.
 - **Wiring:** ONE hook in `matrix.consolidate_and_compare_tsn(evidence_opts=)` covers both
-  matrices; callers resolve their own store layout through `matrix.evidence_opts_for` (the shared
-  gate — toggle on + `visual_evidence.capable(row_key)`). The user toggle is ONE persisted pair
-  (`evidence_images` + `evidence_examples`, endpoints `set_evidence_images` /
-  `set_evidence_examples`) surfaced under *Comparison output* on BOTH matrix pages, greyed with a
-  drop-hint until at least one report's TSN prints are in place —
-  `visual_evidence.availability()` rides the state push and reports **per-report** folders
-  (`reports: [{key,label,tsn_pdfs,dir}]` + the `row_reports` row→report map), so the hint names
-  exactly which report still needs its prints while the other keeps working. The render stack
-  (Pillow + pypdfium2) SHIPS since v0.21.0 — see [build-and-release.md](build-and-release.md).
+  matrices' vs-TSN lanes; the self lane decorates through `_run_self_evidence`, and the env
+  lane through `matrix.build_cell_comparison(evidence=)` → `_run_env_evidence` (HF-10), with
+  the on-demand cameras `matrix.evidence_for_cell(mode_id=…)` /
+  `matrix.run_env_evidence_only` / `day_matrix.evidence_for_day_cell`. The user toggle is ONE
+  persisted triple (`evidence_images` + `evidence_examples` + `evidence_layout`) surfaced
+  under *Comparison output* on BOTH matrix pages; `visual_evidence.availability()` rides the
+  state push (`ready` = deps only; `env_rows` names the five env placements; the per-report
+  print counts remain as TSN-library facts). The render stack (Pillow + pypdfium2) SHIPS
+  since v0.21.0 — see [build-and-release.md](build-and-release.md).
 - **On-demand per-cell evidence (v0.23.0):** a camera action on every BUILT, FRESH vs-TSN cell
   of an evidence-capable row (both matrices) runs `matrix.run_evidence_only` — images for the
   EXISTING comparison, no consolidation, no compare, toggle-independent (endpoints

@@ -143,13 +143,17 @@ function makeMockApi() {
     evidence: {                  // v0.21.0 visual-evidence toggle (shared); v0.22.0 per-report;
       // v0.24.0 Highway Log (raw-sourced prints) + the named unsupported rows;
       // v0.25.0 Highway Sequence (raw-sourced like Highway Log);
-      // v0.26.0 Ramp Detail (statewide print like Intersection Detail)
+      // v0.26.0 Ramp Detail (statewide print like Intersection Detail);
+      // HF-05/HF-10: ready = deps only (workbook panels), env_rows = the five
+      // cross-environment PDF-vs-PDF placements
       on: false, examples: 2, layout: "pair", ready: true, deps_ok: true, tsn_pdfs: 38,
       rows: ["highway_detail", "highway_detail_pdf",
              "highway_log", "highway_log_pdf",
              "highway_sequence", "highway_sequence_pdf",
              "intersection_detail", "intersection_detail_pdf",
              "ramp_detail", "ramp_detail_pdf"],
+      env_rows: ["highway_log_pdf", "highway_sequence_pdf",
+                 "intersection_detail_pdf", "ramp_detail_pdf", "ramp_summary"],
       dir: "C:\\demo\\tsn_library\\highway_detail\\pdf",
       reports: [
         { key: "highway_detail", label: "Highway Detail", tsn_pdfs: 12,
@@ -173,7 +177,7 @@ function makeMockApi() {
         ramp_detail: "ramp_detail",
         ramp_detail_pdf: "ramp_detail",
       },
-      unsupported: ["TSAR: Ramp Summary", "Intersection Summary"],
+      unsupported: ["Intersection Summary"],
     },
   };
   const mockSettings = {

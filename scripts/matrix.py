@@ -52,5 +52,5 @@ from matrix_build import (                                       # noqa: F401
     captured_tsn_workbook,
     consolidate_and_compare_tsn, consolidate_tsn_pdfs, consolidated_state,
     consolidated_store_path, evidence_for_cell, evidence_opts_for,
-    require_cached_tsn_identity, run_evidence_only, tsn_identity_check_for,
-    tsn_expected_workbook_identity)
+    require_cached_tsn_identity, run_env_evidence_only, run_evidence_only,
+    tsn_identity_check_for, tsn_expected_workbook_identity)

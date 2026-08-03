@@ -418,22 +418,6 @@ try:
           _moved_save_temp[0].read_bytes() == _save_prior)
     _moved_save_temp[0].unlink()
 
-    _pdf_a = _alias_tmp / "pdf-a"; _pdf_a.mkdir()
-    _pdf_b = _alias_tmp / "pdf-b"; _pdf_b.mkdir()
-    (_pdf_a / "one.pdf").write_bytes(b"one")
-    _pdf_initial = ve._pdf_source_files(_pdf_a, _pdf_b)
-    _pdf_expected = ve.artifact_store.canonical_path_identities(
-        (*_pdf_initial[0], *_pdf_initial[1]))
-    ve._ensure_pdf_source_set(_pdf_a, _pdf_b, _pdf_expected)
-    (_pdf_b / "late.pdf").write_bytes(b"late")
-    try:
-        ve._ensure_pdf_source_set(_pdf_a, _pdf_b, _pdf_expected)
-        _pdf_add_rejected = False
-    except ValueError:
-        _pdf_add_rejected = True
-    check("a PDF added after evidence discovery fails the set-equality tripwire",
-          _pdf_add_rejected)
-
     # CMP-AUD-098 + 112: the READ SET is a private snapshot, and the bytes the
     # images illustrate come from that copy — not from a live path that anything
     # else may still be writing to. Everything below drives the real snapshot.
@@ -487,6 +471,31 @@ try:
     finally:
         _rs.discard()
     check("discard removes the snapshot", not _rs.root.exists())
+
+    # HF-05/HF-10: labelled side buckets (the env flavor's two run folders may
+    # hold same-named per-route files), original-stat capture for the census
+    # binding, and durable member renaming (PCOA-FINAL-003: a manifest must
+    # never name a private capture path).
+    _sa = _alias_tmp / "side-a"; _sa.mkdir()
+    _sb = _alias_tmp / "side-b"; _sb.mkdir()
+    (_sa / "route_001.pdf").write_bytes(b"%PDF a-side")
+    (_sb / "route_001.pdf").write_bytes(b"%PDF b-side!")
+    _rs2 = ve._snapshot_read_set((), (), buckets=(
+        ("side_a", [_sa / "route_001.pdf"]), ("side_b", [_sb / "route_001.pdf"])))
+    try:
+        check("same-named files land in their own side buckets, bytes intact",
+              (_rs2.dir_for("side_a") / "route_001.pdf").read_bytes() == b"%PDF a-side"
+              and (_rs2.dir_for("side_b") / "route_001.pdf").read_bytes() == b"%PDF b-side!")
+        check("original size+mtime are captured for the env census binding",
+              _rs2.stats[str((_sa / "route_001.pdf").resolve())]
+              == ((_sa / "route_001.pdf").stat().st_size,
+                  (_sa / "route_001.pdf").stat().st_mtime_ns))
+        _rs2.rename_member(_sa / "route_001.pdf", r"C:\durable\route_001.pdf")
+        check("rename_member publishes the DURABLE name with the read digest kept",
+              any(m.name == r"C:\durable\route_001.pdf" for m in _rs2.members)
+              and not any(str(_sa) in m.name for m in _rs2.members))
+    finally:
+        _rs2.discard()
 finally:
     shutil.rmtree(_alias_tmp, ignore_errors=True)
 
@@ -522,15 +531,15 @@ try:
     # stubbed enumerate_diffs can no longer manufacture it.
     _cmp6b = _r6 / "day2 vs tsn.xlsx"
     _hd_row = ["001"] + ["0.100"] + ["x"] * (len(cht.SHARED_HEADER) - 1)
-    _checklib.build_published_comparison(
-        _cmp6b, cht._SCHEMA, [list(_hd_row)], [list(_hd_row)])
-    _wb6b, _img6b = ve.sibling_paths(_cmp6b)
     _cons6 = _r6 / "cons.xlsx"; _cons6.write_bytes(b"consolidated")
     _tsn6 = _r6 / "tsn.xlsx"; _tsn6.write_bytes(b"tsn")
+    # HF-05: the exact-source binding requires a BOUND comparison — committed
+    # generation + typed outcome + provenance over the two side files.
+    _checklib.publish_bound_comparison(
+        _cmp6b, cht._SCHEMA, [list(_hd_row)], [list(_hd_row)],
+        (_cons6, _tsn6))
+    _wb6b, _img6b = ve.sibling_paths(_cmp6b)
     _tdir6 = _r6 / "tsmis_pdf"; _tdir6.mkdir()
-    (_tdir6 / "highway_detail_route_001.pdf").write_bytes(b"%PDF tsmis")
-    _ndir6 = _r6 / "tsn_pdf"; _ndir6.mkdir()
-    (_ndir6 / "d01.pdf").write_bytes(b"%PDF tsn")
     _wb6b.write_bytes(b"PRIOR red evidence workbook")
     _img6b.mkdir()
     (_img6b / "prior.png").write_bytes(b"prior image")
@@ -542,15 +551,14 @@ try:
         def on_log(self, _m):
             pass
 
-    _saved106 = (ehd.load_sides, ehd.enumerate_diffs, ve.tsn_pdf_dir)
+    _saved106 = (ehd.load_sides, ehd.enumerate_diffs)
     ehd.load_sides = lambda _c, _t: ([], [], {"ok": 1}, None)
     ehd.enumerate_diffs = lambda _a, _b, _s: {}          # a CLEAN comparison
-    ve.tsn_pdf_dir = lambda _rk: _ndir6
     try:
         _res6 = ve.generate("highway_detail", _cons6, _tsn6, _cmp6b, _tdir6,
                             _Ev106())
     finally:
-        ehd.load_sides, ehd.enumerate_diffs, ve.tsn_pdf_dir = _saved106
+        ehd.load_sides, ehd.enumerate_diffs = _saved106
     check("generate() on a clean comparison reports no differing columns",
           "no differing columns" in _res6["note"] and _res6["workbook"] is None)
     check("...and the prior red evidence no longer survives at its canonical name",
@@ -575,29 +583,26 @@ try:
         row[_desc8] = desc
         return row
 
-    _checklib.build_published_comparison(
-        _cmp8, cht._SCHEMA,
-        [_dup_row("A1"), _dup_row("A2")], [_dup_row("B1"), _dup_row("B2")])
     _cons8 = _r8 / "cons.xlsx"; _cons8.write_bytes(b"consolidated")
     _tsn8 = _r8 / "tsn.xlsx"; _tsn8.write_bytes(b"tsn")
+    _checklib.publish_bound_comparison(
+        _cmp8, cht._SCHEMA,
+        [_dup_row("A1"), _dup_row("A2")], [_dup_row("B1"), _dup_row("B2")],
+        (_cons8, _tsn8))
     _tdir8 = _r8 / "tsmis_pdf"; _tdir8.mkdir()
-    (_tdir8 / "highway_detail_route_001.pdf").write_bytes(b"%PDF tsmis")
-    _ndir8 = _r8 / "tsn_pdf"; _ndir8.mkdir()
-    (_ndir8 / "d01.pdf").write_bytes(b"%PDF tsn")
-    _parsed8 = []
-    _saved8 = (ehd.load_sides, ehd.enumerate_diffs, ve.tsn_pdf_dir,
-               ve._locate_tsmis_sources)
+    _addressed8 = []
+    _saved8 = (ehd.load_sides, ehd.enumerate_diffs, ve._workbook_rows_at)
     ehd.load_sides = lambda _c, _t: ([], [], {"ok": 1}, None)
     # The real adapter drops duplicate keys, so it proposes nothing here.
     ehd.enumerate_diffs = lambda _a, _b, _s: {}
-    ve.tsn_pdf_dir = lambda _rk: _ndir8
-    ve._locate_tsmis_sources = lambda *a, **k: _parsed8.append(1) or ({}, set())
+    ve._workbook_rows_at = (
+        lambda *a, **k: _addressed8.append(1) or ({}, []))
     try:
         _res8 = ve.generate("highway_detail", _cons8, _tsn8, _cmp8, _tdir8,
                             _Ev106())
     finally:
-        (ehd.load_sides, ehd.enumerate_diffs, ve.tsn_pdf_dir,
-         ve._locate_tsmis_sources) = _saved8
+        (ehd.load_sides, ehd.enumerate_diffs,
+         ve._workbook_rows_at) = _saved8
     check("the published difference count is reported, not zero",
           _res8["fields_with_diffs"] == 1 and "2 published difference"
           in _res8["note"])
@@ -605,7 +610,7 @@ try:
           "no differing columns" not in _res8["note"])
     check("the unrenderable column is NAMED with its reason",
           "repeated-key groups" in (_res8["misses"].get("Description") or ""))
-    check("no PDF was parsed to discover that", not _parsed8)
+    check("no source was addressed to discover that", not _addressed8)
     check("the ledger comes back with the result",
           _res8["ledger"].difference_cells == 2
           and _res8["ledger"].duplicate_groups == 1
@@ -726,6 +731,12 @@ check("availability reports every evidence report, per-dir + source kind",
 check("row_reports maps every capable row to its report (the per-cell action's gate)",
       avail["row_reports"] == ve.TSN_PDF_REPORT
       and set(avail["row_reports"]) == set(ve.rows()))
+# HF-05: the vs-TSN/self lanes render the compared WORKBOOKS, so readiness is
+# the imaging deps alone — TSN prints gate nothing anymore; HF-10 adds the five
+# env placements to the availability the UI reads.
+check("ready == deps alone (no print requirement) and env_rows is published",
+      avail["ready"] == avail["deps_ok"]
+      and avail.get("env_rows") == ve.env_rows())
 
 print("caller-side gate (matrix_build.evidence_opts_for)")
 check("toggle off -> None",
@@ -800,8 +811,8 @@ try:
     check("pair layout -> Summary + ONE tab per differing column, no suffix",
           _pw.sheetnames == ["Summary", "Description", "FT"])
     check("Summary lists only the rendered (side-by-side) image per row",
-          _pw["Summary"]["E6"].value and ".png" in _pw["Summary"]["E6"].value
-          and "  /  " not in _pw["Summary"]["E6"].value)
+          _pw["Summary"]["E7"].value and ".png" in _pw["Summary"]["E7"].value
+          and "  /  " not in _pw["Summary"]["E7"].value)
     _pw.close()
 
     _wb_stacked = _wbtmp / "s (evidence).xlsx"
@@ -1675,6 +1686,185 @@ finally:
     paths.TSN_LIBRARY_ROOT = _old_root
     import shutil as _sh
     _sh.rmtree(_tmp, ignore_errors=True)
+
+# --------------------------------------------------------------------------- #
+# HF-05 (PCOA-FINAL-005): blank-side target geometry never guesses. A field
+# with no cell rectangle inside the record's own printed lines REFUSES —
+# below-the-record and fixed-zone fallbacks boxed the NEXT record / the final
+# 'O' of 'EQUATES TO' in the audited sets.
+print("HF-05: blank-side targets refuse instead of guessing")
+import evidence_highway_log as _ehl5
+import evidence_highway_sequence as _ehs5
+
+_hl_rec = {"approx": False, "page": 3, "top": 100.0, "bottom": 110.0,
+           "src": "x.pdf",
+           "chars": [{"x0": 60.0, "x1": 70.0, "top": 100.0, "bottom": 110.0,
+                      "text": "R"}],
+           "windows": [(0, 100)] * 30, "desc": [],
+           "row": ["R000.100"] + [""] * 30}
+check("HL TSMIS blank Description -> no geometry (was: a box BELOW the record)",
+      _ehl5.tsmis_box(_hl_rec, "Description") is None)
+_hl_tsn_rec = {"page": 2, "top": 50.0, "bottom": 58.0, "src": "d.pdf",
+               "chars": [{"x0": 10.0, "x1": 30.0, "top": 50.0, "bottom": 58.0,
+                          "text": "T121.831"}],
+               "desc": [], "rowd": {"description": None}}
+check("HL TSN blank Description -> no geometry (was: the NEXT record's box)",
+      _ehl5.tsn_box(_hl_tsn_rec, "Description") is None)
+_hsl_eq = {"rowd": {"county": "ALA", "pm": "006.798", "city": None, "hg": None,
+                    "ft": None, "dist": None, "description": "EQUATES TO"},
+           "src": "d.pdf", "dist": "04", "cnty": "ALA", "page": 5,
+           "equate": True, "top": 200.0, "bottom": 208.0,
+           "words": [{"x0": 98.0, "x1": 130.0, "top": 200.0, "bottom": 208.0,
+                      "text": "006.798"},
+                     {"x0": 170.0, "x1": 205.0, "top": 200.0, "bottom": 208.0,
+                      "text": "EQUATES"},
+                     {"x0": 207.0, "x1": 220.0, "top": 200.0, "bottom": 208.0,
+                      "text": "TO"}],
+           "desc": []}
+check("HSL equate line: FT/HG/City/Distance refuse (was: the final 'O' of "
+      "'EQUATES TO')",
+      _ehs5.tsn_box(_hsl_eq, "FT") is None
+      and _ehs5.tsn_box(_hsl_eq, "HG") is None
+      and _ehs5.tsn_box(_hsl_eq, "Distance To Next Point") is None)
+check("HSL equate line: the synthesized Description has no printed segs -> "
+      "no geometry",
+      _ehs5.tsn_box(_hsl_eq, "Description") is None)
+check("HSL equate line: County and PM (really printed) still box",
+      _ehs5.tsn_box(_hsl_eq, "PM") is not None)
+
+# The ENGINE backstop: whatever an adapter returns, an env target outside the
+# captioned record's own printed lines is refused before rendering.
+print("HF-10: the engine's row-rectangle backstop on env renders")
+
+
+class _BadBoxAdapter:
+    @staticmethod
+    def env_value(_rec, _field):
+        return "V"
+
+    @staticmethod
+    def env_box(_rec, _field):
+        return (1, (10, 120, 30, 130), (100, 110), (0, 200))  # below the record
+
+
+_bad_loc = ({"001": {"K": [{"src": "missing.pdf"}]}},
+            {"001": {"K": [{"src": "missing.pdf"}]}})
+_got, _reason = ve._env_example_sides(
+    _BadBoxAdapter, {"route": "001", "key": "K", "display": "V ≠ W"},
+    "F", _bad_loc, ("A", "B"), {})
+check("an env target outside the record's own lines is refused by the ENGINE",
+      _got is None and "outside the record's own printed lines" in _reason)
+
+# --------------------------------------------------------------------------- #
+# HF-10: the env candidate pool comes from the published comparison itself,
+# and the aggregate (route-keyed) shape locates by the key when route is blank.
+print("HF-10: env candidates derive from the published universe")
+
+
+class _PubRow:
+    def __init__(self, excel_row, route, key, occ, mask, values, token):
+        self.excel_row, self.route, self.key = excel_row, route, key
+        self.occurrence, self.mask, self.values, self.token = occ, mask, values, token
+        self.status = "Both"
+
+    @property
+    def matched(self):
+        return True
+
+    def state(self, i):
+        return self.mask[i]
+
+    def value(self, i):
+        return self.values[i]
+
+
+class _Pub:
+    fields = ("F", "G")
+    side_labels = ("A", "B")
+
+    def __init__(self, rows):
+        self.rows = rows
+
+    def position_of(self, f):
+        return self.fields.index(f)
+
+    def is_solo(self, _row):
+        return True
+
+
+class _Ledger5:
+    def for_field(self, _f):
+        return None
+
+
+_pub = _Pub([_PubRow(7, "", "001", 1, "DE", ("1 ≠ 2", "9"), "tok1"),
+             _PubRow(8, "003", "K2", 1, "ED", ("5", "7 ≠ 8"), "tok2")])
+_cand, _misses = ve._env_candidates(_pub, ["F", "G"], _Ledger5())
+check("solo differing rows become candidates carrying the published identity",
+      [e["route"] for e in _cand["F"]] == [""]
+      and _cand["F"][0]["published_token"] == "tok1"
+      and _cand["G"][0]["display"] == "7 ≠ 8")
+
+# env_fields pins: each adapter's list is DERIVED from the env comparison's own
+# constants, so the two can never drift silently.
+print("HF-10: env_fields match the env comparison's own display columns")
+import compare_env as _ce5
+import evidence_ramp_detail as _erd5
+import evidence_intersection_detail as _eid5
+import evidence_ramp_summary as _ers5
+import compare_intersection_detail_tsn as _idt5
+
+check("RD env fields = the forced classic display header + print-only, minus PM",
+      _erd5.env_fields()
+      == [f for f in (list(_ce5._RD_ENV_HEADER) + ["On/Off", "Ramp Type"])
+          if f != "PM"])
+check("ID env fields = the canonical export header minus Route/Post Mile",
+      _eid5.env_fields()
+      == [f for f in _idt5._TSMIS_HEADER if f not in ("Route", "Post Mile")])
+check("HL env fields = the corrected 30 shared fields",
+      _ehl5.env_fields() == list(_ehl5.FIELDS))
+check("HSL env fields = the per-route layout with '(col C)'/'(col E)' for the "
+      "unnamed postmile columns (compare_env's own relabel rule)",
+      _ehs5.env_fields() == ["County", "City", "(col C)", "(col E)", "HG", "FT",
+                             "Distance To Next Point", "Description"])
+check("RS env fields = RS_HEADER minus Route",
+      _ers5.env_fields() == list(_ce5.RS_HEADER[1:]))
+
+# The RS geometry twin: single-line rows parse like the consolidator's own
+# two-column walk, and a count/label pair maps to the count word's box.
+print("HF-10: the Ramp Summary geometry twin")
+import consolidate_ramp_summary as _rs5
+
+_words = [
+    {"text": "228", "x0": 20.0, "x1": 40.0, "top": 100.0, "bottom": 108.0},
+    {"text": "D", "x0": 50.0, "x1": 56.0, "top": 100.0, "bottom": 108.0},
+    {"text": "-", "x0": 58.0, "x1": 62.0, "top": 100.0, "bottom": 108.0},
+    {"text": "Divided", "x0": 64.0, "x1": 96.0, "top": 100.0, "bottom": 108.0},
+    {"text": "17", "x0": 20.0, "x1": 32.0, "top": 120.0, "bottom": 128.0},
+    {"text": "U", "x0": 50.0, "x1": 56.0, "top": 120.0, "bottom": 128.0},
+    {"text": "-", "x0": 58.0, "x1": 62.0, "top": 120.0, "bottom": 128.0},
+    {"text": "Undivided", "x0": 64.0, "x1": 104.0, "top": 120.0, "bottom": 128.0},
+]
+_rows5 = _ers5._line_rows_with_boxes(_words, left=True)
+check("the twin parses (number, cleaned label, count word) per single line",
+      [(n, l) for n, l, _w, _lw in _rows5]
+      == [(228, "D - Divided"), (17, "U - Undivided")])
+_cells5 = {}
+_ers5._attribute(_rows5, _rs5.HIGHWAY_GROUPS, set(), _cells5)
+check("attribution finds the schema categories at their count words",
+      "hwy_divided" in _cells5 and _cells5["hwy_divided"][2] == 228)
+_rec5 = {"record": {"hwy_divided": 228}, "cells": _cells5, "src": "r.pdf",
+         "page": 2}
+check("env_box boxes the COUNT word inside the category's own line",
+      _ers5.env_box(_rec5, "Divided") is not None
+      and _ers5.env_box(_rec5, "Divided")[1][0] >= 18.0
+      and _ers5.env_value(_rec5, "Divided") == "228")
+_rec5b = {"record": {"hwy_divided": 999}, "cells": _cells5, "src": "r.pdf",
+          "page": 2}
+check("a geometry/parser disagreement refuses the box (never mislabels)",
+      _ers5.env_box(_rec5b, "Divided") is None)
+check("an absent category has no line and honestly refuses geometry",
+      _ers5.env_box(_rec5, "Left") is None)
 
 print()
 if _fail:

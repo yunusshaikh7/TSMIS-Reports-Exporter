@@ -245,11 +245,35 @@ def test_orchestration_and_cache():
                      HEADER, CELL)
 
         res = matrix.build_cell_comparison(dest, "ssor-prod", "ramp_detail",
-                                           "ars-prod", events=Events())
+                                           "ars-prod", events=Events(),
+                                           evidence={"enabled": True,
+                                                     "examples": 2,
+                                                     "layout": "pair"})
         check("compare ran ok", res.status == "ok")
         check("verdict = diff", res.verdict == "diff")
         out = matrix.comparison_path(dest, "ssor-prod", "ramp_detail", "ars-prod")
         check("comparison workbook written", out.exists())
+        # HF-10: the evidence request is honored ONLY on the five PDF-vs-PDF
+        # env placements; an XLSX env row stays silent — zero artifacts.
+        check("an XLSX env cell writes NO evidence artifact with the toggle on",
+              not list(out.parent.glob("*evidence*")))
+        # The env camera refuses honestly when there is nothing to illustrate.
+        try:
+            matrix.run_env_evidence_only(dest, "ssor-prod", "ramp_detail",
+                                         "ars-prod", Events())
+            env_cam_refused = False
+        except ValueError as e:
+            env_cam_refused = "cross-environment evidence" in str(e)
+        check("the env camera refuses a row outside the five env placements",
+              env_cam_refused)
+        try:
+            matrix.run_env_evidence_only(dest, "ssor-prod", "ramp_summary",
+                                         "ars-prod", Events())
+            env_cam_missing = False
+        except ValueError as e:
+            env_cam_missing = "build the comparison first" in str(e)
+        check("the env camera refuses an env-capable cell with no comparison",
+              env_cam_missing)
 
         results = matrix.load_results(dest, "ssor-prod")
         rec = results.get("ramp_detail", {}).get("ars-prod", {})

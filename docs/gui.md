@@ -170,11 +170,13 @@ the global "set all comparisons to…" (env|tsn), the live-formulas toggle, the 
 toggle + per-column count** (`#matrixEvidence` / `#matrixEvidenceCount` — ONE shared persisted
 pair `evidence_images`/`evidence_examples` mirrored on the by-day corner, synced by
 `syncMatrixEvidence` off the state's `evidence` block; greyed only when NO report is ready.
-Since v0.24.0 the hint is an always-visible PER-REPORT **status block** (`.ev-status-line`):
-a ✓ "will generate (N TSN prints)" line per ready report, a ○ "needs its TSN PDFs in <dir>"
-line per supported-but-empty one, and one "No evidence support yet: …" line naming the rest
-(the state's `evidence.unsupported`, derived server-side from `matrix_rows()` ×
-`visual_evidence.capable`) — so the toggle is never a mystery switch —
+Since v0.24.0 the hint is an always-visible **status block** (`.ev-status-line`); RB-4
+re-truthed it to the exact-source rule: one ✓ line for the vs-TSN/self lanes (each side
+rendered from its own compared workbook), one ✓ line for the five cross-environment
+PDF-vs-PDF cells (both environments' own prints), and one "No evidence support yet: …"
+line naming the rest (the state's `evidence.unsupported`, derived server-side from
+`matrix_rows()` × `visual_evidence.capable`/`env_capable`) — so the toggle is never a
+mystery switch —
 [comparison-engine.md](comparison-engine.md) §13), the live
 queue, and the **fast-mode browser-count spinner** (`#matrixWorkers`, the `.mc-workers` row): it writes the
 shared `fast_workers` setting via `set_setting`, so the matrix corner, the Export pane

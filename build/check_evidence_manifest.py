@@ -255,13 +255,21 @@ def hd_row(desc=None):
     return row
 
 
-def run_generate(name, rows_a, rows_b, proposals, locate=None,
-                 cancel_at_locate=False, plant_prior=True):
-    """Drive the SHIPPED generate() over a real published comparison."""
+def run_generate(name, rows_a, rows_b, proposals, cancel_at_address=False,
+                 plant_prior=True, strip_provenance=False):
+    """Drive the SHIPPED generate() over a real BOUND comparison — published
+    the production way (committed generation + typed outcome + provenance
+    sidecar over the two side files), so the exact-source binding passes and
+    every terminal state below is reached through the real front door."""
     root = _r / name
     root.mkdir()
     cmp_path = root / "day vs tsn.xlsx"
-    _checklib.build_published_comparison(cmp_path, cht._SCHEMA, rows_a, rows_b)
+    cons = root / "cons.xlsx"; cons.write_bytes(b"consolidated")
+    tsn = root / "tsn.xlsx"; tsn.write_bytes(b"tsn")
+    _checklib.publish_bound_comparison(cmp_path, cht._SCHEMA, rows_a, rows_b,
+                                       (cons, tsn))
+    if strip_provenance:
+        cmp_path.with_name(cmp_path.name + ".provenance.json").unlink()
     wb, img = ve.sibling_paths(cmp_path)
     man = em.manifest_path(cmp_path)
     if plant_prior:
@@ -273,36 +281,23 @@ def run_generate(name, rows_a, rows_b, proposals, locate=None,
             ledger_digest="c" * 64, reader_version=1, difference_cells=9,
             differing_columns=1, workbook=wb,
             images=(em.member_for(img / "prior.png"),))), encoding="utf-8")
-    cons = root / "cons.xlsx"; cons.write_bytes(b"consolidated")
-    tsn = root / "tsn.xlsx"; tsn.write_bytes(b"tsn")
-    tdir = root / "tsmis_pdf"; tdir.mkdir()
-    (tdir / "highway_detail_route_001.pdf").write_bytes(b"%PDF tsmis")
-    ndir = root / "tsn_pdf"; ndir.mkdir()
-    (ndir / "d01.pdf").write_bytes(b"%PDF tsn")
-    saved = (ehd.load_sides, ehd.enumerate_diffs, ve.tsn_pdf_dir,
-             ve._locate_tsmis_sources)
+    saved = (ehd.load_sides, ehd.enumerate_diffs, ve._workbook_rows_at)
     ehd.load_sides = lambda _c, _t: ([], [], {"ok": 1}, None)
     ehd.enumerate_diffs = lambda _x, _y, _s: proposals
-    ve.tsn_pdf_dir = lambda _rk: ndir
     events = Ev()
-    if locate is not None:
-        ve._locate_tsmis_sources = locate
-    saved_index = ehd.district_index
-    if cancel_at_locate:
-        # Cancel once the sources have been located — the render boundary, where
-        # a late cancel must still leave the previous set untouched. Hooked on
-        # district_index because BOTH source roles reach it (the Excel role
-        # never calls _locate_tsmis_sources).
-        def cancel_then_index(*_a, **_k):
+    if cancel_at_address:
+        # Cancel once the compared-workbook rows are being addressed — the
+        # render boundary, where a late cancel must still leave the previous
+        # set untouched.
+        def cancel_then_address(*_a, **_k):
             events.cancelled = True
-            return {}
-        ehd.district_index = cancel_then_index
+            return {}, []
+        ve._workbook_rows_at = cancel_then_address
     try:
-        res = ve.generate("highway_detail", cons, tsn, cmp_path, tdir, events)
+        res = ve.generate("highway_detail", cons, tsn, cmp_path, root, events)
     finally:
-        ehd.district_index = saved_index
-        (ehd.load_sides, ehd.enumerate_diffs, ve.tsn_pdf_dir,
-         ve._locate_tsmis_sources) = saved
+        (ehd.load_sides, ehd.enumerate_diffs,
+         ve._workbook_rows_at) = saved
     return cmp_path, wb, img, man, res
 
 
@@ -322,10 +317,10 @@ check("...and a reader (a RESTART, holding no state) agrees it is current",
 check("...the recorded ledger digest is the published comparison's own",
       len(em.read(_m).ledger_digest) == 64)
 
-# differences exist, but none can be photographed: the PDFs never resolve.
+# differences exist, but none can be photographed: the proposals carry no
+# workbook row positions, so neither side's compared cell can be addressed.
 _c, _w, _i, _m, _res = run_generate(
-    "no_examples", [hd_row("ALPHA")], [hd_row("BETA")], _PROPOSAL,
-    locate=lambda *a, **k: ({}, {"001"}))
+    "no_examples", [hd_row("ALPHA")], [hd_row("BETA")], _PROPOSAL)
 check("a run that renders nothing records 'no_examples', not 'no_differences'",
       _res["manifest_state"] == em.STATE_NO_EXAMPLES
       and em.read(_m).state == em.STATE_NO_EXAMPLES)
@@ -345,7 +340,7 @@ check("a duplicate-only comparison records 'no_examples' with its counts",
 # cancellation: keep-last-good, and the prior record stays truthful.
 _c, _w, _i, _m, _res = run_generate(
     "cancelled", [hd_row("ALPHA")], [hd_row("BETA")], _PROPOSAL,
-    cancel_at_locate=True)
+    cancel_at_address=True)
 check("cancellation publishes nothing and records nothing",
       "cancelled" in _res["note"] and "manifest_state" not in _res)
 check("...the prior evidence AND its manifest are left exactly as they were",
@@ -358,6 +353,22 @@ _c, _w, _i, _m, _res = run_generate(
     "first_run", [hd_row()], [hd_row()], {}, plant_prior=False)
 check("a first run with nothing to retire still records its state",
       _m.is_file() and em.describe(_c)["status"] == em.CURRENT)
+
+# --------------------------------------------------------------------------- #
+print("the exact-source binding (PCOA-FINAL-004): an unbindable pair "
+      "publishes NOTHING — manifest included — and retires the prior set")
+try:
+    _c, _w, _i, _m, _res = run_generate(
+        "unbound", [hd_row("ALPHA")], [hd_row("BETA")], _PROPOSAL,
+        strip_provenance=True)
+    check("an unbindable pair refuses loudly", False)
+except ve.EvidenceSourceBindingError:
+    _c = _r / "unbound" / "day vs tsn.xlsx"
+    _w, _i = ve.sibling_paths(_c)
+    _m = em.manifest_path(_c)
+    check("an unbindable pair refuses loudly", True)
+check("...zero artifacts survive at canonical names — manifest included",
+      not _w.exists() and not _i.exists() and not _m.exists())
 
 shutil.rmtree(_r, ignore_errors=True)
 

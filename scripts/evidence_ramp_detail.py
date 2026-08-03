@@ -252,23 +252,82 @@ def project(field, raw):
 
 
 _EXCEL_HEADER_OK = ctc.exact_consolidated_header_ok(rd._TSMIS_HEADER)
+_EXCEL_HEADER_OK_2026 = ctc.exact_consolidated_header_ok(rd._TSMIS_HEADER_2026)
 
 
 def excel_column_for(field, excel_header):
-    """The comparator's own column resolution (v0.32.0, the M2-D fix): the
-    loader's exact-header gate, then its value positions (rd._TSMIS_POS). The
-    export's header LABELS sit shifted right of City Code / R/U / Description,
-    so the old exact-label lookup pointed one cell PAST each of those values —
-    normally refused by the parse-back check, but able to box the NEIGHBOURING
-    cell when both were blank. District is read out of the Location cell
-    exactly as the loader derives it (project() extracts it for the check);
-    the TSN-only context columns (Ramp Name / On/Off / Ramp Type / ADT) have
-    no workbook cell and stay honestly unevidenced from Excel."""
-    if not _EXCEL_HEADER_OK(list(excel_header)):
+    """The comparator's own column resolution (v0.32.0, the M2-D fix), now
+    DUAL-EDITION like the loader itself (RB-3 accepted both consolidated
+    layouts; HF-05 closes the deferred evidence half): each recognized header
+    resolves through its own value-position map. The classic export's header
+    LABELS sit shifted right of City Code / R/U / Description, so the old
+    exact-label lookup pointed one cell PAST each of those values — normally
+    refused by the parse-back check, but able to box the NEIGHBOURING cell when
+    both were blank. District is read out of the Location cell exactly as the
+    loader derives it (project() extracts it for the check); the TSN-only
+    context columns (Ramp Name / ADT — and On/Off / Ramp Type on the classic
+    edition) have no workbook cell and stay honestly unevidenced from Excel."""
+    header = list(excel_header)
+    if _EXCEL_HEADER_OK(header):
+        pos = rd._TSMIS_POS
+    elif _EXCEL_HEADER_OK_2026(header):
+        pos = rd._TSMIS_POS_2026
+    else:
         return None
     if field == "District":
-        return rd._TSMIS_POS["Location"]
-    return rd._TSMIS_POS.get(field)
+        return pos["Location"]
+    return pos.get(field)
+
+
+# The PDF-edition consolidated workbook ([Route] + rdpdf.HEADER — the print's
+# own 13 columns, two structurally-empty unlabeled cells included). The self
+# flavor's side A and the vs-TSN PDF row's side A are compared from THIS
+# workbook, so its cells are what those panels may draw (PCOA-FINAL-004).
+_PDF_BOOK_HEADER = ["Route"] + ["" if c is None else str(c) for c in rdpdf.HEADER]
+_PDF_BOOK_POS = {"Location": 1, "PR": 2, "PM": 3, "Date of Record": 4,
+                 "HG": 6, "Area 4": 7, "City Code": 9, "R/U": 10,
+                 "Description": 11, "On/Off": 12, "Ramp Type": 13}
+
+
+def pdf_excel_column_for(field, excel_header):
+    header = ["" if c is None else str(c).strip() for c in excel_header]
+    while header and not header[-1]:
+        header.pop()
+    if header != _PDF_BOOK_HEADER:
+        return None
+    if field == "District":
+        return _PDF_BOOK_POS["Location"]
+    return _PDF_BOOK_POS.get(field)
+
+
+def tsn_excel_column_for(field, excel_header):
+    """The normalized TSN library workbook: ['Route'] + SHARED_HEADER + the v4
+    sidecars. District resolves to its OWN sidecar column (the normalizer
+    derives it from the raw Location); an unrecognized shape — including the
+    raw statewide extract — honestly refuses."""
+    header = ["" if c is None else str(c).strip() for c in excel_header]
+    want = ["Route"] + list(rd.SHARED_HEADER)
+    if header[:len(want)] != want or "District" not in header:
+        return None
+    if field == "District":
+        return header.index("District")
+    if field in rd.SHARED_HEADER:
+        return 1 + rd.SHARED_HEADER.index(field)
+    return None
+
+
+def tsn_project(field, raw):
+    """The TSN-side panel check stays STRICT: the normalized workbook's own
+    cell text must equal the compared value after the shared cell trim — the
+    normalizer already wrote the compared forms."""
+    del field
+    return _xl_trim(rd._v(raw))
+
+
+def workbook_sheet(kind):
+    """The Excel/PDF consolidated editions carry their data on the TSMIS sheet;
+    the normalized TSN workbook on its own normalized sheet."""
+    return rd.NORMALIZED_SHEET if kind == "tsn" else rd.TSMIS_SHEET
 
 
 # --------------------------------------------------------------------------- #
@@ -363,6 +422,7 @@ def locate_tsmis(pdf_path, needed_keys):
                 if key in needed_keys:
                     found[key].append({"vals": pr["vals"], "cols": pr["cols"],
                                        "b": b, "page": page_no,
+                                       "src": str(pdf_path),
                                        "top": pr["top"], "bottom": pr["bottom"],
                                        "words": pr["words"]})
     require_document_route(
@@ -551,5 +611,67 @@ def tsn_box(rec, field):
         x0, x1 = lo + 1, hi - 3
     words = [w for _n, (_t, ws) in rec["a"].items() for w in ws]
     xspan = (min(w["x0"] for w in words) - 4, max(w["x1"] for w in words) + 4)
+    return (rec["page"], (x0 - 2, rec["top"] - 2, x1 + 2, rec["bottom"] + 2),
+            (rec["top"], rec["bottom"]), xspan)
+
+
+# --------------------------------------------------------------------------- #
+# cross-environment (HF-10) — both sides are per-route TSMIS prints
+# --------------------------------------------------------------------------- #
+# env display field -> the print's column bucket. The two structurally-empty
+# conversion columns ('PM Suffix', '(unused)') have no printed cell — the
+# conversion always writes them blank on both sides, so they can never hold a
+# counted difference; geometry for them honestly refuses.
+_ENV_COL = {"Location": "loc", "PR": "pr", "Date of Record": "date",
+            "HG": "hg", "Area 4": "area4", "City Code": "city", "R/U": "ru",
+            "Description": "desc", "On/Off": "onoff", "Ramp Type": "rtype"}
+
+
+def env_fields():
+    """The env comparison's display columns minus the PM key — the corrected
+    classic display header plus the two print-only columns, exactly what
+    compare_env.RAMP_DETAIL_PDF publishes."""
+    import compare_env
+    forced = list(compare_env._RD_ENV_HEADER) + ["On/Off", "Ramp Type"]
+    return [f for f in forced if f != "PM"]
+
+
+def env_locate(pdf_path, needed_keys):
+    """{published_key: [record]} in one per-route print. The env comparison
+    keys rows on the same normalized PM text the vs-TSN locator uses, so the
+    LOCKSTEP parse serves both flavors unchanged."""
+    return locate_tsmis(pdf_path, needed_keys)
+
+
+def env_project(field, raw):
+    """The env loader applies the generic cell normalization only — the
+    conversion already wrote the print's parsed tokens, so the panel check
+    stays strict (shared cell trim, no PDF-flavor projections)."""
+    del field
+    return _xl_trim(rd._v(raw))
+
+
+def env_value(rec, field):
+    col = _ENV_COL.get(field)
+    if col is None:
+        return ""
+    return env_project(field, rec["vals"][col])
+
+
+def env_box(rec, field):
+    col = _ENV_COL.get(field)
+    if col is None:
+        return None                    # a structurally-empty conversion column
+    hits = rec["cols"].get(col) or []
+    if hits:
+        x0 = min(w["x0"] for w in hits)
+        x1 = max(w["x1"] for w in hits)
+    elif col in _COL_WIN:
+        lo_k, hi_k = _COL_WIN[col]
+        x0, x1 = rec["b"][lo_k] + 2, rec["b"][hi_k] - 2
+    else:
+        return None                    # loc/desc always carry words when present
+    xspan = (min(w["x0"] for w in rec["words"]) - 4,
+             max(w["x1"] for w in rec["words"]) + 4)
     return (rec["page"], (x0 - 2, rec["top"] - 2, x1 + 2, rec["bottom"] + 2),
             (rec["top"], rec["bottom"]), xspan)

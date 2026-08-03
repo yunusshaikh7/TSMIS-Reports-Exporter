@@ -669,12 +669,15 @@ def _twin_inputs_unchanged(fp_before, folders, out_name, events=None):
 # --------------------------------------------------------------------------- #
 def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
                           confirm_overwrite=None, row_defs=None, also_formulas=False,
-                          commit_guard=None):
+                          evidence=None, commit_guard=None):
     """Compare (row's report, cell env) against the baseline env, writing the
     VALUES workbook to comparison_path(...), and record its verdict + discrepancy
     counts in the cache. Pure delegation to the adapter's compare_folders — the
     comparison engine is untouched. Returns the ConsolidateResult. With
     `also_formulas`, also writes a live-formulas twin beside the values copy.
+    `evidence` ({'enabled','examples','layout'}) requests the visual-evidence
+    decoration on the five PDF-vs-PDF env cells (HF-10) — additive, never a
+    gate: the comparison result is identical with it on or off.
 
     Raises ValueError on an unknown row_key or a baseline cell (nothing to
     compare); compare_folders itself returns a clean error result when a side
@@ -737,7 +740,43 @@ def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
                       generation_id=published.artifact_generation.generation_id,
                       producer_versions=producer_identity(),
                       commit_guard=commit_guard)
+        _run_env_evidence(row_key, out_path, evidence, events, result,
+                          commit_guard)
     return result
+
+
+def _run_env_evidence(row_key, out_path, evidence, events, result,
+                      commit_guard):
+    """The HF-10 env-cell decoration: after a committed COMPLETE env
+    comparison, render the PDF-vs-PDF evidence set beside it. Both run folders
+    come from the comparison's own recorded provenance inside the generator
+    (the exact-source rule); a failed decoration only logs — it never changes
+    the comparison result (the existing evidence contract)."""
+    if not (evidence and evidence.get("enabled")):
+        return
+    import visual_evidence
+    if not visual_evidence.env_capable(row_key):
+        return
+    try:
+        _require_commit_guard(commit_guard, "visual-evidence write")
+        published = consolidation_meta.require_published_comparison(out_path,
+                                                                    result)
+        if published.comparison_outcome.completion != outcome.COMPLETE:
+            raise ValueError("the comparison is partial — evidence would "
+                             "illustrate an incomplete universe")
+        ev = visual_evidence.generate(
+            row_key, None, None, out_path, None, events,
+            examples=visual_evidence.clamp_examples(evidence.get("examples")),
+            layout=visual_evidence.normalize_layout(evidence.get("layout")),
+            commit_guard=commit_guard, flavor=visual_evidence.FLAVOR_ENV)
+        if ev.get("note"):
+            result.summary_lines.append(ev["note"])
+    except Exception as e:                       # noqa: BLE001 — decoration only
+        log.warning("env evidence for %s skipped: %s: %s", row_key,
+                    type(e).__name__, e)
+        msg = str(e).splitlines()[0] if str(e) else type(e).__name__
+        events.on_log(f"  evidence images skipped — {msg}")
+        result.summary_lines.append(f"evidence images skipped — {msg}")
 
 
 def cells_to_rebuild(snapshot, scope="stale", row=None, env=None):
@@ -1219,15 +1258,72 @@ def run_evidence_only(row_key, store_dir, subdir, tsn_path, comparison_path,
     return ConsolidateResult(status="ok", message=note, summary_lines=[note])
 
 
+def run_env_evidence_only(dest, baseline_key, row_key, cell_key, events,
+                          examples=None, layout=None, commit_guard=None):
+    """On-demand HF-10 evidence for one Everything-matrix cell's EXISTING env
+    comparison. Compares nothing; the freshness gates mirror the vs-TSN
+    camera's: the comparison must exist with a trusted, current, COMPLETE
+    committed generation whose id matches the cell cache, and neither side's
+    export folder may have changed since it was built. The run folders
+    themselves come from the comparison's own recorded provenance inside the
+    generator (the exact-source rule)."""
+    import visual_evidence
+    if not visual_evidence.env_capable(row_key):
+        raise ValueError(f"no cross-environment evidence support for {row_key}")
+    rows = _row_defs()
+    if row_key not in rows:
+        raise ValueError(f"unknown matrix row: {row_key}")
+    _label, subdir, _idx, _adapter, _hr = rows[row_key]
+    dest = Path(dest)
+    out_path = comparison_path(dest, baseline_key, row_key, cell_key)
+    evidence_guard = _compose_source_guard(commit_guard, None)
+    _require_commit_guard(evidence_guard, "visual-evidence write", out_path)
+    if not out_path.exists():
+        raise ValueError("build the comparison first — evidence illustrates an "
+                         "existing comparison")
+    comparison_record = consolidation_meta.read_comparison_outcome(out_path)
+    if (comparison_record is None or not comparison_record.trusted
+            or not comparison_record.current
+            or comparison_record.comparison_outcome is None):
+        raise ValueError("the comparison workbook has no trusted, current "
+                         "generation record — refresh the comparison first")
+    generation = comparison_record.artifact_generation
+    cached = _m.load_results(dest, baseline_key).get(row_key, {}).get(cell_key)
+    if (not cached or generation is None
+            or cached.get("generation_id") != generation.generation_id):
+        raise ValueError("the comparison is not the one the matrix recorded — "
+                         "refresh the comparison first")
+    typed = comparison_record.comparison_outcome
+    if typed.completion != outcome.COMPLETE:
+        raise ValueError(_partial_comparison_reason(typed))
+    fp_folders = (dest / cell_key / subdir, dest / baseline_key / subdir)
+    if (cached.get("input_fingerprint") is not None
+            and _cell_input_fingerprint(*fp_folders)
+            != cached.get("input_fingerprint")):
+        raise ValueError("the exports changed since the comparison was built — "
+                         "refresh the comparison first")
+    ev = visual_evidence.generate(
+        row_key, None, None, out_path, None, events,
+        examples=visual_evidence.clamp_examples(examples),
+        layout=visual_evidence.normalize_layout(layout),
+        commit_guard=evidence_guard, flavor=visual_evidence.FLAVOR_ENV)
+    note = ev.get("note") or "evidence run finished"
+    return ConsolidateResult(status="ok", message=note, summary_lines=[note])
+
+
 def evidence_for_cell(dest, row_key, cell_key, baseline_key, events,
                       tsn_files=None, examples=None, layout=None,
-                      commit_guard=None):
-    """On-demand evidence for one Everything-matrix cell's EXISTING vs-TSN
-    comparison. Resolves the same paths build_comparison's tsn branch uses —
+                      commit_guard=None, mode_id="tsn"):
+    """On-demand evidence for one Everything-matrix cell's EXISTING comparison.
+    The vs-TSN mode resolves the same paths build_comparison's tsn branch uses —
     but consolidates nothing, compares nothing, and does NOT heal the TSN
     library (a heal would rebuild it newer than the comparison and the
     freshness gate would then rightly refuse; a version-stale library needs a
-    comparison refresh anyway)."""
+    comparison refresh anyway). The env mode delegates to the HF-10 camera."""
+    if mode_id == "env":
+        return run_env_evidence_only(dest, baseline_key, row_key, cell_key,
+                                     events, examples=examples, layout=layout,
+                                     commit_guard=commit_guard)
     rows = _row_defs()
     if row_key not in rows:
         raise ValueError(f"unknown matrix row: {row_key}")
@@ -1502,7 +1598,7 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
         return _m.build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
                                      confirm_overwrite=confirm_overwrite, row_defs=rows,
                                      also_formulas=also_formulas,
-                                     commit_guard=commit_guard)
+                                     evidence=evidence, commit_guard=commit_guard)
 
     dest = Path(dest)
     out_path = mode_out_path(dest, baseline_key, row_key, cell_key, mode)

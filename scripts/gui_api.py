@@ -374,7 +374,12 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
             seen, unsupported = set(), []
             for _rk, label, sub, _i, _a in matrix_rows():
                 fam = sub[:-4] if sub.endswith("_pdf") else sub
-                if visual_evidence.capable(sub) or fam in seen:
+                # A row counts as supported when ANY lane can illustrate it —
+                # vs-TSN/self or the cross-environment PDF-vs-PDF lane (HF-10:
+                # ramp_summary is env-only, and listing it as unsupported would
+                # assert an absence that no longer exists).
+                if (visual_evidence.capable(sub)
+                        or visual_evidence.env_capable(sub) or fam in seen):
                     continue
                 seen.add(fam)
                 unsupported.append(label)

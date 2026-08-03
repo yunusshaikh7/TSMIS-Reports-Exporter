@@ -248,6 +248,33 @@ def excel_column_for(field, excel_header):
     return cht._TSMIS_POS.get(field)
 
 
+def pdf_excel_column_for(field, excel_header):
+    """Both consolidated editions share the corrected header/positions."""
+    return excel_column_for(field, excel_header)
+
+
+def tsn_excel_column_for(field, excel_header):
+    """The normalized TSN library workbook: ['Route'] + SHARED_HEADER + the
+    sidecars, read positionally under the loader's own shape gate."""
+    header = ["" if c is None else str(c).strip() for c in excel_header]
+    want = ["Route"] + list(cht.SHARED_HEADER)
+    if header[:len(want)] != want:
+        return None
+    if field in ("PS", "PM (raw)"):
+        return 1 + cht.SHARED_HEADER.index(cht.KEY)
+    if field in cht.SHARED_HEADER:
+        return 1 + cht.SHARED_HEADER.index(field)
+    return None
+
+
+def tsn_project(field, raw):
+    return project(field, raw)
+
+
+def workbook_sheet(kind):
+    return cht.NORMALIZED_SHEET if kind == "tsn" else cht.TSMIS_SHEET
+
+
 # --------------------------------------------------------------------------- #
 # TSMIS side — the per-route "Highway Detail (PDF)" export
 # --------------------------------------------------------------------------- #

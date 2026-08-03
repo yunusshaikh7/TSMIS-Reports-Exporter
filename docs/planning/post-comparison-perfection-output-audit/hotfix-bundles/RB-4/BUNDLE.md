@@ -16,7 +16,7 @@ Status: **READY**
 | Theme | Evidence end to end: eligibility, exact-source binding, target geometry, panel fidelity, and the missing cross-environment PDF-vs-PDF lane |
 | Branch | `hotfix/rb-4-evidence` |
 | Readiness source `main` | `ff780af4b1e3845ba30d120e3c3a0b2f7c47665b` — RB-3 merged, its 158/158 post-merge gate and frozen application self-test passed, and its merge closeout was committed before this readiness preparation |
-| Base `main` commit | **PENDING — Stage 4 must fetch, verify a clean `main` identical to `origin/main`, create the branch, and record the exact base before changing code** |
+| Base `main` commit | `72adf447d45a2b74c562ba714008661a180c5d5f` — fetched without force; `main` verified clean and identical to `origin/main`; `hotfix/rb-4-evidence` created from it in worktree `C:\Users\Yunus\Projects\wt-rb4` before any code change (Stage 4, 2026-08-02) |
 | Canonical finding IDs | **PCOA-FINAL-004, -005, -006, -007** |
 | Implementer | **Claude** (owner decision 2026-07-26) |
 | First reviewer | **Codex** — independent non-implementer; binds to the existing evidence ledgers, native-scale review set, source-role witnesses, targeting/truncation census, and the five missing ENV cells |

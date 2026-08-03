@@ -192,6 +192,31 @@ def excel_column_for(field, excel_header):
     return None
 
 
+# The three compared Highway Log workbook editions — the Excel consolidated,
+# the PDF-edition consolidated, and the normalized TSN library workbook — all
+# carry the SAME corrected header on the same sheet (the TSN normalizer writes
+# the consolidated shape verbatim), so one gate resolves them all.
+def pdf_excel_column_for(field, excel_header):
+    return excel_column_for(field, excel_header)
+
+
+def tsn_excel_column_for(field, excel_header):
+    return excel_column_for(field, excel_header)
+
+
+def tsn_project(field, raw):
+    """The TSN-side projection equals the TSMIS one — both sides load through
+    chl._load_input's normalization."""
+    return project(field, raw)
+
+
+def workbook_sheet(kind):
+    """Every compared Highway Log workbook carries its data on the same sheet
+    (the PDF-edition and TSN workbooks add marker sheets after it)."""
+    del kind
+    return chl.SHEET_NAME
+
+
 # --------------------------------------------------------------------------- #
 # TSMIS side — the per-route "Highway Log (PDF)" export (zebra-rect windows)
 # --------------------------------------------------------------------------- #
@@ -203,10 +228,12 @@ def tsmis_pdf_path(pdf_dir, route):
     return paths.resolve_route_file(pdf_dir, f"highway_log_route_{route}.pdf")
 
 
-def locate_tsmis(pdf_path, needed_keys):
-    """{canonical_key: [record]} for `needed_keys`; a record carries the parsed
+def locate_tsmis(pdf_path, needed_keys, key_fn=None):
+    """{key: [record]} for `needed_keys`; a record carries the parsed
     31-column row plus geometry (page, y-extent, windows, chars, description
-    line boxes).
+    line boxes). `key_fn(row)` overrides the vs-TSN canonical-Location keying —
+    the env flavor keys records by the projected Location value the env
+    comparison publishes.
 
     LOCKSTEP: this walk mirrors consolidate_tsmis_highway_log_pdf.parse_pdf
     step for step (per-page zebra-rect windows with carry-forward, the
@@ -220,6 +247,7 @@ def locate_tsmis(pdf_path, needed_keys):
     the document's own cover claim doesn't confirm the route the filename
     names."""
     found = defaultdict(list)
+    keyer = key_fn or (lambda row: _canon(row, off=0))
     doc_route = None                   # the cover's own route claim (049)
     fm = re.search(r"route_([0-9A-Za-z]+)\.pdf$", str(pdf_path))
     file_route = fm.group(1) if fm else None
@@ -277,10 +305,10 @@ def locate_tsmis(pdf_path, needed_keys):
                     vals = chlp._assign_columns(line_chars, page_windows)
                     row = chlp._make_row(vals, None)
                     open_row = row
-                    canon = _canon(row, off=0)
+                    canon = keyer(row)
                     if canon in needed_keys:
                         open_rec = {
-                            "row": row, "page": page_no,
+                            "row": row, "page": page_no, "src": str(pdf_path),
                             "top": top,
                             "bottom": max(c["bottom"] for c in line_chars),
                             "chars": line_chars, "windows": page_windows,
@@ -347,10 +375,14 @@ def tsmis_box(rec, field):
              max([rec["bottom"]] + [d["bottom"] for d in same_page_desc]))
     if field == "Description":
         if not rec["desc"]:
-            # a blank Description: box the gap under the data line
-            return (rec["page"],
-                    (xspan[0] + 40, rec["bottom"], xspan[0] + 220,
-                     rec["bottom"] + 10), yspan, xspan)
+            # A blank Description prints NOTHING on this record — descriptions
+            # live on their own lines below the row, so there is no cell
+            # rectangle inside the record's own printed lines to point at. A
+            # box "where it would print" lands on the NEXT record (the
+            # PCOA-FINAL-005 witness: route 140 @ R029.757 boxed R029.955), so
+            # the honest answer is no geometry, and the example is skipped
+            # with a recorded reason.
+            return None
         pages = {d["page"] for d in rec["desc"]}
         if len(pages) > 1:
             return None                          # split across pages
@@ -479,9 +511,12 @@ def tsn_box(rec, field):
              max([rec["bottom"]] + [d["bottom"] for d in same_page_desc]))
     if field == "Description":
         if not rec["desc"]:
-            return (rec["page"],
-                    (ctnl.DESC_X0_MIN, rec["bottom"],
-                     ctnl.DESC_X0_MIN + 180, rec["bottom"] + 10), yspan, xspan)
+            # Same rule as the TSMIS side: a description that never printed has
+            # no rectangle inside this record's own lines; a guessed box below
+            # the row covers the NEXT record (the PCOA-FINAL-005 witness:
+            # route 395 @ T121.831 boxed T121.945). No geometry — the example
+            # is skipped with a recorded reason.
+            return None
         pages = {d["page"] for d in rec["desc"]}
         if len(pages) > 1:
             return None
@@ -494,6 +529,44 @@ def tsn_box(rec, field):
     if hits:
         x0, x1 = min(c["x0"] for c in hits), max(c["x1"] for c in hits)
     else:
-        x0, x1 = lo, hi
+        # A blank cell in a fixed-window column: clip the window to the line's
+        # own char extent (the first/last windows extend far beyond the print),
+        # mirroring the TSMIS side's _line_cell_box so the box stays on the
+        # record's own line and never spans foreign glyph territory.
+        line_x0 = min(c["x0"] for c in chars)
+        line_x1 = max(c["x1"] for c in chars)
+        x0, x1 = max(lo, line_x0 - 6), min(hi, line_x1 + 6)
+        if x1 <= x0:
+            x0, x1 = lo, lo + 10
     return (rec["page"],
             (x0 - 2, rec["top"] - 2, x1 + 2, rec["bottom"] + 2), yspan, xspan)
+
+
+# --------------------------------------------------------------------------- #
+# cross-environment (HF-10) — both sides are per-route TSMIS prints
+# --------------------------------------------------------------------------- #
+def env_fields():
+    """The env comparison's compared columns: the same 30 shared fields (the
+    env schema forces the corrected labels onto the flat per-route layout, so
+    the published display fields equal the vs-TSN field list)."""
+    return list(FIELDS)
+
+
+def _env_key(row):
+    """The env comparison's published row key: the projected Location value
+    (column 0 of the parsed 31-column row — the env loader's own projection)."""
+    return project("Location", row[0])
+
+
+def env_locate(pdf_path, needed_keys):
+    """{published_key: [record]} in one per-route print — the same LOCKSTEP
+    parse as locate_tsmis, keyed the env comparison's way."""
+    return locate_tsmis(pdf_path, needed_keys, key_fn=_env_key)
+
+
+def env_value(rec, field):
+    return tsmis_value(rec, field)
+
+
+def env_box(rec, field):
+    return tsmis_box(rec, field)

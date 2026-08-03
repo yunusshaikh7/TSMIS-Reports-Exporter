@@ -1,16 +1,15 @@
-"""Evidence is taken from the source the comparison actually READ (CMP-AUD-210).
+"""Evidence is taken from the source the comparison actually READ (CMP-AUD-210,
+completed by the PCOA-FINAL-004 exact-source ruling — HF-05).
 
 Both of a report's matrix rows used to be evidenced from the PDF-edition export,
 and a candidate was DROPPED whenever that print disagreed with the compared
-value. So anything the Excel export holds and the print does not — Highway
-Sequence route 037's Description is the censused case — could never be
-illustrated at all, and an Excel-only truth looked indistinguishable from "no
-verifiable example".
-
-An Excel-compared row is now evidenced from the workbook it was compared from:
-sheet, cell address, the row's own neighbouring values. The cell is rendered
-only once its own workbook value equals what the comparison compared, which is
-the Excel counterpart of the PDF side's parse-back check.
+value. CMP-AUD-210 moved the Excel-compared side onto the workbook it was
+compared from; HF-05 finishes the rule for EVERY side: the vs-TSN and self
+flavors render both panels from the two compared workbooks (each resolved
+through that side's own comparator hook), the env flavor renders both sides'
+own per-route prints, and a drawn panel string equals the compared value or is
+visibly elided (PCOA-FINAL-006 — the silent `text[:26]` cut endorsed a
+different string).
 
 Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_evidence_source_role.py
@@ -65,27 +64,43 @@ try:
         _ws.append(_row)
     _wb.save(_book)
 
-    _rows, _header = ve._excel_rows_at(_book, {0, 2})
+    _rows, _header = ve._workbook_rows_at(_book, {0, 2})
     check("the header comes back verbatim", _header == _HEADER)
     check("wanted DATA rows map to their real sheet rows (header is row 1)",
           set(_rows) == {0, 2}
           and _rows[0] == ("Highway Log", 2, _ROWS[0])
           and _rows[2] == ("Highway Log", 4, _ROWS[2]))
-    check("an empty request reads nothing", ve._excel_rows_at(_book, set()) == ({}, []))
+    check("an empty request reads nothing",
+          ve._workbook_rows_at(_book, set()) == ({}, []))
+    check("a NAMED data sheet is honored and a missing one reads nothing",
+          ve._workbook_rows_at(_book, {0}, sheet="Highway Log")[0]
+          and ve._workbook_rows_at(_book, {0}, sheet="No Such Sheet") == ({}, []))
     check("column letters are the ones a user can type into the Name Box",
           [ve._column_letter(n) for n in (1, 3, 26, 27, 28, 52, 53)]
           == ["A", "C", "Z", "AA", "AB", "AZ", "BA"])
 
     # --------------------------------------------------------------------- #
-    print("the Excel cell strip")
+    print("the Excel cell strip — drawn strings are the compared values "
+          "(PCOA-FINAL-006)")
     _img = ve._excel_strip(_HEADER, _ROWS[0], 2, (0, 1))
     check("the strip renders and is wide enough to read",
           _img.width > 300 and _img.height > 60)
     check("it boxes the compared cell in the same red the PDF strip uses",
           (220, 20, 20) in [c[1] for c in _img.getcolors(maxcolors=100000)])
+    _long = "RIVERSIDE DR OFF RAMP , OC 53-1493"
+    check("panel_cell_text draws a 34-char value IN FULL — no silent cut",
+          ve.panel_cell_text(_long) == (_long, False))
+    _huge = "X" * (ve.PANEL_TEXT_MAX + 40)
+    _drawn, _elided = ve.panel_cell_text(_huge)
+    check("a pathological value elides VISIBLY: '…'-terminated prefix of itself",
+          _elided and _drawn.endswith("…") and _huge.startswith(_drawn[:-1])
+          and len(_drawn) == ve.PANEL_TEXT_MAX)
+    _wide_img = ve._excel_strip(["Route", "Description"], ["001", _long], 1, (0,))
+    check("the strip sizes its column to the FULL drawn value",
+          _wide_img.width > ve._XL_CHAR_W * len(_long))
 
     # --------------------------------------------------------------------- #
-    print("the TSMIS side of one example")
+    print("one workbook side of one example (the per-side ctx contract)")
 
     class Adapter:
         FIELDS = [f for f in _HEADER[1:] if f != "Location"]
@@ -96,16 +111,19 @@ try:
             return str(raw or "").strip()
 
     def side(field, va, row_index=0, rows=None, header=None):
-        return ve._tsmis_excel_side(
-            Adapter, {"row_index": row_index, "va": va}, field,
-            _rows if rows is None else rows,
-            _HEADER if header is None else header, _book.name)
+        ctx = {"rows": _rows if rows is None else rows,
+               "header": _HEADER if header is None else header,
+               "book_name": _book.name, "resolve": "excel_column_for",
+               "project": "project", "index_key": "row_index",
+               "value_key": "va", "label": "TSMIS (Excel)"}
+        return ve._workbook_side(Adapter, {"row_index": row_index, "va": va},
+                                 field, ctx)
 
     _img2, _label, _address, _why = side("Length (MI) [MI]", "000.075")
     check("a matching cell renders, labelled with the workbook and its address",
           _why is None and _img2 is not None and _address == "Highway Log!C2"
           and _label == f"TSMIS (Excel)  —  {_book.name} · Highway Log!C2")
-    check("the label says Excel, so the image never poses as a print",
+    check("the label names the SIDE and the workbook, never a print",
           "TSMIS (Excel)" in _label and "PDF" not in _label)
 
     _, _, _, _why2 = side("Length (MI) [MI]", "999.999")
@@ -117,8 +135,8 @@ try:
     check("a row that is not in the compared workbook is refused",
           _why4 is not None and "not found" in _why4)
     _, _, _, _why5 = side("Nonexistent Column", "000.075")
-    check("a column that is not in the workbook header is refused",
-          _why5 is not None and "not in the workbook header" in _why5)
+    check("a column that is not resolvable in this workbook edition is refused",
+          _why5 is not None and "cannot be resolved" in _why5)
     _, _, _, _why6 = side("SPD", "65", rows={0: ("S", 2, ["001", "R000.129"])})
     check("a short workbook row is refused, never read past its end",
           _why6 is not None and "short of the compared column" in _why6)
@@ -130,6 +148,27 @@ try:
     check("an Excel value the companion print never carried is still "
           "evidenceable (CMP-AUD-210)",
           _why7 is None and _img3 is not None and _addr3 == "Highway Log!D4")
+
+    # HF-05: side B of a vs-TSN example is the NORMALIZED TSN WORKBOOK panel,
+    # resolved through the adapter's tsn hook — never a borrowed print.
+    class TsnAdapter(Adapter):
+        @staticmethod
+        def tsn_excel_column_for(field, header):
+            return header.index(field) if field in header else None
+
+        @staticmethod
+        def tsn_project(_field, raw):
+            return str(raw or "").strip()
+
+    _ctx_b = {"rows": _rows, "header": _HEADER, "book_name": _book.name,
+              "resolve": "tsn_excel_column_for", "project": "tsn_project",
+              "index_key": "row_index_b", "value_key": "vb", "label": "TSN"}
+    _img4, _label4, _addr4, _why8 = ve._workbook_side(
+        TsnAdapter, {"row_index_b": 0, "vb": "000.075"}, "Length (MI) [MI]",
+        _ctx_b)
+    check("the TSN side renders from the compared workbook through its own hook",
+          _why8 is None and _img4 is not None
+          and _label4 == f"TSN  —  {_book.name} · Highway Log!C2")
 finally:
     shutil.rmtree(_r, ignore_errors=True)
 
@@ -146,14 +185,34 @@ for _name in _ADAPTERS:
 
 # --------------------------------------------------------------------------- #
 print("the PDF-vs-Excel self check can be illustrated")
-check("generate() knows both flavors and refuses anything else",
-      ve.FLAVORS == (ve.FLAVOR_TSN, ve.FLAVOR_SELF))
+check("generate() knows exactly the three flavors",
+      ve.FLAVORS == (ve.FLAVOR_TSN, ve.FLAVOR_SELF, ve.FLAVOR_ENV))
 for _name in _ADAPTERS:
     _mod = __import__(_name)
     check(f"{_name} exposes the SELF comparator's loader pair",
           callable(getattr(_mod, "load_sides_self", None)))
+    for _hook in ("pdf_excel_column_for", "tsn_excel_column_for",
+                  "tsn_project", "workbook_sheet"):
+        check(f"{_name} exposes {_hook} (the per-edition panel resolution)",
+              callable(getattr(_mod, _hook, None)))
 check("every evidence row can illustrate its self check",
       all(ve.self_capable(rk) for rk in ve.rows()))
+
+# --------------------------------------------------------------------------- #
+print("the cross-environment lane (HF-10)")
+check("exactly the five PDF-vs-PDF env placements are env-capable",
+      sorted(ve.env_rows()) == ["highway_log_pdf", "highway_sequence_pdf",
+                                "intersection_detail_pdf", "ramp_detail_pdf",
+                                "ramp_summary"]
+      and all(ve.env_capable(rk) for rk in ve.env_rows()))
+check("ramp_summary is env-only: its vs-TSN evidence absence stays the "
+      "audit-approved state", not ve.capable("ramp_summary"))
+for _rk in ve.env_rows():
+    _mod = ve.env_adapter_for(_rk)
+    for _hook in ("env_fields", "env_locate", "env_value", "env_box",
+                  "tsmis_pdf_path"):
+        check(f"{_rk}'s env adapter exposes {_hook}",
+              callable(getattr(_mod, _hook, None)))
 
 # The censused defect: enumerate_diffs used to walk a HARDCODED copy of the
 # vs-TSN header. The PDF-vs-Excel schema carries a column the vs-TSN one does
