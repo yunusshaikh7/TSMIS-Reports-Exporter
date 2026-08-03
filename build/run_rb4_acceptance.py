@@ -233,9 +233,16 @@ def _typed_counts(consolidation_meta, path):
     out = {"present": True, "trusted": bool(rec.trusted),
            "current": bool(rec.current)}
     if oc is not None:
-        for k in ("verdict", "completion", "paired", "only_a", "only_b",
-                  "diff_rows", "diff_cells", "pairing_quality"):
-            out[k] = getattr(oc, k, None)
+        for k in ("verdict", "completion", "pairing_quality"):
+            out[k] = str(getattr(oc, k, None))
+        counts = getattr(oc, "counts", None)
+        if counts is not None:
+            for k in ("known", "paired_rows", "side_a_only_rows",
+                      "side_b_only_rows", "differing_rows", "differing_cells",
+                      "asserted_cells", "context_cells"):
+                out[k] = getattr(counts, k, None)
+            out["per_field_counts"] = dict(getattr(counts, "per_field_counts",
+                                                   {}) or {})
     gen = getattr(rec, "artifact_generation", None)
     out["generation_id"] = getattr(gen, "generation_id", None)
     return out
@@ -558,6 +565,261 @@ def phase_cameras(root, side, tree, run_id):
     write_json(root / "results" / f"cameras-{side}.json", results)
 
 
+def _summary_rows_of(wb_path):
+    """App-free read of one evidence workbook: (source_lines, legends,
+    example rows [(field, at, va, vb)], has_ledger)."""
+    from openpyxl import load_workbook
+    wb = load_workbook(wb_path, read_only=True, data_only=True)
+    try:
+        ws = wb["Summary"]
+        src_lines, rows = [], []
+        for r, row in enumerate(ws.iter_rows(min_row=1, values_only=True), 1):
+            if r in (3, 4) and row and row[0]:
+                src_lines.append(str(row[0]))
+            if r >= 7 and row and row[0]:
+                key = str(row[1] or "")
+                if key.startswith("no verifiable example"):
+                    continue
+                rows.append((str(row[0]), key, str(row[2] or ""),
+                             str(row[3] or "")))
+        legends = []
+        for name in wb.sheetnames:
+            if name in ("Summary", "Ledger"):
+                continue
+            for row in wb[name].iter_rows(min_row=2, max_row=2,
+                                          values_only=True):
+                if row and row[0]:
+                    legends.append(str(row[0]))
+                break
+        return src_lines, sorted(set(legends)), rows, "Ledger" in wb.sheetnames
+    finally:
+        wb.close()
+
+
+def phase_counts(root, side, tree, run_id):
+    """Re-read every placement's strict typed sidecar into one counts table —
+    the base/head invariance record and the audit-count cross-check."""
+    side_root = _sandbox(tree, root, side)
+    import consolidation_meta
+    import day_matrix
+    store = side_root / "store"
+    out = {"run_id": run_id, "side": side, "cells": {}}
+    for row in TSN_ROWS:
+        p = store / "comparisons" / "tsn" / f"{BASELINE}_{row}_tsn.xlsx"
+        out["cells"][f"everything-tsn|{row}"] = _typed_counts(
+            consolidation_meta, p)
+    for row, mode_id in SELF_CELLS:
+        p = store / "comparisons" / "tsn" / f"{BASELINE}_{row}_{mode_id}.xlsx"
+        out["cells"][f"everything-self|{row}|{mode_id}"] = _typed_counts(
+            consolidation_meta, p)
+    for row, other_env in ENV_CELLS:
+        p = store / "comparisons" / BASELINE / f"{other_env}_{row}.xlsx"
+        out["cells"][f"everything-env|{row}"] = _typed_counts(
+            consolidation_meta, p)
+    for row in TSN_ROWS:
+        p = day_matrix.day_out_path(BYDAY_DAY, BYDAY_SOURCE, row)
+        out["cells"][f"byday|{row}"] = _typed_counts(consolidation_meta, p)
+    write_json(root / "results" / f"counts-{side}.json", out)
+
+
+def phase_validate(root, side, tree, run_id):
+    """The programmatic 100 % validation over every retained head evidence set:
+    manifest member integrity, exact-source read-set binding against each
+    comparison's own provenance, truthful source lines + legends, panel-text
+    fidelity census, env geometry re-derivation, and the silent-lane sweep."""
+    side_root = _sandbox(tree, root, side)
+    import compare_core
+    import compare_env
+    import compare_tsn_common as ctc
+    import evidence_manifest as em
+    import published_comparison as pc
+    import visual_evidence as ve
+
+    problems = []
+    out = {"run_id": run_id, "side": side, "tree": str(tree), "sets": [],
+           "problems": problems}
+
+    def note(setrec, cond, what):
+        setrec.setdefault("checks", []).append(
+            {"ok": bool(cond), "what": what})
+        if not cond:
+            problems.append(f"{setrec['comparison']}: {what}")
+
+    def validate_set(cmp_path, flavor, row_key=None):
+        man_path = em.manifest_path(cmp_path)
+        rec = {"comparison": str(cmp_path), "flavor": flavor,
+               "manifest": man_path.exists()}
+        out["sets"].append(rec)
+        if not man_path.exists():
+            note(rec, False, "manifest missing")
+            return
+        man = em.read(man_path)
+        rec["state"] = man.state
+        desc = em.describe(cmp_path, verify_members=True)
+        note(rec, desc["status"] == em.CURRENT,
+             f"manifest describes CURRENT (got {desc['status']})")
+        prov = ctc.read_comparison_provenance(cmp_path)
+        note(rec, isinstance(prov, dict), "provenance sidecar present")
+        if not isinstance(prov, dict):
+            return
+        sides = prov["inputs"]
+        members = list(man.read_set)
+        if flavor == "env":
+            resolved = []
+            for s in sides:
+                d, _files = compare_env._find_input_dir(
+                    Path(s["selection"]), row_key, "*.pdf")
+                census = {m["name"]: (m["size"], m["mtime_ns"])
+                          for m in s.get("members", [])}
+                resolved.append((Path(d).resolve(), census))
+            for m in members:
+                mp = Path(m.name)
+                parent = mp.resolve().parent
+                match = next((c for d, c in resolved if parent == d), None)
+                st = mp.stat() if mp.is_file() else None
+                note(rec, match is not None,
+                     f"read-set member under a compared side dir: {mp.name}")
+                note(rec, st is not None and match is not None
+                     and match.get(mp.name) == (st.st_size, st.st_mtime_ns),
+                     f"read-set member in that side's census: {mp.name}")
+        else:
+            want = {str(Path(s["selection"]).resolve()): s["sha256"]
+                    for s in sides}
+            got = {str(Path(m.name).resolve()): m.sha256 for m in members}
+            note(rec, got == want,
+                 "read set == the comparison's two recorded documents "
+                 f"(got {len(got)} member(s))")
+        if man.state != em.STATE_RENDERED:
+            return
+        src_lines, legends, rows, has_ledger = _summary_rows_of(
+            Path(man.workbook.name) if man.workbook else cmp_path)
+        wb_path = ve.sibling_paths(cmp_path)[0]
+        src_lines, legends, rows, has_ledger = _summary_rows_of(wb_path)
+        note(rec, has_ledger, "Ledger sheet present")
+        want_lines = [f"Compared {s['role']}: {s['selection']}" for s in sides]
+        note(rec, src_lines == want_lines,
+             f"source lines are the provenance selections ({src_lines!r})")
+        want_legend = ve._legend_for(
+            ve.FLAVOR_ENV if flavor == "env" else ve.FLAVOR_TSN)
+        note(rec, all(lg == want_legend for lg in legends),
+             "image-sheet legends state the true sources")
+        rec["examples"] = len(rows)
+        over = [v for _f, _a, va, vb in rows for v in (va, vb)
+                if len(v) > ve.PANEL_TEXT_MAX]
+        rec["elided_values"] = len(over)
+        note(rec, not over,
+             "no drawn value exceeds the panel bound (none elided)")
+        rec["values_over_26"] = sum(
+            1 for _f, _a, va, vb in rows for v in (va, vb) if len(v) > 26)
+        if flavor == "env":
+            adapter = ve.env_adapter_for(row_key)
+            geo_ok = 0
+            for field, at, va, vb in rows:
+                route_key = at.split(" @ ")
+                route = route_key[0]
+                key = route_key[1] if len(route_key) > 1 else route
+                vals = []
+                boxes_ok = True
+                for d, _census in resolved:
+                    pdf = adapter.tsmis_pdf_path(d, route)
+                    recs = adapter.env_locate(Path(pdf), {key})
+                    got_recs = recs.get(key) or recs.get(route, [])
+                    if len(got_recs) != 1:
+                        boxes_ok = False
+                        break
+                    r0 = got_recs[0]
+                    box = adapter.env_box(r0, field)
+                    if box is None:
+                        boxes_ok = False
+                        break
+                    _pg, cell, yspan, _xs = box
+                    if cell[1] < yspan[0] - 3 or cell[3] > yspan[1] + 3:
+                        boxes_ok = False
+                        break
+                    vals.append(adapter.env_value(r0, field))
+                if boxes_ok and vals and (vals[0] or "(blank)"):
+                    composed = (f"{vals[0] or compare_core._BLANK_MARK}"
+                                f"{compare_core._DIFF_MARK}"
+                                f"{vals[1] or compare_core._BLANK_MARK}")
+                    if (vals[0], vals[1]) == (va, vb) or composed:
+                        geo_ok += 1
+                note(rec, boxes_ok and vals[0] == va and vals[1] == vb,
+                     f"env re-derivation matches ({field} @ {at})")
+            rec["env_rederived"] = geo_ok
+        return
+
+    store = side_root / "store"
+    tsn_dir = store / "comparisons" / "tsn"
+    for man in sorted(tsn_dir.glob("*(evidence).json")):
+        cmp_path = man.with_name(man.name.replace(" (evidence).json", ".xlsx"))
+        flavor = ("self" if "_vs_pdf" in cmp_path.name
+                  or "_vs_excel" in cmp_path.name else "tsn")
+        validate_set(cmp_path, flavor)
+    for row_key, other_env in ENV_CELLS:
+        cmp_path = (store / "comparisons" / BASELINE
+                    / f"{other_env}_{row_key}.xlsx")
+        if em.manifest_path(cmp_path).exists() or cmp_path.exists():
+            validate_set(cmp_path, "env", row_key=row_key)
+    byday = (side_root / "output" / "comparisons" / "tsn-by-day"
+             / f"{BYDAY_DAY} {BYDAY_SOURCE}")
+    for man in sorted(byday.glob("*(evidence).json")):
+        cmp_path = man.with_name(man.name.replace(" (evidence).json", ".xlsx"))
+        validate_set(cmp_path, "tsn")
+    # The silent lanes: nothing evidence-like anywhere under the PvE tree.
+    pve_tree = side_root / "output" / "comparisons" / "pdf-vs-excel-by-day"
+    stray = sorted(str(p) for p in pve_tree.rglob("*evidence*")) if pve_tree.is_dir() else []
+    out["pve_stray"] = stray
+    if stray:
+        problems.append(f"PvE tree holds evidence artifacts: {stray}")
+    out["problem_count"] = len(problems)
+    write_json(root / "results" / f"validate-{side}.json", out)
+    print(f"validate {side}: {len(out['sets'])} set(s), "
+          f"{len(problems)} problem(s)")
+    if problems:
+        for p in problems[:20]:
+            print("  PROBLEM:", p)
+        raise SystemExit(1)
+
+
+def phase_excel(root, side, tree, run_id):
+    """Open every retained evidence workbook in INSTALLED Excel: it must open
+    clean (no repair), with its image sheets and Ledger intact."""
+    side_root = _sandbox(tree, root, side)
+    import win32com.client  # type: ignore
+    books = sorted((side_root / "store" / "comparisons").rglob("*(evidence).xlsx"))
+    books += sorted((side_root / "output" / "comparisons").rglob("*(evidence).xlsx"))
+    out = {"run_id": run_id, "side": side, "books": [], "problems": []}
+    excel = win32com.client.DispatchEx("Excel.Application")
+    excel.Visible = False
+    excel.DisplayAlerts = False
+    try:
+        for b in books:
+            entry = {"path": str(b)}
+            try:
+                wb = excel.Workbooks.Open(str(b), UpdateLinks=0, ReadOnly=True,
+                                          CorruptLoad=0)
+                sheets = [s.Name for s in wb.Sheets]
+                entry["sheets"] = len(sheets)
+                entry["has_ledger"] = "Ledger" in sheets
+                entry["pictures"] = sum(
+                    wb.Sheets(n).Shapes.Count for n in sheets
+                    if n not in ("Summary", "Ledger"))
+                wb.Close(SaveChanges=False)
+                entry["opened"] = True
+            except Exception as e:  # noqa: BLE001
+                entry["opened"] = False
+                entry["error"] = f"{type(e).__name__}: {e}"
+                out["problems"].append(str(b))
+            out["books"].append(entry)
+            print(f"  excel {b.name}: opened={entry.get('opened')} "
+                  f"sheets={entry.get('sheets')} pics={entry.get('pictures')}")
+    finally:
+        excel.Quit()
+    write_json(root / "results" / f"excel-{side}.json", out)
+    if out["problems"]:
+        raise SystemExit(1)
+
+
 def phase_checks_at_base(root, tree, head_tree):
     """Run the HEAD's extended evidence checks against the BASE scripts tree —
     the red half of red→green. Every new assertion must fail there with the
@@ -630,7 +892,7 @@ def main(argv=None):
     ap.add_argument("--run-id", default=RUN_ID_DEFAULT)
     ap.add_argument("--phase", required=True,
                     choices=("provision", "generate", "cameras", "census",
-                             "checks-at-base"))
+                             "checks-at-base", "validate", "excel", "counts"))
     ap.add_argument("--side", choices=("base", "head"),
                     help="generate: which acceptance side to run")
     ap.add_argument("--tree", default=str(REPO),
@@ -666,6 +928,18 @@ def main(argv=None):
         phase_census(root)
     elif args.phase == "checks-at-base":
         phase_checks_at_base(root, Path(args.tree), REPO)
+    elif args.phase == "counts":
+        if not args.side:
+            ap.error("--side is required for counts")
+        phase_counts(root, args.side, Path(args.tree), args.run_id)
+    elif args.phase == "validate":
+        if not args.side:
+            ap.error("--side is required for validate")
+        phase_validate(root, args.side, Path(args.tree), args.run_id)
+    elif args.phase == "excel":
+        if not args.side:
+            ap.error("--side is required for excel")
+        phase_excel(root, args.side, Path(args.tree), args.run_id)
     print(f"— phase {args.phase} complete at {time.strftime('%F %T')}")
     return 0
 
