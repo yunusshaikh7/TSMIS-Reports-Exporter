@@ -1,0 +1,78 @@
+{
+ "what": "the two censused Ramp Detail Excel export layouts, measured over every per-route file of both frozen pulls",
+ "classic_2026_07_09": {
+  "header": [
+   "Location",
+   "",
+   "PM",
+   "Date of Record",
+   "",
+   "HG",
+   "Area 4",
+   "",
+   "City Code",
+   "R/U",
+   "Description"
+  ],
+  "files": 126,
+  "rows": 15216,
+  "pm_suffix_nonblank": 0,
+  "null_tokens": {}
+ },
+ "july_2026_07_23": {
+  "header": [
+   "Location",
+   "PRE",
+   "PM",
+   "Date of Record",
+   "HG",
+   "Area 4",
+   "City Code",
+   "R/U",
+   "OF",
+   "TY",
+   "Description"
+  ],
+  "files": 126,
+  "rows": 15213,
+  "of_letters": {
+   "F": 7417,
+   "N": 7635,
+   "Z": 125,
+   "-": 36
+  },
+  "ty_letters": {
+   "D": 6794,
+   "F": 2235,
+   "L": 1333,
+   "G": 615,
+   "K": 1004,
+   "C": 673,
+   "H": 1154,
+   "Z": 146,
+   "E": 335,
+   "R": 334,
+   "J": 294,
+   "B": 173,
+   "M": 34,
+   "P": 2,
+   "A": 31,
+   "-": 36,
+   "V": 20
+  },
+  "null_tokens": {
+   "5": {
+    "-": 36
+   },
+   "8": {
+    "-": 36
+   },
+   "9": {
+    "-": 36
+   },
+   "10": {
+    "NO RAMP LINEAR EVENT": 36
+   }
+  }
+ }
+}

@@ -1,0 +1,51 @@
+{
+ "what": "HF-04 criterion 6: Direct RD-PDF vs TSN generated twice from IDENTICAL inputs (the head-built PDF-consolidated workbook + normalized TSN library workbook) \u2014 once with the base scripts (main @ 194b7ee), once with the head \u2014 typed counts and Comparison sheets diffed",
+ "base": {
+  "status": "ok",
+  "verdict": "diff",
+  "paired": 15204,
+  "a_only": 9,
+  "b_only": 206,
+  "diff_rows": 468,
+  "diff_cells": 619,
+  "per_field": {
+   "0:PR": 0,
+   "2:District": 1,
+   "3:Date of Record": 15,
+   "4:HG": 69,
+   "5:Area 4": 36,
+   "6:City Code": 156,
+   "7:R/U": 68,
+   "8:Description": 163,
+   "9:Ramp Name": 0,
+   "10:On/Off": 74,
+   "11:Ramp Type": 37,
+   "12:ADT": 0
+  }
+ },
+ "head": {
+  "status": "ok",
+  "verdict": "diff",
+  "paired": 15204,
+  "a_only": 9,
+  "b_only": 206,
+  "diff_rows": 468,
+  "diff_cells": 619,
+  "per_field": {
+   "0:PR": 0,
+   "2:District": 1,
+   "3:Date of Record": 15,
+   "4:HG": 69,
+   "5:Area 4": 36,
+   "6:City Code": 156,
+   "7:R/U": 68,
+   "8:Description": 163,
+   "9:Ramp Name": 0,
+   "10:On/Off": 74,
+   "11:Ramp Type": 37,
+   "12:ADT": 0
+  }
+ },
+ "counts_identical": true,
+ "comparison_sheet_cell_diffs": 0
+}

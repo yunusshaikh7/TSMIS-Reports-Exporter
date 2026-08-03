@@ -1,0 +1,10 @@
+{
+ "pdf_consolidated": "C:\\Users\\Yunus\\Projects\\wt-rb3\\output\\2026-07-23 ssor-prod\\consolidated\\tsmis_ramp_detail_pdf_consolidated 2026-07-23 ssor-prod.xlsx",
+ "excel_consolidated": "C:\\Users\\Yunus\\Projects\\wt-rb3\\output\\2026-07-23 ssor-prod\\consolidated\\tsar_ramp_detail_consolidated 2026-07-23 ssor-prod.xlsx",
+ "excel_rows": 15213,
+ "paired": 15213,
+ "keys_only_one_side": 0,
+ "multiplicity_mismatch_keys": 0,
+ "differing_cells": 0,
+ "per_field": {}
+}
