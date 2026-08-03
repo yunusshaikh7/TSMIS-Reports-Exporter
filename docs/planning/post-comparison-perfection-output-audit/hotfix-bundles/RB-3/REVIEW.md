@@ -1,6 +1,6 @@
 # `RB-3` — Adversarial Review Record
 
-Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
+Status: **JOINTLY APPROVED**
 
 ## Review 1 verdict — 2026-08-02
 
@@ -374,3 +374,134 @@ runtime identity, or adversarial probe remains unresolved.
 Mark RB-3 **REVIEW 1 APPROVED — AWAITING REVIEW 2**. Do not merge. Review 2
 must run in a separate fresh task against the pushed approval head, challenge
 this review independently, and approve before RB-3 becomes mergeable.
+
+---
+
+## Review 2 — Codex, 2026-08-02
+
+### Verdict
+
+**APPROVED.**
+
+All seven HF-04 criteria retain exact same-head evidence, the acceptance
+runtime is unchanged, and the independent Review 2 challenge found no product,
+evidence, presentation, or regression contradiction. Review 1 and Review 2
+both approve; Codex did not implement the bundle.
+
+### Review identity, entry state, and budget
+
+| Field | Review 2 record |
+|---|---|
+| Reviewer / pass | Codex / Review 2 |
+| Implemented bundle? | **No** — implementer is Claude |
+| Bundle / work items | `RB-3` / `HF-04` |
+| Branch | `hotfix/rb-3-ramp-detail-layout` |
+| Recorded base / merge base | `194b7ee8da095f0300e7e635bb7e7af78643b685` / exact match |
+| Implementation commit | `c9b55b6c6e9ca898af935bc2c070a435f39b2588` |
+| Acceptance runtime head | `dd922f7b3b726a87912a26e92d7b5d930d90451e` |
+| Review-entry / review-record parent | `cebc1a5d96e43fa0a0610cdf56bcd8b67bf0a58a` |
+| Pushed-head check | Local `HEAD`, tracking ref, and `git ls-remote` all matched `cebc1a5d…`; `origin/main` remained `194b7ee…`; entry worktree was clean |
+| Runtime drift after acceptance | **None** — 417 runtime files re-derived; zero runtime changes after `dd922f7…` |
+| Elapsed active review | Approximately 9 minutes; within the 30-minute ceiling and shorter than implementation |
+| Resource budget | **RESPECTED** — no generation, installed Excel, full gate, application build, whole-corpus recount, or archive re-hash; no process approached 2 GB, 5 minutes, or 500 MB |
+
+The complete base-to-entry diff contains the four authorized Ramp Detail
+scripts, the focused/neighbor checks required by their exact wiring, and the
+required evidence/status records. The recorded base is the exact merge base,
+and `git diff --check` is clean.
+
+### Bound evidence reused and independently verified
+
+| Evidence | Exact identity / Review 2 result |
+|---|---|
+| Complete manifest | `rb3-a1-artifacts.json`; 344,312 bytes; SHA-256 `F63F4A3682D5F8585C71EA3A9C60B02B56AC7F98A1CB1BC42366C24A247E5BB1` |
+| Corrected verifier | `rb3-verify-manifest.py`; 22,952 bytes; SHA-256 `AD906476C14175352515A7B4A66A1929000BDDE749EA2499EAD98BAA77A61859` |
+| Verifier negative suite | **PASS** — clean fixture verified; missing root/file/raw/result/archive, changed bytes, divergent replica, wrong head, and unstamped claim all failed closed |
+| Cheap exact-head verifier | **VERIFIED — 0 problems** — 417 runtime files/digest exact; zero later runtime changes; 30/30 claims name `dd922f7…`; four witnesses bound |
+| Review 1 signed evidence | **REUSED** — Review 1 approval at `2026-08-02T21:50:17.0702481-07:00`, including its full corpus/archive re-hash and native-scale render inspection |
+| Frozen inputs / replicas | Review 1's same-head verifier matched 504 frozen input files + TSN raw, 1,009 replicas, and both 252-member archives; Review 2 did not duplicate that expensive run |
+| Acceptance results | 16/16 generation steps `ok`; 11/11 installed-Excel formulas twins with 10/10 SELF-CHECK rows and zero error cells; both 14-artifact store-integrity records `all_ok=true` |
+| Full gate / app self-test | Hash-bound `gate_log_final.txt` SHA-256 `01DE2B93B6313ACBBC11AE4F7859A3DCC7CBEA2213ED79847B3123DE98E2A0A5` records 158/158; hash-bound `selftest_log.txt` SHA-256 `D626868831B0EAD48B224CC090C7807DE93E8DE2A1E4803687FCC5FF1F2580CA` records PASS |
+| Evidence / presentation sweep | Zero `*evidence*` artifacts across both declared roots; July header labels and mixed PM-Suffix/OF/TY context inventory all true |
+
+### Review 2 challenge to Review 1
+
+Review 1's strongest product challenge covered exact-header dispatch, mixed
+layout handling, completion truth, and same-source null parity. Review 2 tested
+four narrower false-pass mechanisms that could survive that review:
+
+1. **Partial mixed reprojection.** A sentinel row with a unique value in every
+   classic and July column was projected in both side orders. All nine shared
+   fields and all three context fields landed exactly; classic PM suffix was
+   conserved and July PM suffix remained empty in the physical-key raw claims.
+2. **Over-broad null suppression.** The self-check projection normalized only
+   exact `-`, `NO RAMP LINEAR EVENT`, and On/Off `N` tokens at their authorized
+   fields. Near-miss Description/Area-4/On-Off values, HG, and Ramp Type were
+   preserved, so a genuine disagreement is not silently erased.
+3. **Generic-hook blast radius.** `check_compare_env_flat_schema.py` passed the
+   recognized/malformed/reordered matrix for Ramp Detail and neighboring flat
+   families; `check_compare_physical_identity.py` passed all 11 identity gates.
+   The opt-in layout merger remains inert outside Ramp Detail.
+4. **Evidence-tool false pass recurrence.** The committed verifier's negative
+   suite and cheap exact-head command both passed, closing the precise mechanism
+   behind Review 1's two earlier evidence returns.
+
+The exact base still carries all three durable defect signatures: the false
+leading-Route instruction, an Excel self loader with no null projection, and an
+unconditional Ramp Detail `return consolidate_xlsx(...)`. No new base run was
+needed because Review 1 already reproduced the expected-red assertions and the
+base source identities remain exact.
+
+One native-scale retained PNG could not be opened because the Windows sandbox
+ACL helper failed before image loading. Per the one-attempt rule it was not
+retried or regenerated. This is a reviewer-environment event, not a product
+failure; Review 2 relied on the hash-bound render set and Review 1's signed
+original-resolution inspection.
+
+### Criterion-by-criterion disposition
+
+| # | HF-04 criterion | Review 2 disposition |
+|---:|---|---|
+| 1 | Eight topology decisions plus by-day PDF-vs-Excel produce both twins | **PASS** — all required lanes are present in the 16/16 retained generation record; 11 formulas twins retained |
+| 2 | Route 001 row 2 maps `OF`, `TY`, and `Description` correctly | **PASS** — exact raw/projection/published-row witness; all five mapping checks true; all-field sentinel probe adds independent position coverage |
+| 3 | An unconsumable consolidation cannot report `ok` | **PASS** — shared comparator predicate controls the downgrade; retained focused failure check and source inspection agree |
+| 4 | Self check has zero differences across all 15,213 rows | **PASS** — three placements pair 15,213 / 0 one-sided / 0 differing; app-free recount agrees; anti-suppression probe found no over-broad normalization |
+| 5 | Classic layout still compares; unknown layout refuses | **PASS** — retained classic/mixed lanes plus Review 2's malformed/truncated/reordered focused gate |
+| 6 | RD-PDF-vs-TSN counts unchanged | **PASS** — base/head 15,204 paired / 9 A-only / 206 B-only / 468 diff rows / 619 diff cells; Comparison sheets cell-identical |
+| 7 | Full gate green; every new assertion red pre-fix | **PASS** — hash-bound 158/158 gate and frozen app self-test; Review 1's exact-base red run plus Review 2's three source-signature probes |
+
+### Exact deliverable and discrepancy results
+
+| Lane | Paired | A-only | B-only | Diff rows | Diff cells |
+|---|---:|---:|---:|---:|---:|
+| Direct / By Day / Everything vs TSN | 15,204 | 9 | 206 | 431 | 508 |
+| Direct RD-PDF vs TSN control | 15,204 | 9 | 206 | 468 | 619 |
+| Direct / Everything / by-day self | 15,213 | 0 | 0 | 0 | 0 |
+| Mixed classic-env / Baseline / Everything ENV | 15,208 | 5 | 8 | 352 | 408 |
+| Reverse mixed classic-env | 15,208 | 8 | 5 | 352 | 408 |
+
+The independent recount reproduces 507 singleton vs-TSN differences plus one
+duplicate-key assignment difference and 406 singleton mixed-env differences
+plus two in the duplicate group. Workbook totals and per-field totals agree.
+
+### Values, formulas, visual, evidence, and regression matrices
+
+| Domain | Review 2 result |
+|---|---|
+| Values / source truth | **PASS** — retained generation, raw recount, route-field witness, workbook totals, and Review 2 sentinel projection agree |
+| Formulas / installed Excel | **PASS** — 11/11 recalculated; every workbook has 10/10 SELF-CHECK rows, zero error cells, and a verdict matching its values twin |
+| Visual / presentation | **PASS ON RETAINED EVIDENCE** — manifest-bound native-scale pages cover July consolidated, mixed Summary/Comparison/Notes, direct Summary, and self Summary/Notes; Review 1 inspected the named risk pages at original resolution |
+| Evidence eligibility | **PASS** — zero prohibited evidence artifacts in both declared roots |
+| Neighboring behavior | **PASS** — RD-PDF-vs-TSN is cell-identical base/head; focused flat-schema and physical-identity gates pass; Highway Detail remains untouched |
+| Performance / atomic publication / stale cache / failure | **PASS** — retained timings are bounded; pre/post store-integrity records are all green; unknown layout returns error/FAILED and cannot be promoted; exact-head verifier fails closed |
+
+### Failures and reviewer sign-off
+
+**Actionable failures: none.** No criterion, runtime identity, retained artifact,
+or bounded adversarial probe remains unresolved.
+
+**Reviewer signature:** Codex, Review 2 — **APPROVED** —
+`2026-08-02T22:17:58.3662409-07:00`.
+
+Mark RB-3 **JOINTLY APPROVED** and complete Prompt 05's fetch, non-force merge,
+post-merge smoke, merge-record push, and bounded cleanup sequence.

@@ -1,6 +1,6 @@
 # `RB-3` — Implementation Record
 
-Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
+Status: **JOINTLY APPROVED**
 
 | Field | Value |
 |---|---|
@@ -325,8 +325,8 @@ way: classic-layout workbooks load under both trees, and a July-layout
 consolidated workbook produced by this code is simply refused again by a
 reverted tree (no schema/sidecar migration was introduced).
 
-Do not merge this branch. Run **Prompt 05** (`<BUNDLE_ID> = RB-3`,
-`<REVIEWER> = Codex`) against the pushed head.
+Both Prompt-05 reviews approve this branch. Complete the final-approval merge,
+post-merge smoke, record, push, and bounded cleanup sequence.
 
 ## Review 1 return — Codex, 2026-08-02 (`RB3-R1-EG-001`)
 

@@ -1,8 +1,8 @@
 # `RB-3` — Bundle Contract
 
-Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2** — Codex approved all seven
-HF-04 criteria against pushed head `df9af19` and acceptance runtime
-`dd922f7`. The signed approval is in [REVIEW.md](REVIEW.md).
+Status: **JOINTLY APPROVED** — both Codex reviews approved all seven HF-04
+criteria; Review 2 entered at pushed head `cebc1a5d`, and the acceptance
+runtime remains `dd922f7`. The signed approvals are in [REVIEW.md](REVIEW.md).
 
 > This RB-level contract carries work item **HF-04** and transcribes the frozen
 > work-item section from
@@ -78,7 +78,7 @@ or GUI transactions, installed-Excel results, and retained witness hashes:
 | Implementer | Claude |
 | Review 1 | **Codex** (holds `ramp-detail-pdf-excel-sibling-parity.json` and the header-census run ledgers) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-3: REVIEW 1 APPROVED — AWAITING REVIEW 2** |
+| Status | **Inherits RB-3: JOINTLY APPROVED** |
 
 **Exact scope.** Ramp Detail, both editions: the 8 topology decisions the Excel
 edition currently cannot produce (classic env, Direct/By Day/Everything vs TSN,
