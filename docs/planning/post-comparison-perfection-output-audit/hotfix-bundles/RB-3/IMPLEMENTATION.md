@@ -102,7 +102,12 @@ then at head.
 
 ## RB3-A1 — the one executable acceptance run
 
-Implementation head: `c9b55b6` on `hotfix/rb-3-ramp-detail-layout`.
+Acceptance head: **`dd922f7`** on `hotfix/rb-3-ramp-detail-layout` — the
+runtime the whole final artifact set was generated with (`c9b55b6` +
+the one-sentence Notes-wording precision; an earlier artifact set generated
+at `c9b55b6` itself was fully wiped and regenerated so no artifact spans two
+runtimes). Commits after `dd922f7` are documentation/witness-only — zero
+runtime delta.
 
 **Frozen inputs** (identities recorded in `rb3-a1-generation.json` /
 `rb3-a1-artifacts.json`):
