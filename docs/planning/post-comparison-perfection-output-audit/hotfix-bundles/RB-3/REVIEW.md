@@ -113,3 +113,119 @@ records, the reused frozen inputs, and one exact execution runtime.
 
 Do not merge and do not begin Review 2. Resume Prompt 04 on the existing
 `hotfix/rb-3-ramp-detail-layout` branch only to supply `RB3-R1-EG-001`.
+
+---
+
+## Review 1 re-review — Codex, 2026-08-02
+
+### Verdict
+
+**DENIED — EVIDENCE GAP.**
+
+`RB3-R1-EG-001` is **CLOSED**. The remedy supplies the previously missing
+complete manifest, binds the retained acceptance set to runtime head
+`dd922f7b3b726a87912a26e92d7b5d930d90451e`, and verifies every present byte
+in both the cheap and full corpus/archive paths.
+
+One narrower blocking item remains:
+
+> **`RB3-R1-EG-002`:** supply a corrected committed verifier that returns
+> nonzero when any declared item covered by an explicitly requested
+> verification mode is absent. The current verifier prints `SKIPPED` and
+> succeeds for missing corpus roots, result files, the TSN raw input, and
+> archives, so it can certify an incomplete acceptance set.
+
+This is one evidence-tooling gap, not a product-code failure. Review 1 stops at
+that Prompt-05 precondition and does not adjudicate HF-04 criteria 1–7.
+
+### Review identity, entry state, and budget
+
+| Field | Re-review record |
+|---|---|
+| Reviewer | Codex, independent non-implementer |
+| Bundle / branch | `RB-3` / `hotfix/rb-3-ramp-detail-layout` |
+| Bundle base | `194b7ee8da095f0300e7e635bb7e7af78643b685` |
+| Acceptance runtime | `dd922f7b3b726a87912a26e92d7b5d930d90451e` |
+| Initial denial record | `df5c6fc18710c5e82b2626d337982f3eb3716489` |
+| Remedy / review-entry head | `69231d37765f10b2d48491a6abef6f2bce2f3c45` |
+| Pushed-head check | Local `HEAD`, remote-tracking ref, and `git ls-remote` all matched `69231d3…`; entry worktree was clean |
+| Remedy scope | Ten evidence/status files; no product/runtime file changed after `dd922f7…` |
+| Active review time | Approximately 13 minutes; within the 30-minute Prompt-05 cap |
+| Resource budget | No Excel launch, regeneration, render pass, or acceptance rerun; verifier operations each completed in under 30 seconds |
+
+The remedy range `df5c6fc…69231d3` passed `git diff --check`. Its runtime tree
+remains the exact accepted `dd922f7…` tree; all later commits are evidence and
+status records.
+
+### `RB3-R1-EG-001` disposition
+
+| Item | Exact identity / result |
+|---|---|
+| Complete manifest | `rb3-a1-artifacts.json`; 344,312 bytes; SHA-256 `F63F4A3682D5F8585C71EA3A9C60B02B56AC7F98A1CB1BC42366C24A247E5BB1` |
+| Committed verifier | `rb3-verify-manifest.py`; 16,327 bytes; SHA-256 `93D736D74B9E8FC4346A87C9122E1D4E461379E8961BB68CA6AE3BC1C99839EB` |
+| Cheap exact-head verification | Exit 0: 417 runtime files exact, lineage exact with zero later runtime changes, 30 claimed entries at the exact head, four witnesses bound, `VERIFIED — 0 problems` |
+| Full `--corpus --zips` verification | Exit 0: 504 frozen-input files across four roots plus TSN raw, 1,009 replicas, all declared deliverable roots, 30 results, 10 harness records, and both 252-member archives rehashed; `VERIFIED — 0 problems` |
+
+These results close the original missing-manifest gap and establish that every
+item which is present matches the committed claim. Existing bulk artifacts can
+be retained.
+
+### Adversarial fail-closed challenge
+
+A bounded in-memory negative probe called the committed verifier's
+`rehash_block` with a definitely absent requested root. The observed output
+was:
+
+```text
+SKIPPED missing-root-probe not present
+failure_count 0
+```
+
+The probe wrapper rejected that result, but the committed verifier itself
+recorded no failure. Source inspection shows the same mechanism at each
+relevant boundary:
+
+| Verifier surface | Committed behavior | Re-review result |
+|---|---|---|
+| `rehash_block`, lines 260–264 | Missing declared root prints `SKIPPED` and returns without adding a problem | **FAIL — reproduced false pass** |
+| TSN raw input, lines 293–299 | Missing declared raw input prints `SKIPPED` | **FAIL — static path has no failure** |
+| Results, lines 314–320 | Missing declared result prints `SKIPPED` and continues | **FAIL — static path has no failure** |
+| Archives, lines 331–335 | Missing requested archive prints `SKIPPED` and continues | **FAIL — static path has no failure** |
+
+The successful full run proves current bytes, but cannot prove the verifier's
+required failure behavior. Because Prompt 05 and `RB3-R1-EG-001` require a
+verifier that fails on **any missing or mismatched file**, a success exit with a
+declared item removed is a blocking false negative.
+
+### Acceptance and review-domain matrices
+
+| Criterion / gate | Review 1 re-review result | Exact reason |
+|---|---|---|
+| HF-04 criteria 1–7 | **NOT ADJUDICATED** | Prompt 05 stops at the fail-closed evidence precondition |
+| Values / source truth / discrepancy counts | **RETAINED RESULTS VERIFIED; NOT FINALLY ADJUDICATED** | Present bytes are exact; missing-item detection is incomplete |
+| Formulas / installed Excel | **RETAINED RESULT VERIFIED; NOT FINALLY ADJUDICATED** | No recalculation rerun was required for this bounded return |
+| Visual / presentation | **RETAINED RESULTS VERIFIED; NOT FINALLY ADJUDICATED** | The re-review did not proceed beyond the evidence precondition |
+| Evidence prohibition / sibling parity | **RETAINED RESULTS VERIFIED; NOT FINALLY ADJUDICATED** | The manifest binding is fixed; the verifier still does not fail closed |
+| Neighbor regression / full gate / frozen self-test | **RETAINED RESULTS VERIFIED; NOT FINALLY ADJUDICATED** | Runtime and retained results did not drift |
+| Product implementation | **NO FAILURE IDENTIFIED IN THIS RE-REVIEW** | The denial is confined to committed evidence-verifier behavior |
+
+### Actionable evidence gap
+
+| ID | Priority | Missing item | Required return |
+|---|---|---|---|
+| `RB3-R1-EG-002` | P1 / blocking | The committed verifier can return success when explicitly requested declared evidence is absent. | On the existing RB-3 branch, make requested corpus/archive verification fail nonzero for every absent declared corpus root, replica root, TSN raw input, result, harness record, or archive. Add bounded negative checks covering the missing-root, missing-result/raw, and missing-archive paths, then rerun the existing cheap and full verifier commands. Preserve the current manifest, frozen corpus, deliverables, witnesses, and `dd922f7…` acceptance runtime unless any byte changes; do not regenerate or rerun Excel/gates merely to satisfy this return. |
+
+### Reviewer environment notes
+
+The Windows sandbox ACL helper failed before one read-only inspection and before
+the required patch mechanism could read the files. The inspection and a
+sandbox-blocked negative probe were rerun through the approved host shell. The
+review/status edits used narrow atomic UTF-8 `git apply` patches after
+`apply_patch` failed at the ACL boundary. These were reviewer-environment
+events, not product or acceptance failures.
+
+**Reviewer signature:** Codex, Review 1 re-review —
+**DENIED — EVIDENCE GAP** — `2026-08-02T21:23:12.2917858-07:00`.
+
+Do not merge and do not begin Review 2. Resume Prompt 04 on the existing
+`hotfix/rb-3-ramp-detail-layout` branch only to supply `RB3-R1-EG-002`.

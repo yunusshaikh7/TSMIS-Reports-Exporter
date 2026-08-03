@@ -1,7 +1,6 @@
 # `RB-3` — Implementation Record
 
-Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (Review 1's
-`RB3-R1-EG-001` remedied — see the return and remedy sections at the end)
+Status: **DENIED — RETURN TO IMPLEMENTATION** (`RB3-R1-EG-002`)
 
 | Field | Value |
 |---|---|
