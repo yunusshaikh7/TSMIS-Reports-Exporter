@@ -728,13 +728,22 @@ def phase_validate(root, side, tree, run_id):
                 note(rec, st is not None and match is not None
                      and match.get(mp.name) == (st.st_size, st.st_mtime_ns),
                      f"read-set member in that side's census: {mp.name}")
-        else:
+        elif man.state == em.STATE_RENDERED:
             want = {str(Path(s["selection"]).resolve()): s["sha256"]
                     for s in sides}
             got = {str(Path(m.name).resolve()): m.sha256 for m in members}
             note(rec, got == want,
                  "read set == the comparison's two recorded documents "
                  f"(got {len(got)} member(s))")
+        else:
+            # A generation that rendered nothing (no differences to
+            # illustrate) opened no source document, so its read set is
+            # EMPTY by construction — requiring the two documents here would
+            # demand a claim the generation never made. The state itself is
+            # the assertion, and it is checked above via em.describe.
+            note(rec, not members,
+                 f"a non-rendered generation ({man.state}) claims no read "
+                 f"set (got {len(members)} member(s))")
         if man.state != em.STATE_RENDERED:
             return
         wb_path = ve.sibling_paths(cmp_path)[0]
