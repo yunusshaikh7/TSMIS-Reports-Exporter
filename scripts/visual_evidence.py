@@ -754,10 +754,16 @@ def _legend_for(flavor):
     the compared value named in the title. Where it does, the image carries an
     explicit note line saying so — see `_normalization_note`."""
     if flavor == FLAVOR_ENV:
+        # The env panels are CROPS: their glyphs are the print's own and no
+        # string is drawn, so this side states the relationship outright
+        # rather than promising a per-image note it can never emit (the Ramp
+        # Summary print renders '1,768' where the compared form is '1768').
         return ("Red box = the compared cell in each environment's printed "
                 "export; gray box = the record (its printed lines). Each box "
-                "shows the print's OWN text; where the comparison normalized "
-                "it before comparing, a note line names both forms.")
+                "is a CROP of the print itself, so it shows that print's own "
+                "rendering — separators, padding and date form may differ "
+                "from the compared value the title names, which is the form "
+                "the comparison compared.")
     return ("Red box = the compared cell, drawn from each side's compared "
             "workbook (a rendering of the workbook's own values, not a "
             "screenshot); gray box = the compared row. Each cell shows the "
@@ -1323,6 +1329,36 @@ def _quote_note(va, vb, b_label="TSN"):
             f"{_QUOTE_NAMES[pair[1]]}")
 
 
+def _display_header(adapter, header, resolve):
+    """The POSITION-AUTHORITATIVE display header for a workbook strip.
+
+    Some consolidated editions carry header LABELS that sit beside their own
+    values — the Intersection Detail PDF workbook labels value position 9
+    ('73-10-19', the INT Type Eff-Date) as 'INT Type' and position 10 ('T') as
+    'INT Eff-Date', the same label-shift class `compare_env._RD_ENV_HEADER`
+    corrects for the classic Ramp Detail export. The comparator resolves the
+    compared cell by POSITION (so the red box always lands on the right
+    value), but a strip that drew the workbook's own labels put the boxed date
+    under 'INT Type' — the image then reads as landing on the wrong column.
+
+    Each position a compared field resolves to is therefore labelled with THAT
+    FIELD'S name (the comparison's own label, the one the title uses); every
+    other position keeps the workbook's label as context. Where the labels are
+    already correct this is a no-op — the field name and the workbook label
+    agree."""
+    if resolve is None:
+        return header
+    out = list(header)
+    for f in getattr(adapter, "FIELDS", ()) or ():
+        try:
+            at = resolve(f, header)
+        except Exception:                                 # a hook that refuses
+            continue                                      # silent-ok: context
+        if at is not None and 0 <= at < len(out):
+            out[at] = f
+    return out
+
+
 def _workbook_side(adapter, ex, field, ctx):
     """Render one side from the WORKBOOK the comparison read (CMP-AUD-210 →
     the PCOA-FINAL-004 exact-source rule).
@@ -1373,7 +1409,8 @@ def _workbook_side(adapter, ex, field, ctx):
             key_cols.append(key_col)
     elif adapter.KEY_LABEL in header:
         key_cols.append(header.index(adapter.KEY_LABEL))
-    img = _excel_strip(header, values, col, key_cols)
+    img = _excel_strip(_display_header(adapter, header, resolve), values, col,
+                       key_cols)
     address = f"{sheet}!{_column_letter(col + 1)}{excel_row}"
     label = f"{ctx['label']}  —  {ctx['book_name']} · {address}"
     return img, label, address, None, panel_cell_text(str(values[col]))[0]

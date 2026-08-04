@@ -251,6 +251,33 @@ check("the narrow vs-TSN header still walks its own columns unchanged",
 # inspection found both: a title/subline cut mid-glyph at the canvas edge, and
 # a long left caption overprinting the right one into an unreadable mash).
 # --------------------------------------------------------------------------- #
+# The strip's header labels are POSITION-AUTHORITATIVE: a consolidated edition
+# whose own labels sit beside their values (the ID PDF workbook labels value
+# position 9 — a date — 'INT Type') must not draw the boxed value under a
+# neighbour's label. Found by the RB4-A1 native-scale inspection.
+print("the strip's header labels follow the VALUES, not the workbook's shift")
+import evidence_intersection_detail as _eid6
+
+_SHIFTED = ["Route", "P", "Post Mile", "S", "Location", "Date of Record",
+            "H/G", "City Code", "R/U", "INT Type", "INT Eff-Date", "Ctrl T",
+            "Ctrl Type", "Light Eff-Date", "Light T/Y", "ML Eff-Date",
+            "ML S/M", "ML L/C", "ML R/C", "ML T/P", "ML N/L", "Description",
+            "Main Line Lgth", "Inter Eff-Date", "Inter S", "Inter L",
+            "Inter R", "Inter T", "Inter N", "Int St Eff-Date", "Intrte S",
+            "Intrte Route", "Intrte Post", "Intrte Mile", "Xing P/S",
+            "Xing Line Lgth"]
+_fixed = ve._display_header(_eid6, _SHIFTED, _eid6.pdf_excel_column_for)
+_boxed = _eid6.pdf_excel_column_for("INT Type Eff-Date", _SHIFTED)
+check("the boxed value's own column is labelled with the COMPARED field",
+      _boxed == 9 and _fixed[_boxed] == "INT Type Eff-Date"
+      and _SHIFTED[_boxed] == "INT Type")
+check("the neighbouring shifted labels are corrected too",
+      _fixed[10] == "INT Type" and _fixed[12] == "Control Type")
+check("a position no compared field claims keeps the workbook's own label",
+      _fixed[0] == "Route" and _fixed[4] == "Location")
+check("an adapter with no resolve hook leaves the header untouched",
+      ve._display_header(_eid6, _SHIFTED, None) is _SHIFTED)
+
 print("the composed image: no clipping, no overprint, no silent restatement")
 
 _note = ve._normalization_note(("64-01-01", "2004-01-01"),
