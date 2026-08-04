@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 import visual_evidence as ve
 from openpyxl import Workbook
+from PIL import Image
 
 _fail = []
 
@@ -119,32 +120,32 @@ try:
         return ve._workbook_side(Adapter, {"row_index": row_index, "va": va},
                                  field, ctx)
 
-    _img2, _label, _address, _why = side("Length (MI) [MI]", "000.075")
+    _img2, _label, _address, _why, _drawn = side("Length (MI) [MI]", "000.075")
     check("a matching cell renders, labelled with the workbook and its address",
           _why is None and _img2 is not None and _address == "Highway Log!C2"
           and _label == f"TSMIS (Excel)  —  {_book.name} · Highway Log!C2")
     check("the label names the SIDE and the workbook, never a print",
           "TSMIS (Excel)" in _label and "PDF" not in _label)
 
-    _, _, _, _why2 = side("Length (MI) [MI]", "999.999")
+    _, _, _, _why2, _ = side("Length (MI) [MI]", "999.999")
     check("a cell that no longer holds the compared value is refused",
           _why2 is not None and "no longer holds" in _why2)
-    _, _, _, _why3 = side("Length (MI) [MI]", "000.075", row_index=None)
+    _, _, _, _why3, _ = side("Length (MI) [MI]", "000.075", row_index=None)
     check("a candidate with no row position is refused", _why3 is not None)
-    _, _, _, _why4 = side("Length (MI) [MI]", "000.075", row_index=99)
+    _, _, _, _why4, _ = side("Length (MI) [MI]", "000.075", row_index=99)
     check("a row that is not in the compared workbook is refused",
           _why4 is not None and "not found" in _why4)
-    _, _, _, _why5 = side("Nonexistent Column", "000.075")
+    _, _, _, _why5, _ = side("Nonexistent Column", "000.075")
     check("a column that is not resolvable in this workbook edition is refused",
           _why5 is not None and "cannot be resolved" in _why5)
-    _, _, _, _why6 = side("SPD", "65", rows={0: ("S", 2, ["001", "R000.129"])})
+    _, _, _, _why6, _ = side("SPD", "65", rows={0: ("S", 2, ["001", "R000.129"])})
     check("a short workbook row is refused, never read past its end",
           _why6 is not None and "short of the compared column" in _why6)
 
     # THE FINDING'S CASE: the compared Excel value has no counterpart in the
     # companion print at all. The PDF route can only reject it; the Excel route
     # evidences it, because the workbook is where it was compared from.
-    _img3, _label3, _addr3, _why7 = side("City", "LODI", row_index=2)
+    _img3, _label3, _addr3, _why7, _ = side("City", "LODI", row_index=2)
     check("an Excel value the companion print never carried is still "
           "evidenceable (CMP-AUD-210)",
           _why7 is None and _img3 is not None and _addr3 == "Highway Log!D4")
@@ -163,7 +164,7 @@ try:
     _ctx_b = {"rows": _rows, "header": _HEADER, "book_name": _book.name,
               "resolve": "tsn_excel_column_for", "project": "tsn_project",
               "index_key": "row_index_b", "value_key": "vb", "label": "TSN"}
-    _img4, _label4, _addr4, _why8 = ve._workbook_side(
+    _img4, _label4, _addr4, _why8, _ = ve._workbook_side(
         TsnAdapter, {"row_index_b": 0, "vb": "000.075"}, "Length (MI) [MI]",
         _ctx_b)
     check("the TSN side renders from the compared workbook through its own hook",
@@ -243,6 +244,65 @@ check("...with both sides' row positions carried",
       _diffs["FT"][0]["row_index"] == 0 and _diffs["FT"][0]["row_index_b"] == 0)
 check("the narrow vs-TSN header still walks its own columns unchanged",
       len(chsl._SCHEMA.header) + 1 == len(_SELF_HEADER))
+
+# --------------------------------------------------------------------------- #
+# The composed image tells the truth about what it drew (PCOA-FINAL-006's
+# truthfulness half) and never CLIPS what it says (the RB4-A1 native-scale
+# inspection found both: a title/subline cut mid-glyph at the canvas edge, and
+# a long left caption overprinting the right one into an unreadable mash).
+# --------------------------------------------------------------------------- #
+print("the composed image: no clipping, no overprint, no silent restatement")
+
+_note = ve._normalization_note(("64-01-01", "2004-01-01"),
+                               ("1964-01-01", "2004-01-01"),
+                               ("TSMIS (PDF)", "TSN"))
+check("a source form the comparison normalized is DISCLOSED on the image",
+      "64-01-01" in _note and "compared value" in _note
+      and "TSMIS (PDF)" in _note and "2004-01-01" not in _note)
+check("a DERIVED value's composite source cell is disclosed the same way "
+      "(RD District is the leading component of Location)",
+      "12-SD-005" in ve._normalization_note(("12-SD-005", "12"), ("12", "12"),
+                                            ("TSMIS (PDF)", "TSN")))
+check("a drawn value that IS the compared value adds no note",
+      ve._normalization_note(("A", "B"), ("A", "B"), ("X", "Y")) == "")
+check("a crop flavor (no drawn strings) adds no note",
+      ve._normalization_note((None, None), ("A", "B"), ("X", "Y")) == "")
+check("an ELIDED drawn value is not mistaken for a normalization difference",
+      ve._normalization_note((ve.panel_cell_text(_huge)[0], None),
+                             (_huge, ""), ("X", "Y")) == "")
+
+_tiny = Image.new("RGB", (120, 40), (255, 255, 255))
+_long_title = "Description — TSMIS (PDF) 'EQUATES TO END R REALIGNMENT'  vs  " \
+              "TSMIS (Excel) 'END R REALIGNMENT'"
+_long_sub = ("Route 046 @ 50.904 — the workbook cell Intersection Detail!F5563 "
+             "and the workbook cell Intersection Detail (TSN)!G5676 re-read "
+             "and verified against the compared values")
+_long_label = "TSMIS (PDF)  —  tsmis_intersection_detail_pdf_consolidated " \
+              "2026-07-23 ssor-prod.xlsx · Intersection Detail!F5563"
+_cdir = tempfile.mkdtemp(prefix="evidence_compose_")
+try:
+    _st = Path(_cdir) / "s.png"
+    ve._compose_stacked(_long_title, _long_sub, _long_label, _tiny,
+                        "TSN — x.xlsx · A1", _tiny, _st, note=_note)
+    _pr = Path(_cdir) / "p.png"
+    ve._compose_pair(_long_title, _long_sub, _long_label, _tiny,
+                     "TSN — x.xlsx · A1", _tiny, _pr, note=_note)
+    _need = max(ve._text_w(_long_title, ve._font(26, True)),
+                ve._text_w(_long_sub, ve._font(17)),
+                ve._text_w(_note, ve._font(17, True)))
+    _sw = Image.open(_st).width
+    _pw = Image.open(_pr).width
+    check("stacked: the canvas grows to hold the title/subline/note in full",
+          _sw >= _need + 16)
+    check("paired: the canvas grows to hold the title/subline/note in full",
+          _pw >= _need + 16)
+    # The left caption's own column must reach past its text, so the right
+    # caption starts beyond it and the two can never overprint.
+    check("paired: a long left caption cannot reach the right caption",
+          _pw >= ve._text_w(_long_label, ve._font(16, True))
+          + ve._text_w("TSN — x.xlsx · A1", ve._font(16, True)) + 48)
+finally:
+    shutil.rmtree(_cdir, ignore_errors=True)
 
 print()
 if _fail:

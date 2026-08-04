@@ -166,24 +166,24 @@ def test_seam():
     rows = {0: ("Data", 2, ["r1", "kv", "fv"])}
     header = ["Route", "K", "SiteLabel"]
     ex = {"row_index": 0, "va": "fv"}
-    img, label, addr, reason = visual_evidence._workbook_side(
+    img, label, addr, reason, _drawn = visual_evidence._workbook_side(
         _HookAdapter, ex, "F", _ctx(rows, header))
     c.check("hook resolution renders from the mapped cell",
             reason is None and addr == "Data!C2", f"addr={addr} reason={reason}")
-    img, label, addr, reason = visual_evidence._workbook_side(
+    img, label, addr, reason, _drawn = visual_evidence._workbook_side(
         _HookAdapter, ex, "Unknown", _ctx(rows, header))
     c.check("hook None is the honest refusal",
             img is None and "no single cell" in reason, f"reason={reason}")
-    img, label, addr, reason = visual_evidence._workbook_side(
+    img, label, addr, reason, _drawn = visual_evidence._workbook_side(
         _PlainAdapter, ex, "SiteLabel", _ctx(rows, header))
     c.check("an adapter without the hook keeps the exact-label default",
             reason is None and addr == "Data!C2", f"addr={addr} reason={reason}")
-    img, label, addr, reason = visual_evidence._workbook_side(
+    img, label, addr, reason, _drawn = visual_evidence._workbook_side(
         _PlainAdapter, ex, "F", _ctx(rows, header))
     c.check("exact-label miss refuses (unresolvable in this edition)",
             img is None and "cannot be resolved" in reason,
             f"reason={reason}")
-    img, label, addr, reason = visual_evidence._workbook_side(
+    img, label, addr, reason, _drawn = visual_evidence._workbook_side(
         _PlainAdapter, ex, "SiteLabel",
         _ctx(rows, header, resolve="tsn_excel_column_for"))
     c.check("a MISSING side-specific hook refuses — no exact-label fallback "

@@ -745,15 +745,24 @@ def _adapter_sheet(adapter, kind):
 
 
 def _legend_for(flavor):
-    """The image-sheet legend — it must assert only what was actually read."""
+    """The image-sheet legend — it must assert only what was actually read.
+
+    The panels show each side's own SOURCE text (the print's glyphs, or the
+    workbook cell as that workbook holds it), never a normalized restatement:
+    a normalizing comparison (dates, padding, case) can compare two forms that
+    the sources spell differently, so the boxed text may differ in FORM from
+    the compared value named in the title. Where it does, the image carries an
+    explicit note line saying so — see `_normalization_note`."""
     if flavor == FLAVOR_ENV:
         return ("Red box = the compared cell in each environment's printed "
-                "export; gray box = the record (its printed lines). Values "
-                "shown are the compared (normalized) forms.")
+                "export; gray box = the record (its printed lines). Each box "
+                "shows the print's OWN text; where the comparison normalized "
+                "it before comparing, a note line names both forms.")
     return ("Red box = the compared cell, drawn from each side's compared "
             "workbook (a rendering of the workbook's own values, not a "
-            "screenshot); gray box = the compared row. Values shown are the "
-            "compared (normalized) forms.")
+            "screenshot); gray box = the compared row. Each cell shows the "
+            "workbook's OWN text; where the comparison normalized it before "
+            "comparing, a note line names both forms.")
 
 
 class _FieldsView:
@@ -1335,7 +1344,7 @@ def _workbook_side(adapter, ex, field, ctx):
     index = ex.get(ctx["index_key"])
     located = ctx["rows"].get(index) if index is not None else None
     if located is None:
-        return None, None, None, "row not found in the compared workbook"
+        return None, None, None, "row not found in the compared workbook", None
     sheet, excel_row, values = located
     header = ctx["header"]
     resolve = getattr(adapter, ctx["resolve"], None)
@@ -1344,18 +1353,19 @@ def _workbook_side(adapter, ex, field, ctx):
         if col is None:
             return None, None, None, (
                 "the compared column has no single cell in this workbook "
-                "(a derived column, or a header the comparison would refuse)")
+                "(a derived column, or a header the comparison would refuse)"), None
     elif ctx["resolve"] == "excel_column_for" and field in header:
         col = header.index(field)
     else:
         return None, None, None, (
-            "the compared column cannot be resolved in this workbook edition")
+            "the compared column cannot be resolved in this workbook edition"), None
     if col >= len(values):
-        return None, None, None, "the workbook row is short of the compared column"
+        return None, None, None, ("the workbook row is short of the compared "
+                                  "column"), None
     project = getattr(adapter, ctx["project"], None) or adapter.project
     if project(field, values[col]) != project(field, ex[ctx["value_key"]]):
         return None, None, None, ("the compared workbook cell no longer "
-                                  "holds the compared value")
+                                  "holds the compared value"), None
     key_cols = [0]
     if resolve is not None:
         key_col = resolve(adapter.KEY_LABEL, header)
@@ -1366,7 +1376,7 @@ def _workbook_side(adapter, ex, field, ctx):
     img = _excel_strip(header, values, col, key_cols)
     address = f"{sheet}!{_column_letter(col + 1)}{excel_row}"
     label = f"{ctx['label']}  —  {ctx['book_name']} · {address}"
-    return img, label, address, None
+    return img, label, address, None, panel_cell_text(str(values[col]))[0]
 
 
 def _env_example_sides(adapter, ex, field, env_loc, side_labels, page_cache):
@@ -1427,21 +1437,29 @@ def _try_example(adapter, ex, field, out_dir, k, page_cache,
         if got is None:
             return None, reason
         (t_img, t_label, t_verified), (n_img, n_label, n_verified) = got
+        # The env panels are CROPS of the prints — their glyphs are the
+        # document's own and are never a drawn string, so the normalization
+        # note is derived from the print text the adapter read back, which
+        # `_env_example_sides` already required to compose to the published
+        # cell. Nothing to restate here.
+        drawn = (None, None)
     else:
-        t_img, t_label, t_addr, reason = _workbook_side(adapter, ex, field,
-                                                        side_a)
+        t_img, t_label, t_addr, reason, t_drawn = _workbook_side(
+            adapter, ex, field, side_a)
         if reason is not None:
             return None, reason
-        n_img, n_label, n_addr, reason = _workbook_side(adapter, ex, field,
-                                                        side_b)
+        n_img, n_label, n_addr, reason, n_drawn = _workbook_side(
+            adapter, ex, field, side_b)
         if reason is not None:
             return None, reason
         t_verified = f"the workbook cell {t_addr}"
         n_verified = f"the workbook cell {n_addr}"
+        drawn = (t_drawn, n_drawn)
 
     title = (f"{field} — {side_labels[0]} '{ex['va'] or '(blank)'}'  vs  "
              f"{side_labels[1]} '{ex['vb'] or '(blank)'}'")
-    note = _quote_note(ex["va"], ex["vb"], side_labels[1])
+    note = _quote_note(ex["va"], ex["vb"], side_labels[1]) or \
+        _normalization_note(drawn, (ex["va"], ex["vb"]), side_labels)
     sub = (f"Route {ex['route']} @ {ex['key']} — {t_verified} and "
            f"{n_verified} re-read and verified against the compared values")
     safe = re.sub(r"[^A-Za-z0-9]+", "_", field).strip("_")
@@ -1671,10 +1689,61 @@ def _scaled(im, width):
 _NOTE_H = 30            # extra header height when the quote-characters note line shows
 
 
+def _normalization_note(drawn, compared, side_labels):
+    """The note line for a panel whose SOURCE text differs in form from the
+    compared value the title names (PCOA-FINAL-006 truthfulness half).
+
+    A comparison that normalizes (dates, padding, case) or DERIVES (Ramp
+    Detail's District is the leading component of the composite Location cell)
+    legitimately compares a value the source cell spells differently — the ID
+    PDF workbook holds '64-01-01' where the comparison compared '1964-01-01',
+    and the RD workbook's boxed Location cell holds '12-SD-005' where the
+    compared District is '12'. The panel must keep showing the source cell's
+    own text (the exact-source rule), so the image states both forms outright
+    rather than leaving the reader with a title and a box that appear to
+    disagree. Returns "" when every drawn string is its compared value
+    verbatim, or when this flavor draws no strings at all (crops)."""
+    parts = []
+    for text, value, label in zip(drawn, compared, side_labels):
+        if text is None:
+            continue
+        want = panel_cell_text(str(value or ""))[0]
+        if text != want:
+            parts.append(f"{label}'s boxed cell holds '{text}'")
+    if not parts:
+        return ""
+    return (" and ".join(parts)
+            + " — the comparison read the compared value out of it; the title "
+              "names that compared value.")
+
+
+def _text_w(text, font):
+    """Rendered width of one line (Pillow ≥ 8 removed ImageDraw.textsize)."""
+    if not text:
+        return 0
+    try:
+        box = font.getbbox(text)
+        return int(box[2] - box[0])
+    except AttributeError:                       # the built-in bitmap fallback
+        return int(font.getlength(text))
+
+
+def _header_w(title, sub, note=""):
+    """The canvas width the title block needs. The composers size the canvas
+    from the widest of {panels, header}: a title clipped at the canvas edge
+    mid-glyph is the very truncation-without-a-marker defect this bundle
+    retires, so the canvas grows to the text instead of cutting it."""
+    return 32 + max(_text_w(title, _font(26, True)),
+                    _text_w(sub, _font(17)),
+                    _text_w(note, _font(17, True)) if note else 0)
+
+
 def _header(canvas, w, title, sub, note=""):
-    """The title block; returns the y where content starts. `note` (the
-    _quote_note line) renders dark red under the subtitle — it flags a REAL
-    difference the printed values themselves don't show."""
+    """The title block; returns the y where content starts. `note` renders
+    dark red under the subtitle — it flags something the boxed values
+    themselves don't show (a quote-character difference, or a source form the
+    comparison normalized before comparing)."""
+    del w                        # the canvas is sized to fit; nothing to clip
     d = ImageDraw.Draw(canvas)
     d.text((16, 12), title, font=_font(26, True), fill=(20, 20, 20))
     d.text((16, 50), sub, font=_font(17), fill=(90, 90, 90))
@@ -1686,8 +1755,11 @@ def _header(canvas, w, title, sub, note=""):
 def _compose_stacked(title, sub, top_label, top_img, bot_label, bot_img, out,
                      note=""):
     top_img, bot_img = _scaled(top_img, _STACK_W), _scaled(bot_img, _STACK_W)
-    w = max(top_img.width, bot_img.width) + 32
     lab = 30
+    w = max(top_img.width, bot_img.width) + 32
+    w = max(w, _header_w(title, sub, note),
+            32 + max(_text_w(top_label, _font(16, True)),
+                     _text_w(bot_label, _font(16, True))))
     hd = 84 + (_NOTE_H if note else 0)
     h = hd + lab + top_img.height + 14 + lab + bot_img.height + 16
     canvas = Image.new("RGB", (w, h), (255, 255, 255))
@@ -1707,18 +1779,24 @@ def _compose_pair(title, sub, l_label, l_img, r_label, r_img, out, note=""):
     l_img, r_img = _scaled(l_img, _PAIR_SIDE_W), _scaled(r_img, _PAIR_SIDE_W)
     lab = 30
     col_h = max(l_img.height, r_img.height)
-    w = l_img.width + r_img.width + 48
+    # Each caption gets its OWN column: a long left caption used to run under
+    # the right caption and the two overprinted into an unreadable mash. The
+    # columns widen to hold their captions, so neither can reach the other.
+    lab_font = _font(16, True)
+    l_w = max(l_img.width, _text_w(l_label, lab_font))
+    r_w = max(r_img.width, _text_w(r_label, lab_font))
+    w = max(l_w + r_w + 48, _header_w(title, sub, note))
     h = 84 + (_NOTE_H if note else 0) + lab + col_h + 16
     canvas = Image.new("RGB", (w, h), (255, 255, 255))
     y0 = _header(canvas, w, title, sub, note)
     d = ImageDraw.Draw(canvas)
     x = 16
-    for label, im in ((l_label, l_img), (r_label, r_img)):
-        d.text((x, y0 + 4), label, font=_font(16, True), fill=(31, 56, 100))
+    for label, im, col_w in ((l_label, l_img, l_w), (r_label, r_img, r_w)):
+        d.text((x, y0 + 4), label, font=lab_font, fill=(31, 56, 100))
         canvas.paste(im, (x, y0 + lab))
         d.rectangle([x - 1, y0 + lab - 1, x + im.width, y0 + lab + im.height],
                     outline=(200, 200, 200), width=1)
-        x += im.width + 16
+        x += col_w + 16
     canvas.save(out)
 
 
