@@ -26,18 +26,19 @@ status flips to `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW`)
 | `scripts/matrix_build.py` | `build_cell_comparison` gains `evidence=` → `_run_env_evidence` (decoration-after-`require_published_comparison`+COMPLETE, failure only logs — the existing contract); `build_comparison` passes `evidence` through on the env branch; NEW `run_env_evidence_only` (the HF-10 camera: trusted/current/COMPLETE sidecar, cache generation binding, input-fingerprint freshness); `evidence_for_cell` gains `mode_id` ("env" → the env camera) | 007 |
 | `scripts/matrix.py` | Facade re-export `run_env_evidence_only` | 007 |
 | `scripts/gui_matrix.py` | `matrix_evidence_cell` is mode-aware (the row's SELECTED mode: env → `env_capable` + baseline-cell refusal; job carries the frozen mode per CMP-AUD-110); `_dispatch_evidence_job` routes `mode_id` | 007 |
-| `scripts/gui_api.py` | ONE truth line in `_evidence_view`: a row counts as supported when ANY lane can illustrate it (`capable` OR `env_capable`) — without it the UI would keep asserting "no evidence support" for ramp_summary, the same untruthful-prose class criterion 4 retires. **Scope note for the reviewer:** `gui_api.py` is not in the bundle's named file union; the alternative was returning the whole bundle to planning over three tokens of availability plumbing. Flagged here deliberately | 007, criterion-4 spirit |
+| `scripts/gui_api.py` | ONE truth line in `_evidence_view`: a row counts as supported when ANY lane can illustrate it (`capable` OR `env_capable`) — without it the UI would keep asserting "no evidence support" for ramp_summary, the same untruthful-prose class criterion 4 retires | 007, criterion-4 spirit |
+| `scripts/self_test.py` | `evidence_ramp_summary` joins `_DYNAMIC_REPORT_MODULES` — the HF-10 camera resolves the new adapter lazily, so the frozen build must carry it or the env lane fails only on the packaged app | wiring |
 | `scripts/ui/ui-matrix.js` | The evidence hint states the true sources (workbook panels / both environments' prints); `evidenceActionInfo(rowKey, mode)` is lane-aware with NO print requirement; the row camera badge is always lit for supported rows; the Everything cell actions offer the camera+open on env-mode cells of the five env rows (baseline cell excluded) | 004, 007 |
 | `scripts/ui/mock.js` | `env_rows` + the corrected `unsupported` list (mock parity) | wiring |
 | `build/app.spec` | `APP_MODULES` += `evidence_ramp_summary` (F6) | wiring |
 | `build/_checklib.py` | NEW `publish_bound_comparison` — fixtures publish the production way (`artifact_store.commit_workbook` → typed outcome sidecars + `write_comparison_provenance`), so checks drive the exact-source binding through the real front door | test infra |
 | `build/check_visual_evidence.py` | Fixtures rebased on bound comparisons; snapshot bucket/stat/rename coverage; availability `ready`/`env_rows` semantics; NEW blocks: blank-side refusals (HL both prints, HSL equate lines), the engine env row-rectangle backstop, env candidates from the published universe, `env_fields` pinned to `compare_env`'s own constants per family, the RS geometry twin (incl. the mislabel-refusal and absent-category refusal) | 004, 005, 006, 007 |
-| `build/check_evidence_source_role.py` | `_workbook_rows_at`/`_workbook_side` contract; `panel_cell_text` fidelity (full 34-char value drawn; pathological values visibly elided; strip sized to the drawn string); the TSN-side panel via its own hook; the three-flavor registry; per-adapter hook presence; env-capability registry (ramp_summary env-only) | 004, 006, 007 |
+| `build/check_evidence_source_role.py` | `_workbook_rows_at`/`_workbook_side` contract; `panel_cell_text` fidelity (full 34-char value drawn; pathological values visibly elided; strip sized to the drawn string); the TSN-side panel via its own hook; the three-flavor registry; env-capability registry (ramp_summary env-only). The composed image is measured from its OWN INK — the title block must end inside the canvas without being padded far past it, and a long left caption and the right caption must resolve to two separate ink runs; sizing the expectation with the composer's own width helper was circular and a halving regression satisfied both sides of it. The adapter hooks are PROBED, not counted: each column hook must refuse a header it does not recognise (an existence assertion passes against a stub resolving every field to column 0), `tsn_project` must be idempotent and read a blank cell as `""`, `workbook_sheet` must name a sheet per edition with the two TSMIS-side editions sharing one, and `tsmis_pdf_path` must resolve inside the run folder under the end-anchored per-route name. And the two engine helpers with a single call site each — `_display_header`, `_normalization_note` — are locked by one example driven end to end through `_try_example`; without it, deleting either line passed the entire gate | 004, 006, 007 |
 | `build/check_evidence_manifest.py` | `run_generate` publishes BOUND fixtures; the cancel boundary moved to the addressing step; NEW terminal case: an unbindable pair publishes NOTHING — manifest included — and retires the prior set | 004 |
 | `build/check_evidence_excel_columns.py` | Seam test on `_workbook_side` ctx (incl. the no-fallback rule for side-specific hooks); RD July-2026 dual-edition resolution; NEW `test_tsn_and_pdf_hooks` per family | 004 |
 | `build/check_evidence_literal_cells.py` | The new Summary layout (source lines on rows 3–4, data from row 7) with source-controlled text in every new slot | 004 |
 | `build/check_matrix.py` | `build_cell_comparison(evidence=)` accepted; an XLSX env cell stays SILENT with the toggle on; the env camera refuses non-env rows and missing comparisons | 007 |
-| `build/check_pdf_excel_matrix.py` | The by-day PDF-vs-Excel lane writes ZERO evidence artifacts (criterion 5's silent control now has teeth) | 004 |
+| `build/check_pdf_excel_matrix.py` | The by-day PDF-vs-Excel lane writes ZERO evidence artifacts (criterion 5's silent control). A bare "the glob found nothing" reads the same whether the lane is silent, the tree is the wrong one, or the pattern is broken — so the probe is CONTROLLED first: an evidence-named artifact is planted where one would land, the probe must see it, and only then is the lane's own silence read | 004 |
 | `build/check_pdf_route_identity.py` | The engine-half identity pin retargeted to `_locate_env_sides` (the one production print-rendering lane) | wiring |
 | `build/check_matrix_ownership.py` | The evidence-dispatch stub accepts `mode_id` | wiring |
 | `build/run_rb4_acceptance.py` | NEW — the committed `RB4-A1` driver (provision / generate / cameras / counts / validate / excel / census / checks-at-base phases; worker-parity leases and commit guards; per-phase JSON results + logs). Hardened during the run, before the head side started: the PvE silent-control cells take the PDF-edition row keys the matrix actually registers; `phase_validate`'s env re-derivation runs the engine's own lookup end-to-end and treats legal `…`-elision as a LISTED census for the image inspection (never a failure); every phase result SELF-STAMPS the tree's exact git head + a runtime-scoped dirty flag (`tree_stamp`) so exact-head identity lives in the record itself — the RB-2 lesson | acceptance |
@@ -244,7 +245,46 @@ normalizes to blank one does (class 2/5 exact, not blanket).
 
 ## Scope and residual risk
 
-TBD.
+**Files outside the bundle's named union.** The bundle expected
+`scripts/visual_evidence.py`, the `scripts/evidence_*.py` adapters,
+`scripts/matrix_build.py`, the `scripts/day_matrix.py` / `scripts/gui_matrix.py`
+guards, and checks. Six changed files sit outside that union, each named in the
+Changes table and each a consequence of the env lane existing at all rather than
+a widening of the fix:
+
+| File | Why it had to change |
+|---|---|
+| `scripts/matrix.py` | facade re-export of `run_env_evidence_only`; the facade is the patch surface every caller uses |
+| `scripts/gui_api.py` | one truth line, without which the UI keeps asserting "no evidence support" for a row that now has it — the untruthful-prose class criterion 4 retires |
+| `scripts/self_test.py` | the new adapter is resolved lazily, so the frozen build must declare it or the env lane fails ONLY on the packaged app |
+| `scripts/ui/ui-matrix.js`, `scripts/ui/mock.js` | the hint text asserted print sources that no longer exist, and the mock must stay at parity |
+| `build/app.spec` | same lazy-import reason as `self_test.py` |
+
+`scripts/day_matrix.py` is in the union and was NOT changed: the by-day lane is
+one of the two silent paths, and it stays silent by not gaining a call site.
+
+**⛔ Highway Detail: code changed, never exercised.** `evidence_highway_detail.py`
+gained the four shared-contract hooks so the engine stays uniform across
+adapters. HD is PRE-RELEASE, so **no HD cell is exercised anywhere in RB4-A1** —
+not in generation, not by a camera, not in the inspection. Its hooks are covered
+only by the check-level probes. Nothing here re-blesses an HD canary, changes an
+HD parser or normalizer, or infers an HD fact; when the vendor delivers official
+HD exports, the HD evidence lane needs its own first exercise before it is
+trusted.
+
+**The env lane's coverage is five cells on one day.** HF-10 is proved on the five
+Everything ENV cells of the acceptance corpus. The geometry adapters were fixed
+against that corpus's prints, and three of the five needed a probe-driven fix to
+work at all — which is evidence that env geometry is corpus-sensitive. A print
+whose layout differs from these will REFUSE (that is the designed failure), but
+"refuses correctly" is asserted only for the shapes this corpus contains.
+
+**What the acceptance run does not prove.** Excel opens every retained workbook
+without an open failure; because the driver runs with `DisplayAlerts=False`, a
+SILENT repair is not detected, so this is not a zero-repair claim. Image
+correctness is established by exhaustive native-scale human-equivalent
+inspection plus programmatic validation of every retained image — not by a
+pixel-exact golden, which does not exist for this output.
 
 ## Rollback
 
