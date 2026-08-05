@@ -23,6 +23,9 @@ extensions the bundle's acceptance demanded:
 
 Checks, each reported separately:
 
+  PROBLEMS   the manifest's OWN build problem list must be empty — always, not
+             only under --corpus. A builder that recorded broken evidence has
+             already failed the acceptance; the verifier may not certify it.
   RUNTIME    re-derive the runtime set (scripts/, version.py,
              requirements.txt, build/) at the acceptance head and compare
              per-file LF-normalized hashes and the rolled digest.
@@ -30,10 +33,17 @@ Checks, each reported separately:
              and nothing runtime-affecting happened after it.
   EXACT HEAD every claimed entry names the acceptance commit exactly, the
              manifest's recorded self-stamps agree, and commits between the
-             head and the manifest build head touch no runtime file.
+             head and the manifest build head touch no runtime file. A
+             manifest that claims NO acceptance result fails.
   BASE TREE  re-derive the runtime set at the recorded base commit; its digest
              must equal the manifest's `runtime_digest_at_base` and the
-             manifest must assert the export matched file-for-file.
+             manifest must assert the export matched file-for-file. The base
+             side must be EXPLICITLY BOUND: the base commit may not be the
+             acceptance head, the base export may not be the head tree, and
+             every base-signature result must name the base commit in its own
+             recorded stamp (a null/absent stamp fails — a driver run with the
+             tree argument forgotten produces "base" results off the HEAD, and
+             base<->head count invariance is then trivially true).
   WITNESSES  re-hash every committed witness (HF-05 + HF-10) from the repo and
              require each file's own content to carry
              `bound_to_acceptance_head` equal to the acceptance commit, with
@@ -43,19 +53,27 @@ Checks, each reported separately:
              1B witness manifest), the provisioned replicas (each equal to its
              recorded hash AND its frozen source's hash), the deliverables,
              the retained results (re-reading each claimed result's own
-             self-stamp), and the harness. FAIL-CLOSED: once requested, every
-             declared root, file, result and harness record MUST be present
-             and match; any absence is a nonzero failure, never a skip. The
-             manifest's own `problems` list must be empty.
+             self-stamp, and each base result's own base stamp), and the
+             harness. FAIL-CLOSED: once requested, every declared root, file,
+             result and harness record MUST be present and match; any absence
+             is a nonzero failure, never a skip. An EMPTY declaration — a root
+             list with no roots, or a root with no files — fails too: it
+             verifies nothing while reporting success.
   ZIPS       (--zips) re-match every ground-truth 7.9 member of the frozen
              archives against the inventory hashes; no ground-truth file may
              be outside every archive.
   SELF-TEST  (--self-test) bounded NEGATIVE checks over fabricated fixtures:
-             a missing declared root/file/result, changed bytes, a replica
-             diverging from its frozen source, a tampered detached inventory,
-             a wrong-head / unstamped / dirty-stamped claimed entry, and an
-             unbound witness must each FAIL; a clean fixture must verify.
-             Exits nonzero if any negative case passes.
+             a missing declared root/file/result, an EMPTY declared set,
+             changed bytes, a replica diverging from its frozen source, a
+             tampered detached inventory, a non-empty manifest problem list, a
+             wrong-head / unstamped / dirty-stamped claimed entry, a manifest
+             with no claimed entry at all, an unbound base side, and an
+             unbound witness must each FAIL; a clean fixture must verify. The
+             cases drive the REAL check functions (`check_exact_head`,
+             `check_base_binding`, `check_witnesses`, `rehash_block`,
+             `load_inventory`) — a self-test that reimplements the logic it is
+             testing proves only that the copy works. Exits nonzero if any
+             negative case passes.
 
 Usage:
   rb4-verify-manifest.py <manifest.json> [--tree <repo>] [--corpus] [--zips]
@@ -74,6 +92,7 @@ SKIP_SUFFIXES = (".pyc", ".pyo")
 SKIP_PARTS = ("__pycache__", ".ruff_cache", ".venv", "node_modules")
 CHUNK = 1 << 20
 SELF_STAMPED_ROLES = ("generate", "cameras", "counts", "validate", "excel")
+BASE_SIGNATURE_CLASS = "base-signature"
 
 
 def git(tree, *args):
@@ -132,6 +151,37 @@ def rolled_digest(files):
         h.update(files[rel]["sha256"].encode("ascii"))
         h.update(b"\n")
     return h.hexdigest().upper()
+
+
+def check_manifest_problems(manifest, fail):
+    """The builder's own problem list is a VERDICT, not a footnote.
+
+    It used to be read only under --corpus, so the cheap default run certified
+    a manifest that said in its own body that it had been built over broken
+    evidence. An absent list fails too: the builder always writes one, so a
+    manifest without it is not a manifest this verifier can read."""
+    print("\nPROBLEMS — the manifest's own build record")
+    problems = manifest.get("problems")
+    if problems is None:
+        fail("the manifest records no 'problems' list — an absent list is not "
+             "an empty one")
+        return
+    if problems:
+        fail(f"the manifest itself records {len(problems)} build problem(s): "
+             f"{problems[:3]}")
+        return
+    print("  builder recorded                   0 problem(s)")
+
+
+def declared_roots(section, rows, fail):
+    """The declared root list for one section. An EMPTY list fails for the same
+    reason an empty file set does: nothing is verified and the run still
+    reports success."""
+    if not rows:
+        fail(f"{section}: the manifest declares NO root — an empty declaration "
+             f"verifies nothing")
+        return ()
+    return rows
 
 
 def check_runtime(manifest, tree, fail):
@@ -217,6 +267,11 @@ def check_exact_head(manifest, tree, fail):
         return
     entries = manifest["results"]["entries"]
     claimed = [r for r in entries if r.get("class") == "acceptance"]
+    if not claimed:
+        # Nothing claimed means nothing was bound to the head, and every loop
+        # below is vacuously satisfied.
+        fail("the manifest claims NO acceptance result — there is nothing "
+             "bound to the acceptance head")
     missing = [r["path"] for r in claimed if not r.get("runtime_head_commit")]
     wrong = [(r["path"], r["runtime_head_commit"]) for r in claimed
              if r.get("runtime_head_commit")
@@ -259,6 +314,66 @@ def check_exact_head(manifest, tree, fail):
                  f"manifest build head: {touched[:10]}")
         else:
             print("  runtime files changed in between   0")
+
+
+def base_stamp_problems(rec, base_commit, head, export_path):
+    """The manifest-recorded base stamp problems for one base-signature entry.
+
+    The base side must name its OWN runtime the same way the head side does.
+    A base result that names nothing — `tree_commit: null` — leaves the whole
+    red half unbound: the acceptance driver's tree argument DEFAULTS to the
+    head worktree, so a forgotten flag silently produces "base" results off the
+    head runtime and every base<->head count then matches trivially."""
+    out = []
+    stamp = rec.get("base_stamp") or {}
+    got = stamp.get("tree_commit")
+    if not got:
+        out.append(f"base-side result names NO runtime commit of its own "
+                   f"(tree_commit={got!r}) — the base side is unbound: "
+                   f"{rec['path']}")
+    elif got == head:
+        out.append(f"base-side result self-stamps the ACCEPTANCE HEAD "
+                   f"{str(head)[:12]} — it did not run against the base "
+                   f"runtime: {rec['path']}")
+    elif got != base_commit:
+        out.append(f"base-side result self-stamps {str(got)[:12]}, not the "
+                   f"base commit {str(base_commit)[:12]}: {rec['path']}")
+    ran_in = stamp.get("tree")
+    if export_path and ran_in and Path(ran_in) != Path(export_path):
+        out.append(f"base-side result ran in {ran_in}, not the recorded base "
+                   f"export {export_path}: {rec['path']}")
+    return out
+
+
+def check_base_binding(manifest, fail):
+    """The base side is bound EXPLICITLY or not at all: a distinct commit, a
+    distinct tree, and base results that name that commit themselves."""
+    base = manifest.get("base_tree") or {}
+    commit = base.get("commit")
+    head = (manifest.get("acceptance_head") or {}).get("commit")
+    if commit == head:
+        fail(f"the base commit IS the acceptance head {str(head)[:12]} — "
+             f"invariance measured over one runtime proves nothing")
+    export = base.get("export_path")
+    head_tree = ((manifest.get("runtime") or {}).get("head") or {}).get("tree")
+    if not export:
+        fail("the manifest records no base tree export path")
+    elif head_tree and Path(export) == Path(head_tree):
+        fail(f"the base export path IS the head tree ({export}) — the base "
+             f"side ran against the head runtime")
+    entries = [r for r in manifest["results"]["entries"]
+               if r.get("class") == BASE_SIGNATURE_CLASS]
+    if not entries:
+        fail("the manifest binds no base-signature result — the red half of "
+             "red→green rests on nothing")
+        return
+    bound = 0
+    for rec in entries:
+        problems = base_stamp_problems(rec, commit, head, export)
+        for p in problems:
+            fail(p)
+        bound += not problems
+    print(f"  base results explicitly bound      {bound}/{len(entries)}")
 
 
 def check_base_tree(manifest, tree, fail):
@@ -328,7 +443,12 @@ def rehash_block(label, root, recorded, fail, sources=None):
     """Re-hash one declared root. FAIL-CLOSED: when the caller requested this
     verification, an ABSENT declared root or file is a failure, never a skip —
     a verifier that succeeds with declared evidence removed certifies an
-    incomplete acceptance set."""
+    incomplete acceptance set. An EMPTY declaration is the same defect one
+    level up: a root with no files re-hashes nothing and reported `ok`."""
+    if not recorded:
+        fail(f"{label}: the manifest declares an EMPTY file set — an empty "
+             f"declaration verifies nothing")
+        return
     root = Path(root)
     if not root.exists():
         fail(f"{label}: declared root is MISSING: {root}")
@@ -372,16 +492,14 @@ def load_inventory(manifest, fail):
 def check_corpus(manifest, tree, fail):
     print("\nCORPUS — frozen inputs, audit sets, replicas, deliverables, "
           "results (fail-closed: absence is a failure)")
-    if manifest.get("problems"):
-        fail(f"the manifest itself records build problems: "
-             f"{manifest['problems'][:3]}")
+    # The manifest's own problem list is checked unconditionally in main().
     inv = load_inventory(manifest, fail)
     if inv is None:
         return
     head = manifest["acceptance_head"]["commit"]
 
     fs = manifest["frozen_sources"]
-    for row in fs["roots"]:
+    for row in declared_roots("frozen_sources", fs["roots"], fail):
         files = inv["frozen_files"].get(row["label"])
         if files is None:
             fail(f"{row['label']}: absent from the inventory")
@@ -408,7 +526,7 @@ def check_corpus(manifest, tree, fail):
     if audit.get("witness_mismatches"):
         fail(f"the manifest records audit/witness mismatches: "
              f"{audit['witness_mismatches'][:3]}")
-    for row in audit["roots"]:
+    for row in declared_roots("audit_sets", audit["roots"], fail):
         files = inv["audit_files"].get(row["label"])
         if files is None:
             fail(f"{row['label']}: absent from the inventory")
@@ -437,7 +555,7 @@ def check_corpus(manifest, tree, fail):
     if reps.get("mismatches"):
         fail(f"the manifest itself records replica mismatches: "
              f"{reps['mismatches'][:5]}")
-    for row in reps["roots"]:
+    for row in declared_roots("input_replicas", reps["roots"], fail):
         files = inv["replica_files"].get(row["label"])
         if files is None:
             fail(f"{row['label']}: absent from the inventory")
@@ -452,7 +570,7 @@ def check_corpus(manifest, tree, fail):
         rehash_block(row["label"], row["path"], files, fail, sources=sources)
 
     dl = manifest["deliverables"]
-    for row in dl["roots"]:
+    for row in declared_roots("deliverables", dl["roots"], fail):
         files = inv["deliverable_files"].get(row["label"])
         if files is None:
             fail(f"{row['label']}: absent from the inventory")
@@ -483,6 +601,16 @@ def check_corpus(manifest, tree, fail):
                 continue
             if body.get("tree_runtime_dirty") is not False:
                 fail(f"result's OWN self-stamp is not a clean runtime: {p}")
+                continue
+        if rec.get("class") == BASE_SIGNATURE_CLASS:
+            # The same own-content re-read for the red half: the manifest's
+            # recorded base stamp must be what the file itself says.
+            body = json.loads(p.read_text(encoding="utf-8"))
+            stamp = rec.get("base_stamp") or {}
+            if body.get("tree_commit") != stamp.get("tree_commit"):
+                fail(f"base result's OWN stamp {body.get('tree_commit')!r} "
+                     f"disagrees with the manifest's {stamp.get('tree_commit')!r}"
+                     f": {p}")
                 continue
         present += 1
     expected = sum(1 for r in manifest["results"]["entries"]
@@ -647,43 +775,116 @@ def self_test():
                                   "sha256": "0" * 64}}, f), None)[1] or None,
                True, "MISSING")
 
-        print("negative checks — exact head + self-stamps")
+        print("negative checks — the manifest's own problem list")
+        expect("a manifest with a non-empty problem list fails",
+               lambda f: check_manifest_problems(
+                   {"problems": ["the base tree is MISSING"]}, f),
+               True, "records 1 build problem")
+        expect("a manifest with NO problem list fails",
+               lambda f: check_manifest_problems({}, f), True, "absent list")
+        expect("an empty problem list passes",
+               lambda f: check_manifest_problems({"problems": []}, f), False)
+
+        print("negative checks — empty declarations")
+        expect("an EMPTY declared file set fails",
+               lambda f: rehash_block("t", root, {}, f), True, "EMPTY file set")
+        expect("an EMPTY declared root list fails",
+               lambda f: declared_roots("frozen_sources", [], f),
+               True, "NO root")
+
+        print("negative checks — exact head + self-stamps "
+              "(driving check_exact_head itself)")
         head = "a" * 40
 
-        def run_exact(entries, all_same, f):
-            for r in entries:
-                got = r.get("runtime_head_commit")
-                if not got:
-                    f(f"claimed entry names no exact head: {r['path']}")
-                elif got != head:
-                    f(f"claimed entry names {got[:12]}, not {head[:12]}: "
-                      f"{r['path']}")
-                for p in stamp_problems(r, head):
-                    f(p)
-            if not all_same:
-                f("the manifest does not assert same-head")
+        def exact_manifest(entries, all_same=True):
+            return {"acceptance_head": {"commit": head},
+                    "results": {"entries": entries,
+                                "all_claimed_same_head": all_same,
+                                "off_head": [], "unstamped": []}}
         expect("a wrong-head and an unstamped claimed entry both fail",
-               lambda f: run_exact(
+               lambda f: check_exact_head(exact_manifest(
                    [{"path": "p1", "class": "acceptance", "role": "generate",
                      "runtime_head_commit": "b" * 40,
                      "self_stamp": {"tree_commit": "b" * 40,
                                     "tree_runtime_dirty": False}},
                     {"path": "p2", "class": "acceptance", "role": "counts"}],
-                   False, f), True)
+                   all_same=False), None, f), True)
         expect("a DIRTY self-stamp fails even on the right head",
-               lambda f: run_exact(
+               lambda f: check_exact_head(exact_manifest(
                    [{"path": "p3", "class": "acceptance", "role": "validate",
                      "runtime_head_commit": head,
                      "self_stamp": {"tree_commit": head,
-                                    "tree_runtime_dirty": True}}],
-                   True, f), True, "CLEAN runtime")
+                                    "tree_runtime_dirty": True}}]), None, f),
+               True, "CLEAN runtime")
+        expect("a manifest with NO claimed entry fails",
+               lambda f: check_exact_head(exact_manifest([]), None, f),
+               True, "claims NO acceptance result")
         expect("a clean stamped entry passes",
-               lambda f: run_exact(
+               lambda f: check_exact_head(exact_manifest(
                    [{"path": "p4", "class": "acceptance", "role": "excel",
                      "runtime_head_commit": head,
                      "self_stamp": {"tree_commit": head,
-                                    "tree_runtime_dirty": False}}],
-                   True, f), False)
+                                    "tree_runtime_dirty": False}}]), None, f),
+               False)
+
+        print("negative checks — the base side's binding "
+              "(driving check_base_binding itself)")
+        base = "d" * 40
+        export = str(td / "base-tree")
+
+        def base_manifest(stamp, commit=base, export_path=export,
+                          head_tree=str(td / "head-tree")):
+            return {"acceptance_head": {"commit": head},
+                    "runtime": {"head": {"tree": head_tree}},
+                    "base_tree": {"commit": commit,
+                                  "export_path": export_path},
+                    "results": {"entries": [
+                        {"path": "counts-base.json",
+                         "class": BASE_SIGNATURE_CLASS, "role": "counts",
+                         "base_commit": commit, "base_stamp": stamp}]}}
+        expect("a base result with tree_commit: null fails",
+               lambda f: check_base_binding(base_manifest(
+                   {"tree_commit": None, "tree": export}), f),
+               True, "names NO runtime commit")
+        expect("a base result with NO stamp at all fails",
+               lambda f: check_base_binding(
+                   {"acceptance_head": {"commit": head},
+                    "runtime": {"head": {"tree": str(td / "head-tree")}},
+                    "base_tree": {"commit": base, "export_path": export},
+                    "results": {"entries": [
+                        {"path": "counts-base.json",
+                         "class": BASE_SIGNATURE_CLASS, "role": "counts"}]}},
+                   f),
+               True, "names NO runtime commit")
+        expect("a base result stamped with the HEAD fails",
+               lambda f: check_base_binding(base_manifest(
+                   {"tree_commit": head, "tree": export}), f),
+               True, "ACCEPTANCE HEAD")
+        expect("a base commit equal to the head fails",
+               lambda f: check_base_binding(base_manifest(
+                   {"tree_commit": head, "tree": export}, commit=head), f),
+               True, "IS the acceptance head")
+        expect("a base export path equal to the head tree fails",
+               lambda f: check_base_binding(base_manifest(
+                   {"tree_commit": base, "tree": export},
+                   head_tree=export), f),
+               True, "IS the head tree")
+        expect("a base result that ran in another tree fails",
+               lambda f: check_base_binding(base_manifest(
+                   {"tree_commit": base, "tree": str(td / "elsewhere")}), f),
+               True, "not the recorded base export")
+        expect("a manifest with NO base-signature result fails",
+               lambda f: check_base_binding(
+                   {"acceptance_head": {"commit": head},
+                    "runtime": {"head": {"tree": str(td / "head-tree")}},
+                    "base_tree": {"commit": base, "export_path": export},
+                    "results": {"entries": []}}, f),
+               True, "no base-signature result")
+        expect("an explicitly bound base side passes",
+               lambda f: check_base_binding(base_manifest(
+                   {"tree_commit": base, "tree": export,
+                    "tree_runtime_dirty": False}), f),
+               False)
 
         print("negative checks — witness binding")
         wdir = td / "repo" / "w"
@@ -750,10 +951,12 @@ def main():
     print(f"  head runtime     "
           f"{manifest['runtime']['head']['runtime_digest']}")
 
+    check_manifest_problems(manifest, fail)
     check_runtime(manifest, tree, fail)
     check_lineage(manifest, tree, fail)
     check_exact_head(manifest, tree, fail)
     check_base_tree(manifest, tree, fail)
+    check_base_binding(manifest, fail)
     check_witnesses(manifest, tree, fail)
     if corpus:
         check_corpus(manifest, tree, fail)
