@@ -203,10 +203,33 @@ def test_tsn_and_pdf_hooks():
     c.check("RD tsn hook refuses junk and the raw statewide shape",
             erd.tsn_excel_column_for("HG", JUNK) is None)
     pdf_rd = list(erd._PDF_BOOK_HEADER)
-    c.check("RD pdf hook: the conversion's own positions (On/Off included)",
-            erd.pdf_excel_column_for("On/Off", pdf_rd) == 12
-            and erd.pdf_excel_column_for("Description", pdf_rd) == 11
+    # The RB-4 audit's lesson: the PDF conversion reproduces the export's
+    # SHIFTED layout, so this map must be checked against the PRODUCER'S OWN
+    # row-key table (where each value is written), never against the header
+    # labels (which sit one cell right of their values from City Code on).
+    import consolidate_tsmis_ramp_detail_pdf as rdpdf
+    _pdf_value_pos = {k: i + 1 for i, k in enumerate(rdpdf._ROW_KEYS)
+                      if k is not None}
+    c.check("RD pdf hook: every field resolves to the PRODUCER'S value "
+            "position (rdpdf._ROW_KEYS), never the label position",
+            erd.pdf_excel_column_for("City Code", pdf_rd)
+            == _pdf_value_pos["city"] == 8
+            and erd.pdf_excel_column_for("R/U", pdf_rd)
+            == _pdf_value_pos["ru"] == 9
+            and erd.pdf_excel_column_for("Description", pdf_rd)
+            == _pdf_value_pos["desc"] == 10
+            and erd.pdf_excel_column_for("On/Off", pdf_rd)
+            == _pdf_value_pos["onoff"] == 12
+            and erd.pdf_excel_column_for("Ramp Type", pdf_rd)
+            == _pdf_value_pos["rtype"] == 13
             and erd.pdf_excel_column_for("District", pdf_rd) == 1)
+    c.check("RD pdf hook: the label positions for the shifted trio are NOT "
+            "the resolved positions (the audit's exact defect)",
+            pdf_rd[9] == "City Code" and pdf_rd[10] == "R/U"
+            and pdf_rd[11] == "Description"
+            and erd.pdf_excel_column_for("City Code", pdf_rd) != 9
+            and erd.pdf_excel_column_for("R/U", pdf_rd) != 10
+            and erd.pdf_excel_column_for("Description", pdf_rd) != 11)
     c.check("RD pdf hook refuses the Excel-edition header",
             erd.pdf_excel_column_for("HG", rd._TSMIS_HEADER) is None)
     tsn_id = ["Route"] + list(idt.SHARED_HEADER) + ["TSN County"]

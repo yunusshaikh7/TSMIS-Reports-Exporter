@@ -38,7 +38,7 @@ except ImportError:
 
 import compare_env
 import consolidate_ramp_summary as _rs
-from pdf_table_lib import cluster_by_top
+from pdf_table_lib import cluster_by_top, require_document_route
 
 log = logging.getLogger("tsmis.evidence")
 
@@ -53,7 +53,9 @@ _TOTAL_RES = {
     "total_ramps": re.compile(r"(?i)Total Number of Ramps:?\s*$"),
     "ramp_points_no_linework": re.compile(r"(?i)Ramp Points w/out linework:?\s*$"),
 }
-_NUM_RE = re.compile(r"^-?[\d,]+$")
+# At least one DIGIT required — the parser's own `any(c.isdigit())` guard;
+# without it a stray lone comma token reads as a count word (RB-4 audit).
+_NUM_RE = re.compile(r"^-?(?=.*\d)[\d,]+$")
 
 
 def env_fields():
@@ -95,28 +97,47 @@ def _line_rows_with_boxes(words, left):
 
 
 def _attribute(rows, schema, used, cells):
-    """The geometry twin of _rs.match_schema's ordered first-wins walk: assign
-    each schema category the FIRST unused numbered row whose cleaned label
-    matches its pattern, recording the count word's box. Cross-checked at
-    lookup time against parse_pdf's own value, so a drift refuses geometry
-    rather than mislabelling it."""
+    """The geometry twin of _rs.match_schema's ordered walk: a MONOTONE cursor
+    (the parser scans forward, never back — the RB-4 audit caught this twin
+    scanning from 0 per category, which picks a different line than the parser
+    whenever rows print out of schema order), assigning each category the
+    first unused numbered row at-or-after the cursor whose cleaned label
+    matches. Cross-checked at lookup time against parse_pdf's own value, so a
+    drift refuses geometry rather than mislabelling it."""
+    cursor = 0
     for col, pattern in schema:
-        for i, (number, label, count_word, line_words) in enumerate(rows):
+        for i in range(cursor, len(rows)):
+            number, label, count_word, line_words = rows[i]
             if i in used or number is None or count_word is None:
                 continue
             if re.fullmatch(pattern, label):
                 used.add(i)
                 cells[col] = (count_word, line_words, number)
+                cursor = i + 1
                 break
 
 
 def env_locate(pdf_path, needed_keys):
     """{normalized_route: [record]} — ONE record per print (the route's whole
     category table). The record carries the parser's own values plus per-
-    category count-word geometry."""
+    category count-word geometry.
+
+    CMP-AUD-049 (evidence half): the DOCUMENT'S OWN cover claim must confirm
+    the route the filename names — the RB-4 audit caught the previous
+    filename fallback, which would caption a print whose cover failed to
+    extract under whatever route its filename happened to carry, with zero
+    document-side verification. A claim-less or contradicting print raises
+    RouteIdentityError like every sibling adapter, so the engine EXCLUDES it
+    rather than captioning it."""
     record = _rs.parse_pdf(pdf_path)
-    route = compare_env._norm_route_key(record.get("route")
-                                        or compare_env._route_from_name(Path(pdf_path)))
+    file_route = compare_env._route_from_name(Path(pdf_path))
+    doc_claim = record.get("route")
+    require_document_route(
+        Path(pdf_path).name,
+        compare_env._norm_route_key(file_route) if file_route else None,
+        [compare_env._norm_route_key(doc_claim)] if doc_claim else [],
+        claim_desc="the cover's \"All Ramps on Route N\" line")
+    route = compare_env._norm_route_key(doc_claim)
     if route not in needed_keys:
         return {}
     cells = {}
@@ -133,8 +154,13 @@ def env_locate(pdf_path, needed_keys):
         _attribute(left, _rs.POP_GROUPS, used_left, cells)
         _attribute(right, _rs.RAMP_TYPES, used_right, cells)
         # The two footer totals print as their own label lines with a trailing
-        # count; they sit outside both columns' schema walks.
-        for _top, line_words in cluster_by_top(list(words), _rs.Y_TOLERANCE):
+        # count, in the RIGHT column (measured: 'Total Number of Ramps' starts
+        # past COLUMN_SPLIT_X). Clustering only that column's words keeps a
+        # left-column line that happens to share a `top` from merging into the
+        # footer record's geometry (RB-4 audit — the old whole-page cluster
+        # could span an unrelated category row).
+        footer_words = [w for w in words if w["x0"] >= _rs.COLUMN_SPLIT_X]
+        for _top, line_words in cluster_by_top(footer_words, _rs.Y_TOLERANCE):
             line_words = sorted(line_words, key=lambda w: w["x0"])
             texts = [w["text"] for w in line_words]
             if len(texts) < 2 or not _NUM_RE.fullmatch(texts[-1]):

@@ -1297,9 +1297,13 @@ def run_env_evidence_only(dest, baseline_key, row_key, cell_key, events,
     if typed.completion != outcome.COMPLETE:
         raise ValueError(_partial_comparison_reason(typed))
     fp_folders = (dest / cell_key / subdir, dest / baseline_key / subdir)
-    if (cached.get("input_fingerprint") is not None
-            and _cell_input_fingerprint(*fp_folders)
-            != cached.get("input_fingerprint")):
+    # The export-changed gate ALWAYS evaluates (RB-4 audit — a cell cached
+    # before fingerprints were recorded must refuse, not skip the gate the
+    # vs-TSN camera always applies).
+    if cached.get("input_fingerprint") is None:
+        raise ValueError("the matrix cache records no input fingerprint for "
+                         "this comparison — refresh the comparison first")
+    if _cell_input_fingerprint(*fp_folders) != cached.get("input_fingerprint"):
         raise ValueError("the exports changed since the comparison was built — "
                          "refresh the comparison first")
     ev = visual_evidence.generate(
@@ -1307,6 +1311,16 @@ def run_env_evidence_only(dest, baseline_key, row_key, cell_key, events,
         examples=visual_evidence.clamp_examples(examples),
         layout=visual_evidence.normalize_layout(layout),
         commit_guard=evidence_guard, flavor=visual_evidence.FLAVOR_ENV)
+    # The same post-render generation re-check the vs-TSN camera makes (RB-4
+    # audit): a comparison refresh landing mid-render would leave images of
+    # generation N under a manifest digesting generation N+1.
+    after_record = consolidation_meta.read_comparison_outcome(out_path)
+    if (after_record is None or not after_record.trusted
+            or after_record.artifact_generation
+            != comparison_record.artifact_generation):
+        raise ValueError(
+            "the comparison generation changed while evidence was rendering — "
+            "refresh the comparison and evidence")
     note = ev.get("note") or "evidence run finished"
     return ConsolidateResult(status="ok", message=note, summary_lines=[note])
 

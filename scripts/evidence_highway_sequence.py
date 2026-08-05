@@ -181,6 +181,12 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar, schema=None):
 # --------------------------------------------------------------------------- #
 # verification projection
 # --------------------------------------------------------------------------- #
+# The engine passes each example's route into `project` (CMP-AUD-204's
+# own-route-only Description strip needs it; without the route the projection
+# strips nothing and every prefixed-row example refuses — RB-4 audit).
+PROJECT_ROUTE_AWARE = True
+
+
 def project(field, raw, side="tsmis", route=None):
     """A raw PDF cell value -> the compared form, per the comparator's own
     per-field normalization + the engine's Excel TRIM. Description is
@@ -417,10 +423,9 @@ def tsmis_box(rec, field):
              max([rec["bottom"]] + [d["bottom"] for d in rec["desc"]]))
     if field == "Description":
         if not rec["desc"]:
-            # a blank Description: box the gap where it would print
-            x0 = rec["boundaries"]["dist_desc"] + 6
-            return (rec["page"], (x0, rec["top"] - 2, x0 + 180,
-                                  rec["bottom"] + 2), yspan, xspan)
+            # a blank Description REFUSES — the print anchors no cell for it,
+            # and the old 180pt gap guess was the PCOA-FINAL-005 class.
+            return None
         segs = rec["desc"]
         box = (min(d["x0"] for d in segs) - 2, min(d["top"] for d in segs) - 2,
                max(d["x1"] for d in segs) + 2, max(d["bottom"] for d in segs) + 2)
@@ -647,10 +652,21 @@ def tsn_box(rec, field):
 _ENV_COL = {"County": "county", "City": "city", "(col C)": "prefix",
             "(col E)": "suffix", "HG": "hg", "FT": "ft",
             "Distance To Next Point": "dist", "Description": "desc"}
-_ENV_ZONE = {"county": ("county_city", -60), "city": ("city_prefix", -26),
-             "prefix": ("city_prefix", 2), "suffix": ("pm_suffix", 2),
-             "hg": ("suffix_hg", 4), "ft": ("hg_ft", 8),
-             "dist": ("ft_dist", 12)}
+# Each column's OWN window between the measured header boundaries (None = the
+# record line's left edge). A BLANK cell boxes this window, inset so it can
+# never cross a boundary — the RB-4 audit measured the previous fixed
+# `boundary + offset … +30pt` guesses enclosing the NEIGHBOURING column's
+# glyphs on thousands of rows (a blank '(col C)' boxed the PM value, a blank
+# '(col E)' boxed the HG letter): the PCOA-FINAL-005 class this bundle
+# retires, reintroduced by the guess. On this header-anchored layout the
+# window IS the cell, the same rule the RD/ID adapters use.
+_ENV_WINDOW = {"county": (None, "county_city"),
+               "city": ("county_city", "city_prefix"),
+               "prefix": ("city_prefix", "prefix_pm"),
+               "suffix": ("pm_suffix", "suffix_hg"),
+               "hg": ("suffix_hg", "hg_ft"),
+               "ft": ("hg_ft", "ft_dist"),
+               "dist": ("ft_dist", "dist_desc")}
 
 
 def env_fields():
@@ -687,9 +703,11 @@ def env_value(rec, field):
 
 
 def env_box(rec, field):
-    """Geometry for one env display column — the same header-anchored boxes as
-    tsmis_box, extended to the prefix/suffix columns the env comparison
-    publishes as '(col C)'/'(col E)'."""
+    """Geometry for one env display column: the printed words' own extent, or
+    for a BLANK cell the column's boundary-delimited window inset to stay
+    inside it (see `_ENV_WINDOW`). A blank Description REFUSES — the print has
+    no anchored cell for it, and a guessed rectangle is the PCOA-FINAL-005
+    class (its siblings all refuse the same case)."""
     col = _ENV_COL[field]
     line_words = [w for ws in rec["cols"].values() for w in ws]
     xspan = (min(w["x0"] for w in line_words) - 4,
@@ -697,14 +715,24 @@ def env_box(rec, field):
     yspan = (rec["top"],
              max([rec["bottom"]] + [d["bottom"] for d in rec["desc"]]))
     if col == "desc":
-        return tsmis_box(rec, "Description")
+        if not rec["desc"]:
+            return None
+        segs = rec["desc"]
+        box = (min(d["x0"] for d in segs) - 2, min(d["top"] for d in segs) - 2,
+               max(d["x1"] for d in segs) + 2,
+               max(d["bottom"] for d in segs) + 2)
+        return rec["page"], box, yspan, xspan
     ws = rec["cols"].get(col) or []
     if ws:
         x0, x1 = min(w["x0"] for w in ws), max(w["x1"] for w in ws)
-    else:
-        bkey, off = _ENV_ZONE[col]
-        x0 = rec["boundaries"][bkey] + (off if off > 0 else 0)
-        x0 = x0 + off if off < 0 else x0
-        x1 = x0 + 30
-    return (rec["page"],
-            (x0 - 2, rec["top"] - 2, x1 + 2, rec["bottom"] + 2), yspan, xspan)
+        return (rec["page"],
+                (x0 - 2, rec["top"] - 2, x1 + 2, rec["bottom"] + 2),
+                yspan, xspan)
+    lo_key, hi_key = _ENV_WINDOW[col]
+    lo = xspan[0] + 2 if lo_key is None else rec["boundaries"][lo_key]
+    hi = rec["boundaries"][hi_key]
+    x0, x1 = lo + 2, hi - 2
+    if x1 <= x0:
+        return None                  # a window too narrow to box honestly
+    return (rec["page"], (x0, rec["top"] - 2, x1, rec["bottom"] + 2),
+            yspan, xspan)

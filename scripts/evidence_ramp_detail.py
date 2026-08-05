@@ -283,10 +283,22 @@ def excel_column_for(field, excel_header):
 # own 13 columns, two structurally-empty unlabeled cells included). The self
 # flavor's side A and the vs-TSN PDF row's side A are compared from THIS
 # workbook, so its cells are what those panels may draw (PCOA-FINAL-004).
+#
+# POSITIONS ARE THE VALUE POSITIONS, DERIVED FROM THE PRODUCER'S OWN ROW-KEY
+# TABLE (`rdpdf._ROW_KEYS`, offset by the leading Route column) — never read
+# off the header labels. The conversion reproduces the export's shifted
+# layout, so from City Code onward each LABEL sits one cell right of its
+# value ('City Code' labels the R/U value, 'R/U' labels the Description
+# text, 'Description' labels a structurally-empty cell); the RB-4 audit
+# caught this map recording those label positions, which boxed the
+# neighbouring cell whenever both sides' projections happened to agree.
 _PDF_BOOK_HEADER = ["Route"] + ["" if c is None else str(c) for c in rdpdf.HEADER]
-_PDF_BOOK_POS = {"Location": 1, "PR": 2, "PM": 3, "Date of Record": 4,
-                 "HG": 6, "Area 4": 7, "City Code": 9, "R/U": 10,
-                 "Description": 11, "On/Off": 12, "Ramp Type": 13}
+_PDF_BOOK_KEYS = {"loc": "Location", "pr": "PR", "pm": "PM",
+                  "date": "Date of Record", "hg": "HG", "area4": "Area 4",
+                  "city": "City Code", "ru": "R/U", "desc": "Description",
+                  "onoff": "On/Off", "rtype": "Ramp Type"}
+_PDF_BOOK_POS = {_PDF_BOOK_KEYS[k]: i + 1
+                 for i, k in enumerate(rdpdf._ROW_KEYS) if k is not None}
 
 
 def pdf_excel_column_for(field, excel_header):

@@ -97,8 +97,15 @@ try:
           _elided and _drawn.endswith("…") and _huge.startswith(_drawn[:-1])
           and len(_drawn) == ve.PANEL_TEXT_MAX)
     _wide_img = ve._excel_strip(["Route", "Description"], ["001", _long], 1, (0,))
-    check("the strip sizes its column to the FULL drawn value",
-          _wide_img.width > ve._XL_CHAR_W * len(_long))
+    check("the strip sizes its column to the MEASURED drawn value width",
+          _wide_img.width >= ve._text_w(_long, ve._font(19)) + 16)
+    # Wide glyphs are the case a per-character estimate under-allocates
+    # (RB-4 audit: ~18 px/char inked vs a 13 px allowance) — the column must
+    # hold the measured ink of an all-caps M/W-heavy value too.
+    _mheavy = "WWMM MMWW WWMM MMWW WWMM"
+    _mimg = ve._excel_strip(["Route", "Description"], ["001", _mheavy], 1, (0,))
+    check("a wide-glyph value's column holds its MEASURED ink",
+          _mimg.width >= ve._text_w(_mheavy, ve._font(19)) + 16)
 
     # --------------------------------------------------------------------- #
     print("one workbook side of one example (the per-side ctx contract)")
