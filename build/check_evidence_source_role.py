@@ -14,10 +14,13 @@ different string).
 Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_evidence_source_role.py
 """
+import inspect
 import os
+import re
 import shutil
 import sys
 import tempfile
+import types
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
@@ -195,14 +198,41 @@ for _name in _ADAPTERS:
 print("the PDF-vs-Excel self check can be illustrated")
 check("generate() knows exactly the three flavors",
       ve.FLAVORS == (ve.FLAVOR_TSN, ve.FLAVOR_SELF, ve.FLAVOR_ENV))
+# These hooks are PROBED, not merely counted: an existence assertion passes
+# against a stub that resolves every field to column 0, which is exactly the
+# wrong-cell defect the exact-source rule exists to prevent.
+_FOREIGN_HEADER = [f"zzz{i}" for i in range(40)]
+_NO_SUCH_FIELD = "zzz no such compared field"
+_SHEET_KINDS = ("tsn", "tsmis", "pdf")
+
 for _name in _ADAPTERS:
     _mod = __import__(_name)
-    check(f"{_name} exposes the SELF comparator's loader pair",
-          callable(getattr(_mod, "load_sides_self", None)))
-    for _hook in ("pdf_excel_column_for", "tsn_excel_column_for",
-                  "tsn_project", "workbook_sheet"):
-        check(f"{_name} exposes {_hook} (the per-edition panel resolution)",
-              callable(getattr(_mod, _hook, None)))
+    _fields = list(getattr(_mod, "FIELDS", ()) or ())
+    check(f"{_name} loads both self-check sides from a print and a workbook",
+          str(inspect.signature(_mod.load_sides_self))
+          == "(pdf_path, excel_path)")
+    for _hook in ("excel_column_for", "pdf_excel_column_for",
+                  "tsn_excel_column_for"):
+        _fn = getattr(_mod, _hook, None)
+        check(f"{_name}.{_hook} REFUSES a header it does not recognise "
+              "(no positional default onto the wrong cell)",
+              _fn is not None
+              and all(_fn(f, _FOREIGN_HEADER) is None for f in _fields)
+              and _fn(_NO_SUCH_FIELD, _FOREIGN_HEADER) is None
+              and _fn(_fields[0], []) is None)
+    _tp = getattr(_mod, "tsn_project", None)
+    _projected = _tp(_fields[0], "  Sample 12 ") if _tp else None
+    check(f"{_name}.tsn_project is a settled projection (idempotent, and a "
+          "blank cell reads as the empty string, never None)",
+          _tp is not None and _tp(_fields[0], _projected) == _projected
+          and _tp(_fields[0], None) == "")
+    _ws = getattr(_mod, "workbook_sheet", None)
+    check(f"{_name}.workbook_sheet names a sheet for every edition, with the "
+          "two TSMIS-side editions sharing one sheet",
+          _ws is not None
+          and all(isinstance(_ws(k), str) and _ws(k) for k in _SHEET_KINDS)
+          and _ws("tsmis") == _ws("pdf")
+          and _ws(_NO_SUCH_FIELD) == _ws("tsmis"))
 check("every evidence row can illustrate its self check",
       all(ve.self_capable(rk) for rk in ve.rows()))
 
@@ -215,12 +245,33 @@ check("exactly the five PDF-vs-PDF env placements are env-capable",
       and all(ve.env_capable(rk) for rk in ve.env_rows()))
 check("ramp_summary is env-only: its vs-TSN evidence absence stays the "
       "audit-approved state", not ve.capable("ramp_summary"))
-for _rk in ve.env_rows():
-    _mod = ve.env_adapter_for(_rk)
-    for _hook in ("env_fields", "env_locate", "env_value", "env_box",
-                  "tsmis_pdf_path"):
-        check(f"{_rk}'s env adapter exposes {_hook}",
-              callable(getattr(_mod, _hook, None)))
+# The env hooks are probed the same way. `env_fields()` is the whole field
+# universe the engine hands the ledger (`_FieldsView`), so env_value/env_box
+# are only ever asked about a field the adapter declared — what must be proved
+# here is that the declaration is well formed and that the print resolution
+# honours the route it was asked for.
+_ENV_SIGNATURES = {"env_locate": "(pdf_path, needed_keys)",
+                   "env_value": "(rec, field)", "env_box": "(rec, field)"}
+_PROBE_ROUTE = "001"
+_edir = tempfile.mkdtemp(prefix="check_ev_envpath_")
+try:
+    for _rk in ve.env_rows():
+        _mod = ve.env_adapter_for(_rk)
+        _ef = list(_mod.env_fields())
+        check(f"{_rk}: env_fields declares a well-formed field universe",
+              bool(_ef) and len(set(_ef)) == len(_ef)
+              and all(isinstance(f, str) and f for f in _ef))
+        for _hook, _sig in _ENV_SIGNATURES.items():
+            check(f"{_rk}: {_hook} takes the arguments the engine passes",
+                  str(inspect.signature(getattr(_mod, _hook))) == _sig)
+        _pp = _mod.tsmis_pdf_path(_edir, _PROBE_ROUTE)
+        check(f"{_rk}: tsmis_pdf_path resolves inside the run folder, under "
+              "the end-anchored per-route filename contract",
+              _pp is not None
+              and Path(_pp).parent == Path(_edir)
+              and Path(_pp).name.endswith(f"_route_{_PROBE_ROUTE}.pdf"))
+finally:
+    shutil.rmtree(_edir, ignore_errors=True)
 
 # The censused defect: enumerate_diffs used to walk a HARDCODED copy of the
 # vs-TSN header. The PDF-vs-Excel schema carries a column the vs-TSN one does
@@ -305,6 +356,34 @@ check("an ELIDED drawn value is not mistaken for a normalization difference",
       ve._normalization_note((ve.panel_cell_text(_huge)[0], None),
                              (_huge, ""), ("X", "Y")) == "")
 
+# The composed canvas is measured from its OWN INK. Sizing the assertion with
+# the same width helper the composer sizes the canvas with is circular — a
+# regression that halved every measurement would satisfy both sides of it.
+_BG = (255, 255, 255)
+_HEADER_TOP = 10                 # first title row
+_CAPTION_H = 18                  # a caption line's ink band (16 px bold font)
+_CAPTION_GAP = 10                # background columns that separate two captions
+_PAD_MAX = 0.5                   # ink must reach past this fraction of the width
+
+
+def _ink_columns(img, y0, y1):
+    """Every x carrying non-background ink in the horizontal band [y0, y1)."""
+    px = img.load()
+    return [x for x in range(img.width)
+            if any(px[x, y] != _BG for y in range(y0, min(y1, img.height)))]
+
+
+def _ink_runs(cols, gap):
+    """The ink columns grouped into runs separated by at least `gap` blanks."""
+    runs = []
+    for x in cols:
+        if runs and x - runs[-1][1] <= gap:
+            runs[-1][1] = x
+        else:
+            runs.append([x, x])
+    return runs
+
+
 _tiny = Image.new("RGB", (120, 40), (255, 255, 255))
 _long_title = "Description — TSMIS (PDF) 'EQUATES TO END R REALIGNMENT'  vs  " \
               "TSMIS (Excel) 'END R REALIGNMENT'"
@@ -313,6 +392,13 @@ _long_sub = ("Route 046 @ 50.904 — the workbook cell Intersection Detail!F5563
              "and verified against the compared values")
 _long_label = "TSMIS (PDF)  —  tsmis_intersection_detail_pdf_consolidated " \
               "2026-07-23 ssor-prod.xlsx · Intersection Detail!F5563"
+# The caption test uses a SHORT title block, so the header can never be what
+# widens the canvas, and space-free captions, so each caption is one ink run.
+_SHORT_TITLE = "D"
+_SHORT_SUB = "r"
+_L_CAP = ("TSMIS_(PDF)_tsmis_intersection_detail_pdf_consolidated_2026-07-23_"
+          "ssor-prod.xlsx!Intersection_Detail!F5563")
+_R_CAP = "TSN_x.xlsx!A1"
 _cdir = tempfile.mkdtemp(prefix="evidence_compose_")
 try:
     _st = Path(_cdir) / "s.png"
@@ -321,22 +407,138 @@ try:
     _pr = Path(_cdir) / "p.png"
     ve._compose_pair(_long_title, _long_sub, _long_label, _tiny,
                      "TSN — x.xlsx · A1", _tiny, _pr, note=_note)
-    _need = max(ve._text_w(_long_title, ve._font(26, True)),
-                ve._text_w(_long_sub, ve._font(17)),
-                ve._text_w(_note, ve._font(17, True)))
-    _sw = Image.open(_st).width
-    _pw = Image.open(_pr).width
-    check("stacked: the canvas grows to hold the title/subline/note in full",
-          _sw >= _need + 16)
-    check("paired: the canvas grows to hold the title/subline/note in full",
-          _pw >= _need + 16)
-    # The left caption's own column must reach past its text, so the right
-    # caption starts beyond it and the two can never overprint.
-    check("paired: a long left caption cannot reach the right caption",
-          _pw >= ve._text_w(_long_label, ve._font(16, True))
-          + ve._text_w("TSN — x.xlsx · A1", ve._font(16, True)) + 48)
+    # The title block occupies everything above the first caption row.
+    _hband = (_HEADER_TOP, 84 + ve._NOTE_H - 2)
+    for _name, _path in (("stacked", _st), ("paired", _pr)):
+        _im = Image.open(_path)
+        _cols = _ink_columns(_im, *_hband)
+        check(f"{_name}: the title block's ink ends INSIDE the canvas "
+              "(nothing is cut mid-glyph at the edge)",
+              bool(_cols) and max(_cols) < _im.width - 1)
+        check(f"{_name}: ...and the canvas is sized to that ink, not padded "
+              "far past it",
+              bool(_cols) and max(_cols) > _im.width * _PAD_MAX)
+
+    # A long left caption must not reach the right one. Measured as ink: the
+    # caption row must hold TWO separated runs, both inside the canvas. The
+    # pre-fix composer sized each column from its IMAGE, so the left caption
+    # ran under the right one and off the edge — one clipped run, not two.
+    _pc = Path(_cdir) / "c.png"
+    ve._compose_pair(_SHORT_TITLE, _SHORT_SUB, _L_CAP, _tiny, _R_CAP, _tiny,
+                     _pc)
+    _ci = Image.open(_pc)
+    _cap_y = 84 + 4
+    _cap_cols = _ink_columns(_ci, _cap_y, _cap_y + _CAPTION_H)
+    _runs = _ink_runs(_cap_cols, _CAPTION_GAP)
+    check("paired: the two captions are separate ink runs, never overprinted",
+          len(_runs) == 2)
+    check("paired: neither caption is cut off at the canvas edge",
+          bool(_cap_cols) and max(_cap_cols) < _ci.width - 1)
+    check("paired: the right caption starts past the left caption's last ink",
+          len(_runs) == 2 and _runs[1][0] > _runs[0][1])
 finally:
     shutil.rmtree(_cdir, ignore_errors=True)
+
+# --------------------------------------------------------------------------- #
+# The CALL SITES, not only the helpers. `_display_header` and
+# `_normalization_note` are each called from exactly one place in the engine;
+# deleting either line satisfies every unit assertion above. One example driven
+# end to end through `_try_example` proves the strip really draws the corrected
+# header and the composed image really carries the disclosure.
+# --------------------------------------------------------------------------- #
+print("the engine's own render path uses both (the call sites)")
+
+# A workbook whose labels sit one position AFTER their values, the shift class
+# `_display_header` exists for: position 2 holds the Eff-Date, labelled 'INT
+# Type'.
+_WB_HEADER = ["Route", "Post Mile", "INT Type", "INT Type Eff-Date",
+              "Ctrl Type"]
+_WB_AT = {"Route": 0, "Post Mile": 1, "INT Type Eff-Date": 2, "INT Type": 3,
+          "Control Type": 4}
+_TWO_DIGIT_YEAR = re.compile(r"^\d\d-")
+
+
+def _wb_resolve(field, header):
+    del header                   # this fixture resolves by name, not by shift
+    return _WB_AT.get(field)
+
+
+def _wb_project(field, value, **kwargs):
+    """Widen a two-digit year before comparing — so the workbook cell and the
+    compared value are the same fact carried in two different forms."""
+    del kwargs
+    text = str(value or "")
+    if field == "INT Type Eff-Date" and _TWO_DIGIT_YEAR.match(text):
+        return "19" + text
+    return text
+
+
+_ADAPTER = types.SimpleNamespace(
+    __name__="check_evidence_source_role_fixture", FIELDS=tuple(_WB_AT),
+    KEY_LABEL="Post Mile", project=_wb_project, tsn_project=_wb_project,
+    pdf_excel_column_for=_wb_resolve, tsn_excel_column_for=_wb_resolve)
+
+_seen_headers, _seen_notes = [], []
+_real_strip = ve._excel_strip
+_real_stacked = ve._compose_stacked
+_real_pair = ve._compose_pair
+
+
+def _rec_strip(header, values, target_index, key_indexes=(0,)):
+    _seen_headers.append(list(header))
+    return _real_strip(header, values, target_index, key_indexes)
+
+
+def _rec_stacked(title, sub, tl, ti, bl, bi, out, note=""):
+    _seen_notes.append(note)
+    return _real_stacked(title, sub, tl, ti, bl, bi, out, note=note)
+
+
+def _rec_pair(title, sub, ll, li, rl, ri, out, note=""):
+    _seen_notes.append(note)
+    return _real_pair(title, sub, ll, li, rl, ri, out, note=note)
+
+
+_idir = Path(tempfile.mkdtemp(prefix="evidence_callsites_"))
+ve._excel_strip, ve._compose_stacked, ve._compose_pair = (
+    _rec_strip, _rec_stacked, _rec_pair)
+try:
+    _ex = {"route": "046", "key": "50.904", "va": "1964-01-01",
+           "vb": "1964-01-02", "row_index": 0, "row_index_b": 0}
+    _side_a = {"index_key": "row_index",
+               "rows": {0: ("Intersection Detail", 5563,
+                            ["001", "12.345", "64-01-01", "T", "S"])},
+               "header": _WB_HEADER, "resolve": "pdf_excel_column_for",
+               "project": "project", "value_key": "va",
+               "label": "TSMIS (PDF)", "book_name": "tsmis.xlsx"}
+    _side_b = {"index_key": "row_index_b",
+               "rows": {0: ("Intersection Detail (TSN)", 5676,
+                            ["001", "12.345", "1964-01-02", "T", "S"])},
+               "header": _WB_HEADER, "resolve": "tsn_excel_column_for",
+               "project": "tsn_project", "value_key": "vb",
+               "label": "TSN", "book_name": "tsn.xlsx"}
+    _entry, _why = ve._try_example(
+        _ADAPTER, _ex, "INT Type Eff-Date", _idir, 1, {},
+        side_labels=("TSMIS (PDF)", "TSN"), side_a=_side_a, side_b=_side_b)
+    check("the engine renders a two-workbook example end to end",
+          _why is None and bool(_entry))
+    check("...and BOTH strips drew the CORRECTED header, not the workbook's",
+          len(_seen_headers) == 2
+          and all(h[2] == "INT Type Eff-Date" and h[3] == "INT Type"
+                  for h in _seen_headers)
+          and _WB_HEADER[2] == "INT Type")
+    check("...and the composed images carry the normalization disclosure",
+          len(_seen_notes) == 2
+          and all("64-01-01" in n and "compared value" in n
+                  and "TSMIS (PDF)" in n for n in _seen_notes))
+    check("...on both chosen layouts, both written to disk",
+          bool(_entry) and all((_idir / _entry[k]).is_file()
+                               for k in ("stacked", "pair")))
+finally:
+    ve._excel_strip = _real_strip
+    ve._compose_stacked = _real_stacked
+    ve._compose_pair = _real_pair
+    shutil.rmtree(_idir, ignore_errors=True)
 
 print()
 if _fail:
