@@ -1352,8 +1352,15 @@ def _display_header(adapter, header, resolve):
     for f in getattr(adapter, "FIELDS", ()) or ():
         try:
             at = resolve(f, header)
-        except Exception:                                 # a hook that refuses
-            continue                                      # silent-ok: context
+        except Exception as e:
+            # Only this ONE context label goes uncorrected — the compared
+            # column resolves through the same hook in `_workbook_side`, which
+            # does not guard it, so a hook that really is broken still refuses
+            # the panel there rather than being hidden here.
+            log.warning("evidence: %s could not place the context label %r: "
+                        "%s: %s", getattr(adapter, "__name__", adapter), f,
+                        type(e).__name__, str(e).splitlines()[:1])
+            continue
         if at is not None and 0 <= at < len(out):
             out[at] = f
     return out
