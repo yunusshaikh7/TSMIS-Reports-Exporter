@@ -447,9 +447,14 @@ def evidence_identity_checks(root):
     gui_matrix.MatrixEvidenceWorker = FakeWorker
     try:
         # ENV cell: freeze under A, change everything to B, dispatch, run.
+        # The job carries the PRODUCTION shape — the camera endpoint stamps
+        # the row's selected MODE into job["evidence"]["mode"] and dispatch
+        # must ROUTE it (RB-4 audit: the fixture used to omit the mode and
+        # never assert rec["mode_id"], so deleting the routing line passed).
         job = a._make_job("evidence", "cell", "ev", row="highway_log",
                           env="ars-test")
         job["evidence"] = a._capture_evidence_identity("env")
+        job["evidence"]["mode"] = "env"
         check("enqueue freezes the env identity (baseline/dest/examples/tsn)",
               job["evidence"]["baseline"] == "ssor-prod"
               and job["evidence"]["dest"] == str(root / "destA")
@@ -464,6 +469,17 @@ def evidence_identity_checks(root):
               rec["base"] == "ssor-prod" and rec["dest"] == str(root / "destA")
               and rec["examples"] == 2 and rec["layout"] == "pair"
               and rec["tsn"] == {"highway_log": {"kind": "auto"}})
+        check("the frozen MODE is routed into evidence_for_cell (env camera)",
+              rec["mode_id"] == "env")
+        rec.clear()
+        job2 = a._make_job("evidence", "cell", "ev", row="highway_log",
+                           env="ars-test")
+        job2["evidence"] = a._capture_evidence_identity("env")
+        job2["evidence"]["mode"] = "tsn"
+        a._dispatch_evidence_job(job2)
+        captured["fn"](None)
+        check("a vs-TSN camera job routes mode_id='tsn'",
+              rec["mode_id"] == "tsn")
 
         # DAY cell: freeze the source under A, change to B, dispatch, run.
         rec.clear()

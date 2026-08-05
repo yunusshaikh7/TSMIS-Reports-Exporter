@@ -734,9 +734,13 @@ check("row_reports maps every capable row to its report (the per-cell action's g
 # HF-05: the vs-TSN/self lanes render the compared WORKBOOKS, so readiness is
 # the imaging deps alone — TSN prints gate nothing anymore; HF-10 adds the five
 # env placements to the availability the UI reads.
-check("ready == deps alone (no print requirement) and env_rows is published",
+check("ready == deps alone (no print requirement) and env_rows is the "
+      "LITERAL five placements (pinned, not self-derived — RB-4 audit)",
       avail["ready"] == avail["deps_ok"]
-      and avail.get("env_rows") == ve.env_rows())
+      and avail.get("env_rows") == ["highway_log_pdf",
+                                    "highway_sequence_pdf",
+                                    "intersection_detail_pdf",
+                                    "ramp_detail_pdf", "ramp_summary"])
 
 print("caller-side gate (matrix_build.evidence_opts_for)")
 check("toggle off -> None",
@@ -1825,8 +1829,11 @@ check("RD env fields = the forced classic display header + print-only, minus PM"
 check("ID env fields = the canonical export header minus Route/Post Mile",
       _eid5.env_fields()
       == [f for f in _idt5._TSMIS_HEADER if f not in ("Route", "Post Mile")])
-check("HL env fields = the corrected 30 shared fields",
-      _ehl5.env_fields() == list(_ehl5.FIELDS))
+import highway_log_columns as _hlc5
+check("HL env fields = the corrected column SoT minus the key "
+      "(cross-module pin, not the module's own alias — RB-4 audit)",
+      _ehl5.env_fields()
+      == [f for f in _hlc5.HEADER if f != _ehl5.KEY_LABEL])
 check("HSL env fields = the per-route layout with '(col C)'/'(col E)' for the "
       "unnamed postmile columns (compare_env's own relabel rule)",
       _ehs5.env_fields() == ["County", "City", "(col C)", "(col E)", "HG", "FT",
@@ -1859,9 +1866,12 @@ check("attribution finds the schema categories at their count words",
       "hwy_divided" in _cells5 and _cells5["hwy_divided"][2] == 228)
 _rec5 = {"record": {"hwy_divided": 228}, "cells": _cells5, "src": "r.pdf",
          "page": 2}
-check("env_box boxes the COUNT word inside the category's own line",
-      _ers5.env_box(_rec5, "Divided") is not None
-      and _ers5.env_box(_rec5, "Divided")[1][0] >= 18.0
+_dv_box = _ers5.env_box(_rec5, "Divided")
+check("env_box boxes the COUNT word EXACTLY — its own extent, never the "
+      "label's (RB-4 audit: '>= 18' was satisfied by every word on the line)",
+      _dv_box is not None
+      and _dv_box[1] == (18.0, 98.0, 42.0, 110.0)
+      and _dv_box[1][2] < 50.0
       and _ers5.env_value(_rec5, "Divided") == "228")
 _rec5b = {"record": {"hwy_divided": 999}, "cells": _cells5, "src": "r.pdf",
           "page": 2}

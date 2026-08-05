@@ -88,12 +88,14 @@ def test_ramp_detail():
     # HF-05 closes RB-3's deferred evidence half: the July-2026 consolidated
     # edition the loader ALREADY accepts resolves through its own positions.
     hdr26 = rd._TSMIS_HEADER_2026
-    c.check("the July-2026 edition resolves through _TSMIS_POS_2026",
+    # NO None filter (RB-4 audit): the old comprehension discarded every field
+    # the hook failed to resolve — the exact silent-drop class that cost 26 of
+    # 35 columns — so a hook resolving only Description passed. Every mapped
+    # field must resolve, to its own recorded position.
+    c.check("the July-2026 edition resolves EVERY mapped field through "
+            "_TSMIS_POS_2026 — a silent drop fails",
             all(erd.excel_column_for(f, hdr26) == rd._TSMIS_POS_2026[f]
-                for f in rd._TSMIS_POS_2026 if f in rd._TSMIS_POS_2026
-                and erd.excel_column_for(f, hdr26) is not None)
-            and erd.excel_column_for("Description", hdr26)
-            == rd._TSMIS_POS_2026["Description"])
+                for f in rd._TSMIS_POS_2026))
     c.check("July District also resolves to its Location cell",
             erd.excel_column_for("District", hdr26)
             == rd._TSMIS_POS_2026["Location"])
