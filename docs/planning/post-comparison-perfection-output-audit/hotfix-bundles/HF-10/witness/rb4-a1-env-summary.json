@@ -1,0 +1,190 @@
+{
+ "audit_count_check": [
+  {
+   "equal": true,
+   "expected": {
+    "differing_cells": 88238,
+    "one_sided": [
+     1174,
+     2095
+    ]
+   },
+   "got": {
+    "differing_cells": 88238,
+    "one_sided": [
+     1174,
+     2095
+    ]
+   },
+   "row": "highway_log_pdf"
+  },
+  {
+   "equal": true,
+   "expected": {
+    "differing_cells": 1904,
+    "one_sided": [
+     7,
+     246
+    ]
+   },
+   "got": {
+    "differing_cells": 1904,
+    "one_sided": [
+     7,
+     246
+    ]
+   },
+   "row": "highway_sequence_pdf"
+  },
+  {
+   "equal": true,
+   "expected": {
+    "differing_cells": 17562,
+    "one_sided": []
+   },
+   "got": {
+    "differing_cells": 17562,
+    "one_sided": []
+   },
+   "row": "intersection_detail_pdf"
+  },
+  {
+   "equal": true,
+   "expected": {
+    "differing_cells": 376,
+    "one_sided": [
+     5,
+     8
+    ]
+   },
+   "got": {
+    "differing_cells": 376,
+    "one_sided": [
+     5,
+     8
+    ]
+   },
+   "row": "ramp_detail_pdf"
+  },
+  {
+   "equal": true,
+   "expected": {
+    "differing_cells": 67,
+    "one_sided": []
+   },
+   "got": {
+    "differing_cells": 67,
+    "one_sided": []
+   },
+   "row": "ramp_summary"
+  }
+ ],
+ "bound_to_acceptance_head": "7aa76e2a0a69b5bee2abf5c4ee6aec751e166764",
+ "built_utc": "2026-08-05T02:31:22+00:00",
+ "bundle": "RB-4",
+ "cameras": [],
+ "claim": "the five Everything ENV cells render PDF-vs-PDF evidence from the two compared environments' own per-route prints, on HF-05's exact-source contract, with comparison content (counts, verdicts) untouched and equal to the audit's measured numbers",
+ "derived_from": [
+  {
+   "file": "generation-head.json",
+   "sha256": "E43A071A0EFBA60DA5186748B6B47FAD04FD5DF4538FF91069C53DA8164BF436"
+  },
+  {
+   "file": "counts-head.json",
+   "sha256": "EBB46CF03F5BB513CDA5FB37E20C9F76AE2E19C3147A5836BE6C90540F86C8F4"
+  },
+  {
+   "file": "validate-head.json",
+   "sha256": "2400214ACEA39075D29E29E49B8DBC6F6549E61BAE641E3DEBD0125A8CAF17B9"
+  },
+  {
+   "file": "cameras-head.json",
+   "sha256": "86AAA8D37FF5EEEE22A7EED3A40C19E80C8DCC0EA53A65CD0C2BFD53C744321D"
+  }
+ ],
+ "env_cells": {
+  "highway_log_pdf": {
+   "completion": "complete",
+   "differing_cells": 88238,
+   "differing_rows": 22724,
+   "paired_rows": 50712,
+   "side_a_only_rows": 1174,
+   "side_b_only_rows": 2095,
+   "verdict": "diff"
+  },
+  "highway_sequence_pdf": {
+   "completion": "complete",
+   "differing_cells": 1904,
+   "differing_rows": 1895,
+   "paired_rows": 60247,
+   "side_a_only_rows": 246,
+   "side_b_only_rows": 7,
+   "verdict": "diff"
+  },
+  "intersection_detail_pdf": {
+   "completion": "complete",
+   "differing_cells": 17562,
+   "differing_rows": 16328,
+   "paired_rows": 16459,
+   "side_a_only_rows": 0,
+   "side_b_only_rows": 0,
+   "verdict": "diff"
+  },
+  "ramp_detail_pdf": {
+   "completion": "complete",
+   "differing_cells": 376,
+   "differing_rows": 316,
+   "paired_rows": 15208,
+   "side_a_only_rows": 8,
+   "side_b_only_rows": 5,
+   "verdict": "diff"
+  },
+  "ramp_summary": {
+   "completion": "complete",
+   "differing_cells": 67,
+   "differing_rows": 15,
+   "paired_rows": 126,
+   "side_a_only_rows": 0,
+   "side_b_only_rows": 0,
+   "verdict": "diff"
+  }
+ },
+ "id": "RB4-A1-HF10",
+ "produced_by": {
+  "script": "acc_rb4_witness.py",
+  "script_sha256": "EBFBEE6E4F367A1736197678F6F0070AC244B0F73A3181A18A4F8826FD5F9F7F"
+ },
+ "validate_env_sets": [
+  {
+   "checks_failed": 0,
+   "comparison": "ssor-test_highway_log_pdf.xlsx",
+   "env_rederived": 59,
+   "examples": 59
+  },
+  {
+   "checks_failed": 0,
+   "comparison": "ssor-test_highway_sequence_pdf.xlsx",
+   "env_rederived": 8,
+   "examples": 8
+  },
+  {
+   "checks_failed": 0,
+   "comparison": "ssor-test_ramp_detail_pdf.xlsx",
+   "env_rederived": 10,
+   "examples": 10
+  },
+  {
+   "checks_failed": 0,
+   "comparison": "ssor-test_ramp_summary.xlsx",
+   "env_rederived": 23,
+   "examples": 23
+  },
+  {
+   "checks_failed": 0,
+   "comparison": "ars-prod_intersection_detail_pdf.xlsx",
+   "env_rederived": 8,
+   "examples": 8
+  }
+ ],
+ "work_item": "HF-10 (PCOA-FINAL-007)"
+}

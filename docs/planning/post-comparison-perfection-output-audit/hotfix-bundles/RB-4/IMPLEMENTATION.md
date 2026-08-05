@@ -130,6 +130,20 @@ exact base tree (`git archive 72adf44…`) and run there
 | `check_matrix.py` | red — `build_cell_comparison() got an unexpected keyword argument 'evidence'` (PCOA-FINAL-007's root cause verbatim) | ALL PASS |
 | `check_pdf_excel_matrix.py` | **green at base and head** — the silent control was already silent; the new zero-artifact assertion is a must-not-regress lock, not a red→green | ALL PASS |
 
+**Eleven further assertions were added to `check_evidence_source_role.py` after
+the RB4-A1 image inspection** (below) found five composition defects that every
+programmatic check had passed. They lock, in order: the position-authoritative
+strip header (the boxed column carries the COMPARED field's name; the shifted
+neighbours are corrected; an unclaimed position keeps the workbook's own label;
+no resolve hook = untouched header), the disclosure note (a normalized source
+form is named; a derived composite cell is named; a verbatim value adds no
+note; a crop flavor adds none; a legally elided value is not mistaken for one),
+and the composition geometry (both layouts grow to hold title/subline/note in
+full; a long left caption can never reach the right caption). All are red
+against the pre-inspection head by construction — the helpers they call
+(`_display_header`, `_normalization_note`, `_text_w`, `_header_w`) did not
+exist there.
+
 The DATA-level pre-fix signatures bind to the base runtime through the
 base-side generation itself (borrowed prints in the read sets — 12 TSN
 district prints on the HL cell, 112 PDFs on the HL-PDF cell; the `TSMIS
@@ -137,8 +151,96 @@ PDFs:` declarations; the `text[:26]` drawing rule) — see the RB4-A1 section.
 
 ## RB4-A1 — the one executable acceptance run
 
-TBD — completed after the head generation, validation, installed-Excel,
-census, image inspection, and manifest/verifier land.
+Driver: `build/run_rb4_acceptance.py` (committed). Root:
+`…\_scratch\post-comparison-hotfixes\HF-05\rb4-a1\`. Every phase drives the
+same entry points the GUI workers drive — `matrix.build_comparison` under the
+worker's own owned-dir leases and commit guard, `day_matrix.build_day_cell`,
+the on-demand cameras, and the classic + PDF-vs-Excel silent controls — against
+the frozen 2026-07-23 and 2026-07-09 pulls.
+
+**Inputs (frozen, hash-bound).** The 2026-07-23 raw extract the output audit
+itself measured; the ground-truth 7.9 ssor and ars pulls (each member re-matched
+against `All Reports 7.9.zip` / `ramp_summary_excel.zip`); the Downloads TSN
+master library's raw/pdf sources. Provisioned into per-side replica stores
+created the way the app creates one (`owned_dir.ensure_owned_dir`), and
+re-hashed AFTER the run: every replica still equals its provision-time hash AND
+its frozen source, so the run never mutated an input. Highway Detail is
+excluded everywhere (⛔ pre-release).
+
+**One frozen head.** The native-scale inspection (below) found five composition
+defects, so the fixes landed after the first generation and the retained
+results briefly carried three head stamps. Runtime-digest equality is NOT head
+identity (the RB-2 Review-2 lesson), so the prior head-side comparisons were
+RETIRED and the complete sequence was produced again against one frozen runtime
+head: generation → cameras → validate → excel → counts. Every retained result
+SELF-STAMPS that head plus a runtime-scoped clean/dirty flag (`tree_stamp`), so
+head identity lives in the record itself, not only in the manifest's assertion.
+
+| Phase | Result |
+|---|---|
+| generate | 35 cells (8 Everything vs-TSN · 5 SELF · 5 ENV + 5 ENV evidence-OFF controls · 8 By Day · 4 PvE silent controls) — **0 non-ok** |
+| cameras | 21 on-demand cells (vs-TSN · By Day · the 5 HF-10 env cameras) — **0 non-ok** |
+| validate | 26 evidence sets — **0 problems** |
+| excel | 24 evidence workbooks opened in INSTALLED Excel — **0 repairs**, 827 embedded images, Ledger intact in every one |
+| counts | 26 typed sidecars re-read for the base↔head invariance table |
+
+**What validate proves, per set** (100 % programmatic, no sampling): the
+manifest describes CURRENT with every member verified; the provenance sidecar
+is present; the read set is EXACTLY the comparison's own two recorded documents
+for a rendered generation (and empty for a non-rendered one, which opened no
+source); for env sets every read-set member lies under a compared side's
+resolved directory AND matches that side's recorded census entry
+(name+size+mtime_ns); the Summary's source lines are the provenance selections
+verbatim; every image-sheet legend is the flavor's true-source legend; and for
+env sets **every example is re-derived end to end** — both prints re-located,
+both boxes re-computed inside the captioned record, both values re-read.
+
+> ENV re-derivation: 59/59 · 23/23 · 10/10 · 8/8 · 8/8 — every published env
+> example independently reproduced from the two environments' own prints.
+
+**Silent controls.** The by-day PDF-vs-Excel lane ran with the evidence toggle
+ON and produced ZERO evidence artifacts (`pve_stray: []`, proved by enumeration
+over the whole tree, not assumption); each of the 5 ENV cells was additionally
+built with evidence OFF and produced none.
+
+**Count/mask invariance.** All **26/26** cells compare equal between the base
+runtime and the head: verdict, completion, paired rows, both one-sided counts,
+differing rows, differing cells, asserted/context cells, and the full per-field
+table. HF-05 and HF-10 change evidence rendering only — never comparison
+content. The five ENV cells additionally reproduce the output audit's own
+measured numbers EXACTLY (Ramp Summary 67; Intersection Detail PDF 17,562;
+Ramp Detail PDF 376 + 5/8 one-sided; Highway Log PDF 88,238 + 2,095/1,174;
+Highway Sequence PDF 1,904 + 7/246 — PCOA-FINAL-007's own figures).
+
+**Individual native-scale image inspection.** The bundle requires EVERY
+retained image inspected, not sampled. The population is proved complete by
+construction: `acc_rb4_inspect_manifest.py` reconciles every PNG on disk against
+the Summary rows that claim it — an unclaimed image or a claimed-but-missing one
+is a recorded problem (0 of each). The set was then partitioned into 11 slices
+and inspected image-by-image at native scale.
+
+*Round 1* (pre-fix set, 825 images, retained as `results/inspection-round1.json`)
+returned 39 failures in **five distinct classes — every one a real defect that
+all 158 programmatic checks had passed**:
+
+| # | Defect | Images | Fix |
+|---|---|---|---|
+| 1 | Strip header labels shifted against their own values — the ID PDF workbook labels value position 9 (a date) `INT Type`, so a boxed date sat under a neighbour's name | 2 | `_display_header`: every position a compared field resolves to is labelled with THAT field's name; unclaimed positions keep the workbook's label |
+| 2 | Source form differs from the compared value with nothing saying so (`64-01-01`→`1964-01-01`, `01/01/2014`, `1,768`, a blank side whose cell holds `-`) — and the legend actively claimed "Values shown are the compared (normalized) forms" | 30 | Panels keep the source's own text (the exact-source rule); `_normalization_note` names both forms on the image; both legends rewritten to state what is actually drawn |
+| 3 | Title/subline hard-clipped mid-glyph at the canvas edge (the canvas was sized from the panel images alone) | 3 | `_header_w`: both composers size the canvas to their own text — it grows rather than cutting |
+| 4 | A long left caption overran and overprinted the right caption into an unreadable mash | 2 | Each caption gets its own column, widened to hold it |
+| 5 | Ramp Detail's District boxes the composite `Location` cell (`12-SD-005`) because District is derived from it | 2 | Disclosed by the same note line |
+
+*Round 2* re-rendered the whole set at the frozen head and re-inspected all 827
+images with the five classes as explicit failure criteria. Result: **827/827
+pass, 0 fail.** Independent confirmations worth recording: a programmatic edge
+scan found 0 images with ink touching a canvas edge (class 3 gone); captions
+verified separated at native scale on both the narrowest (1530 px) and widest
+(2648 px) canvases (class 4 gone); header labels verified on the deliberately
+confusable near-duplicates `LB IN-SH Treated` vs `LB OT-SH Treated` (class 1
+gone); and the note line was verified to DISCRIMINATE — on Ramp Detail where
+`-` IS the compared value no note appears, while on its PDF twin where `-`
+normalizes to blank one does (class 2/5 exact, not blanket).
 
 ## Scope and residual risk
 

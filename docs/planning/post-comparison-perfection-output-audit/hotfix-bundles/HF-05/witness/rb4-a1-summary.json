@@ -1,0 +1,271 @@
+{
+ "base_defect_census": {
+  "audit_byday": {
+   "examples": 359,
+   "sets": 7,
+   "sets_with_pdf_read_members": 7,
+   "truncated": 7
+  },
+  "audit_everything": {
+   "examples": 529,
+   "sets": 11,
+   "sets_with_pdf_read_members": 10,
+   "truncated": 10
+  },
+  "base_byday": {
+   "examples": 241,
+   "sets": 8,
+   "sets_with_pdf_read_members": 7,
+   "truncated": 5
+  },
+  "base_everything": {
+   "examples": 357,
+   "sets": 13,
+   "sets_with_pdf_read_members": 10,
+   "truncated": 4
+  }
+ },
+ "bound_to_acceptance_head": "7aa76e2a0a69b5bee2abf5c4ee6aec751e166764",
+ "built_utc": "2026-08-05T02:31:22+00:00",
+ "bundle": "RB-4",
+ "claim": "every retained evidence set renders each side from the exact document that side was compared from (read set == the comparison's own recorded inputs), blank targets sit inside the captioned record, drawn values are the compared values or visibly elided, and unbindable pairs emit no artifact",
+ "count_invariance": {
+  "all_equal": true,
+  "cells": 26,
+  "compared": 26,
+  "detail": [
+   {
+    "cell": "byday|highway_log",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "byday|highway_log_pdf",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "byday|highway_sequence",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "byday|highway_sequence_pdf",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "byday|intersection_detail",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "byday|intersection_detail_pdf",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "byday|ramp_detail",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "byday|ramp_detail_pdf",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "everything-env|highway_log_pdf",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "everything-env|highway_sequence_pdf",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "everything-env|intersection_detail_pdf",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "everything-env|ramp_detail_pdf",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "everything-env|ramp_summary",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "everything-self|highway_log_pdf|vs_excel",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "everything-self|highway_log|vs_pdf",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "everything-self|highway_sequence_pdf|vs_excel",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "everything-self|intersection_detail_pdf|vs_excel",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "everything-self|ramp_detail_pdf|vs_excel",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "everything-tsn|highway_log",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "everything-tsn|highway_log_pdf",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "everything-tsn|highway_sequence",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "everything-tsn|highway_sequence_pdf",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "everything-tsn|intersection_detail",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "everything-tsn|intersection_detail_pdf",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "everything-tsn|ramp_detail",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   },
+   {
+    "cell": "everything-tsn|ramp_detail_pdf",
+    "compared": true,
+    "diffs": null,
+    "equal": true
+   }
+  ]
+ },
+ "derived_from": [
+  {
+   "file": "generation-head.json",
+   "sha256": "E43A071A0EFBA60DA5186748B6B47FAD04FD5DF4538FF91069C53DA8164BF436"
+  },
+  {
+   "file": "counts-head.json",
+   "sha256": "EBB46CF03F5BB513CDA5FB37E20C9F76AE2E19C3147A5836BE6C90540F86C8F4"
+  },
+  {
+   "file": "counts-base.json",
+   "sha256": "D7DD559292EDA3A260F575DF4A84605CBADF90095D27C93222374DA95B0E585F"
+  },
+  {
+   "file": "validate-head.json",
+   "sha256": "2400214ACEA39075D29E29E49B8DBC6F6549E61BAE641E3DEBD0125A8CAF17B9"
+  },
+  {
+   "file": "excel-head.json",
+   "sha256": "86CD039E08D7D6E615F980B31D5AD24CEB18353D464A03CA2E3849CB6B092D28"
+  },
+  {
+   "file": "prefix-defect-census.json",
+   "sha256": "A44B5320D7CF4BEE7F0D70D70E20A66AF55A5BD14BC137FD28CE8FEB26876FA4"
+  }
+ ],
+ "excel": {
+  "all_opened": true,
+  "books": 24
+ },
+ "generation_lanes": {
+  "byday-tsn": {
+   "cells": 8,
+   "ok": 8,
+   "png_total": 494
+  },
+  "everything-env": {
+   "cells": 5,
+   "ok": 5,
+   "png_total": 214
+  },
+  "everything-env-off": {
+   "cells": 5,
+   "ok": 5,
+   "png_total": 0
+  },
+  "everything-self": {
+   "cells": 5,
+   "ok": 5,
+   "png_total": 226
+  },
+  "everything-tsn": {
+   "cells": 8,
+   "ok": 8,
+   "png_total": 488
+  },
+  "pve-byday": {
+   "cells": 4,
+   "ok": 4,
+   "png_total": 0
+  }
+ },
+ "id": "RB4-A1-HF05",
+ "produced_by": {
+  "script": "acc_rb4_witness.py",
+  "script_sha256": "EBFBEE6E4F367A1736197678F6F0070AC244B0F73A3181A18A4F8826FD5F9F7F"
+ },
+ "validate": {
+  "elided_examples": 0,
+  "examples": 714,
+  "problems": 0,
+  "pve_stray": [],
+  "sets": 26,
+  "values_over_26": 16
+ },
+ "work_item": "HF-05 (PCOA-FINAL-004 / -005 / -006)"
+}
