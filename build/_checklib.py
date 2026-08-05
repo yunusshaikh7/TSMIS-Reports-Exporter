@@ -164,3 +164,41 @@ def publish_bound_comparison(path, schema, rows_a, rows_b, side_paths,
             banner="fixture", inputs=inputs):
         raise AssertionError("fixture provenance sidecar did not publish")
     return committed
+
+
+def mini_pdf(path, texts, page_w=300, page_h=200):
+    """A minimal one-page PDF with absolutely positioned Helvetica strings
+    [(x, top, size, text)...] — `top` measured from the page TOP the way
+    pdfplumber reports it. Hand-assembled bytes (uncompressed streams), so a
+    check can produce REAL parseable per-route prints without any PDF-writing
+    dependency."""
+    from pathlib import Path
+    parts = []
+    for x, top, size, text in texts:
+        y = page_h - top - size          # PDF user space is y-up
+        safe = (str(text).replace("\\", r"\\")
+                .replace("(", r"\(").replace(")", r"\)"))
+        parts.append(f"BT /F1 {size} Tf {x} {y} Td ({safe}) Tj ET")
+    stream = "\n".join(parts).encode("latin-1")
+    objs = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        (f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {page_w} {page_h}] "
+         f"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>"
+         ).encode(),
+        b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n"
+        + stream + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for i, body in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += f"{i} 0 obj\n".encode() + body + b"\nendobj\n"
+    xref = len(out)
+    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode()
+    for off in offsets:
+        out += f"{off:010} 00000 n \n".encode()
+    out += (f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\n"
+            f"startxref\n{xref}\n%%EOF\n").encode()
+    Path(path).write_bytes(bytes(out))

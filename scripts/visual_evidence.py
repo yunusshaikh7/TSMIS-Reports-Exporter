@@ -956,8 +956,11 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
         # drifted pair could exit through the no-differences/no-examples
         # paths with a fresh manifest.
         for rec_side, live_dir in ((side_rec_a, dir_a), (side_rec_b, dir_b)):
-            _require_live_census(rec_side, live_dir,
-                                 rec_side.get("role") or "a compared side")
+            try:
+                _require_live_census(rec_side, live_dir,
+                                     rec_side.get("role") or "a compared side")
+            except EvidenceSourceBindingError as e:
+                refuse_binding(e)      # retire the prior set, publish nothing
         source_paths = (comparison_path, dir_a, dir_b, *pdfs_a, *pdfs_b)
         initial_pdf_set = artifact_store.canonical_path_identities(
             (*pdfs_a, *pdfs_b))

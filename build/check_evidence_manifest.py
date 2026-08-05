@@ -372,6 +372,151 @@ check("...zero artifacts survive at canonical names — manifest included",
 
 shutil.rmtree(_r, ignore_errors=True)
 
+# --------------------------------------------------------------------------- #
+# HF-10 (the bundle's named env case): an env PDF-vs-PDF cell with positive
+# differences produces a BOUND manifest, workbook and image set with a
+# PDF-only read set that passes the exact-source test; a pair that cannot
+# bind publishes nothing; and the comparison content is untouched by the
+# render. The prints are REAL hand-authored PDFs (mini_pdf), one side spelled
+# the store-tagged way so the end-anchored print resolution is on the path;
+# only the ADAPTER is a fixture — the engine, binding, snapshot, composition
+# check and manifest commit are all production code.
+# --------------------------------------------------------------------------- #
+print("HF-10: an env cell renders a bound, PDF-only evidence set")
+import json as _json
+import types as _types
+
+import artifact_store as _astore
+import compare_tsn_common as _ctc
+import events as _events_mod
+from compare_core import CompareSchema as _CS, run_compare as _rc
+from _checklib import mini_pdf as _mini_pdf
+
+
+def _env_fixture_adapter():
+    import pdfplumber as _pp
+    import paths as _paths
+    mod = _types.ModuleType("_fixture_env_adapter")
+    mod.REPORT_LABEL = "Fixture Env"
+    mod.KEY_LABEL = "Route"
+    mod.FIELDS = ("F",)
+    mod.env_fields = lambda: ["F"]
+    mod.tsmis_pdf_path = lambda d, route: _paths.resolve_route_file(
+        Path(d), f"fixt_route_{route}.pdf")
+
+    def env_locate(pdf_path, needed_keys):
+        with _pp.open(pdf_path) as pdf:
+            words = pdf.pages[0].extract_words()
+        rec = {"src": str(pdf_path), "page": 1, "words": words}
+        return {k: [rec] for k in needed_keys}
+
+    def env_box(rec, field):
+        del field
+        w = rec["words"][-1]
+        xs = ([x["x0"] for x in rec["words"]], [x["x1"] for x in rec["words"]])
+        top = min(x["top"] for x in rec["words"])
+        bottom = max(x["bottom"] for x in rec["words"])
+        return (rec["page"], (w["x0"] - 2, top - 2, w["x1"] + 2, bottom + 2),
+                (top, bottom), (min(xs[0]) - 4, max(xs[1]) + 4))
+
+    mod.env_locate = env_locate
+    mod.env_value = lambda rec, _f: rec["words"][-1]["text"]
+    mod.env_box = env_box
+    mod.env_project = lambda _f, raw: "" if raw is None else str(raw)
+    sys.modules[mod.__name__] = mod
+    return mod
+
+
+def _census(files):
+    out = []
+    for f in files:
+        st = Path(f).stat()
+        out.append({"name": Path(f).name, "size": st.st_size,
+                    "mtime_ns": st.st_mtime_ns})
+    return out
+
+
+_er = Path(tempfile.mkdtemp(prefix="check_ev_env_"))
+try:
+    _ra, _rb = _er / "envA", _er / "envB"
+    _ra.mkdir(), _rb.mkdir()
+    _pa = _ra / "fixt_route_001.pdf"
+    _pb = _rb / "envB fixt_route_001.pdf"       # the store-tagged spelling
+    _mini_pdf(_pa, [(20, 50, 12, "001"), (120, 50, 12, "X")])
+    _mini_pdf(_pb, [(20, 50, 12, "001"), (120, 50, 12, "Y")])
+    _row5 = "_fixture_env_row"
+    _mod5 = _env_fixture_adapter()
+    ve._ENV_ADAPTER_MODULES[_row5] = _mod5.__name__
+    _schema5 = _CS(report_name="Fixture Env", header=["Route", "F"],
+                   side_a="envB", side_b="envA")
+    _cmp5 = _er / "envB_fixture.xlsx"
+    _inputs5 = [
+        {"kind": "folder", "role": "envB",
+         "selection": str(_rb.resolve()), "member_count": 1,
+         "members": _census([_pb])},
+        {"kind": "folder", "role": "envA",
+         "selection": str(_ra.resolve()), "member_count": 1,
+         "members": _census([_pa])},
+    ]
+    _committed5 = _astore.commit_workbook(
+        _cmp5,
+        lambda tmp: _rc(_schema5, [["001", "Y"]], [["001", "X"]], False, tmp,
+                        mode="values", confirm_overwrite=lambda _p: True,
+                        name_a="envB", name_b="envA"),
+        expect_sheet="Comparison", confirm_overwrite=lambda _p: True,
+        source_paths=(_rb, _ra), requested_mode="values")
+    check("the env fixture comparison publishes through the front door",
+          _committed5.status == "ok"
+          and _ctc.write_comparison_provenance(
+              _committed5, _cmp5, report="Fixture Env", banner="fixture",
+              inputs=_inputs5))
+    _before5 = _astore.content_digest(_cmp5)
+    _ev5 = _events_mod.Events(on_log=lambda _m: None)
+    _res5 = ve.generate(_row5, None, None, _cmp5, None, _ev5, examples=1,
+                        layout="pair", flavor=ve.FLAVOR_ENV)
+    _wb5, _img5 = ve.sibling_paths(_cmp5)
+    _man5 = em.manifest_path(_cmp5)
+    check("bound manifest + workbook + image set exist",
+          _res5.get("rendered") == 1 and _wb5.exists() and _man5.exists()
+          and len(list(_img5.glob("*.png"))) == 1)
+    _m5 = _json.loads(_man5.read_text(encoding="utf-8"))
+    _names5 = [x["name"] for x in _m5.get("read_set", [])]
+    check("the read set is PDF-ONLY and exactly the two compared prints",
+          _m5.get("state") == em.STATE_RENDERED
+          and sorted(Path(n).name for n in _names5)
+          == sorted([_pa.name, _pb.name])
+          and all(n.lower().endswith(".pdf") for n in _names5))
+    _census5 = {m["name"] for s in _inputs5 for m in s["members"]}
+    check("every read-set member is a recorded census member (exact-source)",
+          {Path(n).name for n in _names5} == _census5)
+    check("the render leaves the comparison content byte-identical "
+          "(counts unchanged with evidence on)",
+          _astore.content_digest(_cmp5) == _before5)
+
+    print("HF-10: an env pair that cannot bind publishes NOTHING")
+    _pb.touch()                          # drift side B against the census
+    try:
+        ve.generate(_row5, None, None, _cmp5, None, _ev5, examples=1,
+                    layout="pair", flavor=ve.FLAVOR_ENV)
+        check("a census-drifted env pair refuses loudly", False)
+    except ve.EvidenceSourceBindingError:
+        check("a census-drifted env pair refuses loudly", True)
+    check("...and zero artifacts survive — manifest included, prior set "
+          "retired",
+          not _wb5.exists() and not _img5.exists() and not _man5.exists())
+
+    print("HF-10: a cell whose sides are not both PDFs produces nothing")
+    try:
+        ve.generate("highway_log", None, None, _cmp5, None, _ev5,
+                    examples=1, layout="pair", flavor=ve.FLAVOR_ENV)
+        check("a row with no env adapter refuses", False)
+    except Exception:
+        check("a row with no env adapter refuses", True)
+finally:
+    ve._ENV_ADAPTER_MODULES.pop(_row5, None)
+    sys.modules.pop("_fixture_env_adapter", None)
+    shutil.rmtree(_er, ignore_errors=True)
+
 print()
 if _fail:
     print(f"FAILED {len(_fail)} check(s):")
