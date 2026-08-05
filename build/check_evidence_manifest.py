@@ -505,6 +505,52 @@ try:
           "retired",
           not _wb5.exists() and not _img5.exists() and not _man5.exists())
 
+    # The drift above renders one example first, so the snapshot-time census
+    # binding catches it too — deleting the FRONT-DOOR check still passed.
+    # A comparison with NO differences publishes a manifest without rendering
+    # anything, so nothing but the front door stands between a drifted source
+    # and that manifest. This is the case that locks it.
+    print("HF-10: the no-EXAMPLES path is bound at the front door")
+    _inputs6 = [
+        {"kind": "folder", "role": "envB", "selection": str(_rb.resolve()),
+         "member_count": 1, "members": _census([_pb])},
+        {"kind": "folder", "role": "envA", "selection": str(_ra.resolve()),
+         "member_count": 1, "members": _census([_pa])},
+    ]
+    _cmp6 = _er / "envB_fixture_same.xlsx"
+    _committed6 = _astore.commit_workbook(
+        _cmp6,
+        lambda tmp: _rc(_schema5, [["001", "X"]], [["001", "X"]], False, tmp,
+                        mode="values", confirm_overwrite=lambda _p: True,
+                        name_a="envB", name_b="envA"),
+        expect_sheet="Comparison", confirm_overwrite=lambda _p: True,
+        source_paths=(_rb, _ra), requested_mode="values")
+    check("the no-differences env fixture publishes through the front door",
+          _committed6.status == "ok"
+          and _ctc.write_comparison_provenance(
+              _committed6, _cmp6, report="Fixture Env", banner="fixture",
+              inputs=_inputs6))
+    _man6 = em.manifest_path(_cmp6)
+    _wb6, _img6 = ve.sibling_paths(_cmp6)
+    _res6 = ve.generate(_row5, None, None, _cmp6, None, _ev5, examples=1,
+                        layout="pair", flavor=ve.FLAVOR_ENV)
+    check("a no-differences env comparison publishes a manifest and NO images",
+          _res6.get("rendered") == 0 and _man6.exists()
+          and not _img6.exists())
+    with open(_pa, "ab") as _fh:            # drift side A: size AND mtime move
+        _fh.write(b"\n% drifted after the comparison recorded its census\n")
+    try:
+        ve.generate(_row5, None, None, _cmp6, None, _ev5, examples=1,
+                    layout="pair", flavor=ve.FLAVOR_ENV)
+        check("a drifted source refuses even when there is nothing to render",
+              False)
+    except ve.EvidenceSourceBindingError:
+        check("a drifted source refuses even when there is nothing to render",
+              True)
+    check("...and the manifest the no-examples path would have published is "
+          "retired, not left behind",
+          not _man6.exists() and not _wb6.exists() and not _img6.exists())
+
     print("HF-10: a cell whose sides are not both PDFs produces nothing")
     try:
         ve.generate("highway_log", None, None, _cmp5, None, _ev5,
