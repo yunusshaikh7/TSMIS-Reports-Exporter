@@ -1759,6 +1759,98 @@ _got, _reason = ve._env_example_sides(
 check("an env target outside the record's own lines is refused by the ENGINE",
       _got is None and "outside the record's own printed lines" in _reason)
 
+
+class _WideBoxAdapter:
+    """Inside the record's LINES, but past its printed width — the axis the
+    backstop used to ignore, which is exactly how a mis-anchored blank-cell
+    window reached a render."""
+
+    @staticmethod
+    def env_value(_rec, _field):
+        return "V"
+
+    @staticmethod
+    def env_box(_rec, _field):
+        return (1, (180, 100, 260, 110), (100, 110), (0, 200))
+
+
+_got, _reason = ve._env_example_sides(
+    _WideBoxAdapter, {"route": "001", "key": "K", "display": "V ≠ W"},
+    "F", _bad_loc, ("A", "B"), {})
+check("an env target outside the record's printed WIDTH is refused too",
+      _got is None and "outside the record's own printed width" in _reason)
+
+
+class _EdgePadBoxAdapter:
+    """A blank-cell window legitimately padded a few points past the record's
+    glyph extent must still render — the width backstop must not be so tight
+    that it refuses the honest case."""
+
+    @staticmethod
+    def env_value(_rec, _field):
+        return "V"
+
+    @staticmethod
+    def env_box(_rec, _field):
+        return (1, (-4, 100, 204, 110), (100, 110), (0, 200))
+
+
+_got, _reason = ve._env_example_sides(
+    _EdgePadBoxAdapter, {"route": "001", "key": "K", "display": "V ≠ W"},
+    "F", _bad_loc, ("A", "B"), {})
+check("...but a few points of legitimate edge padding is not refused for "
+      "width (it fails later, on the unreadable print)",
+      _got is None and "printed width" not in _reason)
+
+# --------------------------------------------------------------------------- #
+# PCOA-FINAL-005's other half, and the one the engine backstop CANNOT catch: a
+# blank cell's rectangle may sit well inside the record's own lines and width
+# and still enclose the NEIGHBOURING column's glyphs. The audit measured the
+# previous fixed `boundary + offset … +30pt` guesses doing exactly that on
+# thousands of Highway Sequence rows — a blank '(col C)' boxing the PM value, a
+# blank '(col E)' boxing the HG letter.
+print("HF-10: a blank cell's window never encloses another column's glyphs")
+import evidence_highway_sequence as _ehs5
+
+_BOUNDS = {"county_city": 100, "city_prefix": 150, "prefix_pm": 200,
+           "pm_suffix": 250, "suffix_hg": 300, "hg_ft": 350, "ft_dist": 400,
+           "dist_desc": 450}
+
+
+def _w(x0, x1, text):
+    return {"x0": x0, "x1": x1, "top": 100, "bottom": 110, "text": text}
+
+
+# 'prefix' and 'suffix' print nothing on this row; every other column does.
+_PRINTED = {"county": [_w(20, 90, "MON")], "city": [_w(110, 140, "SAL")],
+            "pm": [_w(210, 240, "28.013")], "hg": [_w(310, 340, "H")],
+            "ft": [_w(360, 390, "U")], "dist": [_w(410, 440, "1.204")]}
+_hsl_rec = {"page": 1, "top": 100, "bottom": 110, "desc": [],
+            "boundaries": dict(_BOUNDS), "cols": dict(_PRINTED),
+            "vals": {"prefix": "", "suffix": ""}}
+_others = [word for ws in _PRINTED.values() for word in ws]
+
+_blank_boxes = {}
+for _field in ("(col C)", "(col E)"):
+    _box = _ehs5.env_box(_hsl_rec, _field)
+    _blank_boxes[_field] = _box
+    _rect = _box[1] if _box else None
+    _hits = [word["text"] for word in _others
+             if _rect and word["x0"] < _rect[2] and word["x1"] > _rect[0]]
+    check(f"a blank {_field} boxes its own window and no other column's "
+          f"glyphs", _box is not None and not _hits)
+
+check("...and the window stays strictly between its own header boundaries",
+      _blank_boxes["(col C)"][1][0] >= _BOUNDS["city_prefix"]
+      and _blank_boxes["(col C)"][1][2] <= _BOUNDS["prefix_pm"]
+      and _blank_boxes["(col E)"][1][0] >= _BOUNDS["pm_suffix"]
+      and _blank_boxes["(col E)"][1][2] <= _BOUNDS["suffix_hg"])
+check("a printed column still boxes its OWN words, not the window",
+      _ehs5.env_box(_hsl_rec, "HG")[1][0] < 310 + 1
+      and _ehs5.env_box(_hsl_rec, "HG")[1][2] > 340 - 1)
+check("a blank Description REFUSES — the print anchors no cell for it",
+      _ehs5.env_box(_hsl_rec, "Description") is None)
+
 # --------------------------------------------------------------------------- #
 # HF-10: the env candidate pool comes from the published comparison itself,
 # and the aggregate (route-keyed) shape locates by the key when route is blank.
