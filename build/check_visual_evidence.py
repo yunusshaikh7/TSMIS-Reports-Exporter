@@ -20,6 +20,7 @@ render-stack step (scripts/self_test.py) — no rasterizing here; CI-safe.
 Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_visual_evidence.py
 """
+import inspect
 import os
 import re
 import shutil
@@ -65,6 +66,23 @@ def check(name, cond):
     if not cond:
         _fail.append(name)
 
+
+# --------------------------------------------------------------------------- #
+# Stated FIRST, as an assertion rather than an import-time crash: run against a
+# runtime without the exact-source rebuild, this file used to die on the first
+# new call and print nothing, so it could never demonstrate the defect it
+# exists to catch. Naming the contract makes the base run say what is missing.
+print("the exact-source contract this file depends on")
+check("the read set is captured in labelled per-side buckets, so a manifest "
+      "names the document each side was compared from",
+      "buckets" in inspect.signature(ve._snapshot_read_set).parameters)
+check("the engine renders a side from the compared WORKBOOK "
+      "(_workbook_rows_at + _workbook_side), not from a borrowed print",
+      hasattr(ve, "_workbook_rows_at") and hasattr(ve, "_workbook_side"))
+check("a drawn panel string is full or visibly elided (panel_cell_text)",
+      hasattr(ve, "panel_cell_text"))
+check("the per-route print is resolved by contract (find_route_print)",
+      hasattr(ve, "find_route_print"))
 
 # --------------------------------------------------------------------------- #
 print("registry + sources + clamp")
@@ -1809,6 +1827,43 @@ check("...but a few points of legitimate edge padding is not refused for "
 # previous fixed `boundary + offset … +30pt` guesses doing exactly that on
 # thousands of Highway Sequence rows — a blank '(col C)' boxing the PM value, a
 # blank '(col E)' boxing the HG letter.
+# Resolving WHICH print a route's evidence comes from. The adapter's own name
+# only exists under a run folder; an Export Everything store tags each name
+# with its environment, so the engine falls back to the end-anchored
+# `…_route_<token>.<ext>` contract. That fallback must never GUESS.
+print("HF-10: the per-route print is resolved exactly or not at all")
+_pr_dir = Path(tempfile.mkdtemp(prefix="check_ev_route_"))
+
+
+class _PrintAdapter:
+    @staticmethod
+    def tsmis_pdf_path(pdf_dir, route):
+        return Path(pdf_dir) / f"fixt_route_{route}.pdf"
+
+
+def _resolve(route):
+    return ve.find_route_print(_pr_dir, _PrintAdapter, route)
+
+
+try:
+    check("no candidate at all resolves to nothing", _resolve("001") is None)
+    (_pr_dir / "ssor-prod fixt_route_001.pdf").write_bytes(b"%PDF-1.4\n")
+    check("a store-tagged name resolves by the end-anchored route contract",
+          _resolve("001") == _pr_dir / "ssor-prod fixt_route_001.pdf")
+    (_pr_dir / "fixt_route_002.pdf").write_bytes(b"%PDF-1.4\n")
+    check("another route's print is not borrowed", _resolve("003") is None)
+    check("the exact adapter name wins when it exists",
+          _resolve("002") == _pr_dir / "fixt_route_002.pdf")
+    (_pr_dir / "ars-prod fixt_route_001.pdf").write_bytes(b"%PDF-1.4\n")
+    check("TWO names honour the contract -> refuse, never pick one "
+          "(captioning a route from the wrong environment's print)",
+          _resolve("001") is None)
+    (_pr_dir / "fixt_route_001.pdf").write_bytes(b"%PDF-1.4\n")
+    check("...unless the adapter's own exact name is there to settle it",
+          _resolve("001") == _pr_dir / "fixt_route_001.pdf")
+finally:
+    shutil.rmtree(_pr_dir, ignore_errors=True)
+
 print("HF-10: a blank cell's window never encloses another column's glyphs")
 import evidence_highway_sequence as _ehs5
 

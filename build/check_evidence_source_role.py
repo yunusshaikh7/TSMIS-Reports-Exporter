@@ -40,6 +40,20 @@ def check(name, cond):
 
 
 # --------------------------------------------------------------------------- #
+# Stated FIRST as an assertion, not an import-time crash: against a runtime
+# without the exact-source rebuild this file died on the first new call and
+# printed nothing, so it could not demonstrate the defect it exists to catch.
+print("the exact-source contract this file depends on")
+check("the engine addresses the compared workbook's rows and renders each "
+      "side's panel from it (_workbook_rows_at + _workbook_side)",
+      hasattr(ve, "_workbook_rows_at") and hasattr(ve, "_workbook_side"))
+check("a drawn panel string is full or visibly elided (panel_cell_text)",
+      hasattr(ve, "panel_cell_text"))
+check("the strip's labels follow the values, and a normalized source form is "
+      "disclosed (_display_header + _normalization_note)",
+      hasattr(ve, "_display_header") and hasattr(ve, "_normalization_note"))
+
+# --------------------------------------------------------------------------- #
 print("which source each row was compared FROM")
 check("every '_pdf' row is evidenced from the print, every other from the workbook",
       {rk: ve.tsmis_source_role(rk) for rk in sorted(ve.rows())}
@@ -335,6 +349,25 @@ check("a position no compared field claims keeps the workbook's own label",
       _fixed[0] == "Route" and _fixed[4] == "Location")
 check("an adapter with no resolve hook leaves the header untouched",
       ve._display_header(_eid6, _SHIFTED, None) is _SHIFTED)
+
+# A shifted layout leaves the workbook's OWN copy of a placed name sitting on a
+# position no compared field claims — the classic Ramp Detail export labels
+# position 11 'Description' while the Description VALUE is at 10. Drawing both
+# puts two identical headers in one strip and the reader cannot tell which
+# column the red box is under.
+_DUP_HEADER = ["Route", "PM", "X", "Description"]
+_DUP_AT = {"Route": 0, "PM": 1, "Description": 2}
+_dup_adapter = types.SimpleNamespace(FIELDS=tuple(_DUP_AT), __name__="dupfix")
+_dup = ve._display_header(_dup_adapter, _DUP_HEADER,
+                          lambda f, _h: _DUP_AT.get(f))
+check("the workbook's stale duplicate of a placed label is blanked, so one "
+      "name never appears over two columns",
+      _dup[2] == "Description" and _dup[3] == ""
+      and _DUP_HEADER[3] == "Description")
+check("...and an unclaimed position with its own distinct label is kept",
+      _dup[:2] == ["Route", "PM"]
+      and ve._display_header(_dup_adapter, ["Route", "PM", "X", "Y"],
+                             lambda f, _h: _DUP_AT.get(f))[3] == "Y")
 
 print("the composed image: no clipping, no overprint, no silent restatement")
 

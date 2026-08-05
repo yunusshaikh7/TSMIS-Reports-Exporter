@@ -34,6 +34,28 @@ def check(name, cond):
         _fail.append(name)
 
 
+# Stated FIRST as an assertion, not an import-time crash: against a runtime
+# with no evidence call site this file died on the first new keyword and
+# printed nothing, so it could not demonstrate the defect it exists to catch.
+def check_evidence_contract():
+    import inspect
+
+    import matrix_build
+    print("the matrix evidence contract this file depends on")
+    check("a cell comparison can be asked for evidence "
+          "(build_cell_comparison(evidence=…))",
+          "evidence" in inspect.signature(
+              matrix_build.build_cell_comparison).parameters)
+    check("the cross-environment camera exists and is reachable through the "
+          "facade (run_env_evidence_only)",
+          hasattr(matrix_build, "run_env_evidence_only")
+          and hasattr(matrix, "run_env_evidence_only"))
+    check("the camera is routed by the row's selected mode "
+          "(evidence_for_cell(mode_id=…))",
+          "mode_id" in inspect.signature(
+              matrix_build.evidence_for_cell).parameters)
+
+
 def test_enumeration():
     print("matrix_snapshot enumeration (empty store):")
     dest = Path(tempfile.mkdtemp(prefix="tsmis_mx_"))
@@ -324,6 +346,7 @@ def test_orchestration_and_cache():
 
 
 def main():
+    check_evidence_contract()
     test_enumeration()
     test_reorder()
     test_comparison_path_stable()

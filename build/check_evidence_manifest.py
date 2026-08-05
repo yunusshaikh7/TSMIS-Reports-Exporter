@@ -40,6 +40,21 @@ def check(name, cond):
         _fail.append(name)
 
 
+# Stated FIRST as an assertion, not an import-time crash: against a runtime
+# without the exact-source rebuild this file died on the first new call and
+# printed nothing, so it could not demonstrate the defect it exists to catch.
+print("the exact-source contract this file depends on")
+check("the engine renders a side from the compared WORKBOOK "
+      "(_workbook_rows_at + _workbook_side), not from a borrowed print",
+      hasattr(ve, "_workbook_rows_at") and hasattr(ve, "_workbook_side"))
+check("a pair that cannot be bound to what the comparison read has its own "
+      "refusal type (EvidenceSourceBindingError)",
+      hasattr(ve, "EvidenceSourceBindingError"))
+check("the cross-environment lane exists and names its five placements",
+      hasattr(ve, "FLAVOR_ENV") and hasattr(ve, "env_rows")
+      and len(list(ve.env_rows())) == 5)
+
+
 def refuses(fn, *a, **k):
     try:
         fn(*a, **k)
@@ -550,6 +565,41 @@ try:
     check("...and the manifest the no-examples path would have published is "
           "retired, not left behind",
           not _man6.exists() and not _wb6.exists() and not _img6.exists())
+
+    # Side ORDER is structural, not conventional. The provenance records each
+    # side's role positionally; if the roles are not the published side labels
+    # in order, every crop would be captioned with the OTHER environment's
+    # name — an image that looks right and says the wrong thing.
+    print("HF-10: the recorded side roles must BE the published side labels")
+    _inputs8 = [
+        {"kind": "folder", "role": "envA", "selection": str(_rb.resolve()),
+         "member_count": 1, "members": _census([_pb])},
+        {"kind": "folder", "role": "envB", "selection": str(_ra.resolve()),
+         "member_count": 1, "members": _census([_pa])},
+    ]                                        # roles SWAPPED against the schema
+    _cmp8 = _er / "envB_fixture_swapped.xlsx"
+    _committed8 = _astore.commit_workbook(
+        _cmp8,
+        lambda tmp: _rc(_schema5, [["001", "Y"]], [["001", "X"]], False, tmp,
+                        mode="values", confirm_overwrite=lambda _p: True,
+                        name_a="envB", name_b="envA"),
+        expect_sheet="Comparison", confirm_overwrite=lambda _p: True,
+        source_paths=(_rb, _ra), requested_mode="values")
+    check("the swapped-role fixture publishes through the front door",
+          _committed8.status == "ok"
+          and _ctc.write_comparison_provenance(
+              _committed8, _cmp8, report="Fixture Env", banner="fixture",
+              inputs=_inputs8))
+    _man8 = em.manifest_path(_cmp8)
+    try:
+        ve.generate(_row5, None, None, _cmp8, None, _ev5, examples=1,
+                    layout="pair", flavor=ve.FLAVOR_ENV)
+        check("roles that are not the published side labels refuse", False)
+    except ve.EvidenceSourceBindingError as _e8:
+        check("roles that are not the published side labels refuse",
+              "cannot be ordered" in str(_e8))
+    check("...and that refusal publishes nothing either",
+          not _man8.exists() and not ve.sibling_paths(_cmp8)[0].exists())
 
     print("HF-10: a cell whose sides are not both PDFs produces nothing")
     try:

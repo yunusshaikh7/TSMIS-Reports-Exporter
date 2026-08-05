@@ -25,6 +25,26 @@ FORMULA_LEADS = ("=1+1", "+1", "-1", "@SUM(A1:A2)")
 UNSAFE_LITERALS = FORMULA_LEADS + tuple(ERROR_CODES)
 
 
+def _require(name, cond):
+    """Stated FIRST and printed, not asserted: run against a runtime without
+    the exact-source rebuild, this file died inside the writer with a bare
+    KeyError and printed nothing, so it could never demonstrate the defect it
+    exists to catch. A named failure on stdout says what is missing."""
+    print(f"  [{'OK ' if cond else 'FAIL'}] {name}")
+    if not cond:
+        raise SystemExit(1)
+
+
+def test_evidence_contract():
+    print("the exact-source contract this file depends on")
+    _require("a drawn panel string is full or visibly elided "
+             "(panel_cell_text)", hasattr(ve, "panel_cell_text"))
+    _require("the image sheet's legend states only what was read "
+             "(_legend_for)", hasattr(ve, "_legend_for"))
+    _require("the engine renders a side from the compared workbook "
+             "(_workbook_side)", hasattr(ve, "_workbook_side"))
+
+
 def _assert_text(cell, expected, label):
     assert cell.value == expected, (label, cell.coordinate, cell.value, expected)
     assert cell.data_type == "s", (
@@ -126,6 +146,7 @@ def test_shared_guard_covers_excel_error_tokens():
 
 
 def main():
+    test_evidence_contract()
     test_evidence_workbook_literals()
     test_shared_guard_covers_excel_error_tokens()
     print(
