@@ -275,8 +275,9 @@ def test_orchestration_and_cache():
         check("verdict = diff", res.verdict == "diff")
         out = matrix.comparison_path(dest, "ssor-prod", "ramp_detail", "ars-prod")
         check("comparison workbook written", out.exists())
-        # HF-10: the evidence request is honored ONLY on the five PDF-vs-PDF
-        # env placements; an XLSX env row stays silent — zero artifacts.
+        # HF-10 (amended 2026-08-05): the evidence request is honored ONLY on
+        # the four `_pdf`-family env placements; an XLSX env row stays silent
+        # — zero artifacts — and so does ramp_summary's env cell now.
         check("an XLSX env cell writes NO evidence artifact with the toggle on",
               not list(out.parent.glob("*evidence*")))
         # The env camera refuses honestly when there is nothing to illustrate.
@@ -286,10 +287,18 @@ def test_orchestration_and_cache():
             env_cam_refused = False
         except ValueError as e:
             env_cam_refused = "cross-environment evidence" in str(e)
-        check("the env camera refuses a row outside the five env placements",
+        check("the env camera refuses a row outside the four env placements",
               env_cam_refused)
         try:
             matrix.run_env_evidence_only(dest, "ssor-prod", "ramp_summary",
+                                         "ars-prod", Events())
+            env_cam_rs = False
+        except ValueError as e:
+            env_cam_rs = "cross-environment evidence" in str(e)
+        check("the env camera refuses ramp_summary too (the third ruling: "
+              "no evidence lane at all)", env_cam_rs)
+        try:
+            matrix.run_env_evidence_only(dest, "ssor-prod", "ramp_detail_pdf",
                                          "ars-prod", Events())
             env_cam_missing = False
         except ValueError as e:

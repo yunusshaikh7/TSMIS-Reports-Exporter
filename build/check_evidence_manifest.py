@@ -41,18 +41,21 @@ def check(name, cond):
 
 
 # Stated FIRST as an assertion, not an import-time crash: against a runtime
-# without the exact-source rebuild this file died on the first new call and
+# without the print-crop amendment this file died on the first new call and
 # printed nothing, so it could not demonstrate the defect it exists to catch.
-print("the exact-source contract this file depends on")
-check("the engine renders a side from the compared WORKBOOK "
-      "(_workbook_rows_at + _workbook_side), not from a borrowed print",
-      hasattr(ve, "_workbook_rows_at") and hasattr(ve, "_workbook_side"))
+print("the print-crop contract this file depends on (owner amendment 2026-08-05)")
+check("the vs-TSN lane locates PRINTS (_locate_tsmis_sources) and evidence "
+      "exists only for the four `_pdf` rows",
+      hasattr(ve, "_locate_tsmis_sources")
+      and sorted(ve.rows()) == ["highway_log_pdf", "highway_sequence_pdf",
+                                "intersection_detail_pdf", "ramp_detail_pdf"])
 check("a pair that cannot be bound to what the comparison read has its own "
       "refusal type (EvidenceSourceBindingError)",
       hasattr(ve, "EvidenceSourceBindingError"))
-check("the cross-environment lane exists and names its five placements",
+check("the cross-environment lane exists and names its four placements "
+      "(Ramp Summary removed by the third ruling)",
       hasattr(ve, "FLAVOR_ENV") and hasattr(ve, "env_rows")
-      and len(list(ve.env_rows())) == 5)
+      and len(list(ve.env_rows())) == 4)
 
 
 def refuses(fn, *a, **k):
@@ -259,32 +262,46 @@ check("...and the note says what happened, rather than claiming success",
 
 # --------------------------------------------------------------------------- #
 print("end to end: every terminal state records itself (CMP-AUD-106)")
-_HD_ROW = ["001"] + ["0.100"] + ["x"] * (len(cht.SHARED_HEADER) - 1)
-_DESC = 1 + cht.SHARED_HEADER.index("Description")
+import compare_intersection_detail_tsn as idt                # noqa: E402
+import evidence_intersection_detail as eid                   # noqa: E402
+import paths as _paths_tsn                                   # noqa: E402
+
+_ID_ROW = ["001"] + ["x"] * len(idt.SHARED_HEADER)
+_ID_ROW[1 + idt.SHARED_HEADER.index(idt.KEY)] = "0.100"
+_DESC = 1 + idt.SHARED_HEADER.index("Description")
 
 
 def hd_row(desc=None):
-    row = list(_HD_ROW)
+    row = list(_ID_ROW)
     if desc is not None:
         row[_DESC] = desc
     return row
 
 
-def run_generate(name, rows_a, rows_b, proposals, cancel_at_address=False,
+def run_generate(name, rows_a, rows_b, proposals, cancel_at_locate=False,
                  plant_prior=True, strip_provenance=False):
     """Drive the SHIPPED generate() over a real BOUND comparison — published
     the production way (committed generation + typed outcome + provenance
     sidecar over the two side files), so the exact-source binding passes and
-    every terminal state below is reached through the real front door."""
+    every terminal state below is reached through the real front door. The
+    fixture family is intersection_detail_pdf (the 2026-08-05 ruling: only
+    `_pdf` rows are capable); both print sets are unparseable stubs, so a
+    candidate that reaches the locate step becomes a miss, never a render."""
     root = _r / name
     root.mkdir()
     cmp_path = root / "day vs tsn.xlsx"
     cons = root / "cons.xlsx"; cons.write_bytes(b"consolidated")
     tsn = root / "tsn.xlsx"; tsn.write_bytes(b"tsn")
-    _checklib.publish_bound_comparison(cmp_path, cht._SCHEMA, rows_a, rows_b,
+    _checklib.publish_bound_comparison(cmp_path, idt._SCHEMA, rows_a, rows_b,
                                        (cons, tsn))
     if strip_provenance:
         cmp_path.with_name(cmp_path.name + ".provenance.json").unlink()
+    tdir = root / "tsmis_pdf"
+    tdir.mkdir()
+    (tdir / "intersection_detail_route_001.pdf").write_bytes(b"%PDF tsmis")
+    lib = root / "tsn_library" / "intersection_detail" / "pdf"
+    lib.mkdir(parents=True)
+    (lib / "stub.pdf").write_bytes(b"%PDF tsn")
     wb, img = ve.sibling_paths(cmp_path)
     man = em.manifest_path(cmp_path)
     if plant_prior:
@@ -292,27 +309,29 @@ def run_generate(name, rows_a, rows_b, proposals, cancel_at_address=False,
         img.mkdir()
         (img / "prior.png").write_bytes(b"prior image")
         man.write_text(em.dumps(em.build(
-            state=em.STATE_RENDERED, report="HD", comparison_path=cmp_path,
+            state=em.STATE_RENDERED, report="ID", comparison_path=cmp_path,
             ledger_digest="c" * 64, reader_version=1, difference_cells=9,
             differing_columns=1, workbook=wb,
             images=(em.member_for(img / "prior.png"),))), encoding="utf-8")
-    saved = (ehd.load_sides, ehd.enumerate_diffs, ve._workbook_rows_at)
-    ehd.load_sides = lambda _c, _t: ([], [], {"ok": 1}, None)
-    ehd.enumerate_diffs = lambda _x, _y, _s: proposals
+    saved = (eid.load_sides, eid.enumerate_diffs, ve._locate_tsmis_sources,
+             _paths_tsn.TSN_LIBRARY_ROOT)
+    eid.load_sides = lambda _c, _t: ([], [], {"ok": 1}, None)
+    eid.enumerate_diffs = lambda _x, _y, _s: proposals
+    _paths_tsn.TSN_LIBRARY_ROOT = root / "tsn_library"
     events = Ev()
-    if cancel_at_address:
-        # Cancel once the compared-workbook rows are being addressed — the
-        # render boundary, where a late cancel must still leave the previous
-        # set untouched.
-        def cancel_then_address(*_a, **_k):
+    if cancel_at_locate:
+        # Cancel once the prints are being located — the render boundary,
+        # where a late cancel must still leave the previous set untouched.
+        def cancel_then_locate(*_a, **_k):
             events.cancelled = True
-            return {}, []
-        ve._workbook_rows_at = cancel_then_address
+            return None
+        ve._locate_tsmis_sources = cancel_then_locate
     try:
-        res = ve.generate("highway_detail", cons, tsn, cmp_path, root, events)
+        res = ve.generate("intersection_detail_pdf", cons, tsn, cmp_path,
+                          tdir, events)
     finally:
-        (ehd.load_sides, ehd.enumerate_diffs,
-         ve._workbook_rows_at) = saved
+        (eid.load_sides, eid.enumerate_diffs, ve._locate_tsmis_sources,
+         _paths_tsn.TSN_LIBRARY_ROOT) = saved
     return cmp_path, wb, img, man, res
 
 
@@ -332,8 +351,8 @@ check("...and a reader (a RESTART, holding no state) agrees it is current",
 check("...the recorded ledger digest is the published comparison's own",
       len(em.read(_m).ledger_digest) == 64)
 
-# differences exist, but none can be photographed: the proposals carry no
-# workbook row positions, so neither side's compared cell can be addressed.
+# differences exist, but none can be photographed: both print sets are
+# unparseable stubs, so every candidate becomes a locate miss.
 _c, _w, _i, _m, _res = run_generate(
     "no_examples", [hd_row("ALPHA")], [hd_row("BETA")], _PROPOSAL)
 check("a run that renders nothing records 'no_examples', not 'no_differences'",
@@ -355,7 +374,7 @@ check("a duplicate-only comparison records 'no_examples' with its counts",
 # cancellation: keep-last-good, and the prior record stays truthful.
 _c, _w, _i, _m, _res = run_generate(
     "cancelled", [hd_row("ALPHA")], [hd_row("BETA")], _PROPOSAL,
-    cancel_at_address=True)
+    cancel_at_locate=True)
 check("cancellation publishes nothing and records nothing",
       "cancelled" in _res["note"] and "manifest_state" not in _res)
 check("...the prior evidence AND its manifest are left exactly as they were",

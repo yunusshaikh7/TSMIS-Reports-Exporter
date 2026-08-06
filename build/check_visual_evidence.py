@@ -69,60 +69,59 @@ def check(name, cond):
 
 # --------------------------------------------------------------------------- #
 # Stated FIRST, as an assertion rather than an import-time crash: run against a
-# runtime without the exact-source rebuild, this file used to die on the first
+# runtime without the print-crop amendment, this file used to die on the first
 # new call and print nothing, so it could never demonstrate the defect it
 # exists to catch. Naming the contract makes the base run say what is missing.
-print("the exact-source contract this file depends on")
+print("the print-crop contract this file depends on (owner amendment 2026-08-05)")
 check("the read set is captured in labelled per-side buckets, so a manifest "
-      "names the document each side was compared from",
+      "names the documents each side's crops were read from",
       "buckets" in inspect.signature(ve._snapshot_read_set).parameters)
-check("the engine renders a side from the compared WORKBOOK "
-      "(_workbook_rows_at + _workbook_side), not from a borrowed print",
-      hasattr(ve, "_workbook_rows_at") and hasattr(ve, "_workbook_side"))
-check("a drawn panel string is full or visibly elided (panel_cell_text)",
-      hasattr(ve, "panel_cell_text"))
+check("evidence is refused outside the PDF-edition families at the engine "
+      "boundary (capable names only _pdf rows; FLAVOR_SELF not in FLAVORS)",
+      not ve.capable("highway_log") and not ve.self_capable("highway_log_pdf")
+      and ve.FLAVOR_SELF not in ve.FLAVORS)
+check("the vs-TSN lane locates BOTH prints (_locate_tsmis_sources + the "
+      "adapter tsn locate loop), never a workbook panel",
+      hasattr(ve, "_locate_tsmis_sources")
+      and "tsn_ctx" in inspect.signature(ve._try_example).parameters)
 check("the per-route print is resolved by contract (find_route_print)",
       hasattr(ve, "find_route_print"))
+check("a print target box is engine-checked against the record's own printed "
+      "lines and width (_box_within_record)",
+      hasattr(ve, "_box_within_record"))
 
 # --------------------------------------------------------------------------- #
 print("registry + sources + clamp")
-check("rows: the Highway Detail + Highway Log + Highway Sequence + Intersection "
-      "Detail + Ramp Detail pairs, nothing else",
-      ve.rows() == ["highway_detail", "highway_detail_pdf",
-                    "highway_log", "highway_log_pdf",
-                    "highway_sequence", "highway_sequence_pdf",
-                    "intersection_detail", "intersection_detail_pdf",
-                    "ramp_detail", "ramp_detail_pdf"])
-check("capable() matches rows()",
-      all(ve.capable(r) for r in ve.rows()) and not ve.capable("ramp_summary"))
+check("rows: the four PDF-edition rows, nothing else (the 2026-08-05 ruling — "
+      "Excel rows and Highway Detail are out; HD-PDF joins when the owner "
+      "lifts the pre-release freeze)",
+      ve.rows() == ["highway_log_pdf", "highway_sequence_pdf",
+                    "intersection_detail_pdf", "ramp_detail_pdf"])
+check("capable() matches rows(), and refuses every non-_pdf row",
+      all(ve.capable(r) for r in ve.rows())
+      and not ve.capable("ramp_summary") and not ve.capable("highway_log")
+      and not ve.capable("highway_detail")
+      and not ve.capable("highway_detail_pdf")
+      and not ve.capable("intersection_detail")
+      and not ve.capable("ramp_detail"))
+check("the self lane is retired everywhere (self_capable False for every row)",
+      not any(ve.self_capable(r) for r in ve.rows()))
 check("TSMIS visuals come from each report's (PDF)-edition export subdir",
-      ve.pdf_subdir_for("highway_detail") == "highway_detail_pdf"
-      and ve.pdf_subdir_for("highway_detail_pdf") == "highway_detail_pdf"
-      and ve.pdf_subdir_for("intersection_detail") == "intersection_detail_pdf"
-      and ve.pdf_subdir_for("intersection_detail_pdf") == "intersection_detail_pdf"
-      and ve.pdf_subdir_for("highway_log") == "highway_log_pdf"
+      ve.pdf_subdir_for("intersection_detail_pdf") == "intersection_detail_pdf"
       and ve.pdf_subdir_for("highway_log_pdf") == "highway_log_pdf"
-      and ve.pdf_subdir_for("highway_sequence") == "highway_sequence_pdf"
       and ve.pdf_subdir_for("highway_sequence_pdf") == "highway_sequence_pdf"
-      and ve.pdf_subdir_for("ramp_detail") == "ramp_detail_pdf"
-      and ve.pdf_subdir_for("ramp_detail_pdf") == "ramp_detail_pdf")
+      and ve.pdf_subdir_for("ramp_detail_pdf") == "ramp_detail_pdf"
+      and set(ve.TSMIS_PDF_SUBDIR) == set(ve.rows())
+      and set(ve.TSN_PDF_REPORT) == set(ve.rows()))
 check("TSN prints live in each report's library pdf folder — except the Highway "
       "Log and Highway Sequence, whose district prints ARE the library's raw "
       "inputs (no duplicate drop)",
-      str(ve.tsn_pdf_dir("highway_detail")).replace("\\", "/")
-      .endswith("tsn_library/highway_detail/pdf")
-      and str(ve.tsn_pdf_dir("intersection_detail")).replace("\\", "/")
+      str(ve.tsn_pdf_dir("intersection_detail_pdf")).replace("\\", "/")
       .endswith("tsn_library/intersection_detail/pdf")
-      and str(ve.tsn_pdf_dir("ramp_detail")).replace("\\", "/")
-      .endswith("tsn_library/ramp_detail/pdf")
       and str(ve.tsn_pdf_dir("ramp_detail_pdf")).replace("\\", "/")
       .endswith("tsn_library/ramp_detail/pdf")
-      and str(ve.tsn_pdf_dir("highway_log")).replace("\\", "/")
-      .endswith("tsn_library/highway_log/raw")
       and str(ve.tsn_pdf_dir("highway_log_pdf")).replace("\\", "/")
       .endswith("tsn_library/highway_log/raw")
-      and str(ve.tsn_pdf_dir("highway_sequence")).replace("\\", "/")
-      .endswith("tsn_library/highway_sequence/raw")
       and str(ve.tsn_pdf_dir("highway_sequence_pdf")).replace("\\", "/")
       .endswith("tsn_library/highway_sequence/raw"))
 check("clamp: default/garbage/low/high",
@@ -546,18 +545,31 @@ try:
     # reaches these checks (rather than crashing on a lingering folder).
     # CMP-AUD-208: generate() now reads the cells the comparison PUBLISHED, so
     # "clean" has to be a REAL comparison with no counted differences — a
-    # stubbed enumerate_diffs can no longer manufacture it.
+    # stubbed enumerate_diffs can no longer manufacture it. The fixture family
+    # is intersection_detail_pdf (the 2026-08-05 ruling: only `_pdf` rows are
+    # capable), so the entry gate also wants both print sets present — stub
+    # PDFs suffice, the clean path never parses one.
+    import compare_intersection_detail_tsn as idt6
+    import evidence_intersection_detail as eid6
+    import paths as _paths6
     _cmp6b = _r6 / "day2 vs tsn.xlsx"
-    _hd_row = ["001"] + ["0.100"] + ["x"] * (len(cht.SHARED_HEADER) - 1)
+    _id_row = ["001"] + ["x"] * len(idt6.SHARED_HEADER)
+    _id_row[1 + idt6.SHARED_HEADER.index(idt6.KEY)] = "0.100"
     _cons6 = _r6 / "cons.xlsx"; _cons6.write_bytes(b"consolidated")
     _tsn6 = _r6 / "tsn.xlsx"; _tsn6.write_bytes(b"tsn")
     # HF-05: the exact-source binding requires a BOUND comparison — committed
     # generation + typed outcome + provenance over the two side files.
     _checklib.publish_bound_comparison(
-        _cmp6b, cht._SCHEMA, [list(_hd_row)], [list(_hd_row)],
+        _cmp6b, idt6._SCHEMA, [list(_id_row)], [list(_id_row)],
         (_cons6, _tsn6))
     _wb6b, _img6b = ve.sibling_paths(_cmp6b)
     _tdir6 = _r6 / "tsmis_pdf"; _tdir6.mkdir()
+    (_tdir6 / "intersection_detail_route_001.pdf").write_bytes(b"%PDF tsmis")
+    _old_lib6 = _paths6.TSN_LIBRARY_ROOT
+    _paths6.TSN_LIBRARY_ROOT = _r6 / "tsn_library"
+    _libpdf6 = _r6 / "tsn_library" / "intersection_detail" / "pdf"
+    _libpdf6.mkdir(parents=True)
+    (_libpdf6 / "stub.pdf").write_bytes(b"%PDF tsn")
     _wb6b.write_bytes(b"PRIOR red evidence workbook")
     _img6b.mkdir()
     (_img6b / "prior.png").write_bytes(b"prior image")
@@ -569,14 +581,15 @@ try:
         def on_log(self, _m):
             pass
 
-    _saved106 = (ehd.load_sides, ehd.enumerate_diffs)
-    ehd.load_sides = lambda _c, _t: ([], [], {"ok": 1}, None)
-    ehd.enumerate_diffs = lambda _a, _b, _s: {}          # a CLEAN comparison
+    _saved106 = (eid6.load_sides, eid6.enumerate_diffs)
+    eid6.load_sides = lambda _c, _t: ([], [], {"ok": 1}, None)
+    eid6.enumerate_diffs = lambda _a, _b, _s: {}         # a CLEAN comparison
     try:
-        _res6 = ve.generate("highway_detail", _cons6, _tsn6, _cmp6b, _tdir6,
-                            _Ev106())
+        _res6 = ve.generate("intersection_detail_pdf", _cons6, _tsn6, _cmp6b,
+                            _tdir6, _Ev106())
     finally:
-        ehd.load_sides, ehd.enumerate_diffs = _saved106
+        eid6.load_sides, eid6.enumerate_diffs = _saved106
+        _paths6.TSN_LIBRARY_ROOT = _old_lib6
     check("generate() on a clean comparison reports no differing columns",
           "no differing columns" in _res6["note"] and _res6["workbook"] is None)
     check("...and the prior red evidence no longer survives at its canonical name",
@@ -592,9 +605,13 @@ finally:
 print("CMP-AUD-108: duplicate-only differences are reported, never zeroed")
 _r8 = Path(tempfile.mkdtemp(prefix="evidence_108_"))
 try:
+    import compare_intersection_detail_tsn as idt8
+    import evidence_intersection_detail as eid8
+    import paths as _paths8
     _cmp8 = _r8 / "dup only vs tsn.xlsx"
-    _base8 = ["001"] + ["0.100"] + ["x"] * (len(cht.SHARED_HEADER) - 1)
-    _desc8 = 1 + cht.SHARED_HEADER.index("Description")
+    _base8 = ["001"] + ["x"] * len(idt8.SHARED_HEADER)
+    _base8[1 + idt8.SHARED_HEADER.index(idt8.KEY)] = "0.100"
+    _desc8 = 1 + idt8.SHARED_HEADER.index("Description")
 
     def _dup_row(desc):
         row = list(_base8)
@@ -604,23 +621,31 @@ try:
     _cons8 = _r8 / "cons.xlsx"; _cons8.write_bytes(b"consolidated")
     _tsn8 = _r8 / "tsn.xlsx"; _tsn8.write_bytes(b"tsn")
     _checklib.publish_bound_comparison(
-        _cmp8, cht._SCHEMA,
+        _cmp8, idt8._SCHEMA,
         [_dup_row("A1"), _dup_row("A2")], [_dup_row("B1"), _dup_row("B2")],
         (_cons8, _tsn8))
     _tdir8 = _r8 / "tsmis_pdf"; _tdir8.mkdir()
+    (_tdir8 / "intersection_detail_route_001.pdf").write_bytes(b"%PDF tsmis")
+    _old_lib8 = _paths8.TSN_LIBRARY_ROOT
+    _paths8.TSN_LIBRARY_ROOT = _r8 / "tsn_library"
+    _libpdf8 = _r8 / "tsn_library" / "intersection_detail" / "pdf"
+    _libpdf8.mkdir(parents=True)
+    (_libpdf8 / "stub.pdf").write_bytes(b"%PDF tsn")
     _addressed8 = []
-    _saved8 = (ehd.load_sides, ehd.enumerate_diffs, ve._workbook_rows_at)
-    ehd.load_sides = lambda _c, _t: ([], [], {"ok": 1}, None)
+    _saved8 = (eid8.load_sides, eid8.enumerate_diffs,
+               ve._locate_tsmis_sources)
+    eid8.load_sides = lambda _c, _t: ([], [], {"ok": 1}, None)
     # The real adapter drops duplicate keys, so it proposes nothing here.
-    ehd.enumerate_diffs = lambda _a, _b, _s: {}
-    ve._workbook_rows_at = (
-        lambda *a, **k: _addressed8.append(1) or ({}, []))
+    eid8.enumerate_diffs = lambda _a, _b, _s: {}
+    ve._locate_tsmis_sources = (
+        lambda *a, **k: _addressed8.append(1) or ({}, {}, set()))
     try:
-        _res8 = ve.generate("highway_detail", _cons8, _tsn8, _cmp8, _tdir8,
-                            _Ev106())
+        _res8 = ve.generate("intersection_detail_pdf", _cons8, _tsn8, _cmp8,
+                            _tdir8, _Ev106())
     finally:
-        (ehd.load_sides, ehd.enumerate_diffs,
-         ve._workbook_rows_at) = _saved8
+        (eid8.load_sides, eid8.enumerate_diffs,
+         ve._locate_tsmis_sources) = _saved8
+        _paths8.TSN_LIBRARY_ROOT = _old_lib8
     check("the published difference count is reported, not zero",
           _res8["fields_with_diffs"] == 1 and "2 published difference"
           in _res8["note"])
@@ -736,50 +761,57 @@ avail = ve.availability()
 check("availability shape (rows/tsn_pdfs/ready/dir/reports/row_reports/deps_ok)",
       set(avail) >= {"rows", "tsn_pdfs", "ready", "dir", "reports", "row_reports",
                      "deps_ok"})
-check("availability reports every evidence report, per-dir + source kind",
+check("availability reports the four supported evidence families, per-dir + "
+      "source kind (the 2026-08-05 ruling: HD is out until the freeze lifts)",
       [r["key"] for r in avail["reports"]]
-      == ["highway_detail", "highway_log", "highway_sequence",
-          "intersection_detail", "ramp_detail"]
+      == ["highway_log", "highway_sequence", "intersection_detail",
+          "ramp_detail"]
       and all(set(r) >= {"key", "label", "tsn_pdfs", "dir", "source"}
               for r in avail["reports"])
       and {r["key"]: r["source"] for r in avail["reports"]}
-      == {"highway_detail": "pdf", "highway_log": "raw",
-          "highway_sequence": "raw", "intersection_detail": "pdf",
-          "ramp_detail": "pdf"})
+      == {"highway_log": "raw", "highway_sequence": "raw",
+          "intersection_detail": "pdf", "ramp_detail": "pdf"})
 check("row_reports maps every capable row to its report (the per-cell action's gate)",
       avail["row_reports"] == ve.TSN_PDF_REPORT
       and set(avail["row_reports"]) == set(ve.rows()))
-# HF-05: the vs-TSN/self lanes render the compared WORKBOOKS, so readiness is
-# the imaging deps alone — TSN prints gate nothing anymore; HF-10 adds the five
-# env placements to the availability the UI reads.
-check("ready == deps alone (no print requirement) and env_rows is the "
-      "LITERAL five placements (pinned, not self-derived — RB-4 audit)",
+# The env cells carry their own per-route prints, so readiness stays the
+# imaging deps alone (a vs-TSN cell missing its TSN prints reports that per
+# cell); env_rows is the LITERAL four `_pdf` placements — Ramp Summary is
+# REMOVED by the third ruling (report-type rule).
+check("ready == deps alone and env_rows is the LITERAL four `_pdf` "
+      "placements (pinned, not self-derived — RB-4 audit; RS removed)",
       avail["ready"] == avail["deps_ok"]
       and avail.get("env_rows") == ["highway_log_pdf",
                                     "highway_sequence_pdf",
                                     "intersection_detail_pdf",
-                                    "ramp_detail_pdf", "ramp_summary"])
+                                    "ramp_detail_pdf"])
+check("ramp_summary has NO evidence lane left (env_capable False too)",
+      not ve.env_capable("ramp_summary") and not ve.capable("ramp_summary"))
 
 print("caller-side gate (matrix_build.evidence_opts_for)")
 check("toggle off -> None",
-      matrix_build.evidence_opts_for(None, "highway_detail", lambda s: s) is None
+      matrix_build.evidence_opts_for(None, "highway_log_pdf", lambda s: s) is None
       and matrix_build.evidence_opts_for({"enabled": False, "examples": 5},
-                                         "highway_detail", lambda s: s) is None)
-check("unsupported row -> None",
+                                         "highway_log_pdf", lambda s: s) is None)
+check("unsupported row -> None (Excel rows and ramp_summary alike)",
       matrix_build.evidence_opts_for({"enabled": True}, "ramp_summary",
-                                     lambda s: s) is None)
+                                     lambda s: s) is None
+      and matrix_build.evidence_opts_for({"enabled": True}, "highway_log",
+                                         lambda s: s) is None
+      and matrix_build.evidence_opts_for({"enabled": True}, "highway_detail",
+                                         lambda s: s) is None)
 opts = matrix_build.evidence_opts_for({"enabled": True, "examples": 99},
-                                      "highway_detail",
+                                      "highway_log_pdf",
                                       lambda s: Path("cell") / s)
 check("supported row -> resolved PDF dir + clamped examples + default layout",
-      opts == {"tsmis_pdf_dir": Path("cell") / "highway_detail_pdf",
+      opts == {"tsmis_pdf_dir": Path("cell") / "highway_log_pdf",
                "examples": 10, "layout": "pair"})
 check("evidence_opts_for carries the chosen layout (unknown -> the 'pair' default)",
       matrix_build.evidence_opts_for(
-          {"enabled": True, "layout": "both"}, "highway_detail",
+          {"enabled": True, "layout": "both"}, "highway_log_pdf",
           lambda s: s)["layout"] == "both"
       and matrix_build.evidence_opts_for(
-          {"enabled": True, "layout": "nonsense"}, "highway_detail",
+          {"enabled": True, "layout": "nonsense"}, "highway_log_pdf",
           lambda s: s)["layout"] == "pair")
 
 # --------------------------------------------------------------------------- #
@@ -1226,9 +1258,9 @@ import matrix                                              # noqa: E402
 
 tmp3 = Path(tempfile.mkdtemp())
 try:
-    store = tmp3 / "cell" / "highway_detail_pdf"
+    store = tmp3 / "cell" / "intersection_detail_pdf"
     store.mkdir(parents=True)
-    consolidated = matrix.consolidated_store_path(store, "highway_detail_pdf")
+    consolidated = matrix.consolidated_store_path(store, "intersection_detail_pdf")
     tsn = tmp3 / "tsn.xlsx"
     cmpwb = tmp3 / "cmp.xlsx"
     pdfdir = tmp3 / "pdfs"
@@ -1270,8 +1302,8 @@ try:
 
     def _gate_error(expected_generation="evidence-fixture"):
         try:
-            matrix.run_evidence_only("highway_detail_pdf", store,
-                                     "highway_detail_pdf", tsn, cmpwb, pdfdir,
+            matrix.run_evidence_only("intersection_detail_pdf", store,
+                                     "intersection_detail_pdf", tsn, cmpwb, pdfdir,
                                      events=None, examples=2,
                                      source_identity_check=lambda: True,
                                      expected_generation_id=expected_generation,
@@ -1310,7 +1342,7 @@ try:
     _touch(consolidated, now - 100)
     artifact_store.write_consolidated_fingerprint(consolidated, store)
     _publish_consolidation(consolidated)
-    _touch(store / "highway_detail_route_001.pdf", now - 20)
+    _touch(store / "intersection_detail_route_001.pdf", now - 20)
     err = _gate_error()
     check("store changed since the consolidation -> refuse with the refresh hint",
           err and "exports changed" in err and "refresh the comparison" in err)
@@ -1341,7 +1373,7 @@ try:
                          {"note": "evidence: 2 example(s) across 1/1 …"})
         try:
             res = matrix.run_evidence_only(
-                "highway_detail_pdf", store, "highway_detail_pdf", tsn, cmpwb,
+                "intersection_detail_pdf", store, "intersection_detail_pdf", tsn, cmpwb,
                 pdfdir, events=None, examples=2,
                 source_identity_check=lambda: True,
                 expected_generation_id="evidence-fixture",
@@ -1659,11 +1691,13 @@ print("the pdf/ drop folder exists for the user (v0.21.1 — the update-day gap)
 import paths                                              # noqa: E402
 import report_catalog                                     # noqa: E402
 _pdf_drop_reports = set(ve.TSN_PDF_REPORT.values()) - ve._TSN_PDFS_IN_RAW
-check("every pdf/-drop TSN source is catalog-flagged evidence_pdfs (and only those)",
+check("every pdf/-drop TSN source is catalog-flagged evidence_pdfs (the "
+      "catalog also keeps highway_detail's flagged drop folder — the reserved "
+      "fifth family, pre-release, not in the evidence registry)",
       {report_catalog.TSN[[e.subdir for e in report_catalog.TSN].index(r)].evidence_pdfs
        for r in _pdf_drop_reports} == {True}
       and {e.subdir for e in report_catalog.TSN if e.evidence_pdfs}
-      == _pdf_drop_reports)
+      == _pdf_drop_reports | {"highway_detail"})
 check("every raw-sourced evidence report is a district_pdfs TSN library (its "
       "prints ARE the raw inputs, so no pdf/ drop folder is flagged)",
       all(report_catalog.TSN[[e.subdir for e in report_catalog.TSN].index(r)].raw_kind
@@ -1680,19 +1714,20 @@ try:
     pdf = root / "highway_detail" / "pdf"
     check("ensure_layout creates highway_detail/pdf/ + drops the hint",
           pdf.is_dir() and any(pdf.glob("_PUT TSN DISTRICT PDFS HERE.txt")))
-    check("…and the pdf/ path == the engine's tsn_pdf_dir (one location)",
-          pdf == ve.tsn_pdf_dir("highway_detail") == tsn_library.pdf_dir("highway_detail"))
+    check("…and the pdf/ path == the library's pdf_dir (the engine no longer "
+          "maps highway_detail — the reserved pre-release family)",
+          pdf == tsn_library.pdf_dir("highway_detail"))
     ipdf = root / "intersection_detail" / "pdf"
     check("ensure_layout creates intersection_detail/pdf/ + its hint (v0.22.0)",
           ipdf.is_dir() and any(ipdf.glob("_PUT TSN DISTRICT PDFS HERE.txt")))
     check("…and it too == the engine's tsn_pdf_dir",
-          ipdf == ve.tsn_pdf_dir("intersection_detail")
+          ipdf == ve.tsn_pdf_dir("intersection_detail_pdf")
           == tsn_library.pdf_dir("intersection_detail"))
     rpdf = root / "ramp_detail" / "pdf"
     check("ensure_layout creates ramp_detail/pdf/ + its hint (v0.26.0)",
           rpdf.is_dir() and any(rpdf.glob("_PUT TSN DISTRICT PDFS HERE.txt")))
     check("…and it too == the engine's tsn_pdf_dir",
-          rpdf == ve.tsn_pdf_dir("ramp_detail")
+          rpdf == ve.tsn_pdf_dir("ramp_detail_pdf")
           == tsn_library.pdf_dir("ramp_detail"))
     readme = root / tsn_library._README_NAME
     check("the root README documents BOTH pdf/ folders",

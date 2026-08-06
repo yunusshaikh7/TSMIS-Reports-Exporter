@@ -1,15 +1,13 @@
-"""Evidence is taken from the source the comparison actually READ (CMP-AUD-210,
-completed by the PCOA-FINAL-004 exact-source ruling — HF-05).
+"""Evidence is an INDEPENDENT spot check made of print crops (the owner's
+2026-08-05 amendment), and it exists ONLY for the `_pdf`-edition families.
 
-Both of a report's matrix rows used to be evidenced from the PDF-edition export,
-and a candidate was DROPPED whenever that print disagreed with the compared
-value. CMP-AUD-210 moved the Excel-compared side onto the workbook it was
-compared from; HF-05 finishes the rule for EVERY side: the vs-TSN and self
-flavors render both panels from the two compared workbooks (each resolved
-through that side's own comparator hook), the env flavor renders both sides'
-own per-route prints, and a drawn panel string equals the compared value or is
-visibly elided (PCOA-FINAL-006 — the silent `text[:26]` cut endorsed a
-different string).
+This file locks the amended source-role contract: the four `_pdf` rows render
+BOTH sides as crops of the source prints (the per-route TSMIS export and the
+TSN library print) with a print that DISAGREES with the compared value rendered
+under a disclosure note, never silently dropped; every other row and the whole
+PDF-vs-Excel SELF lane are refused AT THE ENGINE BOUNDARY; the env lane's four
+placements keep their census-bound print crops; and the retired workbook-panel
+renderer stays in code, reachable from nothing, under dormant-code locks.
 
 Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_evidence_source_role.py
@@ -41,32 +39,39 @@ def check(name, cond):
 
 # --------------------------------------------------------------------------- #
 # Stated FIRST as an assertion, not an import-time crash: against a runtime
-# without the exact-source rebuild this file died on the first new call and
+# without the print-crop amendment this file died on the first new call and
 # printed nothing, so it could not demonstrate the defect it exists to catch.
-print("the exact-source contract this file depends on")
-check("the engine addresses the compared workbook's rows and renders each "
-      "side's panel from it (_workbook_rows_at + _workbook_side)",
-      hasattr(ve, "_workbook_rows_at") and hasattr(ve, "_workbook_side"))
-check("a drawn panel string is full or visibly elided (panel_cell_text)",
-      hasattr(ve, "panel_cell_text"))
-check("the strip's labels follow the values, and a normalized source form is "
-      "disclosed (_display_header + _normalization_note)",
-      hasattr(ve, "_display_header") and hasattr(ve, "_normalization_note"))
+print("the print-crop contract this file depends on (owner amendment 2026-08-05)")
+check("the vs-TSN lane renders PRINT CROPS on both sides (tsn_ctx replaces "
+      "the workbook side ctx in _try_example)",
+      "tsn_ctx" in inspect.signature(ve._try_example).parameters
+      and "side_a" not in inspect.signature(ve._try_example).parameters)
+check("evidence is refused outside the PDF-edition families at the engine "
+      "boundary (FLAVOR_SELF not in FLAVORS; Excel rows not capable)",
+      ve.FLAVOR_SELF not in ve.FLAVORS and not ve.capable("highway_log")
+      and not ve.self_capable("highway_log_pdf"))
+check("the workbook-panel renderer is DORMANT but present (kept per the "
+      "ruling: 'keeping the code is fine but ts shouldnt be possible')",
+      hasattr(ve, "_workbook_rows_at") and hasattr(ve, "_workbook_side")
+      and hasattr(ve, "panel_cell_text"))
 
 # --------------------------------------------------------------------------- #
 print("which source each row was compared FROM")
-check("every '_pdf' row is evidenced from the print, every other from the workbook",
+check("every capable row is a '_pdf' edition evidenced from the print "
+      "(the 2026-08-05 ruling: nothing else is capable)",
       {rk: ve.tsmis_source_role(rk) for rk in sorted(ve.rows())}
-      == {"highway_detail": "excel", "highway_detail_pdf": "pdf",
-          "highway_log": "excel", "highway_log_pdf": "pdf",
-          "highway_sequence": "excel", "highway_sequence_pdf": "pdf",
-          "intersection_detail": "excel", "intersection_detail_pdf": "pdf",
-          "ramp_detail": "excel", "ramp_detail_pdf": "pdf"})
+      == {"highway_log_pdf": "pdf", "highway_sequence_pdf": "pdf",
+          "intersection_detail_pdf": "pdf", "ramp_detail_pdf": "pdf"})
 check("the role covers exactly the evidence-capable rows",
       set(ve.rows()) == set(ve.TSMIS_PDF_SUBDIR))
 
 # --------------------------------------------------------------------------- #
-print("addressing the compared workbook")
+# DORMANT-CODE LOCKS (2026-08-05): the workbook-panel renderer is reachable
+# from nothing — the ruling keeps the code, so these unit locks keep it from
+# rotting (it is the ready-made panel path if a future ruling revives it).
+# Nothing below this comment asserts PRODUCT behavior for the panel path; the
+# live product contract is the print path locked further down.
+print("addressing the compared workbook (dormant renderer, kept locked)")
 _r = Path(tempfile.mkdtemp(prefix="check_ev_role_"))
 try:
     _HEADER = ["Route", "Location", "Length (MI) [MI]", "City", "SPD"]
@@ -209,9 +214,11 @@ for _name in _ADAPTERS:
           "row_index=ia" in _text and "row_index_b=ib" in _text)
 
 # --------------------------------------------------------------------------- #
-print("the PDF-vs-Excel self check can be illustrated")
-check("generate() knows exactly the three flavors",
-      ve.FLAVORS == (ve.FLAVOR_TSN, ve.FLAVOR_SELF, ve.FLAVOR_ENV))
+print("the PDF-vs-Excel self check is REFUSED (owner ruling 2026-08-05)")
+check("generate() knows exactly the two live flavors; 'self' stays defined "
+      "for identity checks but is not in FLAVORS",
+      ve.FLAVORS == (ve.FLAVOR_TSN, ve.FLAVOR_ENV)
+      and ve.FLAVOR_SELF == "self")
 # These hooks are PROBED, not merely counted: an existence assertion passes
 # against a stub that resolves every field to column 0, which is exactly the
 # wrong-cell defect the exact-source rule exists to prevent.
@@ -247,18 +254,49 @@ for _name in _ADAPTERS:
           and all(isinstance(_ws(k), str) and _ws(k) for k in _SHEET_KINDS)
           and _ws("tsmis") == _ws("pdf")
           and _ws(_NO_SUCH_FIELD) == _ws("tsmis"))
-check("every evidence row can illustrate its self check",
-      all(ve.self_capable(rk) for rk in ve.rows()))
+check("NO row can illustrate a self check (engine refusal, not UI hiding)",
+      not any(ve.self_capable(rk) for rk in ve.rows()))
+# The engine boundary itself: FLAVOR_SELF and an Excel row are ValueError
+# refusals in generate(), before any source is touched.
+_events_stub = types.SimpleNamespace(is_cancelled=lambda: False,
+                                     on_log=lambda _m: None)
+try:
+    ve.generate("highway_log_pdf", "x.xlsx", "y.xlsx", "c.xlsx", "d",
+                _events_stub, flavor=ve.FLAVOR_SELF)
+    _self_refused = None
+except ValueError as e:
+    _self_refused = str(e)
+check("generate(flavor='self') is refused at the engine boundary",
+      _self_refused is not None and "unknown evidence flavor" in _self_refused)
+try:
+    ve.generate("highway_log", "x.xlsx", "y.xlsx", "c.xlsx", "d",
+                _events_stub, flavor=ve.FLAVOR_TSN)
+    _excel_refused = None
+except ValueError as e:
+    _excel_refused = str(e)
+check("generate() on an Excel row is refused at the engine boundary",
+      _excel_refused is not None
+      and "no visual-evidence support" in _excel_refused)
 
 # --------------------------------------------------------------------------- #
-print("the cross-environment lane (HF-10)")
-check("exactly the five PDF-vs-PDF env placements are env-capable",
+print("the cross-environment lane (HF-10, amended 2026-08-05)")
+check("exactly the four `_pdf`-family env placements are env-capable "
+      "(Ramp Summary removed by the third ruling)",
       sorted(ve.env_rows()) == ["highway_log_pdf", "highway_sequence_pdf",
-                                "intersection_detail_pdf", "ramp_detail_pdf",
-                                "ramp_summary"]
+                                "intersection_detail_pdf", "ramp_detail_pdf"]
       and all(ve.env_capable(rk) for rk in ve.env_rows()))
-check("ramp_summary is env-only: its vs-TSN evidence absence stays the "
-      "audit-approved state", not ve.capable("ramp_summary"))
+check("ramp_summary has no evidence lane at all (its adapter is dormant)",
+      not ve.capable("ramp_summary") and not ve.env_capable("ramp_summary"))
+try:
+    ve.generate("ramp_summary", None, None, "c.xlsx", None, _events_stub,
+                flavor=ve.FLAVOR_ENV)
+    _rs_refused = None
+except ValueError as e:
+    _rs_refused = str(e)
+check("generate() on the ramp_summary env cell is refused at the engine "
+      "boundary",
+      _rs_refused is not None
+      and "no cross-environment evidence support" in _rs_refused)
 # The env hooks are probed the same way. `env_fields()` is the whole field
 # universe the engine hands the ledger (`_FieldsView`), so env_value/env_box
 # are only ever asked about a field the adapter declared — what must be proved
@@ -473,102 +511,142 @@ finally:
     shutil.rmtree(_cdir, ignore_errors=True)
 
 # --------------------------------------------------------------------------- #
-# The CALL SITES, not only the helpers. `_display_header` and
-# `_normalization_note` are each called from exactly one place in the engine;
-# deleting either line satisfies every unit assertion above. One example driven
-# end to end through `_try_example` proves the strip really draws the corrected
-# header and the composed image really carries the disclosure.
+# The CALL SITE, not only the helpers: one vs-TSN example driven end to end
+# through `_try_example` on the PRINT path. Two Pillow-written single-page
+# PDFs stand in for the prints; the fixture adapter returns their geometry
+# directly, so what is under test is the ENGINE half — locate → containment →
+# crop → parse-back → the 2026-08-05 disagreement DISCLOSURE (a print that
+# reads differently renders with a note, never a silent drop) → compose →
+# both layouts on disk with captions naming the print and page.
 # --------------------------------------------------------------------------- #
-print("the engine's own render path uses both (the call sites)")
+print("the engine's own render path (the print call sites + the disclosure)")
 
-# A workbook whose labels sit one position AFTER their values, the shift class
-# `_display_header` exists for: position 2 holds the Eff-Date, labelled 'INT
-# Type'.
-_WB_HEADER = ["Route", "Post Mile", "INT Type", "INT Type Eff-Date",
-              "Ctrl Type"]
-_WB_AT = {"Route": 0, "Post Mile": 1, "INT Type Eff-Date": 2, "INT Type": 3,
-          "Control Type": 4}
-_TWO_DIGIT_YEAR = re.compile(r"^\d\d-")
-
-
-def _wb_resolve(field, header):
-    del header                   # this fixture resolves by name, not by shift
-    return _WB_AT.get(field)
-
-
-def _wb_project(field, value, **kwargs):
-    """Widen a two-digit year before comparing — so the workbook cell and the
-    compared value are the same fact carried in two different forms."""
-    del kwargs
-    text = str(value or "")
-    if field == "INT Type Eff-Date" and _TWO_DIGIT_YEAR.match(text):
-        return "19" + text
-    return text
-
-
-_ADAPTER = types.SimpleNamespace(
-    __name__="check_evidence_source_role_fixture", FIELDS=tuple(_WB_AT),
-    KEY_LABEL="Post Mile", project=_wb_project, tsn_project=_wb_project,
-    pdf_excel_column_for=_wb_resolve, tsn_excel_column_for=_wb_resolve)
-
-_seen_headers, _seen_notes = [], []
-_real_strip = ve._excel_strip
+_seen_notes = []
 _real_stacked = ve._compose_stacked
 _real_pair = ve._compose_pair
 
 
-def _rec_strip(header, values, target_index, key_indexes=(0,)):
-    _seen_headers.append(list(header))
-    return _real_strip(header, values, target_index, key_indexes)
-
-
 def _rec_stacked(title, sub, tl, ti, bl, bi, out, note=""):
-    _seen_notes.append(note)
+    _seen_notes.append((title, sub, tl, bl, note))
     return _real_stacked(title, sub, tl, ti, bl, bi, out, note=note)
 
 
 def _rec_pair(title, sub, ll, li, rl, ri, out, note=""):
-    _seen_notes.append(note)
+    _seen_notes.append((title, sub, ll, rl, note))
     return _real_pair(title, sub, ll, li, rl, ri, out, note=note)
 
 
 _idir = Path(tempfile.mkdtemp(prefix="evidence_callsites_"))
-ve._excel_strip, ve._compose_stacked, ve._compose_pair = (
-    _rec_strip, _rec_stacked, _rec_pair)
+ve._compose_stacked, ve._compose_pair = _rec_stacked, _rec_pair
 try:
-    _ex = {"route": "046", "key": "50.904", "va": "1964-01-01",
-           "vb": "1964-01-02", "row_index": 0, "row_index_b": 0}
-    _side_a = {"index_key": "row_index",
-               "rows": {0: ("Intersection Detail", 5563,
-                            ["001", "12.345", "64-01-01", "T", "S"])},
-               "header": _WB_HEADER, "resolve": "pdf_excel_column_for",
-               "project": "project", "value_key": "va",
-               "label": "TSMIS (PDF)", "book_name": "tsmis.xlsx"}
-    _side_b = {"index_key": "row_index_b",
-               "rows": {0: ("Intersection Detail (TSN)", 5676,
-                            ["001", "12.345", "1964-01-02", "T", "S"])},
-               "header": _WB_HEADER, "resolve": "tsn_excel_column_for",
-               "project": "tsn_project", "value_key": "vb",
-               "label": "TSN", "book_name": "tsn.xlsx"}
-    _entry, _why = ve._try_example(
-        _ADAPTER, _ex, "INT Type Eff-Date", _idir, 1, {},
-        side_labels=("TSMIS (PDF)", "TSN"), side_a=_side_a, side_b=_side_b)
-    check("the engine renders a two-workbook example end to end",
+    def _blank_pdf(path):
+        """A minimal VALID one-page PDF (blank Letter page), built by hand so
+        the fixture needs no PDF writer — pdfium renders it like any print."""
+        objs = [b"<< /Type /Catalog /Pages 2 0 R >>",
+                b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+                b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>"]
+        out = bytearray(b"%PDF-1.4\n")
+        offsets = []
+        for i, body in enumerate(objs, 1):
+            offsets.append(len(out))
+            out += f"{i} 0 obj\n".encode() + body + b"\nendobj\n"
+        xref_at = len(out)
+        out += f"xref\n0 {len(objs) + 1}\n".encode()
+        out += b"0000000000 65535 f \n"
+        for off in offsets:
+            out += f"{off:010d} 00000 n \n".encode()
+        out += (f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\n"
+                f"startxref\n{xref_at}\n%%EOF\n").encode()
+        path.write_bytes(bytes(out))
+
+    _t_pdf = _idir / "tsmis_hl_route_046.pdf"
+    _n_pdf = _idir / "D07 print.pdf"
+    _blank_pdf(_t_pdf)
+    _blank_pdf(_n_pdf)
+    _GEOM = (1, (10.0, 100.0, 60.0, 110.0), (95.0, 115.0), (5.0, 300.0))
+
+    def _print_adapter(tv, nv):
+        return types.SimpleNamespace(
+            __name__="check_evidence_source_role_fixture",
+            tsmis_box=lambda rec, field: _GEOM,
+            tsmis_value=lambda rec, field: tv,
+            tsn_box=lambda rec, field: _GEOM,
+            tsn_value=lambda rec, field: nv)
+
+    def _print_example(tv, nv, out_tag):
+        ex = {"route": "046", "key": "50.904", "va": "1964-01-01",
+              "vb": "1964-01-02", "dist": "07", "cnty": "LA"}
+        ctx = {"tsmis_loc": {"046": {"50.904": [{"src": str(_t_pdf)}]}},
+               "tsn_loc": {"07": {("LA", "046", "50.904"):
+                                  [{"src": str(_n_pdf),
+                                    "dist": "07", "cnty": "LA"}]}},
+               "dist_index": {"07": _n_pdf}, "tsmis_pdf": {"046": _t_pdf}}
+        return ve._try_example(_print_adapter(tv, nv), ex,
+                               "INT Type Eff-Date", _idir, out_tag, {},
+                               side_labels=("TSMIS (PDF)", "TSN"),
+                               tsn_ctx=ctx)
+
+    _seen_notes.clear()
+    _entry, _why = _print_example("1964-01-01", "1964-01-02", 1)
+    check("an agreeing example renders end to end on the print path",
           _why is None and bool(_entry))
-    check("...and BOTH strips drew the CORRECTED header, not the workbook's",
-          len(_seen_headers) == 2
-          and all(h[2] == "INT Type Eff-Date" and h[3] == "INT Type"
-                  for h in _seen_headers)
-          and _WB_HEADER[2] == "INT Type")
-    check("...and the composed images carry the normalization disclosure",
-          len(_seen_notes) == 2
-          and all("64-01-01" in n and "compared value" in n
-                  and "TSMIS (PDF)" in n for n in _seen_notes))
+    check("...both captions name the exact print and page",
+          _seen_notes
+          and all(f"{_t_pdf.name} · page 1" in rec[2]
+                  and f"{_n_pdf.name} · page 1" in rec[3]
+                  for rec in _seen_notes))
+    check("...an agreeing example claims verification and carries no "
+          "disagreement note",
+          all("re-read and verified" in rec[1] and "DISAGREES" not in rec[1]
+              and "print reads" not in rec[4] for rec in _seen_notes))
     check("...on both chosen layouts, both written to disk",
           bool(_entry) and all((_idir / _entry[k]).is_file()
                                for k in ("stacked", "pair")))
+
+    # THE AMENDMENT'S CASE: the print disagrees with the compared value —
+    # the old engine silently dropped it ("the TSN print differs…"), hiding
+    # exactly the parser-bug signal the spot check exists to catch.
+    _seen_notes.clear()
+    _entry2, _why2 = _print_example("1964-01-01", "WRONG-VALUE", 2)
+    check("a print that DISAGREES with the compared value still renders",
+          _why2 is None and bool(_entry2))
+    check("...with the disagreement DISCLOSED on the image note line",
+          _seen_notes
+          and all("TSN print reads 'WRONG-VALUE'" in rec[4]
+                  and "not the compared '1964-01-02'" in rec[4]
+                  for rec in _seen_notes))
+    check("...and the subline stops claiming verification",
+          all("DISAGREES here" in rec[1]
+              and "re-read and verified" not in rec[1]
+              for rec in _seen_notes))
+    check("...while the workbook entry still records the COMPARED values",
+          _entry2 and _entry2["va"] == "1964-01-01"
+          and _entry2["vb"] == "1964-01-02")
+
+    # The geometry backstop guards the print path engine-side: a target box
+    # outside the record's own printed lines/width is refused whatever the
+    # adapter returned (PCOA-FINAL-005 on the vs-TSN lane too).
+    _bad = types.SimpleNamespace(
+        __name__="bad_geometry",
+        tsmis_box=lambda rec, field: (1, (10.0, 130.0, 60.0, 140.0),
+                                      (95.0, 115.0), (5.0, 300.0)),
+        tsmis_value=lambda rec, field: "1964-01-01",
+        tsn_box=lambda rec, field: _GEOM,
+        tsn_value=lambda rec, field: "1964-01-02")
+    _ex3 = {"route": "046", "key": "50.904", "va": "1964-01-01",
+            "vb": "1964-01-02", "dist": "07", "cnty": "LA"}
+    _ctx3 = {"tsmis_loc": {"046": {"50.904": [{"src": str(_t_pdf)}]}},
+             "tsn_loc": {"07": {("LA", "046", "50.904"):
+                                [{"src": str(_n_pdf)}]}},
+             "dist_index": {"07": _n_pdf}, "tsmis_pdf": {"046": _t_pdf}}
+    _entry3, _why3 = ve._try_example(_bad, _ex3, "INT Type Eff-Date", _idir,
+                                     3, {}, side_labels=("TSMIS (PDF)", "TSN"),
+                                     tsn_ctx=_ctx3)
+    check("a target outside the record's own printed lines is REFUSED on the "
+          "vs-TSN print path (the engine backstop, both axes)",
+          _entry3 is None and _why3 is not None
+          and "outside the record's own printed lines" in _why3)
 finally:
-    ve._excel_strip = _real_strip
     ve._compose_stacked = _real_stacked
     ve._compose_pair = _real_pair
     shutil.rmtree(_idir, ignore_errors=True)
