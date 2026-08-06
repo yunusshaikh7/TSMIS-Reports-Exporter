@@ -227,25 +227,31 @@ function syncEvidenceControls(cbId, countRowId, countId, hintId, layoutId) {
     return div;
   };
   const lines = [];
-  const supported = (ev.rows || []).length;
-  if (supported) {
-    lines.push(line("ok",
-      "vs-TSN and self comparisons — each side rendered from the exact " +
-      "workbook it was compared from",
-      "Every panel is a cell strip of the compared document itself (the " +
-      "consolidated export and the normalized TSN workbook, or the two " +
-      "consolidated editions on a self check) — never a borrowed print."));
+  for (const r of ev.reports || []) {
+    if (r.tsn_pdfs) {
+      lines.push(line("ok",
+        `${r.label} (PDF) — will generate (${r.tsn_pdfs} TSN print${r.tsn_pdfs === 1 ? "" : "s"})`,
+        `Print crops of the per-route TSMIS export and the TSN print, read from ${r.dir}. ` +
+        `Cells whose run lacks the ${r.label} (PDF) export skip with a note.`));
+    } else {
+      lines.push(line("todo",
+        `${r.label} (PDF) — needs its TSN PDFs in ${r.dir}`,
+        "Evidence is supported for this report's PDF edition, but its TSN " +
+        "prints aren't there yet."));
+    }
   }
   if ((ev.env_rows || []).length) {
     lines.push(line("ok",
       "Cross-environment PDF-vs-PDF cells — both environments' own prints",
-      "The five env cells that compare PDF against PDF render highlighted " +
-      "crops of the exact per-route prints each side's comparison parsed " +
-      "(checked per cell against the comparison's own recorded read set)."));
+      "The env cells of the PDF-edition reports render highlighted crops of " +
+      "the exact per-route prints each side's comparison parsed (checked per " +
+      "cell against the comparison's own recorded read set)."));
   }
   if ((ev.unsupported || []).length) {
-    lines.push(line("na", `No evidence support yet: ${ev.unsupported.join(", ")}.`,
-      "These reports don't have an evidence adapter yet."));
+    lines.push(line("na", `No evidence: ${ev.unsupported.join(", ")}.`,
+      "Evidence collection exists only for the PDF-edition reports — a crop " +
+      "of an independent print is what makes it a valid spot check of the " +
+      "comparison sheet."));
   }
   hint.replaceChildren(...lines);
 }
@@ -259,14 +265,15 @@ function syncDayMatrixEvidence() {
 }
 
 // Whether a row can run the ON-DEMAND per-cell evidence action right now for
-// the given mode: deps in the build plus the row's adapter for that lane
-// (vs-TSN/self render the compared workbooks — no TSN prints needed since the
-// exact-source ruling; env needs the row to be one of the five PDF-vs-PDF
-// placements). Returns {label} for the tooltip, or null.
+// the given mode. Evidence exists ONLY on the PDF-vs-PDF lanes (the 2026-08-05
+// ruling): the vs-TSN and cross-environment comparisons of the PDF-edition
+// reports. Self-check (vs_pdf/vs_excel) cells and Excel rows never offer the
+// action. Returns {label} for the tooltip, or null.
 function evidenceActionInfo(rowKey, mode) {
   const ev = (S.st && S.st.evidence) || {};
   if (!ev.deps_ok) return null;
-  const lane = mode === "env" ? ev.env_rows : ev.rows;
+  const lane = mode === "env" ? ev.env_rows
+    : mode === "tsn" ? ev.rows : null;
   if (!(lane || []).includes(rowKey)) return null;
   const repKey = (ev.row_reports || {})[rowKey];
   const rep = (ev.reports || []).find((r) => r.key === repKey);
@@ -282,10 +289,9 @@ function evidenceOn() {
 }
 
 // A small camera badge on an evidence-SUPPORTED row's header (both matrices).
-// Always lit for supported rows: since the exact-source ruling the vs-TSN and
-// self lanes render the compared workbooks themselves, so nothing beyond the
-// build's imaging deps gates them. Rows with no evidence support get no badge
-// — the toggle's status lines name them.
+// Only the PDF-edition rows carry one (the 2026-08-05 ruling): their vs-TSN
+// and env lanes render print crops. Every other row gets no badge — the
+// toggle's status lines name them.
 function evidenceRowBadge(rowKey) {
   const ev = (S.st && S.st.evidence) || {};
   const anyLane = (ev.rows || []).includes(rowKey)
@@ -297,7 +303,7 @@ function evidenceRowBadge(rowKey) {
   const b = document.createElement("span");
   b.className = "mxrh-evbadge";
   b.appendChild(icon("i-camera", "ic"));
-  b.title = `Evidence images supported — the toggle (or a cell's camera) renders ${label} diffs from each side's own compared document.`;
+  b.title = `Evidence images supported — the toggle (or a cell's camera) renders ${label} diffs as crops of both source prints.`;
   return b;
 }
 

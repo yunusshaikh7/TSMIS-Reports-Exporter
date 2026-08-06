@@ -676,8 +676,9 @@ def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
     comparison engine is untouched. Returns the ConsolidateResult. With
     `also_formulas`, also writes a live-formulas twin beside the values copy.
     `evidence` ({'enabled','examples','layout'}) requests the visual-evidence
-    decoration on the five PDF-vs-PDF env cells (HF-10) — additive, never a
-    gate: the comparison result is identical with it on or off.
+    decoration on the four `_pdf`-family PDF-vs-PDF env cells (HF-10, amended
+    2026-08-05) — additive, never a gate: the comparison result is identical
+    with it on or off.
 
     Raises ValueError on an unknown row_key or a baseline cell (nothing to
     compare); compare_folders itself returns a clean error result when a side
@@ -1341,6 +1342,12 @@ def evidence_for_cell(dest, row_key, cell_key, baseline_key, events,
     rows = _row_defs()
     if row_key not in rows:
         raise ValueError(f"unknown matrix row: {row_key}")
+    import visual_evidence                               # lazy: pulls PIL/pdfium
+    if not visual_evidence.capable(row_key):
+        # run_evidence_only refuses too — this earlier gate keeps the refusal
+        # a clean sentence instead of a registry KeyError (2026-08-05 ruling:
+        # only the `_pdf` rows carry evidence).
+        raise ValueError("this report doesn't support evidence images")
     _label, subdir, _idx, adapter, _hr = rows[row_key]
     mode = _mode_by_id(_row_modes(row_key, subdir, adapter), "tsn")
     if not mode["supported"]:
@@ -1361,7 +1368,6 @@ def evidence_for_cell(dest, row_key, cell_key, baseline_key, events,
     cached = _m.load_tsn_results(dest)
     record = cached.get(f"{row_key}|{mode['id']}", {}).get(cell_key)
     expected_generation_id = require_cached_tsn_identity(record, token)
-    import visual_evidence                               # lazy: pulls PIL/pdfium
     result = run_evidence_only(
         row_key, dest / cell_key / mode["env_subdir"], mode["env_subdir"],
         src["path"], mode_out_path(dest, baseline_key, row_key, cell_key, mode),
@@ -1523,13 +1529,15 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, su
 def _run_self_evidence(row_key, pdf_consolidated, excel_consolidated, out_path,
                        tsmis_pdf_dir, evidence_opts, events, result,
                        commit_guard):
-    """Illustrate a finished PDF-vs-Excel self check (CMP-AUD-210).
+    """RETIRED LANE (owner ruling 2026-08-05): the PDF-vs-Excel self checks
+    carry no evidence — `visual_evidence.self_capable()` is always False, so
+    this returns silently for every row and the engine refuses FLAVOR_SELF
+    besides. The call site stays so the decoration contract is documented in
+    one place; nothing renders.
 
-    Same decoration contract as the vs-TSN path: it never changes the
-    comparison's status, completion or counts, and any failure only logs and
-    notes. Both compared sides are TSMIS here, so there is no TSN library to
-    certify — the published comparison must still be COMPLETE before anything
-    is drawn from it."""
+    Same decoration contract as the vs-TSN path applied while it was live: it
+    never changes the comparison's status, completion or counts, and any
+    failure only logs and notes."""
     if not evidence_opts:
         return
     try:

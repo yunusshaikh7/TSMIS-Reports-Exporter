@@ -1,14 +1,20 @@
 """Ramp Summary adapter for the visual-evidence generator (visual_evidence) —
-cross-environment flavor ONLY.
+DORMANT since the 2026-08-05 owner ruling.
 
-The Ramp Summary's one evidence-eligible placement is the Everything ENV cell
-(PCOA-FINAL-007): the cross-environment comparison parses each side's per-route
-Ramp Summary PDFs directly (compare_env._load_ramp_summary_side →
+Evidence collection exists only for the `_pdf`-edition report families, by
+REPORT TYPE — so Ramp Summary's env cell is out even though its export is
+PDF-native, and this module is registered nowhere
+(`visual_evidence._ENV_ADAPTER_MODULES` no longer names it;
+`visual_evidence.capable()`/`env_capable()` both say no for ramp_summary).
+The code stays per the same ruling ("keeping the code is fine"), ready to
+re-register if the owner ever extends the family rule.
+
+What it implemented (the HF-10 lane, working when retired): the Everything ENV
+cell (PCOA-FINAL-007) — the cross-environment comparison parses each side's
+per-route Ramp Summary PDFs directly (compare_env._load_ramp_summary_side →
 consolidate_ramp_summary.parse_pdf), so both sides of an example render as
-highlighted crops of those exact prints. Its vs-TSN comparison reads a
-normalized workbook and its clean evidence absence there is the audit-approved
-state — this module therefore exposes NO vs-TSN/self hooks on purpose, and
-`visual_evidence.capable()` keeps saying no for ramp_summary.
+highlighted crops of those exact prints. It exposes NO vs-TSN/self hooks on
+purpose.
 
 VALUES come from the consolidator's own parser (parse_pdf — never a second
 parser), so an example can only illustrate what the comparison compared.

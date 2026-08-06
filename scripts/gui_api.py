@@ -363,25 +363,25 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
 
     def _evidence_view(self):
         """The visual-evidence block for the UI: the persisted toggle+count
-        plus whether the TSN district prints are in place, AND the vs-TSN
-        matrix rows that have NO evidence support at all (named, one entry per
-        report family) — so both matrix pages can spell out exactly which
-        reports the toggle will and won't generate images for. The probe can
-        never break a state push (it only greys the toggle)."""
+        plus whether the TSN prints are in place, AND the matrix rows that
+        have NO evidence support (named per row — evidence exists only for
+        the PDF-edition report families, the 2026-08-05 ruling) — so both
+        matrix pages can spell out exactly which reports the toggle will and
+        won't generate images for. The probe can never break a state push
+        (it only greys the toggle)."""
         try:
             import visual_evidence           # lazy: first call pays the import
             avail = visual_evidence.availability()
-            seen, unsupported = set(), []
+            unsupported = []
             for _rk, label, sub, _i, _a in matrix_rows():
-                fam = sub[:-4] if sub.endswith("_pdf") else sub
-                # A row counts as supported when ANY lane can illustrate it —
-                # vs-TSN/self or the cross-environment PDF-vs-PDF lane (HF-10:
-                # ramp_summary is env-only, and listing it as unsupported would
-                # assert an absence that no longer exists).
+                # Evidence exists only for the PDF-edition report families
+                # (the 2026-08-05 ruling) — every other row is named here, one
+                # entry per ROW, so the hint states exactly which rows the
+                # toggle will never generate images for (an Excel row is
+                # listed even when its PDF sibling is supported).
                 if (visual_evidence.capable(sub)
-                        or visual_evidence.env_capable(sub) or fam in seen):
+                        or visual_evidence.env_capable(sub)):
                     continue
-                seen.add(fam)
                 unsupported.append(label)
             avail["unsupported"] = unsupported
         except Exception:                    # noqa: BLE001 — probe-only
