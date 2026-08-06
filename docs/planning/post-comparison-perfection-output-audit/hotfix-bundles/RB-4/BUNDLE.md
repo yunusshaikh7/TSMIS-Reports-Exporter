@@ -1,6 +1,7 @@
 # `RB-4` — Bundle Contract
 
-Status: **READY**
+Status: **READY — AMENDED BY OWNER 2026-08-05** (the amendment section below
+supersedes conflicting frozen text)
 
 > This RB-level contract carries work items **HF-05 and HF-10** and transcribes
 > both complete frozen work-item sections from
@@ -8,6 +9,65 @@ Status: **READY**
 > authoritative; where this record and the plan disagree, the plan wins. This
 > readiness step freezes scope only. No RB-4 branch, product change, evidence
 > generation, or acceptance run has started.
+
+## ⚠️ Owner amendment — 2026-08-05 (controls wherever it conflicts with the frozen text below)
+
+Mid-implementation, after the first `RB4-A1` run completed, the owner inspected
+the generated images and **rejected the HF-05 remedy as implemented**: rendering
+a compared side as a panel drawn from the compared workbook is CIRCULAR — a
+reviewer looking at it can never catch a bad parse, because the panel and the
+comparison sheet share the same read. His ruling: *"the whole point was that the
+evidence collection was separate and that if some dude looked at the pdf it
+would line up with the comparison sheet — that's the ONLY reason this is even a
+valid spot check."* Three rulings, issued in sequence the same day, now control
+this bundle:
+
+**1. Evidence is an independent spot check made of PRINT CROPS.** Both sides of
+every evidence image are crops of actual prints — the TSMIS per-route PDF
+export, the TSN library print, or the other environment's per-route print — with
+the red box on the compared cell, parse-back-verified. Workbook cell addresses
+may appear in caption text; workbook-rendered panels may not appear anywhere.
+A print whose parsed value disagrees with the compared value is rendered **with
+a disclosure note**, never silently dropped — disagreement is exactly the
+parser-bug signal the spot check exists to catch (the old silent drop was
+itself a defect).
+
+**2. Evidence collection EXISTS ONLY for the `_pdf`-edition report families** —
+Highway Log (PDF), Highway Sequence (PDF), Intersection Detail (PDF), Ramp
+Detail (PDF); Highway Detail (PDF) joins as the fifth family when the owner
+lifts his 2026-07-21 pre-release freeze — in exactly three lanes each:
+Everything vs-TSN, By Day vs-TSN, Everything ENV. **12 cells total.** The rule
+is by REPORT TYPE, not source format: Ramp Summary's env cell is REMOVED from
+HF-10's scope even though its export is PDF-native (owner: "get rid of that one
+too, evidence collection only for these type of reports, soon highway detail
+too"). Everything else — the 8 Excel-row vs-TSN cells and all 5 SELF
+(PDF-vs-Excel) cells — is **refused at the engine boundary**: evidence on
+produces zero artifacts of any kind, manifest included (owner: "keeping the
+code is fine but ts shouldnt be possible"). The workbook-strip renderer goes
+dormant: kept in code, reachable from nothing.
+
+**3. The UI reflects capability.** The evidence toggle and per-cell camera
+appear ONLY on the 12 PDF-vs-PDF cells; Excel rows, SELF cells, and the Ramp
+Summary env cell show no evidence affordance.
+
+**What survives from the original HF-05 analysis** (real defects, still fixed,
+now underneath the print crops): the exact-source read-set rule — each side
+evidenced from the document it was compared from or resolved-to print, never a
+borrowed sibling print, and no prose asserting an unread source; the
+boundary-delimited blank-cell target geometry (PCOA-FINAL-005); no silent
+26-character truncation (PCOA-FINAL-006); captions naming the exact print and
+page. On a vs-TSN cell the TSN side's crop comes from the library print the
+TSN workbook was built from and the TSMIS side's crop from the per-route
+export in the compared run folder — both parse-back-verified against the
+published cell, with disagreement disclosed per ruling 1.
+
+**Acceptance population under the amendment:** 12 evidence sets
+(4 Everything-tsn `_pdf` + 4 By-Day-tsn `_pdf` + 4 Everything-ENV `_pdf`) and
+14 required-silent cells (8 Excel-row vs-TSN + 5 SELF + Ramp Summary ENV, each
+read behind a planted positive control), plus the two always-silent paths
+(classic Compare tab, PDF-vs-Excel by-day matrix). Where the frozen text below
+says "11 registry cells", "18 artifact sets", "all five Everything ENV cells",
+or requires workbook-panel rendering, this amendment controls.
 
 | Field | Value |
 |---|---|
@@ -173,13 +233,19 @@ that were not read. Feature retirement is **not** shipped.
 | Bottom panel | `TSN — D07 Highway Log TSN.pdf · page 144` — **not the compared document.** It is the raw input the normalized workbook was built from, so the values agree, but it is not what was read |
 | Excel cell drawn | `RIVERSIDE DR OFF RAMP  , O` — cut at 26 characters with no ellipsis, while the caption above carries the full `RIVERSIDE DR OFF RAMP , OC 53-1493` (finding 006, this exact cell) |
 
-**Required behaviour.** That image keeps existing: the TSMIS panel is unchanged,
-the TSN panel is redrawn from the **normalized workbook that was compared** (the
-same panel style the Excel side already uses), the truncation is fixed, and the
-workbook stops claiming "the compared cell in each source PDF" or declaring a
-`TSMIS PDFs:` directory it never read. Where a side cannot be bound to the
-document it was compared from, **no artifact of any kind is emitted** — manifest
-included.
+**Required behaviour — SUPERSEDED 2026-08-05 by the owner amendment above.**
+~~That image keeps existing: the TSMIS panel is unchanged, the TSN panel is
+redrawn from the normalized workbook that was compared, the truncation is
+fixed, and the workbook stops claiming "the compared cell in each source PDF"
+or declaring a `TSMIS PDFs:` directory it never read.~~ The workbook-panel
+remedy was implemented, ran through the first `RB4-A1` pass, and was rejected
+by the owner on sight of the images: evidence must be print crops or nothing.
+The amended required behaviour: that cell (an Excel-row vs-TSN cell) **emits no
+evidence at all** — the engine refuses it; the 12 `_pdf`-family cells render
+TWO PRINT CROPS (TSMIS per-route export / TSN library print / env partner
+print) with the exact-source read set, fixed blank-cell geometry, no silent
+truncation, and disagreement disclosed. Where a side cannot be bound to its
+print, **no artifact of any kind is emitted** — manifest included.
 
 **Files expected to change.** `scripts/visual_evidence.py`, the
 `scripts/evidence_*.py` adapters (targeting), `scripts/matrix_build.py`
@@ -267,10 +333,11 @@ truncation census and the target-geometry measurements.
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
 | Status | **Inherits RB-4: READY** |
 
-**Exact scope.** Evidence for the five Everything ENV cells that compare PDF
-against PDF — Ramp Summary, Ramp Detail (PDF), Intersection Detail (PDF),
-Highway Log (PDF), Highway Sequence (PDF) — the one configuration the audit rule
-calls `REQUIRED`.
+**Exact scope — AMENDED 2026-08-05.** Evidence for the ~~five~~ **four**
+Everything ENV cells of the `_pdf` report families — Ramp Detail (PDF),
+Intersection Detail (PDF), Highway Log (PDF), Highway Sequence (PDF). Ramp
+Summary's env cell is REMOVED by the owner's third ruling (report-type rule);
+it joins the required-silent controls, and its env adapter goes dormant.
 
 **Explicitly out of scope.** Ramp Summary **vs TSN** (correctly approved as a
 prohibited absence); Baseline and PDF-vs-Excel lanes unless the owner extends
@@ -328,9 +395,10 @@ must still emit nothing: full gate plus every `check_evidence_*`,
 `check_matrix*.py`, `check_day_matrix.py`, `check_baseline_matrix.py`,
 `check_pdf_excel_matrix.py`.
 
-**Measurable acceptance criteria.**
-1. All five cells produce a bound manifest, evidence workbook and image set with
-   a PDF-only read set passing the exact-source test.
+**Measurable acceptance criteria.** *(amended 2026-08-05: four cells, not
+five — Ramp Summary's env cell joins the required-silent controls)*
+1. All four `_pdf`-family env cells produce a bound manifest, evidence workbook
+   and image set with a PDF-only read set passing the exact-source test.
 2. 100 % of retained crops accurate and readable, reviewed individually.
 3. Env comparison counts identical with evidence on and off.
 4. No other lane's evidence behaviour changed.

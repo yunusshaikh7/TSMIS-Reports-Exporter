@@ -1,7 +1,15 @@
 # `RB-4` — Implementation Record
 
-Status: **IN PROGRESS — RB4-A1 executing** (this file is completed before the
-status flips to `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW`)
+Status: **IN PROGRESS — SCOPE AMENDED BY OWNER 2026-08-05** (the first RB4-A1
+run completed at `a21e0ba` and its COMPARISON-layer results stand — counts,
+masks, formulas twins, silent classic controls, full gate — but the owner
+rejected the workbook-panel evidence rendering on sight of the images and
+re-ruled the bundle: evidence is PRINT CROPS on the 12 `_pdf`-family
+PDF-vs-PDF cells only, refused at the engine boundary everywhere else; see the
+BUNDLE.md amendment section. The evidence layer is being reimplemented and
+RB4-A1 re-runs at the new head; this file is completed before the status flips
+to `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW`. The narrative below this line
+still describes the FIRST run and is rewritten as part of that re-run.)
 
 | Field | Value |
 |---|---|
@@ -116,39 +124,75 @@ only the resolution is the comparator's own.
 
 ## Focused checks — red at base, green at head
 
-Method: the seven extended check files were overlaid onto a staged copy of the
-exact base tree (`git archive 72adf44…`) and run there
-(`run_rb4_acceptance.py --phase checks-at-base`; recorded in
-`results/base-red-checks.json`), then at head.
+Method: the ten extended check files are overlaid onto a staged copy of the
+exact base tree and run there (`run_rb4_acceptance.py --phase checks-at-base`;
+recorded in `results/base-red-checks.json`), and the full gate is run at the
+frozen head (`results/checks-at-head.json`).
 
-| Check file | At base `72adf44` | At head |
+Each check declares in the driver whether it must be **red with a named failure
+signature** or is a **green control**, and the phase fails unless every check
+classifies as declared. A check that dies on a load-class error without printing
+its signature is `inconclusive` — never counted as red.
+
+**A first pass exposed a weakness in this evidence.** Five of the ten checks
+proved nothing at base: each called a function or keyword the hotfix ADDS, so
+the run died on the first new call and printed no failure at all. That failure
+says "this API is new", never "the old behaviour was wrong". Each of the five
+now states the contract it depends on up front and asserts it, so the base run
+names what is missing on its own output before it stops. **Red-at-base went from
+three of ten checks to eight, with two declared green controls.**
+
+| Check file | At base `72adf44` | Signature bound (its own stdout) |
 |---|---|---|
-| `check_visual_evidence.py` | red — `_snapshot_read_set() got an unexpected keyword argument 'buckets'` (the env read-set contract absent) | ALL PASS |
-| `check_evidence_source_role.py` | red — `module 'visual_evidence' has no attribute '_workbook_rows_at'` (no workbook-panel addressing) | ALL PASS |
-| `check_evidence_manifest.py` | red — same missing contract surface | ALL PASS |
-| `check_evidence_excel_columns.py` | red — `_workbook_side` absent + **2 semantic FAILs**: the July-2026 RD edition assertions fail (RB-3's deliberately deferred evidence half) | ALL PASS |
-| `check_evidence_literal_cells.py` | red — `KeyError: 'tsmis_dir'` (the base writer requires the untruthful `TSMIS PDFs:` summary contract) | ALL PASS |
-| `check_matrix.py` | red — `build_cell_comparison() got an unexpected keyword argument 'evidence'` (PCOA-FINAL-007's root cause verbatim) | ALL PASS |
-| `check_pdf_excel_matrix.py` | **green at base and head** — the silent control was already silent; the new zero-artifact assertion is a must-not-regress lock, not a red→green | ALL PASS |
+| `check_visual_evidence.py` | red | `the read set is captured in labelled per-side buckets, so a manifest names the document each side was compared from` |
+| `check_evidence_source_role.py` | red¹ | `the engine addresses the compared workbook's rows and renders each side's panel from it (_workbook_rows_at + _workbook_side)` |
+| `check_evidence_manifest.py` | red¹ | `the engine renders a side from the compared WORKBOOK (_workbook_rows_at + _workbook_side), not from a borrowed print` |
+| `check_evidence_excel_columns.py` | red¹ | `FAIL: July District also resolves to its Location cell` (RB-3's deliberately deferred evidence half) |
+| `check_evidence_literal_cells.py` | red | `a drawn panel string is full or visibly elided (panel_cell_text)` |
+| `check_matrix.py` | red | `a cell comparison can be asked for evidence` (PCOA-FINAL-007's root cause) |
+| `check_matrix_ownership.py` | red | `the frozen MODE is routed into evidence_for_cell` |
+| `check_pdf_route_identity.py` | red | `FAIL visual_evidence._locate_env_sides exists` |
+| `check_pdf_excel_matrix.py` | **green control** | the silent lane was already silent; the new assertion is a must-not-regress lock, not a red→green |
+| `check_evidence_bundle.py` | **green control** | likewise |
 
-**Eleven further assertions were added to `check_evidence_source_role.py` after
-the RB4-A1 image inspection** (below) found five composition defects that every
-programmatic check had passed. They lock, in order: the position-authoritative
-strip header (the boxed column carries the COMPARED field's name; the shifted
-neighbours are corrected; an unclaimed position keeps the workbook's own label;
-no resolve hook = untouched header), the disclosure note (a normalized source
-form is named; a derived composite cell is named; a verbatim value adds no
-note; a crop flavor adds none; a legally elided value is not mistaken for one),
-and the composition geometry (both layouts grow to hold title/subline/note in
-full; a long left caption can never reach the right caption). All are red
-against the pre-inspection head by construction — the helpers they call
-(`_display_header`, `_normalization_note`, `_text_w`, `_header_w`) did not
-exist there.
+¹ printed its declared signature, then died on `AttributeError` — expected for a
+check that also covers an API the hotfix adds. Recorded as
+`died_after_signature`, not downgraded.
+
+**The gate itself was audited for teeth, by mutation.** Reverting a fixed
+behaviour in the engine must make some check go red; where it did not, the
+behaviour was unguarded and the check was written. Found and closed this way:
+
+- `_display_header` and `_normalization_note` each had ONE production call site
+  and no check asserted the call site — deleting either line passed the entire
+  gate. One example is now driven end to end through `_try_example`.
+- The composition geometry assertions were **circular**: they sized the
+  expectation with the same width helper the composer sizes the canvas with, so
+  a regression that halved every measurement satisfied both sides. They now
+  measure the image's own ink.
+- Fifty hook assertions only proved an attribute existed — which a stub
+  resolving every field to column 0 also satisfies. Each hook is now probed for
+  what it must guarantee.
+- The engine's x-axis containment backstop, the Highway Sequence blank-cell
+  window, the ambiguous-print refusal, the stale duplicate header label, the
+  env side-order assertion, and the env front-door census binding were each
+  unguarded; each now has a check that goes red when it is reverted.
+- The by-day silence probe could not tell silence from a broken probe. It plants
+  a positive control first.
+
+The env front-door case is worth naming: the existing census-drift test rendered
+an example first, so the snapshot-time binding caught the drift too and deleting
+the front-door check still passed. The front door exists for the paths that
+publish a manifest WITHOUT rendering anything, so the case that locks it is a
+no-differences comparison with a drifted source.
 
 The DATA-level pre-fix signatures bind to the base runtime through the
-base-side generation itself (borrowed prints in the read sets — 12 TSN
-district prints on the HL cell, 112 PDFs on the HL-PDF cell; the `TSMIS
-PDFs:` declarations; the `text[:26]` drawing rule) — see the RB4-A1 section.
+base-side generation itself: the read sets of the base-side evidence
+manifests name the prints the old engine borrowed — 12 TSN district prints on
+the Highway Log cell, and **110** per-route PDFs on the Highway Log PDF cell
+(109 on its By Day twin) — alongside the `TSMIS PDFs:` declarations and the
+`text[:26]` drawing rule. Counted from the retained base manifests, not from
+the audit's prose.
 
 ## RB4-A1 — the one executable acceptance run
 
@@ -168,22 +212,92 @@ re-hashed AFTER the run: every replica still equals its provision-time hash AND
 its frozen source, so the run never mutated an input. Highway Detail is
 excluded everywhere (⛔ pre-release).
 
-**One frozen head.** The native-scale inspection (below) found five composition
-defects, so the fixes landed after the first generation and the retained
-results briefly carried three head stamps. Runtime-digest equality is NOT head
-identity (the RB-2 Review-2 lesson), so the prior head-side comparisons were
-RETIRED and the complete sequence was produced again against one frozen runtime
-head: generation → cameras → validate → excel → counts. Every retained result
-SELF-STAMPS that head plus a runtime-scoped clean/dirty flag (`tree_stamp`), so
-head identity lives in the record itself, not only in the manifest's assertion.
+**One frozen head, and a harness that fails closed.** An earlier attempt was
+abandoned deliberately: an adversarial audit of the run itself found the harness
+verified *what it found*, so a silently missing evidence set, a camera that
+threw, and a base check that failed for the wrong reason all passed. Those holes
+were closed before this run started (see the driver's entry in the Changes
+table), the prior head-side comparisons were RETIRED, and the complete sequence
+was produced against ONE frozen runtime head — runtime-digest equality is not
+head identity (the RB-2 Review-2 lesson).
+
+The chain script is itself a gate now: it aborts on the first failing phase
+rather than echoing an exit code and continuing, and after every phase it
+re-asserts both that the runtime files are clean AND that `HEAD` has not moved.
+Every retained result SELF-STAMPS that head plus a runtime-scoped clean/dirty
+flag; the base side stamps the base commit, read from a content binding that
+compares each base-tree runtime file against the base commit's own git blob.
+
+Order: full gate at head → base-tree binding → the same check files at base →
+generation → cameras → validate → excel → counts → census.
 
 | Phase | Result |
 |---|---|
+| checks at head | 158 / 158 (`results/checks-at-head.json`) |
+| base-tree binding | 151 / 151 runtime files identical in content to `72adf44` |
+| checks at base | 8 red · 2 green controls · 0 inconclusive |
 | generate | 35 cells (8 Everything vs-TSN · 5 SELF · 5 ENV + 5 ENV evidence-OFF controls · 8 By Day · 4 PvE silent controls) — **0 non-ok** |
-| cameras | 21 on-demand cells (vs-TSN · By Day · the 5 HF-10 env cameras) — **0 non-ok** |
-| validate | 26 evidence sets — **0 problems** |
-| excel | 24 evidence workbooks opened in INSTALLED Excel — **0 repairs**, 827 embedded images, Ledger intact in every one |
-| counts | 26 typed sidecars re-read for the base↔head invariance table |
+| cameras | 21 on-demand cells (8 vs-TSN · 8 By Day · the 5 HF-10 env cameras) — **21/21 ok, 0 problems** |
+| validate | 26 evidence sets (16 vs-TSN · 5 SELF · 5 ENV; 24 rendered, 2 no-differences) — **0 problems** |
+| excel | 24 evidence workbooks opened in INSTALLED Excel — 24/24 without an open failure, Ledger sheet present in all 24, **838 embedded pictures** (exactly the 838 images on disk); **26/26 formulas twins settle to their values workbook's totals**, 0 disagreements |
+| counts | 26 typed sidecars re-read — **26/26 identical** to the base runtime |
+| census | ok |
+
+The whole chain ran 02:25 → 17:09 (14 h 44 m), generation alone 10 h 02 m and the
+Excel leg 2 h 50 m — the twin recalculations are a full rebuild of workbooks up
+to 250 MB.
+
+**The repository gate, all four legs, at that same frozen head:**
+`run_checks.py -j 4 -k` **158/158** · `compileall` clean · `ruff check scripts`
+clean · `build.ps1 -SelfTest` **PASSED** — the exact shipped exe runs every code
+path, including the evidence render stack and the lazily-imported
+`evidence_ramp_summary` adapter this bundle adds, which is the one packaging
+risk it introduces.
+
+**The population is DECLARED, not discovered.** The driver previously globbed
+whatever evidence sets it found, so a silently missing set was invisible. It now
+declares the expected population and fails naming any shortfall. This run:
+`required 26 · discovered 26 · missing 0 · extra 0 · duplicate 0 · forbidden
+present 0`. The 5 ENV sets are *required* at head and *forbidden* at base — the
+base side's job is to prove they do not exist there.
+
+**The recounts the bundle asked for, rather than a sample.** Across 724 examples
+in 24 rendered sets:
+
+| Population | Count |
+|---|---|
+| Blank-side targets (the PCOA-FINAL-005 population) | **238** |
+| Values longer than the old 26-character cut (what PCOA-FINAL-006 silently truncated) | **19** |
+| Examples needing visible elision at the 120-character panel limit | **0** |
+
+So every one of the 19 values the pre-fix rule would have cut mid-string is now
+drawn in full, and no value in this corpus is long enough to require the elision
+path — which is why the elision behaviour is proved by check rather than by this
+run's data.
+
+The bundle also asked for these populations to be **recounted rather than
+sampled** on the audit's own sets, which `phase_census` now does exhaustively
+(`results/prefix-defect-census.json`):
+
+| Set | Examples examined | Over the 26-char prefix limit | Legally elided | Blank-side targets |
+|---|---|---|---|---|
+| Audit — Everything (11 sets) | 529 | 10 | 0 | 208 |
+| Audit — By Day (7 sets) | 359 | 7 | 0 | 132 |
+| Base — Everything (13 sets) | 357 | 4 | 0 | 141 |
+| Base — By Day (8 sets) | 241 | 5 | 0 | 84 |
+
+The prior figure was a sample; these are complete counts with their denominators,
+and legal `…`-elision is counted separately from the defect rather than folded
+into it. One caveat, disclosed rather than papered over: the audit By Day root
+has no frozen copy, so it is declared UNBOUND in the manifest and its identity
+rests on the Stage 1B witness hashes, all of which still match.
+
+**Cross-environment re-derivation.** All 108 env examples (HL-PDF 57 · RS 25 ·
+RD-PDF 10 · HSL-PDF 8 · ID-PDF 8) were independently reproduced end to end from
+the two environments' own prints — re-located, re-boxed inside the captioned
+record, re-read — with **0 failing checks**. Every read-set member was confirmed
+both to lie under a compared side's resolved directory and to match that side's
+recorded census entry.
 
 **What validate proves, per set** (100 % programmatic, no sampling): the
 manifest describes CURRENT with every member verified; the provenance sidecar
@@ -199,16 +313,52 @@ both boxes re-computed inside the captioned record, both values re-read.
 > ENV re-derivation: 59/59 · 23/23 · 10/10 · 8/8 · 8/8 — every published env
 > example independently reproduced from the two environments' own prints.
 
-**Silent controls.** The by-day PDF-vs-Excel lane ran with the evidence toggle
-ON and produced ZERO evidence artifacts (`pve_stray: []`, proved by enumeration
-over the whole tree, not assumption); each of the 5 ENV cells was additionally
-built with evidence OFF and produced none.
+**Silent controls — both driven, neither proxied.** The by-day PDF-vs-Excel lane
+ran with the evidence toggle ON and produced ZERO evidence artifacts, proved by
+enumeration over its tree; each of the 5 ENV cells was additionally built with
+evidence OFF and produced none.
+
+The **classic Compare tab** control was previously a code-comment proxy — the
+by-day lane was said to exercise "the same self comparator", and the record did
+not disclose the substitution. The tab's endpoint blocks on a native save
+dialog and cannot be driven headlessly, but the comparator the endpoint calls
+can be, and the comparator is what the silence claim is about. Both lanes now
+run for real, resolved through the same registry the endpoint uses and fed the
+same two inputs from the source placement's own provenance sidecar: the FILE
+lane (`compare(...)`, Highway Sequence vs-TSN, 398.5 s) and the FOLDER lane
+(`compare_folders(...)`, Highway Sequence PDF between environments, 1144.4 s).
+Both returned `ok` and wrote zero evidence artifacts.
+
+Each silence reading is preceded by a **planted positive control**: an
+evidence-named artifact is placed where one would land and the probe must SEE it
+before the tree is read for real. A bare "the glob found nothing" reads the same
+whether the lane is silent, the tree is the wrong one, or the pattern is broken.
+Both lanes' probes saw their planted control.
 
 **Count/mask invariance.** All **26/26** cells compare equal between the base
-runtime and the head: verdict, completion, paired rows, both one-sided counts,
-differing rows, differing cells, asserted/context cells, and the full per-field
-table. HF-05 and HF-10 change evidence rendering only — never comparison
-content. The five ENV cells additionally reproduce the output audit's own
+runtime and the head across every substantive field: verdict, completion,
+`trusted`/`current`/`known`/`present`, paired rows, both one-sided counts,
+differing rows, differing cells, asserted/context cells, pairing quality, and
+the full per-field table. The only difference anywhere is the `generation_id`,
+which necessarily changes on a rebuild. HF-05 and HF-10 change evidence
+rendering only — never comparison content.
+
+The two sides are bound to different runtimes, which is what makes that
+comparison mean anything: `counts-head.json` self-stamps `a21e0ba`,
+`counts-base.json` self-stamps `72adf44`, and the base tree is proven by content
+to BE `72adf44`. Before this run the base side carried no runtime identity at
+all and the verifier's tree argument defaulted to the head worktree — a
+forgotten flag would have made base and head the same runtime and every count
+would have matched trivially.
+
+**Formulas-twin settlement.** Each comparison publishes a values workbook and a
+live-formulas twin, and nothing previously proved the twin agrees. Every twin
+was opened in installed Excel, fully recalculated, and its Status/Diffs totals
+read back by header label: **26/26 agree, 0 disagree, 0 excused.** Twin
+expectancy is taken from the producer's own probe rather than re-derived — a
+scanned row count would have wrongly excused the largest comparisons, since the
+Highway Log sheet scans past the twin limit yet its twin exists because the
+producer's probe returns no stored dimension. The five ENV cells additionally reproduce the output audit's own
 measured numbers EXACTLY (Ramp Summary 67; Intersection Detail PDF 17,562;
 Ramp Detail PDF 376 + 5/8 one-sided; Highway Log PDF 88,238 + 2,095/1,174;
 Highway Sequence PDF 1,904 + 7/246 — PCOA-FINAL-007's own figures).
@@ -220,9 +370,15 @@ the Summary rows that claim it — an unclaimed image or a claimed-but-missing o
 is a recorded problem (0 of each). The set was then partitioned into 11 slices
 and inspected image-by-image at native scale.
 
-*Round 1* (pre-fix set, 825 images, retained as `results/inspection-round1.json`)
-returned 39 failures in **five distinct classes — every one a real defect that
-all 158 programmatic checks had passed**:
+An inspection of the **pre-fix** set (825 images, retained as
+`results/inspection-round1.json`) returned **39 failures in five classes — every
+one a real defect that all 158 programmatic checks had passed.** That result is
+the reason this bundle carries an image inspection at all: the classes below are
+what a programmatic gate could not see, and they became the explicit failure
+criteria every later inspection hunts for. The per-class counts below are the
+shape of the finding; the retained record carries the totals (39 of 825), not a
+per-class breakdown, so the counts are stated as the classes were characterised
+at the time rather than as a re-derivable measurement.
 
 | # | Defect | Images | Fix |
 |---|---|---|---|
@@ -232,16 +388,27 @@ all 158 programmatic checks had passed**:
 | 4 | A long left caption overran and overprinted the right caption into an unreadable mash | 2 | Each caption gets its own column, widened to hold it |
 | 5 | Ramp Detail's District boxes the composite `Location` cell (`12-SD-005`) because District is derived from it | 2 | Disclosed by the same note line |
 
-*Round 2* re-rendered the whole set at the frozen head and re-inspected all 827
-images with the five classes as explicit failure criteria. Result: **827/827
-pass, 0 fail.** Independent confirmations worth recording: a programmatic edge
-scan found 0 images with ink touching a canvas edge (class 3 gone); captions
-verified separated at native scale on both the narrowest (1530 px) and widest
-(2648 px) canvases (class 4 gone); header labels verified on the deliberately
-confusable near-duplicates `LB IN-SH Treated` vs `LB OT-SH Treated` (class 1
-gone); and the note line was verified to DISCRIMINATE — on Ramp Detail where
-`-` IS the compared value no note appears, while on its PDF twin where `-`
-normalizes to blank one does (class 2/5 exact, not blanket).
+A sixth class was also caught by that inspection: a red box swallowing a leading
+route label (`15/NB OFF TO LIMONITE AVE`) that is not part of the compared value.
+
+**Every one of those six classes is now locked by a check**, so a regression
+fails the gate rather than waiting for a human to look at an image again. That
+was not true when they were first fixed: a mutation run — reverting each fixed
+behaviour and requiring some check to go red — showed the composition classes
+were guarded only by assertions that were circular with the composer's own
+measurements, and that the two helpers doing the relabelling and the disclosure
+could be deleted outright without failing anything. See the focused-checks
+section.
+
+*The inspection of the accepted set* re-rendered every image at the frozen head
+and re-inspected all of them with the six classes as explicit failure criteria.
+
+> **(pending — the acceptance run's inspection is in progress; its result and
+> the retained record replace this line)**
+
+An earlier inspection of an earlier head returned 827/827 pass, but it describes
+images that the current run's retire-and-re-render step deleted. It is history,
+not a claim about the accepted set, and is not cited as evidence here.
 
 ## Scope and residual risk
 
@@ -278,6 +445,17 @@ against that corpus's prints, and three of the five needed a probe-driven fix to
 work at all — which is evidence that env geometry is corpus-sensitive. A print
 whose layout differs from these will REFUSE (that is the designed failure), but
 "refuses correctly" is asserted only for the shapes this corpus contains.
+
+**One inconsistency, disclosed rather than fixed.** `_snapshot_read_set`'s
+same-basename guard raises `EvidenceSourceBindingError` from a call site that is
+NOT inside the `refuse_binding` wrapper, so unlike every other binding refusal in
+the module it would not retire a stale prior evidence set. It was traced as
+unreachable under the current naming conventions — two routes cannot collide on
+one basename inside a directory given the end-anchored `…_route_<token>` contract,
+and the two compared-workbook basenames are distinct constants per report edition
+— so it is a defensive backstop rather than a live bug. It is recorded here
+instead of being changed, because changing runtime after the acceptance head was
+frozen would invalidate the run that proves the rest.
 
 **What the acceptance run does not prove.** Excel opens every retained workbook
 without an open failure; because the driver runs with `DisplayAlerts=False`, a
