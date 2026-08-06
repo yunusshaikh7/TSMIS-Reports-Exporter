@@ -148,9 +148,10 @@ snapshot). **7 rows** (every report — Ramp Summary/Detail, Highway Sequence, b
 Highway Log formats, Intersection Summary/Detail — all with cross-env AND vs-TSN as of
 v0.17.0); each **row header** carries the
 report name (evidence-supported rows append a small **camera badge**, v0.24.0 —
-`evidenceRowBadge`: lit `--success` when the report's TSN prints are in place, dimmed
-with the drop-folder tooltip when not; unsupported rows get no badge, the toggle's
-status lines name them), a per-row **comparison-mode select** (compact + content-sized in a
+`evidenceRowBadge`: only the four PDF-edition rows carry one since the 2026-08-05
+ruling (their vs-TSN and env lanes render print crops); every other row gets no
+badge, the toggle's status lines name them), a per-row **comparison-mode select**
+(compact + content-sized in a
 `.mx-fluent-select` chevron wrapper; the "(soon)" greying is now defensive — every
 mode is coded), a vs-TSN
 **file picker** when in a TSN mode — a **status-dot chip** (`.mxtp-file`) that surfaces
@@ -162,21 +163,24 @@ light-surface `select-light` (not the dark title-bar skin). Each cell renders th
 colour-coded** (`.mx-match`/`.mx-diff-lo`/`.mx-diff-hi`/`.mx-stale`/`.mx-missing`/`.mx-na`)
 plus greyed / needs-export / needs-TSN / "consolidate N PDFs" / stale states — with
 compact **icon** actions (`↻ export` / `↻ compare` / `↗ open`, gated on support+built; since
-v0.23.0 a **camera** on built, FRESH vs-TSN cells of evidence-capable rows — the on-demand
-evidence run for the existing comparison, hidden while the report's TSN prints are missing).
+v0.23.0 a **camera** on built, FRESH cells — the on-demand evidence run for the existing
+comparison, offered ONLY on the tsn/env modes of the four PDF-edition rows since the
+2026-08-05 ruling; a missing TSN print set reports per cell at run time).
 The **config zone** (`#matrixConfig`, a card under the slim activity log, shown via
 `body.matrix-wide:not(.mw-day)`) holds the report + **environment-column** show/hide toggles,
 the global "set all comparisons to…" (env|tsn), the live-formulas toggle, the **evidence-images
 toggle + per-column count** (`#matrixEvidence` / `#matrixEvidenceCount` — ONE shared persisted
 pair `evidence_images`/`evidence_examples` mirrored on the by-day corner, synced by
 `syncMatrixEvidence` off the state's `evidence` block; greyed only when NO report is ready.
-Since v0.24.0 the hint is an always-visible **status block** (`.ev-status-line`); RB-4
-re-truthed it to the exact-source rule: one ✓ line for the vs-TSN/self lanes (each side
-rendered from its own compared workbook), one ✓ line for the five cross-environment
-PDF-vs-PDF cells (both environments' own prints), and one "No evidence support yet: …"
-line naming the rest (the state's `evidence.unsupported`, derived server-side from
-`matrix_rows()` × `visual_evidence.capable`/`env_capable`) — so the toggle is never a
-mystery switch —
+Since v0.24.0 the hint is an always-visible **status block** (`.ev-status-line`); the
+2026-08-05 amendment re-truthed it to the print-crop rule: one ✓/○ line PER supported
+PDF-edition family (✓ with its TSN print count when the prints are dropped, ○ naming
+the drop folder when not), one ✓ line for the four cross-environment PDF-vs-PDF cells
+(both environments' own prints), and one "No evidence: …" line naming every other row
+(the state's `evidence.unsupported`, one entry per row, derived server-side from
+`matrix_rows()` × `visual_evidence.capable`/`env_capable` — evidence exists only for
+the PDF-edition families, so an Excel row is listed even when its PDF sibling is
+supported) — so the toggle is never a mystery switch —
 [comparison-engine.md](comparison-engine.md) §13), the live
 queue, and the **fast-mode browser-count spinner** (`#matrixWorkers`, the `.mc-workers` row): it writes the
 shared `fast_workers` setting via `set_setting`, so the matrix corner, the Export pane

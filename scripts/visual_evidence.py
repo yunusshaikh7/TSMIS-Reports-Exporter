@@ -2322,7 +2322,7 @@ def _write_workbook(wb_path, img_dir, entries, misses, info,
     hdr_row = 3 + max(len(src_lines) + 1, 3)   # row 6 for the two-line layout
     for col, value in enumerate(
             ("Column", "Route @ Post Mile", sides[0], sides[1], "Images",
-             "Published cell", "Source rows"), start=1):
+             "Published cell", "Source rows", "Note"), start=1):
         _safe_cell(ws, hdr_row, col, value, bold)
     r = hdr_row + 1
     for e in entries:
@@ -2335,13 +2335,16 @@ def _write_workbook(wb_path, img_dir, entries, misses, info,
         # CMP-AUD-208: the published coordinates this image illustrates.
         _safe_cell(ws, r, 6, _published_cell_text(e), small)
         _safe_cell(ws, r, 7, _source_rows_text(e), small)
+        # The image's note line, repeated where a reviewer can FILTER for it —
+        # a disagreement disclosure must not live only in pixels (2026-08-05).
+        _safe_cell(ws, r, 8, e.get("note") or "", small)
         r += 1
     for f, why in misses.items():
         _safe_cell(ws, r, 1, f, body)
         _safe_cell(ws, r, 2, f"no verifiable example — {why}", small)
         r += 1
     for col, width in (("A", 14), ("B", 24), ("C", 26), ("D", 26), ("E", 46),
-                       ("F", 34), ("G", 26)):
+                       ("F", 34), ("G", 26), ("H", 40)):
         ws.column_dimensions[col].width = width
 
     used_sheet_names = {"Summary"}

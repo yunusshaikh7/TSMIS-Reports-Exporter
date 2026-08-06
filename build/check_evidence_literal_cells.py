@@ -41,8 +41,9 @@ def test_evidence_contract():
              "(panel_cell_text)", hasattr(ve, "panel_cell_text"))
     _require("the image sheet's legend states only what was read "
              "(_legend_for)", hasattr(ve, "_legend_for"))
-    _require("the engine renders a side from the compared workbook "
-             "(_workbook_side)", hasattr(ve, "_workbook_side"))
+    _require("the dormant workbook-panel renderer is still present "
+             "(_workbook_side — kept per the 2026-08-05 ruling)",
+             hasattr(ve, "_workbook_side"))
 
 
 def _assert_text(cell, expected, label):

@@ -14,7 +14,6 @@ Run with the build venv:
 """
 import inspect
 import os
-import re
 import shutil
 import sys
 import tempfile

@@ -77,22 +77,34 @@ BYDAY_DAY, BYDAY_SOURCE = "2026-07-23", "ssor-prod"
 TSN_LIB_REPORTS = ("highway_log", "highway_sequence", "intersection_detail",
                    "intersection_summary", "ramp_detail", "ramp_summary")
 
-# The complete evidence-relevant cell set (highway_detail excluded, pre-release).
+# The complete COMPARISON cell set this run drives (highway_detail excluded,
+# pre-release). The comparison universe is UNCHANGED by the 2026-08-05
+# amendment — all 26 comparisons build; what changed is which of them carry
+# evidence (EVIDENCE_ROWS below).
 TSN_ROWS = ("highway_log", "highway_log_pdf", "highway_sequence",
             "highway_sequence_pdf", "intersection_detail",
             "intersection_detail_pdf", "ramp_detail", "ramp_detail_pdf")
 # The self mode rides each PDF row (`vs_excel`); Highway Log's Excel row also
 # offers the symmetric `vs_pdf` — exactly the audit's observed self sets.
+# ALL of them are REQUIRED-SILENT for evidence since the amendment.
 SELF_CELLS = (("highway_log", "vs_pdf"),) + tuple(
     (r, "vs_excel") for r in TSN_ROWS if r.endswith("_pdf"))
 # The five Everything ENV PDF-vs-PDF cells (PCOA-FINAL-007), paired the way the
 # audit measured them: ID-PDF against the ars-prod outage substitute, the rest
-# against the 2026-07-09 ssor pull provisioned as ssor-test.
+# against the 2026-07-09 ssor pull provisioned as ssor-test. All five
+# COMPARISONS still build; ramp_summary's cell is REQUIRED-SILENT for evidence
+# (the third ruling: the rule is by report type, not source format).
 ENV_CELLS = (("highway_log_pdf", "ssor-test"),
              ("highway_sequence_pdf", "ssor-test"),
              ("ramp_detail_pdf", "ssor-test"),
              ("ramp_summary", "ssor-test"),
              ("intersection_detail_pdf", "ars-prod"))
+# The rows that CARRY evidence (owner amendment 2026-08-05: print crops on the
+# `_pdf`-edition families only — 12 cells: 4 Everything-tsn + 4 By-Day-tsn +
+# 4 env). Declared, and cross-checked against visual_evidence.rows() /
+# env_rows() in _sanity_defaults.
+EVIDENCE_ROWS = ("highway_log_pdf", "highway_sequence_pdf",
+                 "intersection_detail_pdf", "ramp_detail_pdf")
 BASELINE = "ssor-prod"
 EVIDENCE_REQUEST = {"enabled": True, "examples": 2, "layout": "both"}
 
@@ -105,37 +117,41 @@ EVIDENCE_REQUEST = {"enabled": True, "examples": 2, "layout": "both"}
 # own population can never see one: the retained RB4-A1 validate record found
 # THREE sets, reported zero problems, and passed.
 #
-# DERIVED, not guessed — and cross-checked three independent ways:
-#   * `visual_evidence.rows()` names the ten evidence-capable rows (five report
-#     families x two editions). Highway Detail is excluded everywhere here
-#     (pre-release, owner 2026-07-21), leaving 4 families x 2 editions = the 8
-#     TSN_ROWS.
-#   * `report_catalog.MATRIX`'s `self_id` column declares six self placements
-#     (highway_log/vs_pdf plus five *_pdf/vs_excel); minus highway_detail_pdf
-#     that is exactly the 5 SELF_CELLS. This is the PDF-vs-Excel comparison
-#     MODE inside the Everything matrix — NOT the by-day PvE matrix, which is a
-#     silent control: `pdf_excel_matrix` has its own five rows and must publish
-#     no evidence at all (asserted separately as `pve_stray`).
-#   * By Day runs the same 8 rows against the one frozen day.
-#   8 + 5 + 8 = 21, and the base side's own on-disk manifests count 21 exactly
-#   (13 under store/comparisons/tsn + 8 under the by-day folder).
-# The cross-environment population is `visual_evidence.env_rows()` == the five
-# PCOA-FINAL-007 placements in ENV_CELLS. So the derivation AGREES with the
-# declared 21 + 5; nothing here is bent to reach those numbers.
+# DERIVED, not guessed — and cross-checked against the engine's own registry
+# (owner amendment 2026-08-05: evidence exists ONLY for the `_pdf` families):
+#   * `visual_evidence.rows()` names exactly the four evidence-capable rows —
+#     EVIDENCE_ROWS. Highway Detail stays excluded (pre-release, owner
+#     2026-07-21); the four Excel rows are REQUIRED-SILENT.
+#   * The SELF placements all became REQUIRED-SILENT (`self_capable` is False
+#     everywhere; `generate()` refuses FLAVOR_SELF). The by-day PvE matrix
+#     stays its own silent control (`pve_stray`).
+#   * By Day carries the same four `_pdf` rows against the one frozen day.
+#   * The cross-environment population is `visual_evidence.env_rows()` == the
+#     four `_pdf` placements (ramp_summary REMOVED by the third ruling; its
+#     env COMPARISON still builds, silent).
+#   4 + 4 + 4 = the 12 evidence sets; the other 14 placements (4 Everything
+#   Excel-tsn + 4 By-Day Excel-tsn + 5 self + 1 ramp_summary env) are
+#   REQUIRED-SILENT: their comparisons exist and no evidence artifact of any
+#   kind may sit beside them.
 #
 # The env sets are HEAD-ONLY by design: the HF-10 lane is what the hotfix adds,
-# and the base side's job is to prove those five sets do NOT exist there. So at
-# base they are declared FORBIDDEN, not merely absent.
+# and the retained base record's job was to prove those sets did NOT exist
+# there. At base every evidence expectation is the OLD contract's — the base
+# side is a retained chain6 record, not re-run under the amendment.
 # --------------------------------------------------------------------------- #
-EXPECTED_TSN_SETS = 8            # len(TSN_ROWS)
-EXPECTED_SELF_SETS = 5           # len(SELF_CELLS)
-EXPECTED_BYDAY_SETS = 8          # len(TSN_ROWS), for the one frozen day
-EXPECTED_EVIDENCE_SETS = 21      # the three above — required on BOTH sides
-EXPECTED_ENV_SETS = 5            # len(ENV_CELLS) — required at head, forbidden at base
-# One camera per vs-TSN row in each of the two lanes, plus the env cameras at
-# head only (phase_cameras runs the env loop under `if side == "head"`).
-EXPECTED_CAMERA_RUNS_BASE = 16   # 2 * len(TSN_ROWS)
-EXPECTED_CAMERA_RUNS_HEAD = 21   # + len(ENV_CELLS)
+EXPECTED_TSN_SETS = 4            # len(EVIDENCE_ROWS)
+EXPECTED_SELF_SETS = 0           # the amendment: self carries no evidence
+EXPECTED_BYDAY_SETS = 4          # len(EVIDENCE_ROWS), for the one frozen day
+EXPECTED_EVIDENCE_SETS = 12      # the three above + env — required at head
+EXPECTED_ENV_SETS = 4            # the `_pdf` env placements (RS removed)
+EXPECTED_SILENT_CELLS = 14       # 4+4 Excel-tsn, 5 self, 1 RS env
+# One camera per EVIDENCE row in each of the two vs-TSN lanes, plus the env
+# cameras (head side; the base cameras are the retained chain6 record).
+EXPECTED_CAMERA_RUNS_BASE = 16   # the retained base record's own count
+EXPECTED_CAMERA_RUNS_HEAD = 12   # 4 tsn + 4 byday + 4 env
+# Engine-boundary refusal probes the camera phase drives at head: the four
+# Excel rows' tsn cameras and ramp_summary's env camera must REFUSE.
+EXPECTED_CAMERA_REFUSALS = 5
 RESULT_OK_STATUS = "ok"          # ConsolidateResult's only success terminal
 # The panel-text bounds, split because they mean opposite things.
 # PRE-fix the Excel panel drew value[:26] with NO ellipsis, so any value past
@@ -261,26 +277,28 @@ BASE_CHECK_EXPECTATIONS = {
     "check_visual_evidence.py": {
         "expect": CHECK_RED,
         "signature": "[FAIL] the read set is captured in labelled per-side "
-                     "buckets, so a manifest names the document each side was "
-                     "compared from",
-        "why": "the base has no per-side read-set buckets, so a manifest "
-               "cannot name the document each side was compared from",
+                     "buckets, so a manifest names the documents each side's "
+                     "crops were read from",
+        "why": "the base has no per-side read-set buckets; the amended check "
+               "also reports the missing engine-boundary refusal on the very "
+               "next line (re-derived at the base tree 2026-08-05)",
     },
     "check_evidence_source_role.py": {
         "expect": CHECK_RED,
-        "signature": "[FAIL] the engine addresses the compared workbook's rows "
-                     "and renders each side's panel from it (_workbook_rows_at "
-                     "+ _workbook_side)",
-        "why": "the base cannot address the compared workbook's own rows, so a "
-               "side is rendered from a borrowed print instead",
+        "signature": "[FAIL] the vs-TSN lane renders PRINT CROPS on both "
+                     "sides (tsn_ctx replaces the workbook side ctx in "
+                     "_try_example)",
+        "why": "the base _try_example has no tsn_ctx print path — its TSMIS "
+               "side could render a borrowed print for Excel rows and its "
+               "disagreements were silently dropped",
     },
     "check_evidence_manifest.py": {
         "expect": CHECK_RED,
-        "signature": "[FAIL] the engine renders a side from the compared "
-                     "WORKBOOK (_workbook_rows_at + _workbook_side), not from "
-                     "a borrowed print",
-        "why": "same missing workbook-addressing contract, seen from the "
-               "manifest's side of the boundary",
+        "signature": "[FAIL] the vs-TSN lane locates PRINTS "
+                     "(_locate_tsmis_sources) and evidence exists only for "
+                     "the four `_pdf` rows",
+        "why": "the base registry advertises ten rows and the base engine "
+               "has no print-locate step under the amended contract",
     },
     "check_matrix.py": {
         "expect": CHECK_RED,
@@ -403,21 +421,41 @@ def assert_declared_counts():
     constants would otherwise shrink or inflate an expectation silently — the
     same fail-open class the population check exists to remove. Raises rather
     than warning, and names every constant that disagrees."""
+    env_evidence = [r for r, _e in ENV_CELLS if r in EVIDENCE_ROWS]
     declared = (
-        (EXPECTED_TSN_SETS, len(TSN_ROWS), "EXPECTED_TSN_SETS"),
-        (EXPECTED_SELF_SETS, len(SELF_CELLS), "EXPECTED_SELF_SETS"),
-        (EXPECTED_BYDAY_SETS, len(TSN_ROWS), "EXPECTED_BYDAY_SETS"),
-        (EXPECTED_ENV_SETS, len(ENV_CELLS), "EXPECTED_ENV_SETS"),
+        (EXPECTED_TSN_SETS, len(EVIDENCE_ROWS), "EXPECTED_TSN_SETS"),
+        (EXPECTED_SELF_SETS, 0, "EXPECTED_SELF_SETS"),
+        (EXPECTED_BYDAY_SETS, len(EVIDENCE_ROWS), "EXPECTED_BYDAY_SETS"),
+        (EXPECTED_ENV_SETS, len(env_evidence), "EXPECTED_ENV_SETS"),
         (EXPECTED_EVIDENCE_SETS,
-         EXPECTED_TSN_SETS + EXPECTED_SELF_SETS + EXPECTED_BYDAY_SETS,
+         EXPECTED_TSN_SETS + EXPECTED_SELF_SETS + EXPECTED_BYDAY_SETS
+         + EXPECTED_ENV_SETS,
          "EXPECTED_EVIDENCE_SETS"),
-        (EXPECTED_CAMERA_RUNS_BASE, 2 * len(TSN_ROWS),
-         "EXPECTED_CAMERA_RUNS_BASE"),
-        (EXPECTED_CAMERA_RUNS_HEAD, 2 * len(TSN_ROWS) + len(ENV_CELLS),
+        (EXPECTED_SILENT_CELLS,
+         (len(TSN_ROWS) - len(EVIDENCE_ROWS)) * 2 + len(SELF_CELLS)
+         + (len(ENV_CELLS) - len(env_evidence)),
+         "EXPECTED_SILENT_CELLS"),
+        (EXPECTED_CAMERA_RUNS_HEAD,
+         2 * len(EVIDENCE_ROWS) + len(env_evidence),
          "EXPECTED_CAMERA_RUNS_HEAD"),
+        (EXPECTED_CAMERA_REFUSALS,
+         (len(TSN_ROWS) - len(EVIDENCE_ROWS))
+         + (len(ENV_CELLS) - len(env_evidence)),
+         "EXPECTED_CAMERA_REFUSALS"),
     )
     bad = [f"{name} is {want} but the cell set gives {got}"
            for want, got, name in declared if want != got]
+    # The declared evidence rows must BE the engine's own registry — a drift
+    # between this driver and visual_evidence would validate a population the
+    # product does not produce.
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import visual_evidence as _ve
+    if tuple(sorted(EVIDENCE_ROWS)) != tuple(sorted(_ve.rows())):
+        bad.append(f"EVIDENCE_ROWS {sorted(EVIDENCE_ROWS)} != "
+                   f"visual_evidence.rows() {sorted(_ve.rows())}")
+    if tuple(sorted(env_evidence)) != tuple(sorted(_ve.env_rows())):
+        bad.append(f"env evidence cells {sorted(env_evidence)} != "
+                   f"visual_evidence.env_rows() {sorted(_ve.env_rows())}")
     if bad:
         raise SystemExit("declared population disagrees with the cell set: "
                          + "; ".join(bad))
@@ -764,12 +802,15 @@ def _evidence_sibling_paths(comparison_path):
 
 def _placements(side_root, day_matrix):
     """Every comparison placement this acceptance drives, as one ordered
-    enumeration: [{identity, kind, flavor, row, cell, mode, path}].
+    enumeration: [{identity, kind, flavor, row, cell, mode, path, evidence}].
 
     The counts, validate and excel phases all derive their expected population
     from HERE, so the three can never disagree about what the run was supposed
     to produce. `identity` keeps the counts record's key idiom exactly (that
-    shape is read downstream)."""
+    shape is read downstream). `evidence` says whether the placement CARRIES
+    an evidence set under the 2026-08-05 amendment (the `_pdf` families' tsn/
+    by-day/env cells); every other placement is REQUIRED-SILENT — its
+    comparison exists and no evidence artifact may sit beside it."""
     store = side_root / "store"
     tsn_dir = store / "comparisons" / "tsn"
     out = []
@@ -777,22 +818,25 @@ def _placements(side_root, day_matrix):
         out.append({"identity": f"everything-tsn|{row}",
                     "kind": "everything-tsn", "flavor": "tsn", "row": row,
                     "cell": BASELINE, "mode": "tsn",
+                    "evidence": row in EVIDENCE_ROWS,
                     "path": tsn_dir / f"{BASELINE}_{row}_tsn.xlsx"})
     for row, mode_id in SELF_CELLS:
         out.append({"identity": f"everything-self|{row}|{mode_id}",
                     "kind": "everything-self", "flavor": "self", "row": row,
-                    "cell": BASELINE, "mode": mode_id,
+                    "cell": BASELINE, "mode": mode_id, "evidence": False,
                     "path": tsn_dir / f"{BASELINE}_{row}_{mode_id}.xlsx"})
     for row, other_env in ENV_CELLS:
         out.append({"identity": f"everything-env|{row}",
                     "kind": "everything-env", "flavor": "env", "row": row,
                     "cell": other_env, "mode": "env",
+                    "evidence": row in EVIDENCE_ROWS,
                     "path": (store / "comparisons" / BASELINE
                              / f"{other_env}_{row}.xlsx")})
     for row in TSN_ROWS:
         out.append({"identity": f"byday|{row}", "kind": "byday",
                     "flavor": "tsn", "row": row,
                     "cell": f"{BYDAY_DAY} {BYDAY_SOURCE}", "mode": "tsn",
+                    "evidence": row in EVIDENCE_ROWS,
                     "path": Path(day_matrix.day_out_path(
                         BYDAY_DAY, BYDAY_SOURCE, row))})
     return out
@@ -1271,7 +1315,7 @@ def phase_cameras(root, side, tree, run_id):
         results["cells"].append(entry)
         write_json(root / "results" / f"cameras-{side}.json", results)
 
-    for row in TSN_ROWS:
+    for row in EVIDENCE_ROWS:
         run("camera-tsn", row, BASELINE,
             lambda row=row: matrix.evidence_for_cell(
                 str(dest), row, BASELINE, BASELINE, ev, tsn_files={},
@@ -1281,15 +1325,69 @@ def phase_cameras(root, side, tree, run_id):
                 BYDAY_SOURCE, BYDAY_DAY, row, str(dest), ev, tsn_files={}))
     if side == "head":
         for row, other_env in ENV_CELLS:
+            if row not in EVIDENCE_ROWS:
+                continue
             run("camera-env", row, other_env,
                 lambda row=row, other_env=other_env: matrix.evidence_for_cell(
                     str(dest), row, other_env, BASELINE, ev, tsn_files={},
                     commit_guard=guard, mode_id="env"))
+
+    # The engine-boundary REFUSAL probes (the 2026-08-05 amendment): a camera
+    # pointed at a required-silent cell must refuse with the reason — not
+    # crash, not render. Recorded as their own population beside the runs.
+    refusals = []
+
+    def probe_refusal(kind, row, cell, expect, fn):
+        entry = {"kind": kind, "row": row, "cell": cell, "expected": expect}
+        print(f"=== camera-refusal {side} · {kind} · {row} · {cell} ===")
+        try:
+            res = fn()
+            entry["status"] = "NOT-REFUSED"
+            entry["message"] = getattr(res, "message", "")
+        except ValueError as e:
+            entry["status"] = "refused" if expect in str(e) else "wrong-reason"
+            entry["error"] = str(e)
+        except Exception as e:  # noqa: BLE001
+            entry["status"] = "exception"
+            entry["error"] = f"{type(e).__name__}: {e}"
+        refusals.append(entry)
+        results["refusals"] = refusals
+        write_json(root / "results" / f"cameras-{side}.json", results)
+
+    if side == "head":
+        for row in TSN_ROWS:
+            if row in EVIDENCE_ROWS:
+                continue
+            probe_refusal("refuse-tsn", row, BASELINE,
+                          "doesn't support evidence images",
+                          lambda row=row: matrix.evidence_for_cell(
+                              str(dest), row, BASELINE, BASELINE, ev,
+                              tsn_files={}, commit_guard=guard))
+        for row, other_env in ENV_CELLS:
+            if row in EVIDENCE_ROWS:
+                continue
+            probe_refusal("refuse-env", row, other_env,
+                          "no cross-environment evidence support",
+                          lambda row=row, other_env=other_env:
+                          matrix.evidence_for_cell(
+                              str(dest), row, other_env, BASELINE, ev,
+                              tsn_files={}, commit_guard=guard,
+                              mode_id="env"))
     problems = []
     if len(results["cells"]) != expected_runs:
         problems.append(
             f"{len(results['cells'])} camera run(s) recorded, but side "
             f"{side} declares {expected_runs}")
+    if side == "head" and len(refusals) != EXPECTED_CAMERA_REFUSALS:
+        problems.append(
+            f"{len(refusals)} refusal probe(s) recorded, but the amendment "
+            f"declares {EXPECTED_CAMERA_REFUSALS}")
+    for entry in refusals:
+        if entry.get("status") != "refused":
+            problems.append(
+                f"camera refusal {entry['kind']} · {entry['row']} · "
+                f"{entry['cell']}: status={entry.get('status')!r} — "
+                f"{entry.get('error') or entry.get('message') or 'no detail'}")
     for entry in results["cells"]:
         status = entry.get("status")
         if status == RESULT_OK_STATUS:
@@ -1315,21 +1413,35 @@ def phase_cameras(root, side, tree, run_id):
 
 def _summary_rows_of(wb_path):
     """App-free read of one evidence workbook: (source_lines, legends,
-    example rows [(field, at, va, vb)], has_ledger)."""
+    example rows [(field, at, va, vb, note)], has_ledger).
+
+    The data header row is found by its own first label ('Column'), not by a
+    fixed position — the vs-TSN layout carries four source lines (two
+    'Compared …' + two '… (read)' print folders, the 2026-08-05 amendment)
+    while the env layout keeps two, so the header floats."""
     from openpyxl import load_workbook
     wb = load_workbook(wb_path, read_only=True, data_only=True)
     try:
         ws = wb["Summary"]
         src_lines, rows = [], []
+        hdr_seen = False
         for r, row in enumerate(ws.iter_rows(min_row=1, values_only=True), 1):
-            if r in (3, 4) and row and row[0]:
-                src_lines.append(str(row[0]))
-            if r >= 7 and row and row[0]:
-                key = str(row[1] or "")
-                if key.startswith("no verifiable example"):
-                    continue
-                rows.append((str(row[0]), key, str(row[2] or ""),
-                             str(row[3] or "")))
+            first = str(row[0]) if row and row[0] is not None else ""
+            if not hdr_seen:
+                if first == "Column":
+                    hdr_seen = True
+                elif r >= 3 and first:
+                    src_lines.append(first)
+                continue
+            if not first:
+                continue
+            key = str(row[1] or "") if len(row) > 1 else ""
+            if key.startswith("no verifiable example"):
+                continue
+            rows.append((first, key,
+                         str(row[2] or "") if len(row) > 2 else "",
+                         str(row[3] or "") if len(row) > 3 else "",
+                         str(row[7] or "") if len(row) > 7 else ""))
         legends = []
         for name in wb.sheetnames:
             if name in ("Summary", "Ledger"):
@@ -1396,17 +1508,35 @@ def phase_validate(root, side, tree, run_id):
             f"driver declares {PANEL_TEXT_MAX_DECLARED}; update "
             "PANEL_TEXT_MAX_DECLARED or the census totals are wrong")
 
-    # The declared population. The 21 vs-TSN / self / by-day sets are required
-    # on both sides; the 5 cross-environment sets are the HF-10 lane, so they
-    # are required at head and FORBIDDEN at base (the base side's job is to
-    # prove they do not exist there).
+    # The declared population (owner amendment 2026-08-05): the 12 `_pdf`
+    # placements are required; every other placement is REQUIRED-SILENT —
+    # its manifest is FORBIDDEN, not merely unexpected. (At base the split is
+    # the OLD contract's; the base side is a retained chain6 record and this
+    # phase re-runs only at head.)
     places = _placements(side_root, day_matrix)
     required, forbidden = {}, {}
     for place in places:
         manifest = _evidence_sibling_paths(place["path"])[2]
         env_at_base = place["flavor"] == "env" and side != "head"
-        (forbidden if env_at_base else required)[place["identity"]] = _norm(
+        silent = not place["evidence"] or env_at_base
+        (forbidden if silent else required)[place["identity"]] = _norm(
             manifest)
+    # The discovery glob is CONTROLLED before its silence is trusted: plant an
+    # evidence-named manifest where one would land, require the glob to see
+    # it, remove it, then read the real population (the same pattern as
+    # _probe_evidence — a broken glob must not read as "everything silent").
+    planted = (side_root / "store" / "comparisons"
+               / "zz planted control (evidence).json")
+    planted.parent.mkdir(parents=True, exist_ok=True)
+    planted.write_text("{}", encoding="utf-8")
+    try:
+        probe = [_norm(p) for p in side_root.rglob("*(evidence).json")]
+        if _norm(planted) not in probe:
+            problems.append("the manifest discovery glob did not see the "
+                            "planted control — the silence sweep proves "
+                            "nothing")
+    finally:
+        planted.unlink()
     discovered = [_norm(p) for p in side_root.rglob("*(evidence).json")]
     pop = population_diff(required, discovered, forbidden)
     out["population"] = dict(
@@ -1465,12 +1595,22 @@ def phase_validate(root, side, tree, run_id):
                      and match.get(mp.name) == (st.st_size, st.st_mtime_ns),
                      f"read-set member in that side's census: {mp.name}")
         elif man.state == em.STATE_RENDERED:
+            # The 2026-08-05 amendment: the read set is the two compared
+            # workbooks PLUS every print the crops were read from. The
+            # workbooks bind by recorded sha; every other member must be a
+            # PDF under one of the two print folders the Summary declares.
             want = {str(Path(s["selection"]).resolve()): s["sha256"]
                     for s in sides}
             got = {str(Path(m.name).resolve()): m.sha256 for m in members}
-            note(rec, got == want,
-                 "read set == the comparison's two recorded documents "
-                 f"(got {len(got)} member(s))")
+            note(rec, all(got.get(p) == sha for p, sha in want.items()),
+                 "read set carries the comparison's two recorded documents")
+            extras = {p for p in got if p not in want}
+            note(rec, all(p.lower().endswith(".pdf") for p in extras),
+                 f"every non-workbook read-set member is a print "
+                 f"({len(extras)} print(s))")
+            note(rec, bool(extras),
+                 "at least one print was read (crops cannot come from nowhere)")
+            rec["read_set_prints"] = len(extras)
         else:
             # A generation that rendered nothing (no differences to
             # illustrate) opened no source document, so its read set is
@@ -1485,37 +1625,55 @@ def phase_validate(root, side, tree, run_id):
         wb_path = ve.sibling_paths(cmp_path)[0]
         src_lines, legends, rows, has_ledger = _summary_rows_of(wb_path)
         note(rec, has_ledger, "Ledger sheet present")
-        want_lines = [f"Compared {s['role']}: {s['selection']}" for s in sides]
-        note(rec, src_lines == want_lines,
-             f"source lines are the provenance selections ({src_lines!r})")
+        want_compared = [f"Compared {s['role']}: {s['selection']}"
+                         for s in sides]
+        if flavor == "env":
+            note(rec, src_lines == want_compared,
+                 f"source lines are the provenance selections ({src_lines!r})")
+        else:
+            note(rec, src_lines[:2] == want_compared
+                 and len(src_lines) == 4
+                 and src_lines[2].startswith("TSMIS PDFs (read): ")
+                 and src_lines[3].startswith("TSN PDFs (read): "),
+                 "source lines are the provenance selections plus the two "
+                 f"print folders actually read ({src_lines!r})")
+            read_dirs = [Path(line.split(": ", 1)[1]) for line in src_lines[2:]
+                         if ": " in line]
+            member_parents = {Path(p).resolve().parent
+                              for p in got if p not in want}
+            note(rec, member_parents <= {d.resolve() for d in read_dirs},
+                 "every print member sits under a DECLARED read folder")
         want_legend = ve._legend_for(
             ve.FLAVOR_ENV if flavor == "env" else ve.FLAVOR_TSN)
         note(rec, all(lg == want_legend for lg in legends),
              "image-sheet legends state the true sources")
         rec["examples"] = len(rows)
-        # Panel-text fidelity census: values past the panel bound draw as a
-        # visibly elided prefix (panel_cell_text) — legal under HF-05, so the
-        # over-limit examples are LISTED for the native-scale image inspection
-        # rather than failed; the drawn-string decision itself is unit-locked
-        # in check_visual_evidence.
+        # Value-length census (informational since the amendment removed the
+        # drawn panels — crops have no drawn strings to elide — but the long
+        # and blank values remain the hardest crops, so their identities are
+        # LISTED for the native-scale image inspection).
         rec["elided_examples"] = [
-            [f, a] for f, a, va, vb in rows
+            [f, a] for f, a, va, vb, _n in rows
             if len(va) > ve.PANEL_TEXT_MAX or len(vb) > ve.PANEL_TEXT_MAX]
         rec["values_over_26"] = sum(
-            1 for _f, _a, va, vb in rows for v in (va, vb)
+            1 for _f, _a, va, vb, _n in rows for v in (va, vb)
             if len(v) > PREFIX_PANEL_TRUNCATION_LIMIT)
-        # PCOA-FINAL-005: panels whose compared value is blank on exactly ONE
+        # PCOA-FINAL-005: crops whose compared value is blank on exactly ONE
         # side. The blank side has no glyph to box, so these are the hardest
         # targets to draw — recorded as a population WITH its identities, not
         # left to whichever ones a sample happened to include.
         rec["blank_side_examples"] = [
-            [f, a, ("a" if not va else "b")] for f, a, va, vb in rows
+            [f, a, ("a" if not va else "b")] for f, a, va, vb, _n in rows
             if bool(va) != bool(vb)]
         rec["blank_side_count"] = len(rec["blank_side_examples"])
+        # Disagreement disclosures (the amendment's new behaviour): counted
+        # and listed so the image inspection reads every disclosed crop.
+        rec["disagreement_examples"] = [
+            [f, a, n] for f, a, _va, _vb, n in rows if "print reads" in n]
         if flavor == "env":
             adapter = ve.env_adapter_for(row_key)
             rederived = 0
-            for field, at, va, vb in rows:
+            for field, at, va, vb, _n in rows:
                 route, _, key = at.partition(" @ ")
                 key = key or route
                 vals = []
@@ -1542,6 +1700,65 @@ def phase_validate(root, side, tree, run_id):
                 note(rec, match, f"env re-derivation matches ({field} @ {at})")
                 rederived += bool(match)
             rec["env_rederived"] = rederived
+        else:
+            # The vs-TSN lane's independent re-derivation, TSMIS side, 100%:
+            # each example's route print is re-located through the adapter's
+            # own LOCKSTEP walk and its parse-back value must either equal the
+            # compared value or be DISCLOSED by the image's note line — the
+            # amendment's disagreement contract, closed both ways. (The TSN
+            # side's independent verification is the generation's own
+            # parse-back plus the native-scale image inspection — a full TSN
+            # district re-parse per set would re-run the generation's slow
+            # half; that scope split is recorded, not hidden.)
+            adapter = ve.adapter_for(row_key)
+            tsmis_dir = read_dirs[0] if read_dirs else None
+            need = {}
+            for field, at, va, vb, _n in rows:
+                route, _, key = at.partition(" @ ")
+                need.setdefault(route, set()).add(key or route)
+            located = {}
+            for route, keys in sorted(need.items()):
+                p = (ve.find_route_print(tsmis_dir, adapter, route)
+                     if tsmis_dir else None)
+                if p is None:
+                    note(rec, False,
+                         f"re-derivation: no TSMIS print resolves for route "
+                         f"{route} in the declared read folder")
+                    continue
+                try:
+                    located[route] = adapter.locate_tsmis(p, keys)
+                except Exception as e:  # noqa: BLE001 — a failure is a problem
+                    note(rec, False,
+                         f"re-derivation: {p.name} unparseable "
+                         f"({type(e).__name__}: {e})")
+            rederived = 0
+            for field, at, va, _vb, note_text in rows:
+                route, _, key = at.partition(" @ ")
+                key = key or route
+                recs = located.get(route, {}).get(key, [])
+                if len(recs) != 1:
+                    note(rec, False,
+                         f"re-derivation: row not found uniquely in the "
+                         f"TSMIS print ({field} @ {at})")
+                    continue
+                tv = adapter.tsmis_value(recs[0], field)
+                if tv == va:
+                    ok = "TSMIS print reads" not in note_text
+                    note(rec, ok,
+                         f"TSMIS re-derivation matches with no false "
+                         f"disagreement note ({field} @ {at})")
+                else:
+                    ok = (f"TSMIS print reads '{tv or '(blank)'}'"
+                          in note_text)
+                    note(rec, ok,
+                         f"TSMIS print disagrees and the image DISCLOSES it "
+                         f"({field} @ {at}: print {tv!r} vs compared {va!r})")
+                rederived += bool(ok)
+            rec["tsmis_rederived"] = rederived
+            rec["tsn_side_scope"] = (
+                "generation parse-back + native-scale image inspection "
+                "(a full TSN district re-parse per set would repeat the "
+                "generation's slow half)")
         return
 
     # Driven by the DECLARATION, not by a glob: a set that was never produced
@@ -1551,8 +1768,7 @@ def phase_validate(root, side, tree, run_id):
         if place["identity"] not in required:
             continue
         validate_set(place["path"], place["flavor"],
-                     row_key=place["row"] if place["flavor"] == "env" else None,
-                     identity=place["identity"])
+                     row_key=place["row"], identity=place["identity"])
     # The silent lanes: nothing evidence-like anywhere under the PvE tree.
     pve_tree = side_root / "output" / "comparisons" / "pdf-vs-excel-by-day"
     stray = sorted(str(p) for p in pve_tree.rglob("*evidence*")) if pve_tree.is_dir() else []

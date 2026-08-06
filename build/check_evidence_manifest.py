@@ -25,8 +25,6 @@ sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 import _checklib
-import compare_highway_detail_tsn as cht
-import evidence_highway_detail as ehd
 import evidence_manifest as em
 import visual_evidence as ve
 from PIL import Image

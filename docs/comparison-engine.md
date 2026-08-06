@@ -1243,31 +1243,43 @@ The manual "screenshot the cell in both sources and circle it" workflow, automat
 **decoration of a finished comparison** — it never changes the comparison's
 status/completion/counts, and any evidence failure only logs + adds a summary note.
 
-**The exact-source rule (PCOA-FINAL-004, owner ruling 2026-07-26; shipped in
-RB-4):** each side of every evidence image renders from the EXACT document that
-side was compared from, bound to the comparison's own recorded provenance
-before anything renders. The vs-TSN and self comparisons read two WORKBOOKS
-(the consolidated export — Excel or PDF edition — and the normalized TSN
-workbook / the sibling consolidated edition), so both panels are cell strips of
-those exact workbooks; a raw district/statewide print that merely PRODUCED a
-compared workbook is never rendered or declared. The five cross-environment
-PDF-vs-PDF cells (`FLAVOR_ENV`, HF-10: Ramp Summary + the four `_pdf` rows)
-genuinely parse both run folders' per-route prints at compare time, so their
-panels are highlighted crops of those exact prints — the run folders resolved
-from the comparison's own `.provenance.json`, never a caller's guess. `generate`
-digests its sources against the recorded per-side sha256 (file inputs) or the
-recorded folder census (env inputs); a pair that cannot bind retires any prior
-evidence set and raises `EvidenceSourceBindingError` with NOTHING published —
-no workbook, no images, no manifest. Panel strings draw the FULL compared value
-or a visibly `…`-elided prefix (`panel_cell_text`; PCOA-FINAL-006 retired the
-silent 26-char cut), and a blank-side target with no cell rectangle inside the
-record's own printed lines REFUSES instead of guessing (PCOA-FINAL-005; the
-engine additionally refuses any env target outside the captioned record's
-lines).
-Five reports so far, each via its own adapter over the shared engine:
-`evidence_highway_detail` (district TSN prints), `evidence_intersection_detail` and
-`evidence_ramp_detail` (each ONE statewide TSN print), `evidence_highway_log` and
-`evidence_highway_sequence` (district TSN prints, with the per-print routing — below).
+**The print-crop rule (owner amendment 2026-08-05, superseding the
+PCOA-FINAL-004 workbook-panel remedy):** evidence is an INDEPENDENT spot check
+— a human holds the actual prints against the comparison sheet — so both sides
+of every evidence image are highlighted CROPS of source prints, and evidence
+exists ONLY for the `_pdf`-edition report families (`capable()` names exactly
+`highway_log_pdf` / `highway_sequence_pdf` / `intersection_detail_pdf` /
+`ramp_detail_pdf`; Highway Detail (PDF) joins when its pre-release freeze
+lifts). On a vs-TSN cell the TSMIS side crops the per-route PDF export the
+compared consolidated workbook was built from and the TSN side crops the TSN
+library print; each crop's value is read back through the adapter's LOCKSTEP
+walk, and a print that DISAGREES with the compared value renders WITH a
+disclosure note (image note line + the Summary's Note column), never a silent
+drop — disagreement is the parser-bug signal the spot check exists to catch.
+The four cross-environment PDF-vs-PDF cells (`FLAVOR_ENV`, HF-10 as amended —
+Ramp Summary's cell was removed by the report-type rule) crop both run
+folders' own per-route prints, the folders resolved from the comparison's own
+`.provenance.json`, never a caller's guess. Everything else REFUSES at the
+engine boundary: the Excel rows' vs-TSN cells and every PDF-vs-Excel self cell
+produce no artifact of any kind (`FLAVOR_SELF` is not in `FLAVORS`;
+`self_capable()` is always False), and the workbook-panel renderer
+(`_workbook_side`/`_excel_strip`) stays in code, reachable from nothing.
+`generate` still binds the COMPARISON first: the compared workbooks digest
+against the recorded per-side sha256 (vs-TSN) or the run folders against the
+recorded census (env); a pair that cannot bind retires any prior evidence set
+and raises `EvidenceSourceBindingError` with NOTHING published — no workbook,
+no images, no manifest. The manifest read set lists the prints actually read
+(plus the two compared workbooks on the vs-TSN lane), the Summary declares the
+print folders beside the compared selections, and a target with no cell
+rectangle inside the record's own printed lines REFUSES instead of guessing
+(PCOA-FINAL-005 — `_box_within_record`, both axes, engine-enforced on every
+print lane).
+Four live adapters over the shared engine — `evidence_intersection_detail` and
+`evidence_ramp_detail` (each ONE statewide TSN print), `evidence_highway_log`
+and `evidence_highway_sequence` (district TSN prints, with the per-print
+routing — below) — plus two dormant ones kept per the ruling:
+`evidence_highway_detail` (the reserved fifth family) and
+`evidence_ramp_summary` (env-only, unregistered).
 The HD-specific bullets below apply to the others analogously; the ID/HL/HSL/RD
 differences are called out inline. **Ramp Detail's wrinkle is DUAL-ROW discipline**
 (v0.26.0): its two rows ride DIFFERENT compared sets — the PDF row's comparison
