@@ -216,7 +216,12 @@ behaviour was unguarded and the check was written. Found and closed this way:
 
 - `_display_header` and `_normalization_note` each had ONE production call site
   and no check asserted the call site — deleting either line passed the entire
-  gate. One example is now driven end to end through `_try_example`.
+  gate. One example was driven end to end through `_try_example` to close it.
+  *(Both helpers went dormant with the panels under the 2026-08-05 amendment;
+  that end-to-end lock was REPLACED, not dropped — the same fixture now drives
+  the PRINT path and asserts the crop captions, the disagreement disclosure,
+  and the containment refusal, so the live call site is still locked at its
+  call site rather than in a unit.)*
 - The composition geometry assertions were **circular**: they sized the
   expectation with the same width helper the composer sizes the canvas with, so
   a regression that halved every measurement satisfied both sides. They now
@@ -409,6 +414,27 @@ the accepted set.
 
 > **(pending — the chain7 inspection's result and retained record replace this
 > line)**
+
+## The bundle's measurable criteria, as amended — where each one is met
+
+The criteria are BUNDLE.md's, read through the 2026-08-05 amendment (which
+supersedes the panel-fidelity criterion and rescopes HF-10 from five cells to
+four).
+
+| # | Criterion (amended) | Where it is met |
+|---|---|---|
+| HF-05 · 1 | Zero artifacts — manifest included — for a pair that cannot bind; and the required-silent cells emit nothing | `phase_validate` population: `required 12 · forbidden 14 · discovered 12`, 0 missing/extra/forbidden-present/duplicate, behind a planted control. The unbindable-pair terminal is locked by `check_evidence_manifest` (nothing published, prior set retired) |
+| HF-05 · 2 | *(superseded)* every drawn panel string equals the compared value or is visibly elided → **every crop's value is re-derived from the print, or the disagreement is disclosed** | 258/258 TSMIS-side re-derivations in `phase_validate`, disagreement contract closed both ways; 0 disagreements in this corpus, so the disclosure path is proved by the end-to-end fixture in `check_evidence_source_role` |
+| HF-05 · 3 | 100 % of blank-side examples: target inside the captioned record, touching no other record or field | 119 blank-side examples, all listed by identity; the engine refuses any box outside the record's own lines/width (`_box_within_record`, both axes, both print lanes) — locked by `check_visual_evidence` + the source-role end-to-end fixture; visually confirmed by the native-scale inspection |
+| HF-05 · 4 | No prose asserts an unread source | Summary declares the compared selections PLUS the two print folders actually read; validate asserts every non-workbook read-set member is a `.pdf` under a DECLARED folder (462 print members); legends pinned per flavor |
+| HF-05 · 5 | The two already-correct paths still emit nothing | Classic Compare comparator driven for real in both lanes (file 389.7 s · folder 1106.3 s) + the by-day PvE lane with the toggle ON — zero artifacts, each read behind a planted control |
+| HF-05 · 6 | All comparison counts and typed outcomes unchanged | 26/26 typed sidecars identical base↔head across every substantive field |
+| HF-05 · 7 | Full gate green; every new assertion fails pre-fix | 158/158 at head + compileall + ruff + frozen self-test; 8 red / 2 green / 0 inconclusive at base, signatures re-derived for the amended check files |
+| HF-10 · 1 | All four `_pdf` env cells produce a bound manifest, workbook and image set with a PDF-only read set | 4 env sets, 83 examples, census-bound member for member; ramp_summary's env cell builds its comparison and is proven silent |
+| HF-10 · 2 | 100 % of retained crops accurate and readable, reviewed individually | 341 images (12 sets), population proved complete by construction (0 unclaimed / 0 missing), inspected image-by-image at native scale — **see the inspection result below** |
+| HF-10 · 3 | Env comparison counts identical with evidence on and off | Each ENV cell built evidence-OFF first, then ON; counts equal, and equal to the audit's own measured figures |
+| HF-10 · 4 | No other lane's evidence behaviour changed | The 14 required-silent placements are FORBIDDEN in the population check and none appeared; 5/5 camera refusal probes refused at the engine boundary |
+| HF-10 · 5 | Full gate green; the new assertions fail pre-fix | as HF-05 · 7 |
 
 ## Scope and residual risk
 
