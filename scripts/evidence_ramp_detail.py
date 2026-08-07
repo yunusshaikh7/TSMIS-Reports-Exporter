@@ -464,6 +464,18 @@ def tsmis_box(rec, field):
     IS the cell."""
     col = _TSMIS_COL[field]
     hits = rec["cols"].get(col) or []
+    if col == "loc":
+        # `cols["loc"]` is the CATCH-ALL bucket: the bucketing loop only has
+        # windows for the eight middle columns, so every unwindowed word left
+        # of the Description lands here — the Location cell AND the postmile
+        # (which has no window of its own). District is derived from the
+        # LOCATION cell, so it must box that cell alone; boxing the bucket
+        # swallowed the P/R/E and PM columns' values too, which the RB4-A1
+        # native-scale inspection caught on two independent images.
+        hits = [w for w in hits
+                if (w["x0"] + w["x1"]) / 2 < rec["b"]["loc_pr"]]
+        if not hits:
+            return None                          # no Location cell to point at
     if hits:
         x0 = min(w["x0"] for w in hits)
         x1 = max(w["x1"] for w in hits)

@@ -355,7 +355,16 @@ def tsmis_raw(rec, field):
 def _line_cell_box(chars, windows, idx, top, bottom):
     """The cell box for column `idx` on one parsed data line: its characters'
     extent, or the (contiguous) window bounds clipped to the line's own char
-    extent for a BLANK cell (the first/last windows extend to infinity)."""
+    extent for a BLANK cell (the first/last windows extend to infinity).
+
+    Returns None when a blank cell's window does not overlap the line's own
+    printed extent at all — a TRAILING blank column on a short row, whose
+    window begins past the last glyph. There is no cell rectangle inside the
+    record's own printed lines to point at, so the honest answer is no
+    geometry: the old fallback drew a degenerate 10-point box in the
+    inter-column whitespace beyond the record, which the RB4-A1 native-scale
+    inspection caught boxing nothing at all (PCOA-FINAL-005's rule — blank
+    targets never guess)."""
     lo, hi = windows[idx]
     hits = [c for c in chars if lo <= (c["x0"] + c["x1"]) / 2 < hi]
     if hits:
@@ -365,7 +374,7 @@ def _line_cell_box(chars, windows, idx, top, bottom):
         line_x1 = max(c["x1"] for c in chars)
         x0, x1 = max(lo, line_x0 - 6), min(hi, line_x1 + 6)
         if x1 <= x0:
-            x0, x1 = lo, lo + 10
+            return None
     return x0 - 2, top - 2, x1 + 2, bottom + 2
 
 
@@ -399,9 +408,10 @@ def tsmis_box(rec, field):
         return segs[0]["page"], box, yspan, xspan
     pos = hlc.HEADER.index(field)
     idx = pos if pos < _DESC_IDX else pos - 1    # 30 PDF cells skip Description
-    return (rec["page"],
-            _line_cell_box(chars, rec["windows"], idx, rec["top"], rec["bottom"]),
-            yspan, xspan)
+    box = _line_cell_box(chars, rec["windows"], idx, rec["top"], rec["bottom"])
+    if box is None:
+        return None                              # a trailing blank: no cell
+    return rec["page"], box, yspan, xspan
 
 
 # --------------------------------------------------------------------------- #

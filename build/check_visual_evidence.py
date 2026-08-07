@@ -1821,6 +1821,44 @@ _hl_rec = {"approx": False, "page": 3, "top": 100.0, "bottom": 110.0,
            "row": ["R000.100"] + [""] * 30}
 check("HL TSMIS blank Description -> no geometry (was: a box BELOW the record)",
       _ehl5.tsmis_box(_hl_rec, "Description") is None)
+# A TRAILING blank column on a short row: the column's window begins PAST the
+# line's last glyph, so there is no cell rectangle inside the record's own
+# printed extent. The old fallback drew a degenerate 10-point box out in the
+# inter-column whitespace beyond the record (the RB4-A1 native-scale
+# inspection measured one 8 px wide, sitting outside the record outline).
+_hl_trail = dict(_hl_rec, windows=[(0, 100)] * 29 + [(400.0, 500.0)])
+check("HL TSMIS trailing blank column -> no geometry, never a box past the "
+      "record's own printed extent",
+      _ehl5.tsmis_box(_hl_trail, hlc.HEADER[-1]) is None)
+# ...while a blank column whose window DOES overlap the record still boxes,
+# so the refusal is targeted rather than a blanket ban on blank cells.
+_hl_mid = dict(_hl_rec, windows=[(0, 100)] * 30)
+check("...but a blank column overlapping the record still gets its box",
+      _ehl5.tsmis_box(_hl_mid, hlc.HEADER[-1]) is not None)
+# RD District is DERIVED from the composite Location cell, and `cols["loc"]`
+# is the bucketing loop's CATCH-ALL for every unwindowed word left of the
+# Description — the postmile has no window of its own and lands there too.
+# Boxing the bucket swallowed the P/R/E and PM columns' values; two
+# independent RB4-A1 inspectors measured it against the print's own ruled
+# columns. The box must be the LOCATION cell alone.
+def _rd_word(text, x0, x1):
+    return {"text": text, "x0": x0, "x1": x1, "top": 10.0, "bottom": 18.0}
+
+
+_rd_loc = _rd_word("12-SD-005", 30.0, 100.0)
+_rd_pm = _rd_word("072.366", 140.0, 185.0)      # unwindowed -> the loc bucket
+_rd_geo = {"page": 2, "top": 10.0, "bottom": 18.0,
+           "cols": {"loc": [_rd_loc, _rd_pm]},
+           "b": {"loc_pr": 111.0, "type_desc": 500.0},
+           "words": [_rd_loc, _rd_pm]}
+_rd_box = erd.tsmis_box(_rd_geo, "District")
+check("RD District boxes the LOCATION cell alone, never the catch-all bucket "
+      "(which carries the postmile too)",
+      _rd_box is not None and _rd_box[1][0] <= _rd_loc["x0"]
+      and _rd_box[1][2] < _rd_pm["x0"])
+check("...and a record with nothing in the Location cell refuses rather than "
+      "boxing whatever else landed in the bucket",
+      erd.tsmis_box(dict(_rd_geo, cols={"loc": [_rd_pm]}), "District") is None)
 _hl_tsn_rec = {"page": 2, "top": 50.0, "bottom": 58.0, "src": "d.pdf",
                "chars": [{"x0": 10.0, "x1": 30.0, "top": 50.0, "bottom": 58.0,
                           "text": "T121.831"}],
