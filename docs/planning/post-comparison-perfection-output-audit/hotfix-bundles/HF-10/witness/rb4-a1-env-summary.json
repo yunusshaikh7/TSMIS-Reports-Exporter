@@ -4,17 +4,13 @@
    "equal": true,
    "expected": {
     "differing_cells": 88238,
-    "one_sided": [
-     1174,
-     2095
-    ]
+    "side_a_only": 1174,
+    "side_b_only": 2095
    },
    "got": {
     "differing_cells": 88238,
-    "one_sided": [
-     1174,
-     2095
-    ]
+    "side_a_only": 1174,
+    "side_b_only": 2095
    },
    "row": "highway_log_pdf"
   },
@@ -22,17 +18,13 @@
    "equal": true,
    "expected": {
     "differing_cells": 1904,
-    "one_sided": [
-     7,
-     246
-    ]
+    "side_a_only": 246,
+    "side_b_only": 7
    },
    "got": {
     "differing_cells": 1904,
-    "one_sided": [
-     7,
-     246
-    ]
+    "side_a_only": 246,
+    "side_b_only": 7
    },
    "row": "highway_sequence_pdf"
   },
@@ -40,11 +32,13 @@
    "equal": true,
    "expected": {
     "differing_cells": 17562,
-    "one_sided": []
+    "side_a_only": 0,
+    "side_b_only": 0
    },
    "got": {
     "differing_cells": 17562,
-    "one_sided": []
+    "side_a_only": 0,
+    "side_b_only": 0
    },
    "row": "intersection_detail_pdf"
   },
@@ -52,17 +46,13 @@
    "equal": true,
    "expected": {
     "differing_cells": 376,
-    "one_sided": [
-     5,
-     8
-    ]
+    "side_a_only": 8,
+    "side_b_only": 5
    },
    "got": {
     "differing_cells": 376,
-    "one_sided": [
-     5,
-     8
-    ]
+    "side_a_only": 8,
+    "side_b_only": 5
    },
    "row": "ramp_detail_pdf"
   },
@@ -70,36 +60,126 @@
    "equal": true,
    "expected": {
     "differing_cells": 67,
-    "one_sided": []
+    "side_a_only": 0,
+    "side_b_only": 0
    },
    "got": {
     "differing_cells": 67,
-    "one_sided": []
+    "side_a_only": 0,
+    "side_b_only": 0
    },
    "row": "ramp_summary"
   }
  ],
- "bound_to_acceptance_head": "7aa76e2a0a69b5bee2abf5c4ee6aec751e166764",
- "built_utc": "2026-08-05T02:31:22+00:00",
+ "bound_to_acceptance_head": "adfa9f45d3e4b7ad0f656b18922fd919b79dd746",
+ "built_utc": "2026-08-07T04:43:24+00:00",
  "bundle": "RB-4",
- "cameras": [],
- "claim": "the five Everything ENV cells render PDF-vs-PDF evidence from the two compared environments' own per-route prints, on HF-05's exact-source contract, with comparison content (counts, verdicts) untouched and equal to the audit's measured numbers",
+ "camera_refusals": [
+  {
+   "kind": "refuse-tsn",
+   "row": "highway_log",
+   "status": "refused"
+  },
+  {
+   "kind": "refuse-tsn",
+   "row": "highway_sequence",
+   "status": "refused"
+  },
+  {
+   "kind": "refuse-tsn",
+   "row": "intersection_detail",
+   "status": "refused"
+  },
+  {
+   "kind": "refuse-tsn",
+   "row": "ramp_detail",
+   "status": "refused"
+  },
+  {
+   "kind": "refuse-env",
+   "row": "ramp_summary",
+   "status": "refused"
+  }
+ ],
+ "cameras": [
+  {
+   "kind": "camera-tsn",
+   "row": "highway_log_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-byday",
+   "row": "highway_log_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-tsn",
+   "row": "highway_sequence_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-byday",
+   "row": "highway_sequence_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-tsn",
+   "row": "intersection_detail_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-byday",
+   "row": "intersection_detail_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-tsn",
+   "row": "ramp_detail_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-byday",
+   "row": "ramp_detail_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-env",
+   "row": "highway_log_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-env",
+   "row": "highway_sequence_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-env",
+   "row": "ramp_detail_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-env",
+   "row": "intersection_detail_pdf",
+   "status": "ok"
+  }
+ ],
+ "claim": "the four `_pdf` Everything ENV cells render PDF-vs-PDF evidence from the two compared environments' own per-route prints; all five env COMPARISONS (ramp_summary included) keep counts equal to the audit's measured numbers; and the required-silent cameras REFUSE at the engine boundary",
  "derived_from": [
   {
    "file": "generation-head.json",
-   "sha256": "E43A071A0EFBA60DA5186748B6B47FAD04FD5DF4538FF91069C53DA8164BF436"
+   "sha256": "E2203F46FE31CAA6814B85355E2A2911430213FE7E932F4BBE4442C17BC8C3AB"
   },
   {
    "file": "counts-head.json",
-   "sha256": "EBB46CF03F5BB513CDA5FB37E20C9F76AE2E19C3147A5836BE6C90540F86C8F4"
+   "sha256": "2DB9E6C7A7E76C5FDDEEC3A2A23E3388CC8D962A262B791BE256746A5BC008FC"
   },
   {
    "file": "validate-head.json",
-   "sha256": "2400214ACEA39075D29E29E49B8DBC6F6549E61BAE641E3DEBD0125A8CAF17B9"
+   "sha256": "EC63FBFA5A8DA0E7FF9A528D556E6E9F5A8055F197BA79F14D0CBCAFCDB15C70"
   },
   {
    "file": "cameras-head.json",
-   "sha256": "86AAA8D37FF5EEEE22A7EED3A40C19E80C8DCC0EA53A65CD0C2BFD53C744321D"
+   "sha256": "E05C0DA5F79E3F42BCCE1982B325FACD2EA2EF563CEA0BDD1D9FC3494EE676E9"
   }
  ],
  "env_cells": {
@@ -152,14 +232,14 @@
  "id": "RB4-A1-HF10",
  "produced_by": {
   "script": "acc_rb4_witness.py",
-  "script_sha256": "EBFBEE6E4F367A1736197678F6F0070AC244B0F73A3181A18A4F8826FD5F9F7F"
+  "script_sha256": "43D991DAC4EB3A6CD64D23C5822ACA02601F23A8109D7EB20EF9DFF06C5B9C2D"
  },
  "validate_env_sets": [
   {
    "checks_failed": 0,
    "comparison": "ssor-test_highway_log_pdf.xlsx",
-   "env_rederived": 59,
-   "examples": 59
+   "env_rederived": 57,
+   "examples": 57
   },
   {
    "checks_failed": 0,
@@ -175,16 +255,10 @@
   },
   {
    "checks_failed": 0,
-   "comparison": "ssor-test_ramp_summary.xlsx",
-   "env_rederived": 23,
-   "examples": 23
-  },
-  {
-   "checks_failed": 0,
    "comparison": "ars-prod_intersection_detail_pdf.xlsx",
    "env_rederived": 8,
    "examples": 8
   }
  ],
- "work_item": "HF-10 (PCOA-FINAL-007)"
+ "work_item": "HF-10 (PCOA-FINAL-007, as amended 2026-08-05: four `_pdf` env cells; ramp_summary's cell required-silent)"
 }

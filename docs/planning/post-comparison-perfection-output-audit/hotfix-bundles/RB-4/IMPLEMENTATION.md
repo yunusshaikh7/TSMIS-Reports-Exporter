@@ -1,15 +1,15 @@
 # `RB-4` — Implementation Record
 
-Status: **IN PROGRESS — SCOPE AMENDED BY OWNER 2026-08-05** (the first RB4-A1
-run completed at `a21e0ba` and its COMPARISON-layer results stand — counts,
-masks, formulas twins, silent classic controls, full gate — but the owner
-rejected the workbook-panel evidence rendering on sight of the images and
-re-ruled the bundle: evidence is PRINT CROPS on the 12 `_pdf`-family
-PDF-vs-PDF cells only, refused at the engine boundary everywhere else; see the
-BUNDLE.md amendment section. The evidence layer is being reimplemented and
-RB4-A1 re-runs at the new head; this file is completed before the status flips
-to `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW`. The narrative below this line
-still describes the FIRST run and is rewritten as part of that re-run.)
+Status: **IN PROGRESS — CHAIN7 PASSED AT `adfa9f4`; IMAGE INSPECTION RUNNING**
+(the amendment is implemented and the amended RB4-A1 re-run — chain7 — passed
+every phase; this file flips to `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW`
+once the exhaustive native-scale image inspection and the witness/manifest/
+verifier closeout land. The first run's history: RB4-A1 first completed at
+`a21e0ba` on the original workbook-panel contract; the owner rejected those
+images and re-ruled the bundle — evidence is PRINT CROPS on the 12
+`_pdf`-family PDF-vs-PDF cells only, refused at the engine boundary everywhere
+else; see the BUNDLE.md amendment section and "The 2026-08-05 amendment"
+below.)
 
 | Field | Value |
 |---|---|
@@ -17,42 +17,50 @@ still describes the FIRST run and is rewritten as part of that re-run.)
 | Branch | `hotfix/rb-4-evidence` (worktree `C:\Users\Yunus\Projects\wt-rb4`; the user's `main` checkout untouched) |
 | Base `main` commit | `72adf447d45a2b74c562ba714008661a180c5d5f` (the RB-4 readiness commit on top of readiness source `ff780af…`; verified clean and identical to `origin/main` at branch creation) |
 | Work items | HF-05 (PCOA-FINAL-004 P1, -005 P1, -006 P1) + HF-10 (PCOA-FINAL-007 P2) |
-| Generated-output root | `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-05\rb4-a1\` (lib copy + base/head stores + results + logs); the five env image sets copied to `…\HF-10\rb4-a1\`; committed machine-readable witnesses in `../HF-05/witness/` and `../HF-10/witness/` |
+| Generated-output root | `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-05\rb4-a1\` (lib copy + base/head stores + results + logs); the four env image sets copied to `…\HF-10\rb4-a1\`; the owner's 12-set deliverable at `…\post-comparison-hotfixes\RB-4 evidence deliverable 2026-08-06\`; committed machine-readable witnesses in `../HF-05/witness/` and `../HF-10/witness/` |
 
 ## Changes
 
+> **Amended 2026-08-05.** The table describes the FINAL tree (the print-crop
+> amendment applied over the first implementation). Where a row says a
+> mechanism was "replaced under the amendment", the first implementation's
+> version shipped through the first RB4-A1 run and was then reversed by the
+> owner's ruling — the git history carries both.
+
 | File | Change | Finding IDs |
 |---|---|---|
-| `scripts/visual_evidence.py` | The exact-source rebuild. `generate()` binds BOTH sides to the comparison's own recorded provenance BEFORE anything renders: `_bound_provenance` requires the `.provenance.json` sidecar, a trusted+current typed outcome whose committed `generation_id` equals the sidecar's, and per-flavor input kinds; the live bytes are digested against each side's recorded sha256 (file inputs) or per-file census (env inputs); a pair that cannot bind RETIRES any prior evidence set and raises `EvidenceSourceBindingError` with NOTHING published — no workbook, no images, no manifest (`refuse_binding`; the early byte check closes the no-examples side door a tampered side could exit through). The vs-TSN and self flavors render BOTH panels from the two compared workbooks (`_workbook_side` — the generalized CMP-AUD-210 panel, resolved through each side's own comparator hook: `excel_column_for` / `pdf_excel_column_for` / `tsn_excel_column_for`, projections `project`/`tsn_project`, data sheet via `workbook_sheet`); `tsmis_source_role` now selects the resolve hook, never a print. The manifest read set is exactly the two compared documents named by their DURABLE selections (`_ReadSet.rename_member` — a private TSN capture path never reaches the manifest, PCOA-FINAL-003 discipline). NEW `FLAVOR_ENV` (HF-10): both run folders come from the provenance selections resolved the env comparison's own way (`compare_env._find_input_dir`), candidates derive from the published universe itself (`_env_candidates` — solo matched `D` rows), both sides locate in their own per-route prints (`_locate_env_sides` → adapter `env_locate`, CMP-AUD-049 identity refusals kept), each example's print values must COMPOSE to the published cell display, and the ENGINE refuses any target rectangle outside the captioned record's own printed lines (`_env_example_sides` — the PCOA-FINAL-005 backstop). Panel truncation fixed (`panel_cell_text`: full value or a visibly `…`-elided prefix, column widths sized to the drawn string — PCOA-FINAL-006). Summary declares the compared selections per side ("Compared <role>: <selection>"), image-sheet legends state only what was read (`_legend_for`), captions/labels carry the published side labels. `availability()`: `ready` = imaging deps alone (prints gate nothing), `env_rows` published; `env_capable`/`env_rows`/`env_adapter_for` new; `_snapshot_read_set` gains labelled side buckets + original-stat capture; the dead print-discovery pair (`_pdf_source_files`/`_ensure_pdf_source_set`) and `_locate_tsmis_sources` removed (the env locate loop carries the identity-refusal contract) | 004, 005, 006, 007, (003 discipline) |
+| `scripts/visual_evidence.py` | **The print-crop engine (owner amendment 2026-08-05).** Evidence exists ONLY for the `_pdf` families: `_ADAPTER_MODULES` names exactly the four `_pdf` rows — the registry IS the engine-boundary refusal, and `capable()`/`evidence_opts_for`/both cameras/the UI all gate through it; `FLAVORS = (tsn, env)` so `generate()` refuses FLAVOR_SELF outright; `self_capable()` is always False; `_ENV_ADAPTER_MODULES` drops ramp_summary (the third ruling — its adapter goes dormant). The provenance binding from the first implementation is KEPT UNCHANGED: `_bound_provenance` requires the `.provenance.json` sidecar + a trusted/current typed outcome with a matching committed `generation_id`; the compared workbooks' live bytes digest against the recorded sha256 before anything else runs; a pair that cannot bind RETIRES any prior set and raises `EvidenceSourceBindingError` with NOTHING published. The vs-TSN branch renders PRINT CROPS on both sides: print discovery restored (`_pdf_source_files`/`_ensure_pdf_source_set`), the TSMIS side resolved per route through `find_route_print` (dated/legacy/store-tagged names) and located by `_locate_tsmis_sources` (CMP-AUD-049 identity refusals; resolved paths carried), the TSN side through the adapter district/locate loop; the snapshot buckets hold the prints PLUS the two compared workbooks. `_try_example`'s tsn branch crops both prints under the shared `_box_within_record` engine backstop (both axes — the PCOA-FINAL-005 rule now uniform across print lanes) and implements the amendment's disagreement contract: a print whose parsed value differs from the compared value renders WITH a disclosure note (the image note line AND the Summary's new `Note` column) and a subline that says DISAGREES instead of claiming verification — never the old silent drop. The Summary declares the two print folders under the compared selections (`read_lines`; the data header row floats below them), and `_legend_for(tsn)` states the crop rule + the disclosure promise. `FLAVOR_ENV` (HF-10) is unchanged from the first implementation apart from riding the shared backstop: provenance-resolved run folders (`compare_env._find_input_dir`), candidates from the published universe, `_locate_env_sides` → adapter `env_locate`, per-example COMPOSE-to-published verification. The workbook-panel renderer (`_workbook_side`/`_excel_strip`/`panel_cell_text`/`_workbook_rows_at`/`_display_header`/`_normalization_note`) is DORMANT — kept in code, reachable from nothing ("keeping the code is fine but ts shouldnt be possible") | amendment; 004/005/007 kept, 006's surface retired with the panels |
 | `scripts/evidence_highway_log.py` | `pdf_excel_column_for`/`tsn_excel_column_for` = the one corrected-header gate (all three compared HL workbooks share it); `tsn_project`; `workbook_sheet`; `locate_tsmis` gains `key_fn` + `src` capture; blank-Description boxes now REFUSE on both prints (the below-the-record guesses that boxed the NEXT record are gone); the TSN blank-window fallback clips to the record's own line; env hooks (`env_fields` = the 30 corrected fields, `env_locate` keyed by the projected Location, `env_value`/`env_box`) | 004, 005, 007 |
 | `scripts/evidence_highway_sequence.py` | Panel hooks (`pdf_excel_column_for` alias — the conversion reproduces the export header verbatim; `tsn_excel_column_for` over `['Route'] + SHARED_HEADER`; side-aware `tsn_project`; `workbook_sheet` incl. the normalized sheet); `locate_tsmis` gains `key_fn` + `src`; synthetic equate rows are MARKED and their blank fields REFUSE geometry (the final-'O'-of-'EQUATES TO' class), the no-segs Description fixed-zone guess removed; env hooks (`env_fields` incl. the env comparison's own `(col C)`/`(col E)` names for the unnamed postmile columns, `env_locate` keyed by the plain PM cell, strict `env_project`, `env_box` with prefix/suffix zones) | 004, 005, 007 |
 | `scripts/evidence_intersection_detail.py` | Panel hooks (`pdf_excel_column_for` alias — the legacy labels ride the same value positions; `tsn_excel_column_for` under the v3-sidecar gate; `tsn_project`; `workbook_sheet`); `locate_tsmis` gains `key_fn` + `src`; env hooks (`env_fields` = the canonical export header minus Route/Post Mile, `_ENV_TO_SHARED` derived from `idt._TSMIS_POS` × `_TSMIS_HEADER` so the mapping can never drift from the loader, padded-PM env keying, strict `env_project`, Location special-cased to its print cell). Probe-driven fix on the real corpus: the two env display columns OUTSIDE the vs-TSN map that the print nevertheless carries as grid cells (`PS` = rowA window 2, `Intrte S` = rowB window 13) get `_ENV_CELL_EXTRA` geometry + positional value reads (`tsmis_box` refactored over `_box_at`); without them every published `PS` diff refused (`box None` on all 12 sampled) | 004, 007 |
 | `scripts/evidence_ramp_detail.py` | `excel_column_for` goes DUAL-EDITION (the July-2026 consolidated the loader already accepts resolves through `_TSMIS_POS_2026` — RB-3's deliberately deferred evidence half); `pdf_excel_column_for` over the conversion's own 14-column book (`_PDF_BOOK_POS`); `tsn_excel_column_for` with District resolving to its OWN sidecar column; strict `tsn_project`; `workbook_sheet`; `locate_tsmis` gains `src`; env hooks (`env_fields` from `compare_env._RD_ENV_HEADER` + the print-only pair, strict `env_project`, `env_box` refusing the two structurally-empty conversion columns). Probe-driven fix on the real corpus: the env comparison publishes the export's RAW padded PM text (`043.274`) while the LOCKSTEP walk keys on the normalized PM (`43.274`) — `env_locate` now normalizes the published keys for the walk and re-keys the result by the published text, excluding (never guessing) two published texts that collapse onto one normalized PM; without it every env lookup returned zero records | 004, 006-adjacent, 007 |
 | `scripts/evidence_highway_detail.py` | The minimal shared-contract hooks only (`pdf_excel_column_for` alias, `tsn_excel_column_for`, `tsn_project`, `workbook_sheet`) so the shared engine stays uniform. NO parser/canary/behavior change; no env hooks (⛔ HD pre-release honored — its lane is not exercised by RB4-A1) | wiring |
-| `scripts/evidence_ramp_summary.py` | NEW env-only adapter for the fifth PDF-vs-PDF cell: values from the consolidator's OWN parser (`_rs.parse_pdf` — never a second parser), geometry from a word-box-keeping twin of its two-column walk (`_line_rows_with_boxes` + `_attribute`, cross-checked at lookup so an attribution drift can only REFUSE, never mislabel), footer totals located by their own label lines, absent categories honestly refuse geometry. Exposes no vs-TSN/self hooks on purpose — `capable("ramp_summary")` stays False (its clean vs-TSN evidence absence is the audit-approved state) | 007 |
+| `scripts/evidence_ramp_summary.py` | NEW env-only adapter, then made DORMANT by the third ruling (evidence is by report type — ramp_summary's env cell is required-silent; the module is registered nowhere, kept on disk with its working HF-10 implementation: values from the consolidator's OWN parser, geometry from a word-box-keeping twin of its two-column walk, mislabel-refusal cross-check, footer totals by their own label lines) | 007 → amendment |
 | `scripts/visual_evidence.py` (env candidates) | Probe-driven fix on the real corpus: a route-keyed comparison (Ramp Summary) publishes no separate route column — `_env_candidates` now carries `route = row.route or row.key` so the padded key serves as the print-file route token; without it the engine resolved `tsar_ramp_summary_route_.pdf` (empty token) and every RS example missed | 007 |
-| `scripts/matrix_build.py` | `build_cell_comparison` gains `evidence=` → `_run_env_evidence` (decoration-after-`require_published_comparison`+COMPLETE, failure only logs — the existing contract); `build_comparison` passes `evidence` through on the env branch; NEW `run_env_evidence_only` (the HF-10 camera: trusted/current/COMPLETE sidecar, cache generation binding, input-fingerprint freshness); `evidence_for_cell` gains `mode_id` ("env" → the env camera) | 007 |
+| `scripts/matrix_build.py` | `build_cell_comparison` gains `evidence=` → `_run_env_evidence` (decoration-after-`require_published_comparison`+COMPLETE, failure only logs — the existing contract; silently skips env-incapable rows, which now includes ramp_summary); `build_comparison` passes `evidence` through on the env branch; NEW `run_env_evidence_only` (the HF-10 camera: trusted/current/COMPLETE sidecar, cache generation binding, input-fingerprint freshness); `evidence_for_cell` gains `mode_id` ("env" → the env camera) and an EARLY `capable` gate so a required-silent row's camera refuses with a clean sentence instead of a registry KeyError; `_run_self_evidence` is the retired lane — `self_capable` is False everywhere, so it returns silently for every row (its docstring says so) | 007, amendment |
 | `scripts/matrix.py` | Facade re-export `run_env_evidence_only` | 007 |
-| `scripts/gui_matrix.py` | `matrix_evidence_cell` is mode-aware (the row's SELECTED mode: env → `env_capable` + baseline-cell refusal; job carries the frozen mode per CMP-AUD-110); `_dispatch_evidence_job` routes `mode_id` | 007 |
-| `scripts/gui_api.py` | ONE truth line in `_evidence_view`: a row counts as supported when ANY lane can illustrate it (`capable` OR `env_capable`) — without it the UI would keep asserting "no evidence support" for ramp_summary, the same untruthful-prose class criterion 4 retires | 007, criterion-4 spirit |
-| `scripts/self_test.py` | `evidence_ramp_summary` joins `_DYNAMIC_REPORT_MODULES` — the HF-10 camera resolves the new adapter lazily, so the frozen build must carry it or the env lane fails only on the packaged app | wiring |
-| `scripts/ui/ui-matrix.js` | The evidence hint states the true sources (workbook panels / both environments' prints); `evidenceActionInfo(rowKey, mode)` is lane-aware with NO print requirement; the row camera badge is always lit for supported rows; the Everything cell actions offer the camera+open on env-mode cells of the five env rows (baseline cell excluded) | 004, 007 |
-| `scripts/ui/mock.js` | `env_rows` + the corrected `unsupported` list (mock parity) | wiring |
+| `scripts/gui_matrix.py` | `matrix_evidence_cell` is mode-aware (the row's SELECTED mode: env → `env_capable` + baseline-cell refusal; job carries the frozen mode per CMP-AUD-110) and — the amendment — refuses every mode other than tsn/env ("Evidence images exist only for the vs-TSN and cross-environment comparisons of the PDF-edition reports"); `_dispatch_evidence_job` routes `mode_id` | 007, amendment |
+| `scripts/day_matrix.py` | `evidence_for_day_cell` gains the early `visual_evidence.capable` gate (a required-silent row's by-day camera refuses with a clean sentence, mirroring the Everything camera) | amendment |
+| `scripts/gui_api.py` | `_evidence_view`'s `unsupported` list is per ROW under the report-type rule: every matrix row with no lane (`capable` OR `env_capable`) is named — an Excel row is listed even when its PDF sibling is supported, so the hint states exactly what the toggle will and won't generate | 007 → amendment |
+| `scripts/self_test.py` | `evidence_ramp_summary` joins `_DYNAMIC_REPORT_MODULES` — kept: the dormant module still ships in the frozen build so the self-test import census stays truthful | wiring |
+| `scripts/ui/ui-matrix.js` | The evidence hint is per-family again: a ✓/○ line per supported PDF-edition family (print count / drop folder), the env line, and a "No evidence: …" line naming every other row; `evidenceActionInfo(rowKey, mode)` offers the action ONLY for mode tsn/env of registry rows (self-mode cells lose camera AND open); the row camera badge exists only on the four PDF rows and its tooltip says crops of both source prints | 004, 007, amendment |
+| `scripts/ui/mock.js` | Evidence block mirrors the amendment: `rows`/`env_rows` = the four `_pdf` rows, `reports` = the four families, `unsupported` = the eight other matrix-row labels in matrix order (mock parity) | wiring |
 | `build/app.spec` | `APP_MODULES` += `evidence_ramp_summary` (F6) | wiring |
 | `build/_checklib.py` | NEW `publish_bound_comparison` — fixtures publish the production way (`artifact_store.commit_workbook` → typed outcome sidecars + `write_comparison_provenance`), so checks drive the exact-source binding through the real front door | test infra |
-| `build/check_visual_evidence.py` | Fixtures rebased on bound comparisons; snapshot bucket/stat/rename coverage; availability `ready`/`env_rows` semantics; NEW blocks: blank-side refusals (HL both prints, HSL equate lines), the engine env row-rectangle backstop, env candidates from the published universe, `env_fields` pinned to `compare_env`'s own constants per family, the RS geometry twin (incl. the mislabel-refusal and absent-category refusal) | 004, 005, 006, 007 |
-| `build/check_evidence_source_role.py` | `_workbook_rows_at`/`_workbook_side` contract; `panel_cell_text` fidelity (full 34-char value drawn; pathological values visibly elided; strip sized to the drawn string); the TSN-side panel via its own hook; the three-flavor registry; env-capability registry (ramp_summary env-only). The composed image is measured from its OWN INK — the title block must end inside the canvas without being padded far past it, and a long left caption and the right caption must resolve to two separate ink runs; sizing the expectation with the composer's own width helper was circular and a halving regression satisfied both sides of it. The adapter hooks are PROBED, not counted: each column hook must refuse a header it does not recognise (an existence assertion passes against a stub resolving every field to column 0), `tsn_project` must be idempotent and read a blank cell as `""`, `workbook_sheet` must name a sheet per edition with the two TSMIS-side editions sharing one, and `tsmis_pdf_path` must resolve inside the run folder under the end-anchored per-route name. And the two engine helpers with a single call site each — `_display_header`, `_normalization_note` — are locked by one example driven end to end through `_try_example`; without it, deleting either line passed the entire gate | 004, 006, 007 |
-| `build/check_evidence_manifest.py` | `run_generate` publishes BOUND fixtures; the cancel boundary moved to the addressing step; NEW terminal case: an unbindable pair publishes NOTHING — manifest included — and retires the prior set | 004 |
-| `build/check_evidence_excel_columns.py` | Seam test on `_workbook_side` ctx (incl. the no-fallback rule for side-specific hooks); RD July-2026 dual-edition resolution; NEW `test_tsn_and_pdf_hooks` per family | 004 |
-| `build/check_evidence_literal_cells.py` | The new Summary layout (source lines on rows 3–4, data from row 7) with source-controlled text in every new slot | 004 |
-| `build/check_matrix.py` | `build_cell_comparison(evidence=)` accepted; an XLSX env cell stays SILENT with the toggle on; the env camera refuses non-env rows and missing comparisons | 007 |
+| `build/check_visual_evidence.py` | The stated-contract block asserts the PRINT-CROP contract (registry = the four `_pdf` rows; FLAVOR_SELF out of FLAVORS; `_locate_tsmis_sources` + `tsn_ctx`; `_box_within_record`); the registry/sources/availability blocks pin the four-row maps + the four-family reports + `env_rows` LITERAL four; the engine fixtures (retire-on-clean, dup-only, freshness gate) ported to `intersection_detail_pdf` with stub prints + a sandboxed TSN library; `evidence_opts_for` refuses Excel rows and highway_detail; KEPT: bound-comparison fixtures, snapshot bucket/stat/rename coverage, blank-side refusals (HL both prints, HSL equate lines), env row-rectangle backstop, env candidates, `env_fields` pins, the RS geometry twin (now a dormant-adapter lock) | 004, 005, 007, amendment |
+| `build/check_evidence_source_role.py` | The stated-contract block asserts the print-crop contract; the role map covers exactly the four `_pdf` rows; the SELF lane's checks flip to REFUSAL (self_capable False everywhere; `generate(flavor='self')` and an Excel row both ValueError at the engine boundary; ramp_summary's env generate refuses); the env lane pins the LITERAL four placements. The composed-image ink checks are KEPT (live: the crop composer). The workbook-panel unit blocks are KEPT as marked DORMANT-CODE LOCKS. The end-to-end call-site lock is REPLACED: one vs-TSN example driven through `_try_example` on the PRINT path over two hand-built valid blank-page PDFs — agreement renders with the verification subline and no note; a disagreeing TSN print still renders WITH the "print reads '…'" disclosure and a DISAGREES subline while the workbook entry keeps the COMPARED values; and a target outside the record's own lines is refused by the engine backstop | 004, 007, amendment |
+| `build/check_evidence_manifest.py` | The stated-contract block asserts the print-crop contract (four rows, four env placements); `run_generate` fixtures ported to `intersection_detail_pdf` with stub prints in a subdir + a sandboxed TSN library (unparseable stubs make every candidate a locate miss — the no_examples terminal reached the amended way); the cancel boundary moved to the locate step (`_locate_tsmis_sources` stub); KEPT: bound fixtures, every terminal state recording itself, the unbindable-pair NOTHING-published case, the env fixture lanes (front-door census, swapped-role refusal) | 004, amendment |
+| `build/check_evidence_excel_columns.py` | Seam test on `_workbook_side` ctx + per-family hook probes — KEPT as dormant-code locks (the panel hooks still exist; RD July-2026 dual-edition resolution among them) | 004 (dormant) |
+| `build/check_evidence_literal_cells.py` | Literal-cell safety over the writer fixtures (unchanged — the writer still writes summaries/captions); the contract block names the dormant panel renderer as dormant | 004 |
+| `build/check_matrix.py` | `build_cell_comparison(evidence=)` accepted; an XLSX env cell stays SILENT with the toggle on; the env camera refuses non-env rows, refuses ramp_summary (no evidence lane at all), and refuses an env-capable cell with no comparison (fixture: ramp_detail_pdf) | 007, amendment |
 | `build/check_pdf_excel_matrix.py` | The by-day PDF-vs-Excel lane writes ZERO evidence artifacts (criterion 5's silent control). A bare "the glob found nothing" reads the same whether the lane is silent, the tree is the wrong one, or the pattern is broken — so the probe is CONTROLLED first: an evidence-named artifact is planted where one would land, the probe must see it, and only then is the lane's own silence read | 004 |
-| `build/check_pdf_route_identity.py` | The engine-half identity pin retargeted to `_locate_env_sides` (the one production print-rendering lane) | wiring |
+| `build/check_pdf_route_identity.py` | The engine-half identity pin covers `_locate_env_sides`; `_locate_tsmis_sources` (restored) carries the same RouteIdentityError-exclusion contract, exercised by check_visual_evidence's fixtures | wiring |
 | `build/check_matrix_ownership.py` | The evidence-dispatch stub accepts `mode_id` | wiring |
-| `build/run_rb4_acceptance.py` | NEW — the committed `RB4-A1` driver (provision / generate / cameras / counts / validate / excel / census / checks-at-base phases; worker-parity leases and commit guards; per-phase JSON results + logs). Hardened during the run, before the head side started: the PvE silent-control cells take the PDF-edition row keys the matrix actually registers; `phase_validate`'s env re-derivation runs the engine's own lookup end-to-end and treats legal `…`-elision as a LISTED census for the image inspection (never a failure); every phase result SELF-STAMPS the tree's exact git head + a runtime-scoped dirty flag (`tree_stamp`) so exact-head identity lives in the record itself — the RB-2 lesson | acceptance |
+| `build/check_tsn_canonical_consumer_identity.py` | The evidence entry points' TSN-identity forwarding fixtures ride `highway_log_pdf` (the Excel row is refused before the identity gate under the amendment; the TSN dataset key stays `highway_log`) | wiring, amendment |
+| `build/run_rb4_acceptance.py` | NEW — the committed `RB4-A1` driver (provision / generate / cameras / counts / validate / excel / census / checks-at-base phases; worker-parity leases and commit guards; per-phase JSON results + logs; every phase result SELF-STAMPS the tree's exact git head + a runtime-scoped dirty flag — the RB-2 lesson). **Amended populations (2026-08-05):** the comparison universe is unchanged (26 cells across TSN_ROWS/SELF_CELLS/ENV_CELLS/by-day) while `EVIDENCE_ROWS` declares the four `_pdf` rows — 12 evidence sets required, 14 placements REQUIRED-SILENT (their manifests FORBIDDEN, the discovery glob proven live by a planted control); `assert_declared_counts` cross-checks the declared rows against `visual_evidence.rows()`/`env_rows()` so driver and engine cannot drift; `phase_cameras` runs 12 cameras + 5 engine-boundary REFUSAL probes (4 Excel-row tsn + ramp_summary env, each required to refuse with its reason); `phase_validate` re-derives the tsn read-set shape (two compared workbooks + PDF members under the two DECLARED print folders), re-derives the TSMIS side 100 % through the adapter's own locate walk with the disagreement-note contract closed both ways (a disagreeing print must be disclosed; an agreeing one must not carry a false note), records the TSN side's verification scope explicitly (generation parse-back + the native-scale image inspection), and keeps the env re-derivation + value-length/blank-side censuses; `BASE_CHECK_EXPECTATIONS` re-derived at the base tree for the amended checks (8 red / 2 green) | acceptance, amendment |
 | `docs/…/rb4-verify-manifest.py` | NEW — the committed fail-closed verifier (RUNTIME / LINEAGE / EXACT HEAD with self-stamps / BASE TREE / WITNESSES / `--corpus` with the sha-bound detached inventory / `--zips` archive re-match / `--self-test` negatives) | acceptance |
-| `docs/comparison-engine.md` §13, `docs/gui.md` | The documented contract moved to the exact-source rule + the env lane; the Sources/UX paragraphs rewritten | docs |
-| `hotfix-bundles/RB-4/BUNDLE.md` | Base `main` SHA filled | — |
+| `docs/comparison-engine.md` §13, `docs/gui.md` | The documented contract is the print-crop rule: §13 states the amendment (crops on the `_pdf` families, the disagreement disclosure, the engine-boundary refusals, the dormant renderers); gui.md's badge/camera/hint paragraphs follow | docs |
+| `hotfix-bundles/RB-4/BUNDLE.md` | Base `main` SHA filled; the 2026-08-05 owner amendment section added (it controls over the frozen text; HF-05 required-behaviour superseded in place; HF-10 rescoped to four cells) | — |
 
 ## Root cause confirmed
 
@@ -85,42 +93,80 @@ through `compare_env._find_input_dir` (the comparison's own resolution) rather
 than assuming a layout. No scope expansion: the binding contract is unchanged,
 only the resolution is the comparator's own.
 
-## Design
+## The 2026-08-05 amendment — what happened and why
 
-1. **The binding IS the eligibility rule.** Under the owner's exact-source
-   ruling there is no shape-based prohibition left: a pair is eligible exactly
-   when both sides bind to the comparison's recorded read set (sha256 for file
-   inputs, per-file census + the comparison's own folder resolution for env
-   inputs), and an unbindable pair leaves nothing — not even a manifest —
-   with any prior set retired. The check runs BEFORE proposals so no failing
-   pair can exit through the no-examples path with a fresh record.
-2. **One panel renderer, per-side comparator hooks.** `_workbook_side`
-   generalizes the CMP-AUD-210 Excel panel to every workbook side; each
-   adapter resolves each EDITION through the loader family that reads it
-   (Excel / PDF-conversion / normalized-TSN), so evidence and comparison can
-   never resolve a column differently, and a side-specific hook that is
-   missing REFUSES rather than falling back to labels.
-3. **The env flavor reuses the pipeline, not a parallel renderer.** Candidates
-   come from the published universe (solo `D` rows); both sides locate through
-   the adapters' LOCKSTEP print parsers re-keyed the env comparison's way;
-   the located values must COMPOSE to the published cell display before
-   anything renders; the same `_strip`/compose/publish machinery draws it.
-   The engine refuses any env target outside the captioned record's printed
-   lines regardless of adapter geometry — defense in depth over the
-   PCOA-FINAL-005 class.
-4. **Blank targets never guess.** A field with no cell rectangle inside the
+The first implementation carried the audit's remedy faithfully: since a vs-TSN
+comparison reads two workbooks, both evidence panels were REDRAWN from those
+workbooks. The first RB4-A1 run passed every phase on that contract. Then the
+owner looked at the images and rejected the remedy itself: **a panel rendered
+from a compared workbook is circular** — it re-states the comparison's own
+read, so a human holding it against the comparison sheet can never catch a bad
+parse. The entire value of evidence is that the crop comes from the PRINT, one
+step OUTSIDE the compared workbook: "the whole point was that the evidence
+collection was separate and that if some dude looked at the pdf it would line
+up with the comparison sheet — that's the ONLY reason this is even a valid
+spot check." Three rulings followed (transcribed in BUNDLE.md's amendment
+section): print crops or nothing; evidence only for the `_pdf`-edition
+families (12 cells — Ramp Summary's env cell removed by the report-type rule);
+everything else refused at the engine boundary with the UI showing the icon
+only where evidence exists.
+
+What this record keeps from the first implementation, because the audit's
+findings there were real: the provenance binding and no-artifact refusal
+(004's discipline), the blank-side geometry refusals (005 — now
+engine-enforced on every print lane via `_box_within_record`), the truthful
+Summary/legend/read-set declarations, and the env lane (already print crops).
+What it reverses: the render source (crops, not panels) and the silent
+disagreement drop — the old engine DROPPED an example whenever the print
+disagreed with the compared value, hiding exactly the parser-bug signal the
+spot check exists to catch; a disagreement now renders WITH a disclosure note
+on the image and in the Summary's Note column. 006's drawn-string surface
+retired with the panels (crops draw no strings; the value-length census stays
+as inspection guidance).
+
+## Design (as amended 2026-08-05)
+
+1. **The registry IS the engine-boundary refusal.** Evidence exists exactly
+   where `_ADAPTER_MODULES`/`_ENV_ADAPTER_MODULES` say it does — the four
+   `_pdf` rows in the tsn and env lanes. Every consumer (the toggle-driven
+   decoration, both cameras, the day-matrix camera, the UI badge/actions, the
+   Settings panel) gates through `capable()`/`env_capable()`, so removing a
+   row from the registry removes the capability EVERYWHERE at once, and
+   `generate()` refuses FLAVOR_SELF and unregistered rows before touching a
+   source. "Shouldn't be possible" is a registry fact, not a UI style.
+2. **The comparison binds; the prints render.** The comparison-side binding
+   from the first implementation is unchanged (provenance sidecar +
+   trusted/current typed outcome + workbook sha digests / env census; an
+   unbindable pair publishes NOTHING and retires any prior set, before
+   proposals). The prints the crops come from resolve through the product's
+   own contracts — the run-folder subdir per route via `find_route_print`
+   (dated/legacy/store-tagged), the TSN library print dirs — are
+   snapshot-copied with the workbooks, byte-stable at the commit boundary,
+   and declared honestly in the Summary and the manifest read set.
+3. **Parse-back verifies; disagreement DISCLOSES.** Each crop's value is read
+   back through the adapter's LOCKSTEP walk. Agreement makes the image an
+   end-to-end check of the comparison at that cell; disagreement renders WITH
+   a note on the image and in the Summary's Note column and a subline that
+   says DISAGREES — never the old silent drop, which hid exactly the
+   parser-bug signal the spot check exists to catch. (The env lane keeps its
+   stricter COMPOSE-to-published refusal: there the print values ARE the
+   compared values, so non-composure means a wrong locate, not a signal.)
+4. **One containment backstop for every print lane.** `_box_within_record`
+   (both axes) refuses any target rectangle outside the captioned record's
+   own printed lines/width, whatever an adapter returned — the
+   PCOA-FINAL-005 rule, now shared by the tsn and env paths.
+5. **Blank targets never guess.** A field with no cell rectangle inside the
    record's own printed lines refuses with a recorded reason (HL blank
-   Descriptions, HSL equate-line fields, RS absent categories); a fixed-window
-   column's blank cell still boxes its own window clipped to the record's
-   line. Honest misses over plausible-but-wrong boxes.
-5. **Drawn strings are the compared values.** `panel_cell_text` is the pure
-   decision the renderer draws with — full value up to `PANEL_TEXT_MAX`, else
-   a visibly `…`-elided prefix — so fidelity is assertable programmatically
-   over 100 % of examples without OCR, and columns are sized to what is drawn.
-6. **Decoration stays decoration.** The env evidence rides AFTER
-   `require_published_comparison` + COMPLETE, failures only log, and the env
-   camera carries the same freshness discipline as the vs-TSN one (trusted /
-   current / generation-bound / input-fingerprint-unchanged).
+   Descriptions, HSL equate-line fields); a fixed-window column's blank cell
+   still boxes its own window clipped to the record's line. Honest misses
+   over plausible-but-wrong boxes.
+6. **Decoration stays decoration.** Evidence rides AFTER
+   `require_published_comparison` + COMPLETE, failures only log, and both
+   cameras carry the same freshness discipline (trusted / current /
+   generation-bound / input-fingerprint-unchanged).
+7. **The retired renderer is dormant, not deleted.** The workbook-panel chain
+   stays in code with unit locks marked DORMANT-CODE LOCKS — per the ruling,
+   and as the ready-made panel path should a future ruling revive it.
 
 ## Focused checks — red at base, green at head
 
@@ -142,12 +188,17 @@ now states the contract it depends on up front and asserts it, so the base run
 names what is missing on its own output before it stops. **Red-at-base went from
 three of ten checks to eight, with two declared green controls.**
 
+The signatures were RE-DERIVED at the base tree after the 2026-08-05 amendment
+edited the check files (a red-at-base claim binds the check file, not the
+finding — an edited check has no standing until re-run). The chain7 re-run
+classified all ten as declared: **8 red / 2 green / 0 inconclusive**.
+
 | Check file | At base `72adf44` | Signature bound (its own stdout) |
 |---|---|---|
-| `check_visual_evidence.py` | red | `the read set is captured in labelled per-side buckets, so a manifest names the document each side was compared from` |
-| `check_evidence_source_role.py` | red¹ | `the engine addresses the compared workbook's rows and renders each side's panel from it (_workbook_rows_at + _workbook_side)` |
-| `check_evidence_manifest.py` | red¹ | `the engine renders a side from the compared WORKBOOK (_workbook_rows_at + _workbook_side), not from a borrowed print` |
-| `check_evidence_excel_columns.py` | red¹ | `FAIL: July District also resolves to its Location cell` (RB-3's deliberately deferred evidence half) |
+| `check_visual_evidence.py` | red | `the read set is captured in labelled per-side buckets, so a manifest names the documents each side's crops were read from` |
+| `check_evidence_source_role.py` | red¹ | `the vs-TSN lane renders PRINT CROPS on both sides (tsn_ctx replaces the workbook side ctx in _try_example)` |
+| `check_evidence_manifest.py` | red¹ | `the vs-TSN lane locates PRINTS (_locate_tsmis_sources) and evidence exists only for the four `_pdf` rows` |
+| `check_evidence_excel_columns.py` | red¹ | `FAIL: July District also resolves to its Location cell` (RB-3's deliberately deferred evidence half; a dormant-code lock since the amendment) |
 | `check_evidence_literal_cells.py` | red | `a drawn panel string is full or visibly elided (panel_cell_text)` |
 | `check_matrix.py` | red | `a cell comparison can be asked for evidence` (PCOA-FINAL-007's root cause) |
 | `check_matrix_ownership.py` | red | `the frozen MODE is routed into evidence_for_cell` |
@@ -203,212 +254,161 @@ worker's own owned-dir leases and commit guard, `day_matrix.build_day_cell`,
 the on-demand cameras, and the classic + PDF-vs-Excel silent controls — against
 the frozen 2026-07-23 and 2026-07-09 pulls.
 
+**Two complete runs; the second is the acceptance.** The first complete run
+(chain6, head `a21e0ba`, 2026-08-05) executed the original workbook-panel
+contract end to end and passed every phase — and its images are what the owner
+rejected, producing the amendment. Its COMPARISON-layer results stand as the
+proof that the panel-era engine also never touched comparison content, and its
+base-side records (the unrepeatable 7.5 h base generation, `counts-base.json`,
+the base-tree content binding) carry forward. The evidence layer was then
+reimplemented to the print-crop ruling and the ENTIRE head side re-produced as
+**chain7** at one new frozen head — `adfa9f4` — with the prior head comparisons
+retired first so the record is one generation end to end. Everything below
+describes chain7 unless it says otherwise.
+
 **Inputs (frozen, hash-bound).** The 2026-07-23 raw extract the output audit
 itself measured; the ground-truth 7.9 ssor and ars pulls (each member re-matched
 against `All Reports 7.9.zip` / `ramp_summary_excel.zip`); the Downloads TSN
 master library's raw/pdf sources. Provisioned into per-side replica stores
-created the way the app creates one (`owned_dir.ensure_owned_dir`), and
-re-hashed AFTER the run: every replica still equals its provision-time hash AND
-its frozen source, so the run never mutated an input. Highway Detail is
-excluded everywhere (⛔ pre-release).
+created the way the app creates one (`owned_dir.ensure_owned_dir`). Highway
+Detail is excluded everywhere (⛔ pre-release).
 
-**One frozen head, and a harness that fails closed.** An earlier attempt was
-abandoned deliberately: an adversarial audit of the run itself found the harness
-verified *what it found*, so a silently missing evidence set, a camera that
-threw, and a base check that failed for the wrong reason all passed. Those holes
-were closed before this run started (see the driver's entry in the Changes
-table), the prior head-side comparisons were RETIRED, and the complete sequence
-was produced against ONE frozen runtime head — runtime-digest equality is not
-head identity (the RB-2 Review-2 lesson).
+**One frozen head, and a harness that fails closed.** The chain script is a
+gate: it aborts on the first failing phase rather than echoing an exit code and
+continuing, and after every phase it re-asserts both that the runtime files are
+clean AND that `HEAD` has not moved. Every retained result SELF-STAMPS that
+head plus a runtime-scoped clean/dirty flag; the base side stamps the base
+commit, read from a content binding that compares each base-tree runtime file
+against the base commit's own git blob. The populations are DECLARED constants
+cross-checked against the engine's own registry (`assert_declared_counts`), so
+the driver cannot validate a population the product does not produce.
 
-The chain script is itself a gate now: it aborts on the first failing phase
-rather than echoing an exit code and continuing, and after every phase it
-re-asserts both that the runtime files are clean AND that `HEAD` has not moved.
-Every retained result SELF-STAMPS that head plus a runtime-scoped clean/dirty
-flag; the base side stamps the base commit, read from a content binding that
-compares each base-tree runtime file against the base commit's own git blob.
+Order: full gate at head → base-tree binding → the same (amended) check files
+at base → retire the prior head → generation → cameras → validate → excel →
+counts → census.
 
-Order: full gate at head → base-tree binding → the same check files at base →
-generation → cameras → validate → excel → counts → census.
-
-| Phase | Result |
+| Phase | Result (chain7, head `adfa9f4`) |
 |---|---|
-| checks at head | 158 / 158 (`results/checks-at-head.json`) |
+| checks at head | **158 / 158** (`results/checks-at-head.json`) |
 | base-tree binding | 151 / 151 runtime files identical in content to `72adf44` |
-| checks at base | 8 red · 2 green controls · 0 inconclusive |
-| generate | 35 cells (8 Everything vs-TSN · 5 SELF · 5 ENV + 5 ENV evidence-OFF controls · 8 By Day · 4 PvE silent controls) — **0 non-ok** |
-| cameras | 21 on-demand cells (8 vs-TSN · 8 By Day · the 5 HF-10 env cameras) — **21/21 ok, 0 problems** |
-| validate | 26 evidence sets (16 vs-TSN · 5 SELF · 5 ENV; 24 rendered, 2 no-differences) — **0 problems** |
-| excel | 24 evidence workbooks opened in INSTALLED Excel — 24/24 without an open failure, Ledger sheet present in all 24, **838 embedded pictures** (exactly the 838 images on disk); **26/26 formulas twins settle to their values workbook's totals**, 0 disagreements |
-| counts | 26 typed sidecars re-read — **26/26 identical** to the base runtime |
-| census | ok |
+| checks at base | **8 red · 2 green controls · 0 inconclusive** (signatures re-derived for the amended check files) |
+| generate | 35 cells (8 Everything vs-TSN · 5 SELF · 5 ENV + 5 ENV evidence-OFF controls · 8 By Day · 4 PvE silent controls) — **0 non-ok**; evidence rendered on exactly the 12 `_pdf` placements; both classic Compare controls ok (file 389.7 s · folder 1106.3 s), planted probes seen, 0 control problems |
+| cameras | **12 / 12 ok** (4 vs-TSN · 4 By Day · 4 env) **+ 5 / 5 refusal probes REFUSED** (the 4 Excel-row tsn cameras and ramp_summary's env camera, each with its declared reason) |
+| validate | **12 evidence sets · 0 problems**; population `required 12 · forbidden 14 · discovered 12 · missing/extra/forbidden-present/duplicate 0`, the discovery glob proven live by a planted control |
+| excel | **12 / 12** evidence workbooks opened in INSTALLED Excel, Ledger present in all, **341 embedded pictures** (exactly the 341 images on disk); **26 / 26 formulas twins settle** to their values workbook's totals |
+| counts | 26 typed sidecars re-read — **26 / 26 identical** to the base runtime (every substantive field; only `generation_id` differs, which a rebuild necessarily changes) |
+| census | ok (the audit/base-era recounts unchanged — those roots predate the amendment) |
 
-The whole chain ran 02:25 → 17:09 (14 h 44 m), generation alone 10 h 02 m and the
-Excel leg 2 h 50 m — the twin recalculations are a full rebuild of workbooks up
-to 250 MB.
+The chain ran 23:19 → 15:21 (16 h 03 m): generation 10 h 40 m, cameras 1 h 37 m,
+validate 1 h 00 m, the Excel leg 2 h 44 m — the twin recalculations are a full
+rebuild of workbooks up to 250 MB.
 
 **The repository gate, all four legs, at that same frozen head:**
 `run_checks.py -j 4 -k` **158/158** · `compileall` clean · `ruff check scripts`
 clean · `build.ps1 -SelfTest` **PASSED** — the exact shipped exe runs every code
-path, including the evidence render stack and the lazily-imported
-`evidence_ramp_summary` adapter this bundle adds, which is the one packaging
-risk it introduces.
+path, including the evidence render stack.
 
-**The population is DECLARED, not discovered.** The driver previously globbed
-whatever evidence sets it found, so a silently missing set was invisible. It now
-declares the expected population and fails naming any shortfall. This run:
-`required 26 · discovered 26 · missing 0 · extra 0 · duplicate 0 · forbidden
-present 0`. The 5 ENV sets are *required* at head and *forbidden* at base — the
-base side's job is to prove they do not exist there.
+**What the 12 sets are.** 341 examples across the four `_pdf` families — the
+final on-disk sets are the CAMERA phase's regeneration at the shipped Settings
+default (`pair` layout, one PNG per example), which is exactly what a user's
+per-cell camera produces:
 
-**The recounts the bundle asked for, rather than a sample.** Across 724 examples
-in 24 rendered sets:
+| Lane | Sets | Examples |
+|---|---|---|
+| Everything vs-TSN | HL-PDF 60 · ID-PDF 48 · RD-PDF 17 · HSL-PDF 4 | 129 |
+| By Day vs-TSN (2026-07-23) | the same four families | 129 |
+| Everything ENV | HL-PDF 57 · RD-PDF 10 · HSL-PDF 8 · ID-PDF 8 | 83 |
 
-| Population | Count |
-|---|---|
-| Blank-side targets (the PCOA-FINAL-005 population) | **238** |
-| Values longer than the old 26-character cut (what PCOA-FINAL-006 silently truncated) | **19** |
-| Examples needing visible elision at the 120-character panel limit | **0** |
+**The independent re-derivation, 100 % — no sampling.** For every vs-TSN and
+By Day example, `phase_validate` re-located the route's own per-route print
+through `find_route_print` + the adapter's LOCKSTEP walk and re-read the boxed
+value: **258 / 258 TSMIS-side values re-derived**, with the disagreement
+contract closed both ways — a re-derived value that differed from the compared
+one would REQUIRE the image's "print reads '…'" disclosure, and an agreeing one
+must carry no false note. **This corpus produced 0 disagreements**: every crop's
+parsed value equals the compared value, so the disclosure path is proved by the
+focused checks (a live end-to-end fixture) rather than by this run's data. The
+TSN side's scope is recorded, not hidden: its verification is the generation's
+own parse-back plus the native-scale image inspection — a full TSN district
+re-parse per set would repeat the generation's slow half. For the env lane,
+**83 / 83 examples** were independently reproduced end to end from the two
+environments' own prints — re-located, re-boxed inside the captioned record,
+re-read — with 0 failing checks.
 
-So every one of the 19 values the pre-fix rule would have cut mid-string is now
-drawn in full, and no value in this corpus is long enough to require the elision
-path — which is why the elision behaviour is proved by check rather than by this
-run's data.
+**Read sets are prints, declared honestly.** Every rendered vs-TSN set's
+manifest carries the two compared workbooks by recorded sha PLUS the prints the
+crops were read from (462 print members across the 12 sets), and every print
+member is required to be a `.pdf` under one of the two folders the Summary
+itself declares (`TSMIS PDFs (read):` / `TSN PDFs (read):`). Env read sets
+remain census-bound per side, member for member.
 
-The bundle also asked for these populations to be **recounted rather than
-sampled** on the audit's own sets, which `phase_census` now does exhaustively
-(`results/prefix-defect-census.json`):
+**Recounts.** Blank-side targets (the PCOA-FINAL-005 population — the hardest
+crops, where the box marks an EMPTY position inside the record's own line):
+**119** across the 341 examples, every one listed by identity for the image
+inspection. The audit-era exhaustive recounts (`phase_census`) are unchanged
+from the first run — they census the pre-fix roots, which the amendment does
+not touch: Audit Everything 529 examples / 10 over the 26-char limit / 208
+blank-side; Audit By Day 359 / 7 / 132; Base Everything 357 / 4 / 141; Base By
+Day 241 / 5 / 84. The audit By Day root has no frozen copy, so it is declared
+UNBOUND in the manifest and its identity rests on the Stage 1B witness hashes,
+all of which still match.
 
-| Set | Examples examined | Over the 26-char prefix limit | Legally elided | Blank-side targets |
-|---|---|---|---|---|
-| Audit — Everything (11 sets) | 529 | 10 | 0 | 208 |
-| Audit — By Day (7 sets) | 359 | 7 | 0 | 132 |
-| Base — Everything (13 sets) | 357 | 4 | 0 | 141 |
-| Base — By Day (8 sets) | 241 | 5 | 0 | 84 |
+**Required-silent cells, proven silent.** The 14 required-silent placements (4
+Everything Excel-tsn · 4 By Day Excel-tsn · 5 SELF · ramp_summary ENV) each
+built their comparison and produced NO evidence artifact of any kind — their
+manifests are declared FORBIDDEN in the population check, which found none. The
+by-day PDF-vs-Excel lane ran with the toggle ON and produced zero artifacts;
+each ENV cell was additionally built evidence-OFF first (count parity on/off).
+The classic Compare tab's comparator ran for real in both lanes (file 389.7 s,
+folder 1106.3 s), returned ok, and wrote zero evidence artifacts. Every silence
+reading — the classic sweeps, the PvE tree, validate's manifest glob — is
+preceded by a **planted positive control** the probe must SEE before the real
+tree is read; all probes saw their plants.
 
-The prior figure was a sample; these are complete counts with their denominators,
-and legal `…`-elision is counted separately from the defect rather than folded
-into it. One caveat, disclosed rather than papered over: the audit By Day root
-has no frozen copy, so it is declared UNBOUND in the manifest and its identity
-rests on the Stage 1B witness hashes, all of which still match.
-
-**Cross-environment re-derivation.** All 108 env examples (HL-PDF 57 · RS 25 ·
-RD-PDF 10 · HSL-PDF 8 · ID-PDF 8) were independently reproduced end to end from
-the two environments' own prints — re-located, re-boxed inside the captioned
-record, re-read — with **0 failing checks**. Every read-set member was confirmed
-both to lie under a compared side's resolved directory and to match that side's
-recorded census entry.
-
-**What validate proves, per set** (100 % programmatic, no sampling): the
-manifest describes CURRENT with every member verified; the provenance sidecar
-is present; the read set is EXACTLY the comparison's own two recorded documents
-for a rendered generation (and empty for a non-rendered one, which opened no
-source); for env sets every read-set member lies under a compared side's
-resolved directory AND matches that side's recorded census entry
-(name+size+mtime_ns); the Summary's source lines are the provenance selections
-verbatim; every image-sheet legend is the flavor's true-source legend; and for
-env sets **every example is re-derived end to end** — both prints re-located,
-both boxes re-computed inside the captioned record, both values re-read.
-
-> ENV re-derivation: 59/59 · 23/23 · 10/10 · 8/8 · 8/8 — every published env
-> example independently reproduced from the two environments' own prints.
-
-**Silent controls — both driven, neither proxied.** The by-day PDF-vs-Excel lane
-ran with the evidence toggle ON and produced ZERO evidence artifacts, proved by
-enumeration over its tree; each of the 5 ENV cells was additionally built with
-evidence OFF and produced none.
-
-The **classic Compare tab** control was previously a code-comment proxy — the
-by-day lane was said to exercise "the same self comparator", and the record did
-not disclose the substitution. The tab's endpoint blocks on a native save
-dialog and cannot be driven headlessly, but the comparator the endpoint calls
-can be, and the comparator is what the silence claim is about. Both lanes now
-run for real, resolved through the same registry the endpoint uses and fed the
-same two inputs from the source placement's own provenance sidecar: the FILE
-lane (`compare(...)`, Highway Sequence vs-TSN, 398.5 s) and the FOLDER lane
-(`compare_folders(...)`, Highway Sequence PDF between environments, 1144.4 s).
-Both returned `ok` and wrote zero evidence artifacts.
-
-Each silence reading is preceded by a **planted positive control**: an
-evidence-named artifact is placed where one would land and the probe must SEE it
-before the tree is read for real. A bare "the glob found nothing" reads the same
-whether the lane is silent, the tree is the wrong one, or the pattern is broken.
-Both lanes' probes saw their planted control.
-
-**Count/mask invariance.** All **26/26** cells compare equal between the base
+**Count/mask invariance.** All **26 / 26** cells compare equal between the base
 runtime and the head across every substantive field: verdict, completion,
 `trusted`/`current`/`known`/`present`, paired rows, both one-sided counts,
 differing rows, differing cells, asserted/context cells, pairing quality, and
-the full per-field table. The only difference anywhere is the `generation_id`,
-which necessarily changes on a rebuild. HF-05 and HF-10 change evidence
-rendering only — never comparison content.
+the full per-field table. The two sides are bound to different runtimes —
+`counts-head.json` self-stamps `adfa9f4`, `counts-base.json` self-stamps
+`72adf44`, and the base tree is proven by content to BE `72adf44`. The five ENV
+comparisons (ramp_summary's included — its COMPARISON still builds; only its
+evidence is silent) reproduce the output audit's own measured numbers EXACTLY:
+Ramp Summary 67; Intersection Detail PDF 17,562; Ramp Detail PDF 376 + 5/8
+one-sided; Highway Log PDF 88,238 + 2,095/1,174; Highway Sequence PDF 1,904 +
+7/246 — PCOA-FINAL-007's own figures.
 
-The two sides are bound to different runtimes, which is what makes that
-comparison mean anything: `counts-head.json` self-stamps `a21e0ba`,
-`counts-base.json` self-stamps `72adf44`, and the base tree is proven by content
-to BE `72adf44`. Before this run the base side carried no runtime identity at
-all and the verifier's tree argument defaulted to the head worktree — a
-forgotten flag would have made base and head the same runtime and every count
-would have matched trivially.
-
-**Formulas-twin settlement.** Each comparison publishes a values workbook and a
-live-formulas twin, and nothing previously proved the twin agrees. Every twin
-was opened in installed Excel, fully recalculated, and its Status/Diffs totals
-read back by header label: **26/26 agree, 0 disagree, 0 excused.** Twin
-expectancy is taken from the producer's own probe rather than re-derived — a
-scanned row count would have wrongly excused the largest comparisons, since the
-Highway Log sheet scans past the twin limit yet its twin exists because the
-producer's probe returns no stored dimension. The five ENV cells additionally reproduce the output audit's own
-measured numbers EXACTLY (Ramp Summary 67; Intersection Detail PDF 17,562;
-Ramp Detail PDF 376 + 5/8 one-sided; Highway Log PDF 88,238 + 2,095/1,174;
-Highway Sequence PDF 1,904 + 7/246 — PCOA-FINAL-007's own figures).
+**Formulas-twin settlement.** Every twin was opened in installed Excel, fully
+recalculated, and its Status/Diffs totals read back by header label: **26/26
+agree, 0 disagree, 0 excused**, twin expectancy taken from the producer's own
+probe.
 
 **Individual native-scale image inspection.** The bundle requires EVERY
 retained image inspected, not sampled. The population is proved complete by
-construction: `acc_rb4_inspect_manifest.py` reconciles every PNG on disk against
-the Summary rows that claim it — an unclaimed image or a claimed-but-missing one
-is a recorded problem (0 of each). The set was then partitioned into 11 slices
-and inspected image-by-image at native scale.
+construction: `acc_rb4_inspect_manifest.py` reconciles every PNG on disk
+against the Summary rows that claim it — an unclaimed image or a
+claimed-but-missing one is a recorded problem (**12 sets · 341 images · 0
+problems**), the workbook legends must match each set's flavor, and a SELF set
+existing at all would itself be a finding. The set was partitioned into 11
+slices and inspected image-by-image at native scale against the print-crop
+criteria (box on the compared cell within the captioned record, blank-side
+targets in the record's own empty position, no clipping, separated captions,
+captions naming a print + page, the disagreement contract, and any
+workbook-style panel an automatic FAIL).
 
-An inspection of the **pre-fix** set (825 images, retained as
-`results/inspection-round1.json`) returned **39 failures in five classes — every
-one a real defect that all 158 programmatic checks had passed.** That result is
-the reason this bundle carries an image inspection at all: the classes below are
-what a programmatic gate could not see, and they became the explicit failure
-criteria every later inspection hunts for. The per-class counts below are the
-shape of the finding; the retained record carries the totals (39 of 825), not a
-per-class breakdown, so the counts are stated as the classes were characterised
-at the time rather than as a re-derivable measurement.
+The historical context that justifies this cost: the inspection of the PRE-fix
+set (825 images, retained as `results/inspection-round1.json`) returned **39
+failures in six classes — every one a real defect that all 158 programmatic
+checks had passed** (shifted strip labels; undisclosed normalization; clipped
+titles; overprinted captions; composite source cells; route-prefix
+over-enclosure). Those classes are now locked by checks where their surfaces
+survive, and the mutation audit that hardened those checks is described in the
+focused-checks section. The chain6 head's 838 workbook-panel images were
+retired with their sets — that inspection round is history, not a claim about
+the accepted set.
 
-| # | Defect | Images | Fix |
-|---|---|---|---|
-| 1 | Strip header labels shifted against their own values — the ID PDF workbook labels value position 9 (a date) `INT Type`, so a boxed date sat under a neighbour's name | 2 | `_display_header`: every position a compared field resolves to is labelled with THAT field's name; unclaimed positions keep the workbook's label |
-| 2 | Source form differs from the compared value with nothing saying so (`64-01-01`→`1964-01-01`, `01/01/2014`, `1,768`, a blank side whose cell holds `-`) — and the legend actively claimed "Values shown are the compared (normalized) forms" | 30 | Panels keep the source's own text (the exact-source rule); `_normalization_note` names both forms on the image; both legends rewritten to state what is actually drawn |
-| 3 | Title/subline hard-clipped mid-glyph at the canvas edge (the canvas was sized from the panel images alone) | 3 | `_header_w`: both composers size the canvas to their own text — it grows rather than cutting |
-| 4 | A long left caption overran and overprinted the right caption into an unreadable mash | 2 | Each caption gets its own column, widened to hold it |
-| 5 | Ramp Detail's District boxes the composite `Location` cell (`12-SD-005`) because District is derived from it | 2 | Disclosed by the same note line |
-
-A sixth class was also caught by that inspection: a red box swallowing a leading
-route label (`15/NB OFF TO LIMONITE AVE`) that is not part of the compared value.
-
-**Every one of those six classes is now locked by a check**, so a regression
-fails the gate rather than waiting for a human to look at an image again. That
-was not true when they were first fixed: a mutation run — reverting each fixed
-behaviour and requiring some check to go red — showed the composition classes
-were guarded only by assertions that were circular with the composer's own
-measurements, and that the two helpers doing the relabelling and the disclosure
-could be deleted outright without failing anything. See the focused-checks
-section.
-
-*The inspection of the accepted set* re-rendered every image at the frozen head
-and re-inspected all of them with the six classes as explicit failure criteria.
-
-> **(pending — the acceptance run's inspection is in progress; its result and
-> the retained record replace this line)**
-
-An earlier inspection of an earlier head returned 827/827 pass, but it describes
-images that the current run's retire-and-re-render step deleted. It is history,
-not a claim about the accepted set, and is not cited as evidence here.
+> **(pending — the chain7 inspection's result and retained record replace this
+> line)**
 
 ## Scope and residual risk
 
@@ -416,19 +416,20 @@ not a claim about the accepted set, and is not cited as evidence here.
 `scripts/visual_evidence.py`, the `scripts/evidence_*.py` adapters,
 `scripts/matrix_build.py`, the `scripts/day_matrix.py` / `scripts/gui_matrix.py`
 guards, and checks. Six changed files sit outside that union, each named in the
-Changes table and each a consequence of the env lane existing at all rather than
-a widening of the fix:
+Changes table and each a consequence of the lanes' capability surface rather
+than a widening of the fix:
 
 | File | Why it had to change |
 |---|---|
 | `scripts/matrix.py` | facade re-export of `run_env_evidence_only`; the facade is the patch surface every caller uses |
-| `scripts/gui_api.py` | one truth line, without which the UI keeps asserting "no evidence support" for a row that now has it — the untruthful-prose class criterion 4 retires |
-| `scripts/self_test.py` | the new adapter is resolved lazily, so the frozen build must declare it or the env lane fails ONLY on the packaged app |
-| `scripts/ui/ui-matrix.js`, `scripts/ui/mock.js` | the hint text asserted print sources that no longer exist, and the mock must stay at parity |
-| `build/app.spec` | same lazy-import reason as `self_test.py` |
+| `scripts/gui_api.py` | the `unsupported` hint list — under the amendment it names every row without an evidence lane, per row, so the toggle's hint states exactly what will and won't generate |
+| `scripts/self_test.py` | the dormant `evidence_ramp_summary` module still ships in the frozen build, so the import census must declare it |
+| `scripts/ui/ui-matrix.js`, `scripts/ui/mock.js` | the hint/badge/action gating must reflect the capability rule (icons only where evidence exists), and the mock must stay at parity |
+| `build/app.spec` | same frozen-build reason as `self_test.py` |
 
-`scripts/day_matrix.py` is in the union and was NOT changed: the by-day lane is
-one of the two silent paths, and it stays silent by not gaining a call site.
+`scripts/day_matrix.py` gained one guard inside the union's spirit: the by-day
+camera refuses a required-silent row with a clean sentence (the engine refuses
+regardless). Its comparison lane is otherwise untouched.
 
 **⛔ Highway Detail: code changed, never exercised.** `evidence_highway_detail.py`
 gained the four shared-contract hooks so the engine stays uniform across
@@ -439,12 +440,16 @@ HD parser or normalizer, or infers an HD fact; when the vendor delivers official
 HD exports, the HD evidence lane needs its own first exercise before it is
 trusted.
 
-**The env lane's coverage is five cells on one day.** HF-10 is proved on the five
-Everything ENV cells of the acceptance corpus. The geometry adapters were fixed
-against that corpus's prints, and three of the five needed a probe-driven fix to
-work at all — which is evidence that env geometry is corpus-sensitive. A print
-whose layout differs from these will REFUSE (that is the designed failure), but
-"refuses correctly" is asserted only for the shapes this corpus contains.
+**The env lane's coverage is four cells on one day.** HF-10 as amended is
+proved on the four `_pdf` Everything ENV cells of the acceptance corpus
+(ramp_summary's cell builds its COMPARISON and is proven silent). The geometry
+adapters were fixed against that corpus's prints, and several needed a
+probe-driven fix to work at all — which is evidence that env geometry is
+corpus-sensitive. A print whose layout differs from these will REFUSE (that is
+the designed failure), but "refuses correctly" is asserted only for the shapes
+this corpus contains. The vs-TSN crops carry the same caveat: the TSMIS/TSN
+locate walks are LOCKSTEP mirrors of the shipped parsers, pinned by checks,
+and exercised here on this corpus's prints.
 
 **One inconsistency, disclosed rather than fixed.** `_snapshot_read_set`'s
 same-basename guard raises `EvidenceSourceBindingError` from a call site that is
@@ -453,9 +458,11 @@ the module it would not retire a stale prior evidence set. It was traced as
 unreachable under the current naming conventions — two routes cannot collide on
 one basename inside a directory given the end-anchored `…_route_<token>` contract,
 and the two compared-workbook basenames are distinct constants per report edition
-— so it is a defensive backstop rather than a live bug. It is recorded here
-instead of being changed, because changing runtime after the acceptance head was
-frozen would invalidate the run that proves the rest.
+— so it is a defensive backstop rather than a live bug. The 2026-08-05
+amendment reopened the runtime and this was left as-is deliberately: the
+amendment diff stays scoped to the owner's ruling, and the guard remains
+unreachable under the same naming contracts (the restored tsn print buckets
+keep per-route-distinct basenames the same way the env buckets do).
 
 **What the acceptance run does not prove.** Excel opens every retained workbook
 without an open failure; because the driver runs with `DisplayAlerts=False`, a
@@ -468,6 +475,8 @@ pixel-exact golden, which does not exist for this output.
 
 Revert the merge commit. Evidence sets are regenerable decorations; no
 comparison workbook schema, count, or sidecar format changes, so nothing
-downstream needs migration. The five env cells return to
-absent-and-required; the vs-TSN/self lanes return to the borrowed-print
-behavior the audit recorded.
+downstream needs migration. Rolling back restores the pre-RB-4 behavior the
+audit recorded (evidence on all ten rows from sometimes-borrowed prints, the
+silent disagreement drop, no env lane) — the owner's amendment rulings would
+be un-shipped with it, so a rollback is a return to planning, not a safe
+steady state.

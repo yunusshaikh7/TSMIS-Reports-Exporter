@@ -1,34 +1,70 @@
 {
  "base_defect_census": {
   "audit_byday": {
+   "blank_side_targets": 132,
    "examples": 359,
    "sets": 7,
    "sets_with_pdf_read_members": 7,
-   "truncated": 7
+   "truncated": 7,
+   "truncation_population": {
+    "elision_limit": 120,
+    "examples_examined": 359,
+    "legally_elided": 0,
+    "prefix_limit": 26,
+    "truncated_not_elided": 7,
+    "truncated_over_prefix_limit": 7
+   }
   },
   "audit_everything": {
+   "blank_side_targets": 208,
    "examples": 529,
    "sets": 11,
    "sets_with_pdf_read_members": 10,
-   "truncated": 10
+   "truncated": 10,
+   "truncation_population": {
+    "elision_limit": 120,
+    "examples_examined": 529,
+    "legally_elided": 0,
+    "prefix_limit": 26,
+    "truncated_not_elided": 10,
+    "truncated_over_prefix_limit": 10
+   }
   },
   "base_byday": {
+   "blank_side_targets": 84,
    "examples": 241,
    "sets": 8,
    "sets_with_pdf_read_members": 7,
-   "truncated": 5
+   "truncated": 5,
+   "truncation_population": {
+    "elision_limit": 120,
+    "examples_examined": 241,
+    "legally_elided": 0,
+    "prefix_limit": 26,
+    "truncated_not_elided": 5,
+    "truncated_over_prefix_limit": 5
+   }
   },
   "base_everything": {
+   "blank_side_targets": 141,
    "examples": 357,
    "sets": 13,
    "sets_with_pdf_read_members": 10,
-   "truncated": 4
+   "truncated": 4,
+   "truncation_population": {
+    "elision_limit": 120,
+    "examples_examined": 357,
+    "legally_elided": 0,
+    "prefix_limit": 26,
+    "truncated_not_elided": 4,
+    "truncated_over_prefix_limit": 4
+   }
   }
  },
- "bound_to_acceptance_head": "7aa76e2a0a69b5bee2abf5c4ee6aec751e166764",
- "built_utc": "2026-08-05T02:31:22+00:00",
+ "bound_to_acceptance_head": "adfa9f45d3e4b7ad0f656b18922fd919b79dd746",
+ "built_utc": "2026-08-07T04:43:24+00:00",
  "bundle": "RB-4",
- "claim": "every retained evidence set renders each side from the exact document that side was compared from (read set == the comparison's own recorded inputs), blank targets sit inside the captioned record, drawn values are the compared values or visibly elided, and unbindable pairs emit no artifact",
+ "claim": "the 12 `_pdf`-family cells render BOTH sides as crops of the source prints (per-route TSMIS export / TSN library print), each TSMIS-side value re-derived from the print or disclosed as a disagreement on the image; the 14 required-silent cells emit no evidence artifact of any kind; blank targets sit inside the captioned record; and unbindable pairs emit no artifact",
  "count_invariance": {
   "all_equal": true,
   "cells": 26,
@@ -190,48 +226,54 @@
     "diffs": null,
     "equal": true
    }
-  ]
+  ],
+  "floor": 26
  },
  "derived_from": [
   {
    "file": "generation-head.json",
-   "sha256": "E43A071A0EFBA60DA5186748B6B47FAD04FD5DF4538FF91069C53DA8164BF436"
+   "sha256": "E2203F46FE31CAA6814B85355E2A2911430213FE7E932F4BBE4442C17BC8C3AB"
   },
   {
    "file": "counts-head.json",
-   "sha256": "EBB46CF03F5BB513CDA5FB37E20C9F76AE2E19C3147A5836BE6C90540F86C8F4"
+   "sha256": "2DB9E6C7A7E76C5FDDEEC3A2A23E3388CC8D962A262B791BE256746A5BC008FC"
   },
   {
    "file": "counts-base.json",
-   "sha256": "D7DD559292EDA3A260F575DF4A84605CBADF90095D27C93222374DA95B0E585F"
+   "sha256": "39E7BC26042B500D9CB93CD44145646D5471D62ACC1C49C38794417D36368F64"
   },
   {
    "file": "validate-head.json",
-   "sha256": "2400214ACEA39075D29E29E49B8DBC6F6549E61BAE641E3DEBD0125A8CAF17B9"
+   "sha256": "EC63FBFA5A8DA0E7FF9A528D556E6E9F5A8055F197BA79F14D0CBCAFCDB15C70"
   },
   {
    "file": "excel-head.json",
-   "sha256": "86CD039E08D7D6E615F980B31D5AD24CEB18353D464A03CA2E3849CB6B092D28"
+   "sha256": "C9406D8C2F2DA347A509B90D3F6BFE87C680BBF80387E421A89A344AC37E6319"
   },
   {
    "file": "prefix-defect-census.json",
-   "sha256": "A44B5320D7CF4BEE7F0D70D70E20A66AF55A5BD14BC137FD28CE8FEB26876FA4"
+   "sha256": "A8ACEC4B876703F47233EC940C4AE07096729E61ABF82D7AD33ABD89E42358A5"
   }
  ],
+ "evidence_population": {
+  "discovered": 12,
+  "forbidden": 14,
+  "required": 12
+ },
  "excel": {
   "all_opened": true,
-  "books": 24
+  "books": 12
  },
  "generation_lanes": {
   "byday-tsn": {
    "cells": 8,
    "ok": 8,
-   "png_total": 494
+   "png_total": 258
   },
   "everything-env": {
    "cells": 5,
    "ok": 5,
-   "png_total": 214
+   "png_total": 164
   },
   "everything-env-off": {
    "cells": 5,
@@ -241,12 +283,12 @@
   "everything-self": {
    "cells": 5,
    "ok": 5,
-   "png_total": 226
+   "png_total": 0
   },
   "everything-tsn": {
    "cells": 8,
    "ok": 8,
-   "png_total": 488
+   "png_total": 258
   },
   "pve-byday": {
    "cells": 4,
@@ -257,15 +299,17 @@
  "id": "RB4-A1-HF05",
  "produced_by": {
   "script": "acc_rb4_witness.py",
-  "script_sha256": "EBFBEE6E4F367A1736197678F6F0070AC244B0F73A3181A18A4F8826FD5F9F7F"
+  "script_sha256": "43D991DAC4EB3A6CD64D23C5822ACA02601F23A8109D7EB20EF9DFF06C5B9C2D"
  },
  "validate": {
+  "disagreement_examples": 0,
   "elided_examples": 0,
-  "examples": 714,
+  "examples": 341,
   "problems": 0,
   "pve_stray": [],
-  "sets": 26,
-  "values_over_26": 16
+  "sets": 12,
+  "tsmis_rederived": 258,
+  "values_over_26": 11
  },
- "work_item": "HF-05 (PCOA-FINAL-004 / -005 / -006)"
+ "work_item": "HF-05 (PCOA-FINAL-004 / -005 / -006, as amended 2026-08-05: print crops on the `_pdf` families only)"
 }
