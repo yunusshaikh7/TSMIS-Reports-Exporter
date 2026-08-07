@@ -490,6 +490,21 @@ amendment diff stays scoped to the owner's ruling, and the guard remains
 unreachable under the same naming contracts (the restored tsn print buckets
 keep per-route-distinct basenames the same way the env buckets do).
 
+**The parse-back check has a blind spot, and the crop is what covers it.**
+Each crop's value is re-read by the adapter's LOCKSTEP walk — a deliberate
+mirror of the shipped consolidator parser. So the automated check catches
+ADDRESSING errors (wrong row, wrong column, wrong route, a key that resolves
+ambiguously) but CANNOT catch a systematic parser misread: the mirror would
+reproduce the same wrong value the consolidated workbook holds, the two would
+agree, and no disagreement note would fire. That is not a gap this bundle can
+close in software — it is the exact reason the owner ruled evidence must be
+crops of the actual print: the IMAGE carries the document's own glyphs, so a
+human comparing the crop against the comparison sheet sees a systematic
+misread that no self-consistent parser pair ever will. This run produced 0
+disagreements across 341 examples, which says the addressing is right and says
+nothing about the parsers — the native-scale inspection and the owner's own
+use of these sets are what speak to that.
+
 **What the acceptance run does not prove.** Excel opens every retained workbook
 without an open failure; because the driver runs with `DisplayAlerts=False`, a
 SILENT repair is not detected, so this is not a zero-repair claim. Image
