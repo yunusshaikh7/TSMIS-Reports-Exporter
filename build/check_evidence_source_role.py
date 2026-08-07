@@ -602,6 +602,61 @@ try:
           bool(_entry) and all((_idir / _entry[k]).is_file()
                                for k in ("stacked", "pair")))
 
+    # THE NORMALIZATION DISCLOSURE (the RB4-A1 native-scale inspection found
+    # both of these): a print whose own TOKEN differs in form from the
+    # compared value, while still normalizing TO it, must say so — Ramp
+    # Detail's '-' null marker under a title saying '(blank)', and a TSN
+    # signalized code 'P' the comparator crosswalks to 'S'. Without it the
+    # box and the title appear to disagree and nothing resolves it.
+    def _raw_adapter(t_raw, n_raw):
+        a = _print_adapter("1964-01-01", "1964-01-02")
+        a.tsmis_raw = lambda rec, field: t_raw
+        a.tsn_raw = lambda rec, field: n_raw
+        return a
+
+    _seen_notes.clear()
+    _ex4 = {"route": "046", "key": "50.904", "va": "1964-01-01",
+            "vb": "1964-01-02", "dist": "07", "cnty": "LA"}
+    _ctx4 = {"tsmis_loc": {"046": {"50.904": [{"src": str(_t_pdf)}]}},
+             "tsn_loc": {"07": {("LA", "046", "50.904"):
+                                [{"src": str(_n_pdf)}]}},
+             "dist_index": {"07": _n_pdf}, "tsmis_pdf": {"046": _t_pdf}}
+    _entry4, _why4 = ve._try_example(
+        _raw_adapter("64-01-01", "Y64-01-02"), _ex4, "INT Type Eff-Date",
+        _idir, 4, {}, side_labels=("TSMIS (PDF)", "TSN"), tsn_ctx=_ctx4)
+    check("a print token that NORMALIZES to the compared value is disclosed "
+          "on the image, both sides, with the title's value unchanged",
+          _why4 is None and _seen_notes
+          and all("boxed cell holds '64-01-01'" in rec[4]
+                  and "boxed cell holds 'Y64-01-02'" in rec[4]
+                  for rec in _seen_notes))
+    check("...and the subline still claims verification (the values DO agree "
+          "— this is a form difference, not a disagreement)",
+          all("re-read and verified" in rec[1] and "DISAGREES" not in rec[1]
+              for rec in _seen_notes))
+
+    _seen_notes.clear()
+    ve._try_example(_raw_adapter("1964-01-01", "1964-01-02"), dict(_ex4),
+                    "INT Type Eff-Date", _idir, 5, {},
+                    side_labels=("TSMIS (PDF)", "TSN"), tsn_ctx=_ctx4)
+    check("a print token that IS the compared value adds no note (the "
+          "disclosure must not fire on every image)",
+          _seen_notes and all(rec[4] == "" for rec in _seen_notes))
+
+    _seen_notes.clear()
+    _blank_ex = {**_ex4, "va": "", "vb": "Y"}
+    _blank_adapter = _print_adapter("", "Y")
+    _blank_adapter.tsmis_raw = lambda rec, field: "-"
+    _blank_adapter.tsn_raw = lambda rec, field: "Y"
+    ve._try_example(_blank_adapter, _blank_ex, "Area 4", _idir, 6, {},
+                    side_labels=("TSMIS (PDF)", "TSN"), tsn_ctx=_ctx4)
+    check("the null-render marker case is disclosed: a box drawn around '-' "
+          "under a title saying '(blank)' says so",
+          _seen_notes
+          and all("boxed cell holds '-'" in rec[4]
+                  and "TSN's boxed cell" not in rec[4]
+                  for rec in _seen_notes))
+
     # THE AMENDMENT'S CASE: the print disagrees with the compared value —
     # the old engine silently dropped it ("the TSN print differs…"), hiding
     # exactly the parser-bug signal the spot check exists to catch.

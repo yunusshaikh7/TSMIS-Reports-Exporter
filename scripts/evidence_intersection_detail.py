@@ -378,6 +378,16 @@ def tsmis_value(rec, field):
     return project(field, rec["row"][_TSMIS_SRC[field]])
 
 
+def tsmis_raw(rec, field):
+    """The print's OWN token for `field` — what a reader SEES inside the red
+    box, before `project` normalizes it. The engine discloses it on the image
+    whenever it differs from the compared value (ID prints two-digit years and
+    carries District/County/Route Suffix inside the composite Location cell)."""
+    if field in ("Route Suffix", "District", "County"):
+        return rec["row"][3]
+    return rec["row"][_TSMIS_SRC[field]]
+
+
 def tsmis_box(rec, field):
     """(page_no, cell_box, record_yspan, table_xspan) for `field`'s cell.
     Rejects (returns None) a record whose two lines landed on different pages —
@@ -609,6 +619,19 @@ def tsn_value(rec, field):
     if field in ("Route Suffix", "District", "County"):
         return _tsn_raw(rec, field)
     return project(field, _tsn_raw(rec, field))
+
+
+def tsn_raw(rec, field):
+    """The TSN print's OWN token for `field` (see `tsmis_raw`).
+
+    Deliberately NOT `_tsn_raw`: that one strips a date's signature flag and
+    resolves the three composite-derived fields, both of which are exactly the
+    form differences the reader needs told about — the box encloses the whole
+    `Y86-04-07` cell, and the whole `12-ORA-090` Location cell."""
+    if field in ("Route Suffix", "District", "County"):
+        return rec["a1"]["LOC"][0]
+    line, name = TSN_CELL[field]
+    return (rec["a1"] if line == 1 else rec["a2"])[name][0]
 
 
 def tsn_box(rec, field):

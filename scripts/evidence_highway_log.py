@@ -345,6 +345,13 @@ def tsmis_value(rec, field):
     return project(field, rec["row"][hlc.HEADER.index(field)])
 
 
+def tsmis_raw(rec, field):
+    """The print's OWN token for `field` — what a reader SEES inside the red
+    box, before `project` normalizes it. The engine discloses it on the image
+    whenever it differs from the compared value."""
+    return rec["row"][hlc.HEADER.index(field)]
+
+
 def _line_cell_box(chars, windows, idx, top, bottom):
     """The cell box for column `idx` on one parsed data line: its characters'
     extent, or the (contiguous) window bounds clipped to the line's own char
@@ -500,6 +507,13 @@ def tsn_value(rec, field):
     if field == "Description":
         return project(field, rec["rowd"].get("description"))
     return project(field, rec["rowd"].get(_TSN_WIN_KEY[field]))
+
+
+def tsn_raw(rec, field):
+    """The TSN print's OWN token for `field` (see `tsmis_raw`)."""
+    if field == "Description":
+        return rec["rowd"].get("description")
+    return rec["rowd"].get(_TSN_WIN_KEY[field])
 
 
 def tsn_box(rec, field):

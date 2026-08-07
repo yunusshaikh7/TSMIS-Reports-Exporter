@@ -1740,6 +1740,11 @@ def _try_example(adapter, ex, field, out_dir, k, page_cache,
     Returns (entry_dict, None) on success, (None, reason) otherwise."""
     dist = cnty = ""
     disagreements = []
+    # The per-side print TOKEN the normalization disclosure reads, or None for
+    # a side that says nothing (the env lane already REQUIRES both print
+    # values to compose to the published cell, so its crops carry the compared
+    # forms by construction and have nothing to disclose).
+    drawn = (None, None)
     if flavor == FLAVOR_ENV:
         got, reason = _env_example_sides(adapter, ex, field, env_loc,
                                          side_labels, page_cache)
@@ -1813,15 +1818,31 @@ def _try_example(adapter, ex, field, out_dir, k, page_cache,
             disagreements.append(
                 f"⚠ the TSN print reads '{nv or '(blank)'}' at this cell, "
                 f"not the compared '{ex['vb'] or '(blank)'}'")
+        # And the quieter half of the same honesty rule: a print whose own
+        # TOKEN differs in FORM from the compared value, while still
+        # NORMALIZING to it, is disclosed too. The reader is looking at the
+        # print's glyphs — Ramp Detail's '-' null marker under a title saying
+        # '(blank)', a two-digit year, a signalized code the comparator
+        # crosswalks to 'S', a composite Location cell a District is derived
+        # from. Without this the box and the title appear to disagree and
+        # nothing on the image resolves it (the RB4-A1 native-scale
+        # inspection caught exactly these). A side that already carries a
+        # DISAGREEMENT note is left to it — that one is the louder statement.
+        drawn = (None if tv != ex["va"] else _raw_token(adapter, "tsmis_raw",
+                                                        trec, field),
+                 None if nv != ex["vb"] else _raw_token(adapter, "tsn_raw",
+                                                        nrec, field))
 
     title = (f"{field} — {side_labels[0]} '{ex['va'] or '(blank)'}'  vs  "
              f"{side_labels[1]} '{ex['vb'] or '(blank)'}'")
-    # BOTH notes when both apply (RB-4 audit): a quote-character difference
-    # must not swallow a disagreement disclosure — the disclosure is what
-    # keeps a crop that reads differently from the compared value honest.
+    # EVERY note that applies (RB-4 audit): a quote-character difference must
+    # not swallow a disagreement disclosure, and neither may swallow the
+    # normalization disclosure — each answers a different question a reader
+    # asks of the same box.
     note = "   —   ".join(n for n in (
         _quote_note(ex["va"], ex["vb"], side_labels[1]),
-        *disagreements) if n)
+        *disagreements,
+        _normalization_note(drawn, (ex["va"], ex["vb"]), side_labels)) if n)
     verified_phrase = ("re-read and verified against the compared values"
                        if not disagreements else
                        "re-read against the compared values — a print "
@@ -2075,20 +2096,43 @@ def _scaled(im, width):
 _NOTE_H = 30            # extra header height when the quote-characters note line shows
 
 
-def _normalization_note(drawn, compared, side_labels):
-    """The note line for a panel whose SOURCE text differs in form from the
-    compared value the title names (PCOA-FINAL-006 truthfulness half).
+def _raw_token(adapter, hook, rec, field):
+    """The print's OWN token for one side's boxed cell, or None when this
+    adapter does not expose it.
 
-    A comparison that normalizes (dates, padding, case) or DERIVES (Ramp
-    Detail's District is the leading component of the composite Location cell)
-    legitimately compares a value the source cell spells differently — the ID
-    PDF workbook holds '64-01-01' where the comparison compared '1964-01-01',
-    and the RD workbook's boxed Location cell holds '12-SD-005' where the
-    compared District is '12'. The panel must keep showing the source cell's
-    own text (the exact-source rule), so the image states both forms outright
-    rather than leaving the reader with a title and a box that appear to
-    disagree. Returns "" when every drawn string is its compared value
-    verbatim, or when this flavor draws no strings at all (crops)."""
+    Optional by design: an adapter that has not declared how to reach its raw
+    token simply discloses nothing, which is the pre-amendment behaviour —
+    never a guess at what the box contains."""
+    fn = getattr(adapter, hook, None)
+    if fn is None:
+        return None
+    try:
+        raw = fn(rec, field)
+    except Exception as e:                       # noqa: BLE001 — cosmetic only
+        log.warning("evidence: %s(%s) failed: %s: %s", hook, field,
+                    type(e).__name__, e)
+        return None
+    return "" if raw is None else str(raw).strip()
+
+
+def _normalization_note(drawn, compared, side_labels):
+    """The note line for a box whose SOURCE text differs in form from the
+    compared value the title names (PCOA-FINAL-006's truthfulness half, now
+    serving the print crops).
+
+    A comparison that normalizes (dates, padding, case, a null-render marker,
+    a code crosswalk) or DERIVES (Ramp Detail's District is the leading
+    component of the composite Location cell) legitimately compares a value
+    the source spells differently — the ID print shows '64-01-01' where the
+    comparison compared '1964-01-01', the RD print shows '-' where it compared
+    a blank, a TSN print shows the signalized code 'P' where the comparator
+    crosswalks to 'S'. The box must keep showing the source's own text (it is
+    a crop of the document — that is the whole point), so the image states
+    both forms outright rather than leaving the reader with a title and a box
+    that appear to disagree. Returns "" when every side's token IS its
+    compared value, or when a side has nothing to say (`None` — the env lane,
+    a side already carrying the louder disagreement note, or an adapter that
+    does not expose its raw token)."""
     parts = []
     for text, value, label in zip(drawn, compared, side_labels):
         if text is None:

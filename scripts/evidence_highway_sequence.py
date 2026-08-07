@@ -414,6 +414,18 @@ def tsmis_value(rec, field):
                    route=rec.get("route"))
 
 
+def tsmis_raw(rec, field):
+    """The print's OWN token for `field` — what a reader SEES inside the red
+    box, before `project` normalizes it (PM is the print's three windows glued
+    the way the comparison glues them; a Description keeps its own-route label
+    that the comparison strips). The engine discloses it on the image whenever
+    it differs from the compared value."""
+    if field == "PM":
+        v = rec["vals"]
+        return f"{v['prefix']}{v['pm']}{v['suffix']}"
+    return rec["vals"][_TSMIS_COL[field]]
+
+
 def tsmis_box(rec, field):
     """(page_no, cell_box, record_yspan, record_xspan) for `field`'s cell."""
     line_words = [w for ws in rec["cols"].values() for w in ws]
@@ -586,10 +598,17 @@ def _keep_tsn(found, needed_routes, needed_keys, path, district, county, route,
 def tsn_value(rec, field):
     """The compared value this print record carries for `field` (TSN side:
     Description verbatim — CMP-AUD-204)."""
-    key = {"County": "county", "PM": "pm", "City": "city", "HG": "hg",
-           "FT": "ft", "Distance To Next Point": "dist",
-           "Description": "description"}[field]
-    return project(field, rec["rowd"].get(key), side="tsn")
+    return project(field, rec["rowd"].get(_TSN_ROWD_KEY[field]), side="tsn")
+
+
+_TSN_ROWD_KEY = {"County": "county", "PM": "pm", "City": "city", "HG": "hg",
+                 "FT": "ft", "Distance To Next Point": "dist",
+                 "Description": "description"}
+
+
+def tsn_raw(rec, field):
+    """The TSN print's OWN token for `field` (see `tsmis_raw`)."""
+    return rec["rowd"].get(_TSN_ROWD_KEY[field])
 
 
 def tsn_box(rec, field):

@@ -449,6 +449,15 @@ def tsmis_value(rec, field):
     return project(field, rec["vals"][_TSMIS_COL[field]])
 
 
+def tsmis_raw(rec, field):
+    """The print's OWN token for `field` — what a reader SEES inside the red
+    box, before `project` normalizes it. The engine discloses it on the image
+    whenever it differs from the compared value (Ramp Detail's `-` null-render
+    marker projects to blank, and District is derived from the composite
+    Location cell)."""
+    return rec["vals"][_TSMIS_COL[field]]
+
+
 def tsmis_box(rec, field):
     """(page_no, cell_box, record_yspan, record_xspan) for `field`'s cell. A
     blank cell boxes its column window — on a header-anchored layout the window
@@ -608,6 +617,11 @@ def locate_tsn(pdf_path, needed_routes, needed_keys):
 def tsn_value(rec, field):
     """The compared value this print record carries for `field`."""
     return project(field, rec["a"][TSN_CELL[field]][0])
+
+
+def tsn_raw(rec, field):
+    """The TSN print's OWN token for `field` (see `tsmis_raw`)."""
+    return rec["a"][TSN_CELL[field]][0]
 
 
 def tsn_box(rec, field):
