@@ -757,6 +757,10 @@ def _run_env_evidence(row_key, out_path, evidence, events, result,
         return
     import visual_evidence
     if not visual_evidence.env_capable(row_key):
+        # The lane is retired for this row (the 2026-08-05 amendment). Sweep
+        # any set a PRE-amendment build left beside this comparison so it
+        # can't survive looking current.
+        visual_evidence.retire_unsupported(out_path, events, commit_guard)
         return
     try:
         _require_commit_guard(commit_guard, "visual-evidence write")
@@ -1494,6 +1498,15 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, su
     # changes the comparison's status/completion/counts, and any failure only
     # logs + notes (the comparison already succeeded). `evidence_opts` is set by
     # the callers when the user's toggle is on AND the row supports it.
+    if result.status == "ok" and not evidence_opts:
+        # `evidence_opts_for` returns None both when the toggle is off and
+        # when the ROW can no longer collect evidence. Only the second case
+        # owes a sweep, so the capability is re-asked here rather than
+        # inferred from the None (2026-08-05 amendment).
+        import visual_evidence                           # lazy: pulls PIL/pdfium
+        if not visual_evidence.capable(row_key):
+            visual_evidence.retire_unsupported(out_path, events,
+                                               comparison_guard)
     if result.status == "ok" and evidence_opts:
         try:
             _require_commit_guard(comparison_guard, "visual-evidence write")
@@ -1543,6 +1556,9 @@ def _run_self_evidence(row_key, pdf_consolidated, excel_consolidated, out_path,
     try:
         import visual_evidence                          # lazy: pulls PIL/pdfium
         if not visual_evidence.self_capable(row_key):
+            # The self lane is retired for EVERY row (2026-08-05). Sweep any
+            # set a pre-amendment build left beside this comparison.
+            visual_evidence.retire_unsupported(out_path, events, commit_guard)
             return
         _require_commit_guard(comparison_guard := commit_guard,
                               "visual-evidence write")

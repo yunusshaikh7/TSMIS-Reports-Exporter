@@ -531,6 +531,66 @@ try:
     check("_retire_stale_evidence removes the stale workbook + image folder",
           not _wb6.exists() and not _img6.exists()
           and "retired" in (_note6 or ""))
+
+    # The 2026-08-05 amendment retired WHOLE LANES, and those cells are
+    # refused BEFORE generate() runs — so generate()'s own retirement never
+    # fires for them and a pre-amendment set would sit beside its rebuilt
+    # comparison looking current. `retire_unsupported` is the sweep the gates
+    # call on their way out; without it the orphan survives.
+    _cmp6c = _r6 / "excel row vs tsn.xlsx"
+    _cmp6c.write_bytes(b"comparison")
+    _wb6c, _img6c = ve.sibling_paths(_cmp6c)
+    _man6c = ve.evidence_manifest.manifest_path(_cmp6c)
+    _wb6c.write_bytes(b"PRE-AMENDMENT evidence workbook")
+    _img6c.mkdir()
+    (_img6c / "panel.png").write_bytes(b"a workbook-panel image")
+    _man6c.write_text("{}", encoding="utf-8")
+    _note6c = ve.retire_unsupported(_cmp6c)
+    check("retire_unsupported sweeps a pre-amendment set beside a comparison "
+          "whose lane no longer collects evidence",
+          not _wb6c.exists() and not _img6c.exists() and not _man6c.exists()
+          and "retired" in (_note6c or ""))
+    check("...and it is a no-op (empty note) when there is nothing beside the "
+          "comparison, so a clean cell is never touched",
+          ve.retire_unsupported(_cmp6c) == "" and _cmp6c.exists())
+    check("...and it never raises for a comparison that does not exist "
+          "(a decoration gate must not fail a comparison)",
+          ve.retire_unsupported(_r6 / "no such comparison.xlsx") == "")
+
+    # THE CALL SITES, not just the helper (the mutation lesson: deleting the
+    # one line that calls it passed the entire gate). Each retired lane's gate
+    # is driven with a planted pre-amendment set and must sweep it.
+    class _Ev6c:
+        def is_cancelled(self):
+            return False
+
+        def on_log(self, _m):
+            pass
+
+    def _plant(name):
+        cmp_path = _r6 / name
+        cmp_path.write_bytes(b"comparison")
+        wb, img = ve.sibling_paths(cmp_path)
+        wb.write_bytes(b"PRE-AMENDMENT evidence workbook")
+        img.mkdir()
+        (img / "panel.png").write_bytes(b"a workbook-panel image")
+        return cmp_path, wb, img
+
+    _ev_cmp, _ev_wb, _ev_img = _plant("env ramp_summary.xlsx")
+    matrix_build._run_env_evidence(
+        "ramp_summary", _ev_cmp, {"enabled": True}, _Ev6c(),
+        ConsolidateResult(status="ok", summary_lines=[]), None)
+    check("the ENV decoration gate sweeps a retired row's pre-amendment set "
+          "(ramp_summary — evidence by report type, the third ruling)",
+          not _ev_wb.exists() and not _ev_img.exists())
+
+    _sf_cmp, _sf_wb, _sf_img = _plant("self highway_log_pdf.xlsx")
+    matrix_build._run_self_evidence(
+        "highway_log_pdf", None, None, _sf_cmp, None, {"enabled": True},
+        _Ev6c(), ConsolidateResult(status="ok", summary_lines=[]), None)
+    check("the SELF decoration gate sweeps its pre-amendment set (the self "
+          "lane is retired for every row)",
+          not _sf_wb.exists() and not _sf_img.exists())
     # a source-aliased artifact is refused (left in place, noted) not force-removed
     _wb6.write_bytes(b"aliased")
     _note6b = ve._retire_stale_evidence(

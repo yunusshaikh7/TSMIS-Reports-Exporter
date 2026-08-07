@@ -604,6 +604,46 @@ def _safe_sibling_paths(comparison_path, source_paths, captured_sources=(),
     return wb_path, img_dir, man_path
 
 
+def retire_unsupported(comparison_path, events=None, commit_guard=None):
+    """Retire a prior evidence set beside a comparison whose lane can no longer
+    produce one, and return a short note (or "" when there was nothing).
+
+    The 2026-08-05 amendment retired WHOLE LANES — the Excel rows' vs-TSN
+    cells, every PDF-vs-Excel self cell, ramp_summary's env cell. Those cells
+    are refused before `generate()` is ever entered, so `generate()`'s own
+    retirement never runs for them, and a set produced by a PRE-amendment
+    build would sit beside its rebuilt comparison looking current forever.
+    The bundle's own rule is the opposite: a cell that no longer generates
+    must have its prior set PROVED RETIRED, not left looking current. So each
+    gate that refuses a lane calls this on its way out.
+
+    Safe by construction: it only ever touches the three canonical sibling
+    names beside the comparison, through the same guarded, quarantine-then-
+    delete path every other evidence retirement uses — a locked, foreign or
+    source-aliased artifact is left in place with a note rather than forced.
+    Never raises: a decoration gate must not fail a comparison."""
+    try:
+        if not os.path.lexists(comparison_path):
+            return ""
+        sources = (Path(comparison_path),)
+        captured = artifact_store.capture_source_identities(sources)
+        wb_path, img_dir, man_path = _safe_sibling_paths(
+            comparison_path, sources, captured, None,
+            commit_guard=commit_guard)
+        if not any(os.path.lexists(p) for p in (wb_path, img_dir, man_path)):
+            return ""
+        note = _retire_stale_evidence(wb_path, img_dir, sources, captured,
+                                      None, commit_guard, man_path)
+    except Exception as e:                       # noqa: BLE001 — never a gate
+        log.warning("evidence: could not sweep the unsupported set beside "
+                    "%s: %s: %s", comparison_path, type(e).__name__, e)
+        return ""
+    if note and events is not None:
+        events.on_log(f"  evidence: {note} — this report no longer collects "
+                      "evidence")
+    return note or ""
+
+
 def _ensure_captured_current(captured):
     """Verify an exclusively-created temp/quarantine still names our object."""
     artifact_store.ensure_outputs_do_not_alias_sources(
