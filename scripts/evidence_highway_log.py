@@ -477,6 +477,14 @@ def _scan_tsn_print(path, needed_routes, needed_keys, found):
                         open_rec = open_row = None
                         continue
                     rowd = ctnl._parse_data_line(line_chars)
+                    # The print's OWN tokens, captured BEFORE `_normalize_row`
+                    # rewrites them IN PLACE (it zero-pads MI and strips the
+                    # traveled-way widths' leading zeros so the two sides'
+                    # numbers compare). The normalization disclosure has to
+                    # state what the reader SEES inside the box — '024',
+                    # '0.071' — so the raw tokens are kept beside the
+                    # normalized row instead of being overwritten by it.
+                    raw = dict(rowd)
                     ctnl._normalize_row(rowd)
                     rowd["description"] = None
                     open_row = rowd
@@ -484,7 +492,7 @@ def _scan_tsn_print(path, needed_routes, needed_keys, found):
                     canon = _canon(row31, off=0)
                     if ("", route, canon) in needed_keys:
                         open_rec = {
-                            "rowd": rowd, "src": str(path),
+                            "rowd": rowd, "raw": raw, "src": str(path),
                             "dist": district or "", "cnty": county,
                             "page": page_no, "top": top,
                             "bottom": max(c["bottom"] for c in line_chars),
@@ -520,10 +528,18 @@ def tsn_value(rec, field):
 
 
 def tsn_raw(rec, field):
-    """The TSN print's OWN token for `field` (see `tsmis_raw`)."""
+    """The TSN print's OWN token for `field` (see `tsmis_raw`).
+
+    Reads the PRE-normalization snapshot, not `rowd`: `_normalize_row` rewrites
+    MI and the two traveled-way widths in place to the TSMIS forms, so by the
+    time the record exists `rowd` no longer holds what the print shows. Reading
+    it made this hook return the compared value itself, which silenced the
+    normalization disclosure on exactly the cells that needed it — four RB4-A1
+    inspectors saw boxes reading '024' and '0.071' under titles saying '24' and
+    '000.071' with nothing on the image connecting the two."""
     if field == "Description":
         return rec["rowd"].get("description")
-    return rec["rowd"].get(_TSN_WIN_KEY[field])
+    return rec["raw"].get(_TSN_WIN_KEY[field])
 
 
 def tsn_box(rec, field):
@@ -561,7 +577,16 @@ def tsn_box(rec, field):
         line_x1 = max(c["x1"] for c in chars)
         x0, x1 = max(lo, line_x0 - 6), min(hi, line_x1 + 6)
         if x1 <= x0:
-            x0, x1 = lo, lo + 10
+            # A TRAILING blank column, whose window begins PAST the record's
+            # last glyph — the same shape `_line_cell_box` refuses on the TSMIS
+            # side, and refusing it here is the missing half of that fix. The
+            # old fallback drew a degenerate 10-point box out in the whitespace
+            # beyond the record; three independent RB4-A1 inspectors measured
+            # it on the Sig Chg. Date column (a ~7 px sliver jammed against the
+            # record outline, pointing at nothing a reader can check). No
+            # rectangle inside the record's own printed lines means no
+            # geometry, and the example skips with a recorded reason.
+            return None
     return (rec["page"],
             (x0 - 2, rec["top"] - 2, x1 + 2, rec["bottom"] + 2), yspan, xspan)
 

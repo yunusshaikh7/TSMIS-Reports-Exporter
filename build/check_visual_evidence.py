@@ -1865,6 +1865,106 @@ _hl_tsn_rec = {"page": 2, "top": 50.0, "bottom": 58.0, "src": "d.pdf",
                "desc": [], "rowd": {"description": None}}
 check("HL TSN blank Description -> no geometry (was: the NEXT record's box)",
       _ehl5.tsn_box(_hl_tsn_rec, "Description") is None)
+# The TSN side's own trailing-blank column. `_line_cell_box` learned to refuse
+# this on the TSMIS side; the TSN side kept a `lo, lo + 10` fallback, so three
+# RB4-A1 inspectors independently measured a ~7 px sliver beyond the record's
+# printing on Sig Chg. Date. Both sides must refuse, and both must still box a
+# blank column that DOES overlap the record.
+import consolidate_tsn_highway_log as _ctnl5
+
+_sig_lo = _ehl5._TSN_WINDOWS[_ehl5._TSN_WIN_KEY["Sig Chg. Date"]][0]
+
+
+def _hl_tsn_chars(x1_end):
+    return [{"x0": x1_end - 20.0, "x1": x1_end, "top": 50.0, "bottom": 58.0,
+             "text": "6"}]
+
+
+_hl_tsn_trail = dict(_hl_tsn_rec, chars=_hl_tsn_chars(_sig_lo - 40.0))
+check("HL TSN trailing blank column -> no geometry, never a degenerate box "
+      "past the record's own printed extent",
+      _ehl5.tsn_box(_hl_tsn_trail, "Sig Chg. Date") is None)
+_hl_tsn_over = dict(_hl_tsn_rec, chars=_hl_tsn_chars(_sig_lo + 30.0))
+check("...but a TSN blank column overlapping the record still gets its box",
+      _ehl5.tsn_box(_hl_tsn_over, "Sig Chg. Date") is not None)
+# ...and the raw-token hook must read the PRINT's token, not the value
+# `_normalize_row` rewrote in place. Driven through the SHIPPED scan (a
+# monkeypatched pdfplumber, like check_intersection_detail_pdf) so moving the
+# snapshot back below the normalizer fails here — the defect was at the CALL
+# SITE, not in the hook.
+_MI_RAW, _TW_RAW = "0.071", "024"
+
+
+class _FakeTsnPdf:
+    def __init__(self, pages):
+        self.pages = pages
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def _tsn_line(top, items, cw=2.4):
+    out = []
+    for center, text in items:
+        x = center - (len(text) * cw) / 2
+        for ch in text:
+            if ch.strip():
+                out.append({"text": ch, "x0": x, "x1": x + cw, "top": top,
+                            "bottom": top + 7.0})
+            x += cw
+    return out
+
+
+def _win_center(key):
+    lo, hi = next((l, h) for k, l, h in _ctnl5.COLUMN_WINDOWS if k == key)
+    return (lo + hi) / 2
+
+
+def _scan_one_tsn_row():
+    """Run the REAL _scan_tsn_print over one synthetic district print."""
+    from types import SimpleNamespace
+    chars = (_tsn_line(70.0, [(_win_center("location"), "012.540")])
+             + _tsn_line(70.0, [(_win_center("mi"), _MI_RAW)])
+             + _tsn_line(70.0, [(_win_center("rb_tw"), _TW_RAW)]))
+    group = _tsn_line(60.0, [(260.0, "04"), (275.0, "ALA"), (292.0, "001")])
+    page = SimpleNamespace(width=612.0, chars=group + chars, rects=[])
+    found = __import__("collections").defaultdict(list)
+    saved = _ehl5.pdfplumber.open
+
+    # The scan keeps only rows whose canonical key is WANTED; this stands in for
+    # the real needed-keys set so the synthetic row survives to the record.
+    class _All(dict):
+        def __contains__(self, _k):
+            return True
+
+    try:
+        _ehl5.pdfplumber.open = lambda p: _FakeTsnPdf([page])
+        _ehl5._scan_tsn_print(Path("D04 fake.pdf"), {"001"}, _All(), found)
+    finally:
+        _ehl5.pdfplumber.open = saved
+    recs = [r for v in found.values() for r in v]
+    return recs[0] if recs else None
+
+
+_tsn_rec = _scan_one_tsn_row()
+check("the shipped TSN scan parsed the synthetic row", _tsn_rec is not None)
+if _tsn_rec is not None:
+    check("HL TSN raw token is the PRINT's MI, not the zero-padded compared "
+          "value (_normalize_row rewrites rowd IN PLACE)",
+          _ehl5.tsn_raw(_tsn_rec, "Length (MI) [MI]") == _MI_RAW
+          and _tsn_rec["rowd"]["mi"] != _MI_RAW)
+    check("HL TSN raw token is the PRINT's traveled-way width, not the "
+          "leading-zero-stripped compared value",
+          _ehl5.tsn_raw(_tsn_rec, "RB T-W Wid [RB T-W]") == _TW_RAW
+          and _tsn_rec["rowd"]["rb_tw"] != _TW_RAW)
+    check("...so the engine DOES disclose those two forms on the image",
+          ve._normalization_note(
+              (None, _ehl5.tsn_raw(_tsn_rec, "RB T-W Wid [RB T-W]")),
+              (None, _ehl5.tsn_value(_tsn_rec, "RB T-W Wid [RB T-W]")),
+              ("TSMIS", "TSN")).startswith("TSN's boxed cell holds '024'"))
 _hsl_eq = {"rowd": {"county": "ALA", "pm": "006.798", "city": None, "hg": None,
                     "ft": None, "dist": None, "description": "EQUATES TO"},
            "src": "d.pdf", "dist": "04", "cnty": "ALA", "page": 5,
