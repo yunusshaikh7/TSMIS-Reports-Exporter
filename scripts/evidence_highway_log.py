@@ -352,29 +352,50 @@ def tsmis_raw(rec, field):
     return rec["row"][hlc.HEADER.index(field)]
 
 
+def _blank_cell_span(chars, lo, hi):
+    """(x0, x1) for a BLANK cell in the column window (lo, hi), or None.
+
+    A blank cell can only be POINTED AT when the record's own printing
+    BRACKETS the column — ink to its left and ink to its right. The print
+    itself then establishes where that column sits on this line, and the full
+    window is the honest rectangle.
+
+    When the record's ink stops before the window, nothing on this line
+    locates the column. The first fix here refused only a completely EMPTY
+    overlap, which left a hole: a record whose last glyph poked a point or two
+    into the window — or whose ±6 cosmetic padding did — still produced a
+    sliver in the gap after the PREVIOUS column. Two RB4-A1 inspectors
+    measured one at 12 px, drawn past the record's right edge and well left of
+    where that column actually prints, so it read as marking the wrong cell.
+    (The engine's own `_box_within_record` backstop allows 8 pt of slack, so
+    it cannot catch a sliver this small either.) Locating a blank cell from
+    NEIGHBOURING records is precisely the guess PCOA-FINAL-005 forbids."""
+    line_x0 = min(c["x0"] for c in chars)
+    line_x1 = max(c["x1"] for c in chars)
+    if not (line_x0 < lo and hi < line_x1):
+        return None
+    return lo, hi
+
+
 def _line_cell_box(chars, windows, idx, top, bottom):
     """The cell box for column `idx` on one parsed data line: its characters'
-    extent, or the (contiguous) window bounds clipped to the line's own char
-    extent for a BLANK cell (the first/last windows extend to infinity).
+    extent, or — for a BLANK cell — the window, but ONLY where the record's
+    own printing brackets it (`_blank_cell_span`).
 
-    Returns None when a blank cell's window does not overlap the line's own
-    printed extent at all — a TRAILING blank column on a short row, whose
-    window begins past the last glyph. There is no cell rectangle inside the
-    record's own printed lines to point at, so the honest answer is no
-    geometry: the old fallback drew a degenerate 10-point box in the
-    inter-column whitespace beyond the record, which the RB4-A1 native-scale
-    inspection caught boxing nothing at all (PCOA-FINAL-005's rule — blank
+    Returns None when a blank cell's column is not bracketed by this line's own
+    ink: a TRAILING blank column, whose window sits at or past the last glyph.
+    There is no cell rectangle inside the record's own printed lines to point
+    at, so the honest answer is no geometry (PCOA-FINAL-005's rule — blank
     targets never guess)."""
     lo, hi = windows[idx]
     hits = [c for c in chars if lo <= (c["x0"] + c["x1"]) / 2 < hi]
     if hits:
         x0, x1 = min(c["x0"] for c in hits), max(c["x1"] for c in hits)
     else:
-        line_x0 = min(c["x0"] for c in chars)
-        line_x1 = max(c["x1"] for c in chars)
-        x0, x1 = max(lo, line_x0 - 6), min(hi, line_x1 + 6)
-        if x1 <= x0:
+        span = _blank_cell_span(chars, lo, hi)
+        if span is None:
             return None
+        x0, x1 = span
     return x0 - 2, top - 2, x1 + 2, bottom + 2
 
 
@@ -569,24 +590,14 @@ def tsn_box(rec, field):
     if hits:
         x0, x1 = min(c["x0"] for c in hits), max(c["x1"] for c in hits)
     else:
-        # A blank cell in a fixed-window column: clip the window to the line's
-        # own char extent (the first/last windows extend far beyond the print),
-        # mirroring the TSMIS side's _line_cell_box so the box stays on the
-        # record's own line and never spans foreign glyph territory.
-        line_x0 = min(c["x0"] for c in chars)
-        line_x1 = max(c["x1"] for c in chars)
-        x0, x1 = max(lo, line_x0 - 6), min(hi, line_x1 + 6)
-        if x1 <= x0:
-            # A TRAILING blank column, whose window begins PAST the record's
-            # last glyph — the same shape `_line_cell_box` refuses on the TSMIS
-            # side, and refusing it here is the missing half of that fix. The
-            # old fallback drew a degenerate 10-point box out in the whitespace
-            # beyond the record; three independent RB4-A1 inspectors measured
-            # it on the Sig Chg. Date column (a ~7 px sliver jammed against the
-            # record outline, pointing at nothing a reader can check). No
-            # rectangle inside the record's own printed lines means no
-            # geometry, and the example skips with a recorded reason.
+        # A blank cell in a fixed-window column: the SAME bracketing rule as
+        # the TSMIS side's `_line_cell_box`. The Sig Chg. Date column is the
+        # last one, so a record that leaves it blank has no ink to its right
+        # and honestly refuses rather than marking the gap after Date of Rec.
+        span = _blank_cell_span(chars, lo, hi)
+        if span is None:
             return None
+        x0, x1 = span
     return (rec["page"],
             (x0 - 2, rec["top"] - 2, x1 + 2, rec["bottom"] + 2), yspan, xspan)
 

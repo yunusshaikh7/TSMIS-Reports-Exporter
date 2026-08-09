@@ -1830,11 +1830,38 @@ _hl_trail = dict(_hl_rec, windows=[(0, 100)] * 29 + [(400.0, 500.0)])
 check("HL TSMIS trailing blank column -> no geometry, never a box past the "
       "record's own printed extent",
       _ehl5.tsmis_box(_hl_trail, hlc.HEADER[-1]) is None)
-# ...while a blank column whose window DOES overlap the record still boxes,
-# so the refusal is targeted rather than a blanket ban on blank cells.
-_hl_mid = dict(_hl_rec, windows=[(0, 100)] * 30)
-check("...but a blank column overlapping the record still gets its box",
-      _ehl5.tsmis_box(_hl_mid, hlc.HEADER[-1]) is not None)
+# A window the record's ink only just REACHES is the same defect wearing a
+# smaller size: refusing only an EMPTY overlap left a record whose last glyph
+# poked a point or two in (or whose cosmetic padding did) still drawing a
+# sliver in the gap after the PREVIOUS column — two RB4-A1 inspectors measured
+# one at 12 px, sitting past the record's right edge and well left of where
+# the column actually prints. A blank cell is only boxable when the record's
+# own ink BRACKETS the window on both sides.
+_hl_graze = dict(_hl_rec,
+                 chars=[{"x0": 60.0, "x1": 405.0, "top": 100.0,
+                         "bottom": 110.0, "text": "R"}],
+                 windows=[(0, 100)] * 29 + [(400.0, 500.0)])
+check("HL TSMIS blank column the record's ink merely GRAZES -> no geometry "
+      "(the sliver case, not just the empty-overlap case)",
+      _ehl5.tsmis_box(_hl_graze, hlc.HEADER[-1]) is None)
+# ...while a blank column the record's ink BRACKETS still boxes, so the
+# refusal is targeted rather than a blanket ban on blank cells.
+_hl_mid = dict(_hl_rec,
+               chars=[{"x0": 10.0, "x1": 600.0, "top": 100.0, "bottom": 110.0,
+                       "text": "R"}],
+               windows=[(0, 100)] * 29 + [(400.0, 500.0)])
+_hl_mid_box = _ehl5.tsmis_box(_hl_mid, hlc.HEADER[-1])
+check("...but a blank column the record BRACKETS still gets its box, spanning "
+      "the whole column window",
+      _hl_mid_box is not None
+      and _hl_mid_box[1][0] <= 400.0 and _hl_mid_box[1][2] >= 500.0)
+# The env lane rides the same geometry (env_box delegates to tsmis_box), and
+# the third measured sliver was found THERE — on a blank Date of Rec, not on
+# the vs-TSN side. Pin the delegation so env can never grow its own rule.
+check("HL env blank geometry IS the TSMIS rule (env_box delegates), so the "
+      "graze case refuses on the env lane too",
+      _ehl5.env_box(_hl_graze, hlc.HEADER[-1]) is None
+      and _ehl5.env_box(_hl_mid, hlc.HEADER[-1]) is not None)
 # RD District is DERIVED from the composite Location cell, and `cols["loc"]`
 # is the bucketing loop's CATCH-ALL for every unwindowed word left of the
 # Description — the postmile has no window of its own and lands there too.
@@ -1884,9 +1911,24 @@ _hl_tsn_trail = dict(_hl_tsn_rec, chars=_hl_tsn_chars(_sig_lo - 40.0))
 check("HL TSN trailing blank column -> no geometry, never a degenerate box "
       "past the record's own printed extent",
       _ehl5.tsn_box(_hl_tsn_trail, "Sig Chg. Date") is None)
-_hl_tsn_over = dict(_hl_tsn_rec, chars=_hl_tsn_chars(_sig_lo + 30.0))
-check("...but a TSN blank column overlapping the record still gets its box",
-      _ehl5.tsn_box(_hl_tsn_over, "Sig Chg. Date") is not None)
+# The measured field defect: the record's last token ends a couple of points
+# INSIDE the window, so the overlap was non-empty and a sliver was drawn.
+_hl_tsn_graze = dict(_hl_tsn_rec, chars=_hl_tsn_chars(_sig_lo + 2.0))
+check("HL TSN blank column the record's ink merely GRAZES -> no geometry "
+      "(the 12 px Sig Chg. Date sliver two inspectors measured)",
+      _ehl5.tsn_box(_hl_tsn_graze, "Sig Chg. Date") is None)
+# Sig Chg. Date is the LAST column, so nothing can ever print to its right —
+# a blank there is never locatable from the record's own line. A bracketed
+# interior column still boxes.
+_mi_lo, _mi_hi = _ehl5._TSN_WINDOWS[_ehl5._TSN_WIN_KEY["Length (MI) [MI]"]]
+_hl_tsn_mid = dict(_hl_tsn_rec,
+                   chars=[{"x0": _mi_lo - 30.0, "x1": _mi_hi + 200.0,
+                           "top": 50.0, "bottom": 58.0, "text": "6"}])
+_hl_tsn_mid_box = _ehl5.tsn_box(_hl_tsn_mid, "Length (MI) [MI]")
+check("...but a TSN blank column the record BRACKETS still gets its box, "
+      "spanning the whole column window",
+      _hl_tsn_mid_box is not None
+      and _hl_tsn_mid_box[1][0] <= _mi_lo and _hl_tsn_mid_box[1][2] >= _mi_hi)
 # ...and the raw-token hook must read the PRINT's token, not the value
 # `_normalize_row` rewrote in place. Driven through the SHIPPED scan (a
 # monkeypatched pdfplumber, like check_intersection_detail_pdf) so moving the
