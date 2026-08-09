@@ -1,0 +1,2104 @@
+{
+ "acceptance_head": {
+  "commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+  "manifest_built_at": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+  "note": "the ONE exact git head every claimed result names and self-stamps; later commits on the branch may only touch docs"
+ },
+ "base_tree": {
+  "commit": "72adf447d45a2b74c562ba714008661a180c5d5f",
+  "export_matches_commit": true,
+  "export_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\base-tree",
+  "files_compared": 417,
+  "note": "the pre-fix defect signatures ran against this exported tree; it equals the recorded base commit file-for-file (LF-normalized)",
+  "runtime_digest_at_base": "4350EB8A2C83C859A4BA8FA845BC6CD96094F095570B088591981EB629DB97AF"
+ },
+ "built_utc": "2026-08-09T01:33:09+00:00",
+ "bundle": "RB-4",
+ "deliverables": {
+  "roots": [
+   {
+    "label": "base",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\base"
+   },
+   {
+    "label": "head",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\head"
+   },
+   {
+    "label": "lib",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\lib"
+   },
+   {
+    "label": "hf10-retained",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-10\\rb4-a1"
+   }
+  ],
+  "summary": {
+   "base": {
+    "bytes": 4182371416,
+    "count": 1489,
+    "rolled_sha256": "52DA12A924DDF0FCAF6ACAEA468598DAD7424987A4D3A1A25CE35E51B1DBCB3D"
+   },
+   "head": {
+    "bytes": 4172476057,
+    "count": 635,
+    "rolled_sha256": "08E9A455DCB55ADF71F2E56C479F766222B6305FA579C7D574D406991BC815A8"
+   },
+   "hf10-retained": {
+    "bytes": 1112951766,
+    "count": 270,
+    "rolled_sha256": "2853124B882B48E8E5110535B1C1C018321874E0257D2F24939704F88BE4904A"
+   },
+   "lib": {
+    "bytes": 12884277,
+    "count": 8,
+    "rolled_sha256": "613116FAF431FAD135E19C7CFEB11F25A7FF52F1BD2B2D1F170862D8423952AD"
+   }
+  }
+ },
+ "frozen_sources": {
+  "archive_bindings": [
+   {
+    "archive": "C:\\Users\\Yunus\\Downloads\\TSMIS\\ground-truth\\All Reports 7.9\\All Reports 7.9.zip",
+    "bytes": 202739676,
+    "extract_files_not_in_archive": [],
+    "matched": 2471,
+    "mismatched": [],
+    "sha256": "93AEA5B9E7180915615C9E75D934A759BBE51465086B54C9A0A1C0B157F7BC27"
+   },
+   {
+    "archive": "C:\\Users\\Yunus\\Downloads\\TSMIS\\ground-truth\\All Reports 7.9\\ramp_summary_excel.zip",
+    "bytes": 592912,
+    "matched": 126,
+    "mismatched": [],
+    "sha256": "E1BF10E6CA32A77A144CFAE320F9EE7FBBCB2177188DBE55698891DD45EE9B3D"
+   }
+  ],
+  "audit_sets": {
+   "roots": [
+    {
+     "binding": "frozen",
+     "binding_note": "the output audit's own retained scratch copy under Downloads\\TSMIS; nothing regenerates it in place",
+     "label": "audit-everything",
+     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-output-audit-claude-independent-2026-07-23\\everything-dest\\comparisons\\tsn"
+    },
+    {
+     "binding": "unbound",
+     "binding_note": "LIVE application output inside the MAIN repo working tree: any by-day rebuild at this run identity overwrites it, so the path is not frozen evidence. No frozen copy of the audited bytes exists — the only other copy of this folder (_scratch\\post-comparison-perfection-output-audit-2026-07-23\\comparisons\\tsn-by-day) is a DIFFERENT generation (764 of 791 files differ). Every recounted file here is instead bound to the Stage 1B witness hashes, and an unwitnessed file fails the build",
+     "label": "audit-byday",
+     "path": "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\output\\comparisons\\tsn-by-day\\2026-07-23 ssor-prod"
+    }
+   ],
+   "unmatched_in_witness": [],
+   "witness_manifest": {
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-output-audit-claude-independent-2026-07-23\\witness\\MANIFEST.json",
+    "sha256": "E14E2570FC6541FFD2691698BFC27C534A7D654820E9563B925BCD239FFDE2B7"
+   },
+   "witness_mismatches": []
+  },
+  "audit_summary": {
+   "audit-byday": {
+    "bytes": 1289806934,
+    "count": 795,
+    "rolled_sha256": "99D11A6E502598B3FDC0650AD8EF1317CB2261999BD1B6C70D60EC79290F625B"
+   },
+   "audit-everything": {
+    "bytes": 2200487206,
+    "count": 1170,
+    "rolled_sha256": "5BF34AA4E7FDCE1C4484DB041AF0A49C77387859C7057FF92CA380720BDDA053"
+   }
+  },
+  "note": "the exact inputs the acceptance read; per-file hashes in the detached inventory, rolled digests here",
+  "roots": [
+   {
+    "identity": "the frozen 2026-07-23 ssor-prod raw extract (the audit's Stage 1B source; no earlier archive exists — this manifest is its first per-file hash anchor)",
+    "label": "pull-2026-07-23",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-output-audit-claude-independent-2026-07-23\\raw-extract\\2026-07-23 ssor-prod"
+   },
+   {
+    "identity": "the ground-truth 2026-07-09 ssor-prod pull (bound to All Reports 7.9.zip)",
+    "label": "gt-7.9-ssor",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\ground-truth\\All Reports 7.9\\2026-07-09 ssor-prod"
+   },
+   {
+    "identity": "the ground-truth 2026-07-09 ars-prod outage substitute (bound to All Reports 7.9.zip)",
+    "label": "gt-7.9-ars",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\ground-truth\\All Reports 7.9\\2026-07-09 ars-prod"
+   },
+   {
+    "identity": "the Downloads TSN master library (the six datasets RB4-A1 provisions)",
+    "label": "tsn-library",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\tsn_library"
+   }
+  ],
+  "summary": {
+   "gt-7.9-ars": {
+    "bytes": 82609082,
+    "count": 868,
+    "rolled_sha256": "C643A65BD6801F4B51B4D761B8D3C6DCBEE53926506ACB0B86B4A2F671A54128"
+   },
+   "gt-7.9-ssor": {
+    "bytes": 199434024,
+    "count": 1729,
+    "rolled_sha256": "36C91C3A965811DAEBE11AD47D8C55E9E4011D49DBF34A5B7F19624C6D98CF34"
+   },
+   "pull-2026-07-23": {
+    "bytes": 285635268,
+    "count": 2380,
+    "rolled_sha256": "0810E82975E9EBECA52EF7F7BD172A1866357CEBEE230FD159C751E9130CB9A6"
+   },
+   "tsn-library": {
+    "bytes": 46987426,
+    "count": 38,
+    "rolled_sha256": "3519DB083D3CB48D5C0FBE655C663B34EA3456471A603803C852BB2B5818770B"
+   }
+  }
+ },
+ "harness": {
+  "driver": {
+   "committed_at_head": true,
+   "repo_path": "build/run_rb4_acceptance.py",
+   "sha256_lf": "4532C2E5BA5CAAB61F8B9E28CCDC8D38EE3B07A8445E866D4EEAAE765031DE35"
+  },
+  "files": {
+   "INSPECTION-PROMPT.md": {
+    "bytes": 8027,
+    "sha256": "57F9719850315F966CD847D25D09964A43D9C94D77A87B915BB5FFC2B2435F71"
+   },
+   "acc_rb4_inspect_manifest.py": {
+    "bytes": 8973,
+    "sha256": "6B898BCBFD305069B0C9E149101139A6DBCDF4A5113FAA1779C493787FCFE3A4"
+   },
+   "acc_rb4_manifest.py": {
+    "bytes": 36965,
+    "sha256": "D71F633FFB9CF86FD39E10E46F3550297AFD49EE01881EA6124B6D4DFC40B3D3"
+   },
+   "acc_rb4_witness.py": {
+    "bytes": 22176,
+    "sha256": "43D991DAC4EB3A6CD64D23C5822ACA02601F23A8109D7EB20EF9DFF06C5B9C2D"
+   },
+   "gather_deliverable.py": {
+    "bytes": 5036,
+    "sha256": "E9E94AE010738756820BD69BF3BA95F728A2E098BF5833D44801F594B84FD8A8"
+   },
+   "pilot_cell.py": {
+    "bytes": 2666,
+    "sha256": "DC1F275686C6D403BA2FD5605E6C771E09C4AC1EA512D25C27FD5152DCC3D690"
+   },
+   "probe_env.py": {
+    "bytes": 3692,
+    "sha256": "03E3D9ED2B76A3ED811F1837FFC446EC8A134038EC2C5675A3A422E9504DDEA6"
+   },
+   "probe_generate.py": {
+    "bytes": 3587,
+    "sha256": "A92BF807F2C3002B0AE290C19359A86467A35ACBE0D2514735ABF84F16B91422"
+   },
+   "probe_validate_env.py": {
+    "bytes": 4765,
+    "sha256": "A10BF9233B09852062AC5260D7C9D3AF40F3AF56CAC12DE2E4380E4C9CB1CD95"
+   },
+   "probe_validate_tsn.py": {
+    "bytes": 2981,
+    "sha256": "FCD77DEC73203582105D9343847B7458E4E17DFCF0CA0F5B2F3A4F8CCFE206E1"
+   },
+   "rb4_chain.sh": {
+    "bytes": 1535,
+    "sha256": "DFFBE1BC1660E9BF58CF63D511E16D4F8978CB9CB74B489C4DE196F1F1397938"
+   },
+   "rb4_chain2.sh": {
+    "bytes": 2272,
+    "sha256": "064119DE5B73C76154732EFA5CF7D3E2C8AA360E3AC67978E8B0816E35F17AAB"
+   },
+   "rb4_chain3.sh": {
+    "bytes": 1246,
+    "sha256": "7CF5ED34BAE300C4B10C2971E603E3E341C03105787A066D73DEA40237DE967A"
+   },
+   "rb4_chain4.sh": {
+    "bytes": 1668,
+    "sha256": "5B7EF2CF8FAA632CF5E0C91FB535C69379A99F10D4A2C229900C6BCAA58AE6AC"
+   },
+   "rb4_chain5.sh": {
+    "bytes": 2000,
+    "sha256": "FBA35D443CD52AEE108980A3405D86AF13EDED48316DA2C765827FDFC1262F92"
+   },
+   "rb4_chain6.sh": {
+    "bytes": 4296,
+    "sha256": "8FF762DA6116E347A373573A6AD77F8E2B9CBF5EDCF808073E8FC4AA1B35A9A5"
+   },
+   "rb4_chain7.sh": {
+    "bytes": 4414,
+    "sha256": "CB1C587B9B0C7DEE99B3F26C51033EFDCEEC0C60FDD5BD24B590D4D74646CA28"
+   },
+   "rb4_chain8.sh": {
+    "bytes": 4579,
+    "sha256": "CB38402A9B540C5FB4A464FDA5FB512D32A752BA9FDF801FD22B7576225B176D"
+   },
+   "rb4_chain9.sh": {
+    "bytes": 4708,
+    "sha256": "995278758B62DF8D754A228B5932C687F4F183730DE92ED8EA8FA92ACC2E73F5"
+   },
+   "slice_inspection.py": {
+    "bytes": 2460,
+    "sha256": "9608F7C04049F586159885385F5D9C033E1EDDB98F3CC7E5ED62A29BB7B41615"
+   },
+   "write_inspection_record.py": {
+    "bytes": 3658,
+    "sha256": "33E82AE56C3CBACAD749978C8A8BAA5D1330691B76A27C509A39E441FA30073D"
+   }
+  },
+  "location": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\harness",
+  "note": "the acceptance tooling that produced every result here"
+ },
+ "id": "RB4-A1",
+ "input_replicas": {
+  "mismatches": [],
+  "note": "every file the driver provisioned for the app to read, re-hashed AFTER the run: unchanged, and equal to its frozen source — the run never mutated an input. The TSN library's derived caches (consolidated/normalized) are excluded: the acceptance rebuilds them by design and their post-run state is bound as a deliverable",
+  "roots": [
+   {
+    "label": "base/output/2026-07-23 ssor-prod",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\base\\output\\2026-07-23 ssor-prod"
+   },
+   {
+    "label": "base/store/ars-prod",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\base\\store\\ars-prod"
+   },
+   {
+    "label": "base/store/ssor-prod",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\base\\store\\ssor-prod"
+   },
+   {
+    "label": "base/store/ssor-test",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\base\\store\\ssor-test"
+   },
+   {
+    "label": "head/output/2026-07-23 ssor-prod",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\head\\output\\2026-07-23 ssor-prod"
+   },
+   {
+    "label": "head/store/ars-prod",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\head\\store\\ars-prod"
+   },
+   {
+    "label": "head/store/ssor-prod",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\head\\store\\ssor-prod"
+   },
+   {
+    "label": "head/store/ssor-test",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\head\\store\\ssor-test"
+   },
+   {
+    "label": "lib/tsn_library",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\lib\\tsn_library"
+   }
+  ],
+  "summary": {
+   "base/output/2026-07-23 ssor-prod": {
+    "bytes": 285635268,
+    "count": 2380,
+    "rolled_sha256": "0810E82975E9EBECA52EF7F7BD172A1866357CEBEE230FD159C751E9130CB9A6"
+   },
+   "base/store/ars-prod": {
+    "bytes": 82609082,
+    "count": 868,
+    "rolled_sha256": "C643A65BD6801F4B51B4D761B8D3C6DCBEE53926506ACB0B86B4A2F671A54128"
+   },
+   "base/store/ssor-prod": {
+    "bytes": 285635268,
+    "count": 2380,
+    "rolled_sha256": "0810E82975E9EBECA52EF7F7BD172A1866357CEBEE230FD159C751E9130CB9A6"
+   },
+   "base/store/ssor-test": {
+    "bytes": 199434024,
+    "count": 1729,
+    "rolled_sha256": "36C91C3A965811DAEBE11AD47D8C55E9E4011D49DBF34A5B7F19624C6D98CF34"
+   },
+   "head/output/2026-07-23 ssor-prod": {
+    "bytes": 285635268,
+    "count": 2380,
+    "rolled_sha256": "0810E82975E9EBECA52EF7F7BD172A1866357CEBEE230FD159C751E9130CB9A6"
+   },
+   "head/store/ars-prod": {
+    "bytes": 82609082,
+    "count": 868,
+    "rolled_sha256": "C643A65BD6801F4B51B4D761B8D3C6DCBEE53926506ACB0B86B4A2F671A54128"
+   },
+   "head/store/ssor-prod": {
+    "bytes": 285635268,
+    "count": 2380,
+    "rolled_sha256": "0810E82975E9EBECA52EF7F7BD172A1866357CEBEE230FD159C751E9130CB9A6"
+   },
+   "head/store/ssor-test": {
+    "bytes": 199434024,
+    "count": 1729,
+    "rolled_sha256": "36C91C3A965811DAEBE11AD47D8C55E9E4011D49DBF34A5B7F19624C6D98CF34"
+   },
+   "lib/tsn_library": {
+    "bytes": 46987426,
+    "count": 38,
+    "rolled_sha256": "3519DB083D3CB48D5C0FBE655C663B34EA3456471A603803C852BB2B5818770B"
+   }
+  }
+ },
+ "inventory": {
+  "bytes": 8025009,
+  "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\rb4-a1-inventory.json",
+  "sha256": "02E917111299A9A677435DB5FED2C95F3CEF3EEC86B095A5F38B19A3F3CB19A1"
+ },
+ "problems": [],
+ "purpose": "bind the complete RB4-A1 acceptance set (HF-05 exact-source evidence + HF-10 env evidence lane) to one exact runtime head, the recorded base runtime, and the frozen inputs",
+ "results": {
+  "all_claimed_same_head": true,
+  "claimed": 7,
+  "count": 60,
+  "entries": [
+   {
+    "base_commit": "72adf447d45a2b74c562ba714008661a180c5d5f",
+    "base_stamp": {
+     "tree": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\base-tree",
+     "tree_commit": "72adf447d45a2b74c562ba714008661a180c5d5f",
+     "tree_runtime_dirty": false
+    },
+    "bytes": 22763,
+    "class": "base-signature",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\base-red-checks.json",
+    "role": "checks-at-base",
+    "sha256": "21B1030AAEAF94850E894CE4BF46FAAD930B0873728DDEFA946698C94F801CBE"
+   },
+   {
+    "bytes": 568,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\base-tree-binding.json",
+    "role": "log",
+    "sha256": "E81D360B38BA080299B1FABDC3046BF0262DE8DA0CF39B299A4D6DF29E9A2920"
+   },
+   {
+    "bytes": 5927,
+    "class": "acceptance",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\cameras-head.json",
+    "role": "cameras",
+    "runtime_head_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+    "self_stamp": {
+     "tree_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+     "tree_runtime_dirty": false
+    },
+    "sha256": "9AC0366B4C6B3A1583F85831F6032D57B50903EA7DAAB605D68F6601A95D7539"
+   },
+   {
+    "bytes": 5986,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\checks-at-head.json",
+    "role": "log",
+    "sha256": "A54D21B4B2A4D6BB4D2E2BBE92BE36430C386A809EDB92AD7A90AD8429DD569C"
+   },
+   {
+    "base_commit": "72adf447d45a2b74c562ba714008661a180c5d5f",
+    "base_stamp": {
+     "tree": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\base-tree",
+     "tree_commit": "72adf447d45a2b74c562ba714008661a180c5d5f",
+     "tree_runtime_dirty": false
+    },
+    "bytes": 33090,
+    "class": "base-signature",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\counts-base.json",
+    "role": "counts",
+    "sha256": "39E7BC26042B500D9CB93CD44145646D5471D62ACC1C49C38794417D36368F64"
+   },
+   {
+    "bytes": 32994,
+    "class": "acceptance",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\counts-head.json",
+    "role": "counts",
+    "runtime_head_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+    "self_stamp": {
+     "tree_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+     "tree_runtime_dirty": false
+    },
+    "sha256": "611E32B62355E9B3EFDBFC67A25A49FA3EDC5A4028D70CE442452DA73BCC4EF3"
+   },
+   {
+    "bytes": 27997,
+    "class": "acceptance",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\excel-head.json",
+    "role": "excel",
+    "runtime_head_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+    "self_stamp": {
+     "tree_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+     "tree_runtime_dirty": false
+    },
+    "sha256": "0B55818C9E7B79D40FB286015086763F20015A294D49CC9F4E9BFEECD23109EA"
+   },
+   {
+    "bytes": 80386,
+    "class": "base-log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\generation-base-byday-retry.json",
+    "role": "generate",
+    "sha256": "0C710D4C9B76DC421F1D2655860B743965AE089E014988FF1686FC21D31F1733"
+   },
+   {
+    "bytes": 17511,
+    "class": "base-log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\generation-base-pve-retry.json",
+    "role": "generate",
+    "sha256": "3F66887834D4994197C51A4D7818C09899C20A95958A9A71679ED55D90168CAA"
+   },
+   {
+    "bytes": 74753,
+    "class": "base-log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\generation-base-retry.json",
+    "role": "generate",
+    "sha256": "877EE06462D33FA514BD893B119BBC352C5B64FC4D5BED2806204822748227C3"
+   },
+   {
+    "bytes": 108745,
+    "class": "base-log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\generation-base.json",
+    "role": "generate",
+    "sha256": "6860095CA00FAC54E07BD2946D4D4A3D405918561A4A27CAD2101251ABAC58B8"
+   },
+   {
+    "bytes": 224383,
+    "class": "acceptance",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\generation-head.json",
+    "role": "generate",
+    "runtime_head_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+    "self_stamp": {
+     "tree_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+     "tree_runtime_dirty": false
+    },
+    "sha256": "E9A9F377953E9B98266CDB82893BD2116C93F116FEB38F695A8A1102407EF4FB"
+   },
+   {
+    "bytes": 8980,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\inspection-chain7-round1.json",
+    "role": "log",
+    "sha256": "32EA53CCC775311F37569CAA512E11DCB99C6549BA06E673D89BC55AA420B881"
+   },
+   {
+    "bytes": 456539,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\inspection-manifest.json",
+    "role": "log",
+    "sha256": "6A955A25FCEE4B833D00FE18A945ECBAF481F26C91E76303B3151FB8E1F817D2"
+   },
+   {
+    "bytes": 176142,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\inspection-round1.json",
+    "role": "log",
+    "sha256": "8EF3F98D2E8CD2EF2CA6213DC90D3951155BCC22C7689D37EB72E1495758B74A"
+   },
+   {
+    "bytes": 149271,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\inspection-round2.json",
+    "role": "log",
+    "sha256": "B06DDE3802EE5EADD41A22BA97FF5506F04962797698B239255CB7AB699A089F"
+   },
+   {
+    "bytes": 513399,
+    "class": "census",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\prefix-defect-census.json",
+    "role": "census",
+    "sha256": "A8ACEC4B876703F47233EC940C4AE07096729E61ABF82D7AD33ABD89E42358A5"
+   },
+   {
+    "bytes": 8253703,
+    "class": "provision",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\provision.json",
+    "role": "provision",
+    "sha256": "D4D4B2666BA8C1ED782B71DED18334F24FE766A7EEA607552C51E3C120FF0C17"
+   },
+   {
+    "bytes": 152201,
+    "class": "acceptance",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\validate-head.json",
+    "role": "validate",
+    "runtime_head_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+    "self_stamp": {
+     "tree_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+     "tree_runtime_dirty": false
+    },
+    "sha256": "6E5018D86064EF2509E62E77163AEFA45599C7A2E7674DB3B4A7B5B7ACE32E24"
+   },
+   {
+    "bytes": 87372,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\cameras-head.log",
+    "role": "log",
+    "sha256": "2EF58366A870E15DCF9BE68488D014D512B843B1B25E8288FB05568203DA1CEF"
+   },
+   {
+    "bytes": 3280802,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\chain.log",
+    "role": "log",
+    "sha256": "407A82DC66A14B0754845E010E69F2F15755AD33DF145F49FE572D89BAA8875C"
+   },
+   {
+    "bytes": 2825702,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\chain2.log",
+    "role": "log",
+    "sha256": "95DBC9DB3E5C314470633D043B86D04759B55921887FDC0AFED7829308D8590F"
+   },
+   {
+    "bytes": 129250,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\chain3.log",
+    "role": "log",
+    "sha256": "89F0AF530D3FF89C37B433BDA1CC3B502A97E0072EC3CFFAADA311048C6B77A6"
+   },
+   {
+    "bytes": 77640,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\chain4.log",
+    "role": "log",
+    "sha256": "DC074E7011388C9C48E4290365AA65E3CEE99ADFBF27684B10BC91CA912CE592"
+   },
+   {
+    "bytes": 2702915,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\chain5.log",
+    "role": "log",
+    "sha256": "2B8C8A26475A4A9DECC77311B7AFE93ACE47BAF500C38A0B844DDF78BFC7CB40"
+   },
+   {
+    "bytes": 883,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\chain6-driver.log",
+    "role": "log",
+    "sha256": "B31FFD64C6FF9FDF506BF0002948FAA9373CE811DAEC8BCB49A5958D6CB5F0CC"
+   },
+   {
+    "bytes": 2861490,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\chain6.log",
+    "role": "log",
+    "sha256": "5FC953FD93D216DBCA4714C2195CCA19A7B454F5C7EEC5F4746AC3CC46E27488"
+   },
+   {
+    "bytes": 883,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\chain7-console.log",
+    "role": "log",
+    "sha256": "8E17A97EC195B930168E309802F92559FC0C9B7EC01F56FE186A92B0B7B9531A"
+   },
+   {
+    "bytes": 2859073,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\chain7.log",
+    "role": "log",
+    "sha256": "E34EC62FD10ABFF8E706D50A63FB3E0EA480B7088C13313BCD44DE045F8C875D"
+   },
+   {
+    "bytes": 883,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\chain8-console.log",
+    "role": "log",
+    "sha256": "F9AAEDACE184A7DE9712D37F1D87C1CD0D8AD077E2EE766491C1EA49CB47DAED"
+   },
+   {
+    "bytes": 2858975,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\chain8.log",
+    "role": "log",
+    "sha256": "F8201458843553E895278598FF7E0665805B0DEEEEAD52A35BEA8D7F04D1B899"
+   },
+   {
+    "bytes": 883,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\chain9-console.log",
+    "role": "log",
+    "sha256": "DFD6C445C87963FEA3D5C6DBE6D89AD60F888FEBF0A8EADD6F4FFEB21E0AD235"
+   },
+   {
+    "bytes": 2858977,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\chain9.log",
+    "role": "log",
+    "sha256": "AFB9D4370A2926C2D7D12508DF62C98F0265DC68795F08F4AE4E9ED90F1914E9"
+   },
+   {
+    "bytes": 6584,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\checks-at-head.log",
+    "role": "log",
+    "sha256": "F47F7FD1E4C9439B69438B771D822C660BAEB746036924576720575280C057E1"
+   },
+   {
+    "bytes": 115260,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\driver-cameras-head.log",
+    "role": "log",
+    "sha256": "44A742F845CDE4C1E0DED420B2FAC3569C75D1FE4E91A95A7081D45718D0D35F"
+   },
+   {
+    "bytes": 1722,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\driver-census.log",
+    "role": "log",
+    "sha256": "802DDB75F27594EE504F55EAA1DB38882016924C0083763EAD03FC123DB64E11"
+   },
+   {
+    "bytes": 11888,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\driver-checks-at-base.log",
+    "role": "log",
+    "sha256": "E5D99E970995AA3F2013FC951717226FF7E7EF6647DA42376290B201C19FBD59"
+   },
+   {
+    "bytes": 1005,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\driver-counts-base.log",
+    "role": "log",
+    "sha256": "8210204C06852E3CF2770634C430D5E830D8726F9772AFD400163C46846DA1E9"
+   },
+   {
+    "bytes": 2224,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\driver-counts-head.log",
+    "role": "log",
+    "sha256": "1928A3FAC44E42753717AC08AAB04AE95F0F3B98C0678A131A7CA2E04340EECC"
+   },
+   {
+    "bytes": 38603,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\driver-excel-head.log",
+    "role": "log",
+    "sha256": "1F4AD48B7A4DD5A7CFCDA36EDCCEF666140291378BF1F74A55F0D90F0BB3BEED"
+   },
+   {
+    "bytes": 2159326,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\driver-generate-base.log",
+    "role": "log",
+    "sha256": "D91E11AFAF8ED4717794D8534DA24EA2A0CDF89DE265DCD6A3B26A3CD5A761B7"
+   },
+   {
+    "bytes": 19908919,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\driver-generate-head.log",
+    "role": "log",
+    "sha256": "3ABE26D87C8BD76D5921FD04621285B260C006C91D67EDB28A2601439FBDA3FC"
+   },
+   {
+    "bytes": 946,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\driver-provision.log",
+    "role": "log",
+    "sha256": "30FDDBD62F4F993D7C159C852436F9183EDBE6800914753BA343D3293B5B3BD0"
+   },
+   {
+    "bytes": 3404,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\driver-validate-head.log",
+    "role": "log",
+    "sha256": "AC82C8C9FFCCD2C04FE4A509178EC24C20380E5962D20F94F000234F08F4C595"
+   },
+   {
+    "bytes": 9721,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\gate-amended-1.log",
+    "role": "log",
+    "sha256": "FFF1D0F26787ACC55997DB6DC653F251EDE786570D478B8D2D6E88D3C56704ED"
+   },
+   {
+    "bytes": 6587,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\gate-amended-2.log",
+    "role": "log",
+    "sha256": "58590B221147E1A1ECECF74267715BC34B890A01FEAA301FCBA28C62E66F5491"
+   },
+   {
+    "bytes": 278947,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\generate-base-byday-retry.log",
+    "role": "log",
+    "sha256": "AB8E96E6A24D5B6E7345A06E9E678CB4EDA9F8D0C2BC2EB3019552214F881EAF"
+   },
+   {
+    "bytes": 20421,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\generate-base-pve-retry.log",
+    "role": "log",
+    "sha256": "499A38FED109BE54A7EF1DFF524F3DF6332D927F94404724D5366EC4974543A0"
+   },
+   {
+    "bytes": 94681,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\generate-base-retry.log",
+    "role": "log",
+    "sha256": "D808F5F4E598264BCD571EF1794314415AF09B2009D156F61D6E1B8CDFC93737"
+   },
+   {
+    "bytes": 1725582,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\generate-base.log",
+    "role": "log",
+    "sha256": "8ECCD72EF1529BBF3230CE98998498E38501DEB09F353BDB43528BAD14AAAFD5"
+   },
+   {
+    "bytes": 56044,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\generate-head-rerender.log",
+    "role": "log",
+    "sha256": "AAF2844B917E8111DDF7A0E7096FD86334A80EA3F27A6148E633CD69F27BE901"
+   },
+   {
+    "bytes": 108093,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\generate-head-resume.log",
+    "role": "log",
+    "sha256": "70FD1EFF63677969AEDD351BFD416907F435F847CC8602E75A08971B9C0E8C03"
+   },
+   {
+    "bytes": 19658039,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\generate-head.log",
+    "role": "log",
+    "sha256": "59F707AAAFFFC80FC5772F23BFD993732855CFB7E53F83F4DDF8106B0C3A1C75"
+   },
+   {
+    "bytes": 791,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\pilot-highway_sequence_pdf-tsn.log",
+    "role": "log",
+    "sha256": "6FF954B9D8582EBD258A605DBAAD7D9263B3ABB27AEB06B97964B3C924D6E262"
+   },
+   {
+    "bytes": 1209,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\pilot-hl-tsn.log",
+    "role": "log",
+    "sha256": "9928F89D7EBAE964D8848261F403F401C4F2F1BB611D60367E0801058CBA651B"
+   },
+   {
+    "bytes": 2363,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\pilot-intersection_detail_pdf-tsn.log",
+    "role": "log",
+    "sha256": "FB2810614EF8C0870A3018358E1B7CF153D20A6F5AEF427EB84DAE932FD840F4"
+   },
+   {
+    "bytes": 1595,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\pilot-ramp_detail_pdf-tsn.log",
+    "role": "log",
+    "sha256": "0B4B807DB37B34AF7EA409CC2C3C94854C7D8B79B4BA7119B75AF19BD2DB9E61"
+   },
+   {
+    "bytes": 7249,
+    "class": "acceptance",
+    "path": "C:\\Users\\Yunus\\Projects\\wt-rb4\\docs\\planning\\post-comparison-perfection-output-audit\\hotfix-bundles\\HF-05\\witness\\rb4-a1-summary.json",
+    "repo_path": "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-05/witness/rb4-a1-summary.json",
+    "role": "committed-witness",
+    "runtime_head_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+    "sha256": "D4948173986187210E3EB062292817237789A1327DF2F02B22835FAD35DAF091"
+   },
+   {
+    "bytes": 5849,
+    "class": "acceptance",
+    "path": "C:\\Users\\Yunus\\Projects\\wt-rb4\\docs\\planning\\post-comparison-perfection-output-audit\\hotfix-bundles\\HF-10\\witness\\rb4-a1-env-summary.json",
+    "repo_path": "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-10/witness/rb4-a1-env-summary.json",
+    "role": "committed-witness",
+    "runtime_head_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+    "sha256": "03B7C38BD99610CDD5EF5F9DFC433360BE1F2894D8D452E552097FD52BDD3A05"
+   },
+   {
+    "bytes": 8025009,
+    "class": "inventory",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\rb4-a1-inventory.json",
+    "role": "inventory",
+    "sha256": "02E917111299A9A677435DB5FED2C95F3CEF3EEC86B095A5F38B19A3F3CB19A1"
+   }
+  ],
+  "note": "every retained result, log and committed witness; claimed (class=acceptance) entries name AND self-stamp the one acceptance head",
+  "off_head": [],
+  "unstamped": []
+ },
+ "runtime": {
+  "head": {
+   "files": {
+    "gate": {
+     "build/_checklib.py": {
+      "sha256_lf": "6F40309FFDCF741B7916C22AEA91EDBC059FC28B345DA81930CB40670712FF41"
+     },
+     "build/_hl_fixture_pdf.py": {
+      "sha256_lf": "54D8EDFFE8365AE764CB65526B4EE8476F69B422144AF37E5414EE2D127D29DD"
+     },
+     "build/app.ico": {
+      "sha256_lf": "B4CE532ABCCAF2387FBF835DB4D2009D8ED53D6F52000746DD99176A15D8764D"
+     },
+     "build/app.manifest": {
+      "sha256_lf": "9BE01484E42B43F937CBD6958FE3D6AE0F3F8563886F9572563E72CE43C93C91"
+     },
+     "build/app.spec": {
+      "sha256_lf": "2B1D371FDE6F3C81A66962D2153574530B4E8F54AEF392CA7EBC534828CC1A29"
+     },
+     "build/backfill_release_notes.ps1": {
+      "sha256_lf": "9DF46B1924F78E90686137A9D4C8E310EE13D2178BE40E307E7F1BB827BCFAE2"
+     },
+     "build/bind_rb4_base_tree.py": {
+      "sha256_lf": "9BFA91E3EE4BC30A2D32B03236F783F7F000FA9CE858ED2DEDCF2FCF9F1D7805"
+     },
+     "build/build.ps1": {
+      "sha256_lf": "19ED6F977C57F0213FBB542E40F260F8C93A1185E0BAD0149E30E303715A9575"
+     },
+     "build/build_phase8_highway_sequence_raw_tsn_direct_twin.py": {
+      "sha256_lf": "86D271619F4E446590FE6EDAA40E9E85D74DA2CA9623F9A5BFCF7877C7101EA5"
+     },
+     "build/build_phase8_highway_sequence_raw_tsn_twin.py": {
+      "sha256_lf": "761C7A09F47E752E7ECA45D03C66E1710BE14AFE535BEA1D901BDB84FE694F7D"
+     },
+     "build/cache_phase8_highway_sequence_tsn_rows.py": {
+      "sha256_lf": "8C5DDAD23110C1A33A727D3BAF2CA4B013F38E6C3059147652A2869B25FDB3E4"
+     },
+     "build/check_a1_filenames.py": {
+      "sha256_lf": "D660C0C954B723D1931E13A1AE845F78C96AFCDD5F052B3252725397BB13279E"
+     },
+     "build/check_a2_compare_filter.py": {
+      "sha256_lf": "05C42F1B70A5A0024B0E9C304DF679E3A69E3069B6670D2621E8AE6794CB0B96"
+     },
+     "build/check_app_manifest.py": {
+      "sha256_lf": "61A991DD166C5F02221B3E4538EB2370C8CBD5C4EEDAFFD98080D3FD99EBB347"
+     },
+     "build/check_app_modules.py": {
+      "sha256_lf": "C4ED43BB7F4A1F1BFA39FB380735AAD9F229011E05B6C93C33786AFCA3C6EFDF"
+     },
+     "build/check_artifact_store.py": {
+      "sha256_lf": "42EF3AB19C9C90CE28E79EDA078E0497B5A8AC31E9B85BE506E4A11090D4FA9B"
+     },
+     "build/check_auth_reliability.py": {
+      "sha256_lf": "942C0A8659275B3A6B18BF28586C91D63A88E30CAE0A006CA9816CCC58A0FD0B"
+     },
+     "build/check_b1_pause.py": {
+      "sha256_lf": "2CFC53DB28A1874484F955EBCE43B853504718731EB130495B5B4DDA942FF486"
+     },
+     "build/check_b2_autoconsolidate.py": {
+      "sha256_lf": "46E12634C6B64E28F6A2647D45C08B591ACFEE9A8A3DBCAD040A2F2B5B4C67D6"
+     },
+     "build/check_b3_batch.py": {
+      "sha256_lf": "736F7A1A22A21EAD617E4D23EBC335626A4045D04F7FD745E61CA3A40DF4FCF8"
+     },
+     "build/check_baseline_matrix.py": {
+      "sha256_lf": "E5CD2C6BEA401A109DAE0638ADB9F08C703F25710582B395F4A997327D116836"
+     },
+     "build/check_batch_outcome.py": {
+      "sha256_lf": "CD34C87D54419F0CD270A0F0CDA6326B5BAA46483EE7B73F0C4952B9AAC21084"
+     },
+     "build/check_build_env.py": {
+      "sha256_lf": "09ED86CA96E21ED86931ABC089FC737D6C184092F3D22C82516038752CB9AC4A"
+     },
+     "build/check_ci_manifest.py": {
+      "sha256_lf": "403EE04B972AC2647BC6E72FD6C1E50B776E5B6E0CAA038F2934AD82AC3ED97B"
+     },
+     "build/check_classic_comparison_outcome.py": {
+      "sha256_lf": "345A04A7F87F8133A64B71301C636E62511CB7782D959EF21CAEF97BDB49137E"
+     },
+     "build/check_clean_road.py": {
+      "sha256_lf": "153BD1AFCC2ABFF6E60BEC063AA81D87FBA747FC44A2A49D6F148DC254B41260"
+     },
+     "build/check_coalesce_editions.py": {
+      "sha256_lf": "6434FBD373336A2CDD864D870343163153C1E4455B0EDFACF0BD1C0A4BA51106"
+     },
+     "build/check_compare_audit.py": {
+      "sha256_lf": "18EFC2A201B308602D2E780A0C670876CA7BBD880F6D59A3F93F23A046ACAD0C"
+     },
+     "build/check_compare_blankkey.py": {
+      "sha256_lf": "A1E6C6565A5E78A09EA5E87FFEE878B378608E7DEAEA3BD670444C0620B6E4CE"
+     },
+     "build/check_compare_build_freshness.py": {
+      "sha256_lf": "A87984F7BC4F5AC0E449C0764230365EB7147218336EF0ECBE8CE0837F91DCB3"
+     },
+     "build/check_compare_cancel_visibility.js": {
+      "sha256_lf": "BC35D160EA6E0C4F41845B3748631205A583620E568686998DC71445EE67076E"
+     },
+     "build/check_compare_cancellation.py": {
+      "sha256_lf": "C8FF29A965DC4C502AE6ACF3F5E51FE4BFDFEEFC42DA220F4A50467CEA561463"
+     },
+     "build/check_compare_coercion.py": {
+      "sha256_lf": "219DE30F5C82CED8F5502511929FAF144AEAB3EFFDEB6021BAFABA6BF36B0D08"
+     },
+     "build/check_compare_consolidated_layout.py": {
+      "sha256_lf": "0BEE97E29756829B55DBF004B2D0F4D8CF2C350BC2B2CC72E9909AEC4411675B"
+     },
+     "build/check_compare_dirs_race.js": {
+      "sha256_lf": "A9648DDAD7F4969E0DB1C2A965A29E1B17F7FF7028829DC0A3E9582E4F13E934"
+     },
+     "build/check_compare_ditto.py": {
+      "sha256_lf": "9C1C90CBDAAE229851D817705B2F706A8478F1698A82DB825871D5B44475FFC7"
+     },
+     "build/check_compare_dupmatch.py": {
+      "sha256_lf": "D8D7A56173DA9DA7B633CA7B539265B7A40E1DCAB2B40218485C20AE6DE0F6D7"
+     },
+     "build/check_compare_env_field_labels.py": {
+      "sha256_lf": "EA24D9D43252D2C1207CEA7F324AB46A42C1E16A2C557AD3824CF414F3CFDCA7"
+     },
+     "build/check_compare_env_flat_schema.py": {
+      "sha256_lf": "CD3B299AAA008406E4A5DEFE472D816AFB9462AEC9709D091723E6F3549E5479"
+     },
+     "build/check_compare_env_highway_log.py": {
+      "sha256_lf": "8499973C4420C84ECA5FA19D5D1A37456B94D3709AA18603318794737BAA7FFA"
+     },
+     "build/check_compare_env_highway_log_pdf.py": {
+      "sha256_lf": "E3159965484DB5CA8B14FD3B02EC0E9986CFC90ECB460AD0DE54EA1E3E440F5F"
+     },
+     "build/check_compare_env_intersection.py": {
+      "sha256_lf": "8ABE6F5DC81303C3204E41121C0866402A4165D0596C3303A330AE96EBA7A41E"
+     },
+     "build/check_compare_env_pdf_completion.py": {
+      "sha256_lf": "9DBA2FAB966351AB2615EFC447016D9CB03AF49F1638FD6C31606F9809F98E3B"
+     },
+     "build/check_compare_env_route_universe.py": {
+      "sha256_lf": "1E6D40C53CCB37CD9E803B4BD37390C61A228FB27C58B9E19A607D5469A2E0D9"
+     },
+     "build/check_compare_env_sidelabel.py": {
+      "sha256_lf": "7F0738BE242C2497D4C7936F7F78154C9C3AE85DDA423E03B519C46B8751E2B4"
+     },
+     "build/check_compare_equality_policy.py": {
+      "sha256_lf": "8B882A60FBEA023CACB1ED594434C07475B199D8E1707B9B6AE70021769F6528"
+     },
+     "build/check_compare_highway_detail_tsn.py": {
+      "sha256_lf": "BA435ACBD2C7840ED6AC6753143A5D4D3B1247FB5BC57747D52E0A9DFD059B75"
+     },
+     "build/check_compare_highway_log.py": {
+      "sha256_lf": "34F4A554E9F1601C037EC378B426A10F0CA398AFCD0E10F8C7BE346FF02281CB"
+     },
+     "build/check_compare_highway_sequence.py": {
+      "sha256_lf": "647689FF7F16AFB1A256222015E6CBE25ED3AA8499202281E651BFBFC5F524A6"
+     },
+     "build/check_compare_highway_sequence_tsn.py": {
+      "sha256_lf": "D4C7436B6419BF23785F3B36ABF1A0811F0C6B013C711ADD15750E629F51DDCD"
+     },
+     "build/check_compare_injection.py": {
+      "sha256_lf": "637087CE2F10F4C6648EA74CDCB693E6EE66E2A17500CE24EE0AE7A970413450"
+     },
+     "build/check_compare_input_outcomes.py": {
+      "sha256_lf": "31564D6F5E73F14D3D956EF70F09B22F6998A6BE2279E4258CB88B5EEEC330D9"
+     },
+     "build/check_compare_input_recipe_binding.js": {
+      "sha256_lf": "DCE61D3082BAB6B8521FC687D6E075D0B09B00451D82255696A6A0F69F50C45F"
+     },
+     "build/check_compare_intersection_detail_tsn.py": {
+      "sha256_lf": "918E6721C0D5265BD5F7028C4EFF94C1593E5587BFA70751668A8FAAE067142E"
+     },
+     "build/check_compare_intersection_summary_tsn.py": {
+      "sha256_lf": "050C42F4C02E6D3D8F26A658A59DBF1261884B480081E9C1BD9964437858415B"
+     },
+     "build/check_compare_keyfield.py": {
+      "sha256_lf": "0A38699BC7D1F10F82290494B536416B0B0A66E4D2724751358364BDCD23F4E9"
+     },
+     "build/check_compare_limits.py": {
+      "sha256_lf": "1D9D59F431121049E24ED47197250F36FDB9A47860559C3ABED48153E6797691"
+     },
+     "build/check_compare_overwrite_consent.js": {
+      "sha256_lf": "440CE3323786280AAD1E2763F605801DAC62FB3AE352A8D1A36EFF2BD8D4A737"
+     },
+     "build/check_compare_pairing_policy.py": {
+      "sha256_lf": "2B65336105DF90B5C5E337058814E88FD24540B5251FFC99EBB30CF27D0FD2AA"
+     },
+     "build/check_compare_physical_identity.py": {
+      "sha256_lf": "0E2073FA3030396A9D31050C91032763B0137618945C0E07AA10870DDFAA3330"
+     },
+     "build/check_compare_ramp_detail.py": {
+      "sha256_lf": "66EAD1D661F9E1ADF3BA5BC4B2EEAD15312510188CA2EF3472044660D4306276"
+     },
+     "build/check_compare_ramp_detail_pdf.py": {
+      "sha256_lf": "8A799028686C0EB2BF82F739E046C0BBF335070E0D3E093FAC52F8F9E954A74F"
+     },
+     "build/check_compare_ramp_detail_tsn.py": {
+      "sha256_lf": "CEC76420B104570F6D4C90F6A2CBFC1CFC55770858E868B9535453F43A449596"
+     },
+     "build/check_compare_ramp_summary.py": {
+      "sha256_lf": "93F86BFE9A6255311AFC130910F2444DCDAAC32FEF43FC2D58D2B0F6228550FF"
+     },
+     "build/check_compare_ramp_summary_tsn.py": {
+      "sha256_lf": "AAE5B0870ED9D847710B703A47F4AEE0C13FF942B9DD18BF6673FEE8DD7EEDCE"
+     },
+     "build/check_compare_routing.js": {
+      "sha256_lf": "E86021C51399EE6144CA0F93789A5A0B434D6C12BBF16D08A652C97B004280A3"
+     },
+     "build/check_compare_same_source.py": {
+      "sha256_lf": "FCB890CD5BE2522C3B8AA4F119660C70AB70F9D77F919218406925A5A0C77F3F"
+     },
+     "build/check_compare_skipwarn.py": {
+      "sha256_lf": "D79D942BFA2647A24A890D8CB189AF6D67F2C2927A8D0B848584A2B9BF21935F"
+     },
+     "build/check_compare_source_files.py": {
+      "sha256_lf": "1A1E7330167F2E195113A4786C4A68AB9C312429EDE0C5C35A41F32BF87D918E"
+     },
+     "build/check_compare_tsn_common.py": {
+      "sha256_lf": "A89E97EBF16B0E6D7EF52F2D9358B4DEEB30D862EBED15CFF20FF101ADD38793"
+     },
+     "build/check_comparison_artifact_schema.py": {
+      "sha256_lf": "9BFF35BE7AA0A260FAEB775E29D2C3434725913B2B1654694288C42E7A29789F"
+     },
+     "build/check_comparison_contract.py": {
+      "sha256_lf": "FFE399AD5A959E69FB83944A8767056F29C334D0D0D3A77956161D80827790F1"
+     },
+     "build/check_comparison_outcome.py": {
+      "sha256_lf": "5AEBC6DF8AE693E1ABCA67AA056BB42CB25AAB5DD6565F3A7EE797B333A27435"
+     },
+     "build/check_comparison_path_limits.py": {
+      "sha256_lf": "A3F32E5F5ABDCFADE596E2003E4CC40E25905EC4A77C05C4DD03AAA0C2EBB682"
+     },
+     "build/check_comparison_payload_resources.py": {
+      "sha256_lf": "04854AA5A3848503AB0EBE70F7E8235314F2B2274F05B3528964D94817E91AE5"
+     },
+     "build/check_comparison_publication.py": {
+      "sha256_lf": "FD74922890CDCF852220BEA50A7280BD6F5AB97F53A07052C8EC16E57A4DFE1F"
+     },
+     "build/check_comparison_sidecar_scale.py": {
+      "sha256_lf": "3BA2D0A6102F61CF210DF3346A91092A6E8172D25EC53994D4D75979CFDAF15E"
+     },
+     "build/check_comparison_sidecars.py": {
+      "sha256_lf": "7620D6F0D76EE99409E215809D6F9FC9878655631FC1E6D6AEFDC9798BFED7D6"
+     },
+     "build/check_consolidate_intersection.py": {
+      "sha256_lf": "3EBBFE010A468CC1EB9B226682C87ECA0F6FE60D00A6DC2841BCD66564BA9F33"
+     },
+     "build/check_consolidate_outcome.py": {
+      "sha256_lf": "F91B2543D42DD33CB0C6E519ECD80404FCA162BBD265444670FE62AA32158CA2"
+     },
+     "build/check_consolidate_toctou.py": {
+      "sha256_lf": "55C08D19441B582CA1C762A7A3A68AFB0CDBAB740304EF583AA9BCA1BE1BA106"
+     },
+     "build/check_consolidate_worker_publication.py": {
+      "sha256_lf": "18C0FFE0D72C57C1A7D2D98AAA3B9391B77FA0FF31FEB4DD3AA5342F6DA79940"
+     },
+     "build/check_content_identity.py": {
+      "sha256_lf": "7964BEF496CA57BBCD11D1A5382C09D9227E46BFF2263E57D69A3582366CFC33"
+     },
+     "build/check_day_matrix.py": {
+      "sha256_lf": "B6A4DC9B12A824E33FF37AE62C5C952A9472B217600FF8995B3F01D612B5801E"
+     },
+     "build/check_docs_capability.py": {
+      "sha256_lf": "6B8C3FED73671DB873CC00700A4076CB39DF464A2DC151BA9DE830A921A97B11"
+     },
+     "build/check_edge_login.py": {
+      "sha256_lf": "E269543F444B1DC5BD2130F389B539845B6AD7781A3E56A2C5FDC2A2AEDB55F4"
+     },
+     "build/check_engine_layers.py": {
+      "sha256_lf": "57A8A9AFA287A89E859F9AB8D3D8894F464342F948F29E235A2E309908B5DFD8"
+     },
+     "build/check_engine_leaves.py": {
+      "sha256_lf": "5AB8917A2E3670EEC8E177FC0FAE621B0721CDC19C282480C06F3A7CE791BB9D"
+     },
+     "build/check_evidence_bundle.py": {
+      "sha256_lf": "7BB45097A8A412F58ADD4B4E8D82111897E7A0DCA74D8F51DD5FD7693FA5BE08"
+     },
+     "build/check_evidence_excel_columns.py": {
+      "sha256_lf": "239D81613B04DC7AD5FC99EFAFFA4C76CC2A94610136C7E810B5FA6B008058E8"
+     },
+     "build/check_evidence_literal_cells.py": {
+      "sha256_lf": "DBC89AB279EB712AE6E8336FE117D0CBA210A10CEA17C0BC63DAA76B8477EF49"
+     },
+     "build/check_evidence_manifest.py": {
+      "sha256_lf": "96FAD2B750E2BC13FF8B0650854C9B7588AEC0C91E6A633CEE9FB9C2DCAD6CA4"
+     },
+     "build/check_evidence_oracle.py": {
+      "sha256_lf": "2544152C1A219D18F7E0D4812E8A88E7783CEDE8F02883C7186115182C81B331"
+     },
+     "build/check_evidence_source_role.py": {
+      "sha256_lf": "5E6D9B844D753B7D886FF5A6AEF63B81190D3B8685221902FB8C6893025B5200"
+     },
+     "build/check_export_engine.py": {
+      "sha256_lf": "E3BA30BF6C5D8ECE7A30604E05EB703938D58218B944A95B7AEBEE72FFDD84EB"
+     },
+     "build/check_export_lifecycle.py": {
+      "sha256_lf": "D5DDCA4D67241A957C925009E002DE27D3661D1A34240D9E1568BEE3DE5A055C"
+     },
+     "build/check_export_stub_guard.py": {
+      "sha256_lf": "285DF1A4E3E0807B6B25B1C1D701A6AF8B4A8A58D2DF953210D1AE02409731FD"
+     },
+     "build/check_export_summary_outcome.py": {
+      "sha256_lf": "C01B0FD322CABF345E5BF6E8B4CF8E8F130B8D4C8787DFC55DEE50B2CE163D25"
+     },
+     "build/check_fake_site.py": {
+      "sha256_lf": "D83E5F548E3563446B010CEAFD49E6B30747F782459EA9CF9C079146EBF2AE5A"
+     },
+     "build/check_formulas_twin_guard.py": {
+      "sha256_lf": "2BECD851CC20E1FE4CFC1577AD18CCB4BAFE3EC4C49DEB0A05272784433731F0"
+     },
+     "build/check_gui_api_surface.py": {
+      "sha256_lf": "4466BCC97150CB435C70990C9E721064C13A453AA8A00243C4DA52D81B6DE3C6"
+     },
+     "build/check_gui_bridge.py": {
+      "sha256_lf": "1857BDDB02547BDD2D9DBA7AE43EE0C53FB7B8E72EA34A7C7C09EFF13A9A2FDE"
+     },
+     "build/check_gui_endpoint.py": {
+      "sha256_lf": "CE948A3193EB7ABDA1D99ADDFF4A75ECD1661BDF7B361A53D330950157462D0E"
+     },
+     "build/check_highway_detail_pdf.py": {
+      "sha256_lf": "0BE8017F00B553373F3D89C0E4603A1EA19278594F5034E3D62763FE5746DF99"
+     },
+     "build/check_highway_log_columns.py": {
+      "sha256_lf": "6FFD3DD13AA7840EE76DCC7BBA1EA0577B9190C66E55A0C45B6924B5CEDFD867"
+     },
+     "build/check_highway_log_ditto.py": {
+      "sha256_lf": "78F3720D8F9679FDA9E12F412643AAA36F2A64ADC95936D02A22502AB0BEEE8F"
+     },
+     "build/check_highway_log_roadbed.py": {
+      "sha256_lf": "0B1D2A315D48A95E73811636FE22BFC0D7C200AAA6AA58ECED5B9D7C8A35A033"
+     },
+     "build/check_import_direction.py": {
+      "sha256_lf": "13E7E04635CB8F759B955A46E3C50E0677749B9FBDBA96C5E1C52DE2A274808C"
+     },
+     "build/check_intersection_detail_pdf.py": {
+      "sha256_lf": "43A459DDA7C0D5A454FF7D39CAC51C0AE8F9F893EC997952E74F3CDA1F20D36F"
+     },
+     "build/check_intersection_gate.py": {
+      "sha256_lf": "414D56A98A3D9FBF50BC1A634C89A16A188EF6535050513CB7DE2E3128CA7EBD"
+     },
+     "build/check_last_complete.py": {
+      "sha256_lf": "6DA8F7D0FFCA85423EA802696C036B554A946B810D42A7FBF2114E11C18BDDE4"
+     },
+     "build/check_matrix.py": {
+      "sha256_lf": "DC6E801F2C78F83831B3171D2A65D22EB5CC4070C9AB17A78A9BBDA3A7A42901"
+     },
+     "build/check_matrix_bridge.py": {
+      "sha256_lf": "9BB9E77CD8DEF01E65D38D5AE5ACFA835750F1F8EE2341B95E9272CCB9420B29"
+     },
+     "build/check_matrix_cache_adversarial.py": {
+      "sha256_lf": "5726776BAA022A0CF37E9500D143E58AC0016508384B06716051965D3F74ABEE"
+     },
+     "build/check_matrix_ownership.py": {
+      "sha256_lf": "F9CF492591ED8B63E0B90ABA6AA3DE2D77700570F811207D41E683607B1635A5"
+     },
+     "build/check_matrix_presence_predicate.py": {
+      "sha256_lf": "6CF44201C408D8BD88954D43B4A4D3C8B4B644BAA993C03A509B4CCFF8E38394"
+     },
+     "build/check_matrix_producer_version.py": {
+      "sha256_lf": "1690702368EAFF21FD9486FCDA95AB8FA7C5E9DAA61ED391842D66D64F5EE6B4"
+     },
+     "build/check_matrix_tsn.py": {
+      "sha256_lf": "8CB18E0549B144652ECD5EB0FFB44E545198EBF39D3A68EA8B898CF3CE243289"
+     },
+     "build/check_medwid_formula_prototype.py": {
+      "sha256_lf": "55C957F1B7E8F62D35D7663827936CA381079F3E797B0DCC0C17E6F4465B3A1B"
+     },
+     "build/check_mock_event_order.js": {
+      "sha256_lf": "FB67AEFC5372303BCCEE6D93FAC1E509041241CEB18DD7F80D1A8AFE4B65F367"
+     },
+     "build/check_mx_partial_render.js": {
+      "sha256_lf": "242DB7CBD99F215B014D437F4E478ABFC124E2A46544CACF110B0C682435B958"
+     },
+     "build/check_no_misspelling.py": {
+      "sha256_lf": "4802181A94829ECBCD3DE310AD130189172C05CCD555641681DBD545AAEC2F63"
+     },
+     "build/check_oracle_grouping.py": {
+      "sha256_lf": "1FAAF9780A9BA5AA68FFB9DBB31571AB1218497C1CCD602B2E3B588F7A19E0B2"
+     },
+     "build/check_outcome_contract.py": {
+      "sha256_lf": "BC84E018793CCBE30659EAFE943D29A777C667C344A4D8A67245E2FB04BCC492"
+     },
+     "build/check_owned_dir.py": {
+      "sha256_lf": "8CEA99AE0A07D7B1A061B77EB3AA2807DBF2481121CCA4E47A226BA40E996E66"
+     },
+     "build/check_p2_freshness.py": {
+      "sha256_lf": "931F73683715E109F4149766772E665EB9E8F9626C24B35D68D0A8F0872FA54E"
+     },
+     "build/check_parallel_reconcile.py": {
+      "sha256_lf": "84CD2F91156D974E70D28666902DD8BA706A3C871E6FDA3FB1395A49EFB2DB2F"
+     },
+     "build/check_pdf_excel_matrix.py": {
+      "sha256_lf": "34F4F2FD563A8F78D68BDF7630432DEB6BC3AD3E7EFBD57EE46905AF80F16713"
+     },
+     "build/check_pdf_role_provenance.py": {
+      "sha256_lf": "3E2C1532A067B9B2481DD59C568690E674CB99B12FF04EA17DB2246C3B86546D"
+     },
+     "build/check_pdf_route_identity.py": {
+      "sha256_lf": "80238013C1E708DA0C9BF1ADF746146FA2E7BB9EE1F2D02066FBDB7C852FCBE4"
+     },
+     "build/check_pdf_route_universe.py": {
+      "sha256_lf": "0FB5D084D4EF7BD23BAA52EB59D58B8ADABE448E6FBAD0C067C9ED18C4BCB3D1"
+     },
+     "build/check_pdf_row_oracle.py": {
+      "sha256_lf": "0FEEF0EAA568B99EC6018BA757643AD2F9A35F82AF4544871960012EB6578E36"
+     },
+     "build/check_persistence.py": {
+      "sha256_lf": "EE3AA5E7641ACE9C1686F9A1BF9EF1E5BCC91EC33D173D237E46DCE2C4673E77"
+     },
+     "build/check_phase3_canary_payload_evidence.py": {
+      "sha256_lf": "A9739DCAE17709276B1CB7E2A947318380849880089AAF2576BFAB8D5523F26A"
+     },
+     "build/check_phase3_independent_oracle.py": {
+      "sha256_lf": "9D9CF2D0EB2B3BC19DA36B0FCFD43E2EB0BB298F6FBCA7A786FD79A504DEF89E"
+     },
+     "build/check_phase3_intersection_detail_oracle.py": {
+      "sha256_lf": "CF7BEB6E8F8BC047E46EBCC54EE780328FFB77C974A8AE906A5759D58AEA0FD6"
+     },
+     "build/check_phase3_xlsx_stream.py": {
+      "sha256_lf": "AD6CA5CD31A5BECF24A3D54E3F81159CD3F12D59BC7CFF00DACC4BFB738239A5"
+     },
+     "build/check_phase4_tsn_rebaseline_runner.py": {
+      "sha256_lf": "4673E90A24E56E8FDFF48EC7A45D0B8C0EBF066D6759BDFEE62B3C253CDB283C"
+     },
+     "build/check_phase6_highway_log_conservation.py": {
+      "sha256_lf": "FFC21351AE33DE4F94365903184F6C7C12EA103E385E2C8311732C4822A07F17"
+     },
+     "build/check_phase6_highway_sequence_conservation.py": {
+      "sha256_lf": "5E61E9B422EB5497C8E07314CD21EAA797776AD86663BCDBAFE53501C6612C2A"
+     },
+     "build/check_phase6_intersection_summary_conservation.py": {
+      "sha256_lf": "0CEAA5090D20AF75F5D3A3B2AEF213D8CF30EB36F36582D7FDBC4BBFDF2ECE68"
+     },
+     "build/check_phase6_ramp_detail_conservation.py": {
+      "sha256_lf": "673987C7D4A1ACF3E0DA6A8D9F30206CF0E4DD8210838FD548177F44FA8EAE04"
+     },
+     "build/check_phase6_ramp_summary_conservation.py": {
+      "sha256_lf": "309BA1AF2A72CF827B2245EFE08E4DD4C5D27DE78D819BF30BCCB9BF12841B45"
+     },
+     "build/check_phase8_highway_detail_comparison.py": {
+      "sha256_lf": "BCA5762F0935D5E576B73EA985B62734D85DD7396809F0F4BA91A7DDCD44D16F"
+     },
+     "build/check_phase8_highway_sequence_product_comparisons.py": {
+      "sha256_lf": "1E8A7285950B6081AF21CE037FC1CB8EF85A416D7C5B0AD407D3B9A4669A3CD3"
+     },
+     "build/check_phase8_highway_sequence_product_raw_tsn_comparisons.py": {
+      "sha256_lf": "F9A7F8B8D4127E6558A12E40A57B325E99D2E5DD8C42628B16E189AB2EEE37C0"
+     },
+     "build/check_phase8_highway_sequence_product_sources.py": {
+      "sha256_lf": "23BFE4C6A064A0412C2676516E89B63124BBBF81AA393227517CD0A25B0404D5"
+     },
+     "build/check_phase8_highway_sequence_summary_spot.py": {
+      "sha256_lf": "374EA7F8D4994A0E07B8DECE903CB1ADE5362BCA014E0A5A85E11C8B7FCCCB96"
+     },
+     "build/check_phase8_intersection_detail_comparison.py": {
+      "sha256_lf": "C070C64708B7FCFC57CAC16A5F4A6415049F6BE1A9D1D4C13C67AE16F0928790"
+     },
+     "build/check_phase8_intersection_summary_comparison.py": {
+      "sha256_lf": "6148E4EBB786A69EBFF9672BBF8943A353B5B42179E7C0526B32662C8B93D727"
+     },
+     "build/check_phase8_ramp_detail_comparison.py": {
+      "sha256_lf": "417D48DBC4EC2C100FAFE812604EC9E377D117BA113651DB601351CE6E30F0A7"
+     },
+     "build/check_phase8_ramp_summary_comparison.py": {
+      "sha256_lf": "08F343E290BC78DEFF93E7C70D7B2AC3CF6F374A05135A364F36A6DEB6B0F595"
+     },
+     "build/check_pm_code_vocabulary.py": {
+      "sha256_lf": "6411BAE0964FC87F6E3F51C2F71F62AD6561BE749C716B56F1065109DA43EB4A"
+     },
+     "build/check_published_comparison.py": {
+      "sha256_lf": "3DA26F23F84F6B9D116BB981B7A220563504779BC4331A87002BE76E9E43CF03"
+     },
+     "build/check_ramp_summary_partial.py": {
+      "sha256_lf": "E71D8FAD07801413F85571803C7EC92CAFC25898F466F82F9CA8B727223A61C8"
+     },
+     "build/check_ramp_summary_schema.py": {
+      "sha256_lf": "B9C65FB64C31B90B81C0A0173F828D4B9C8E45795FCB22F431CD547E309E8E17"
+     },
+     "build/check_read_counts_layout.py": {
+      "sha256_lf": "3A3FF4E2256E0F2C516B3DE9A0B47EA75513C9DBF01142D3218C484BCC88077E"
+     },
+     "build/check_report_catalog.py": {
+      "sha256_lf": "CCDAF4384A0032F11AD0B4C206518A7FF65AF3BD7E3958CC75F31FA3E12FEBEE"
+     },
+     "build/check_report_library.py": {
+      "sha256_lf": "3CC1C54703B9FF6D7CD4F850B88F620426306EDABDBE9671712495CF6CDE2761"
+     },
+     "build/check_report_recipe.py": {
+      "sha256_lf": "A630E713651D842DF8B76E185852061902ECD766439F6DDA4B5676A5222AFB38"
+     },
+     "build/check_report_wiring.py": {
+      "sha256_lf": "9432BA3FDE4A9B92C71EA5D0D7740AD3618E1FCC1FF5FA43E8658E19C0EC81BC"
+     },
+     "build/check_reset_safety.py": {
+      "sha256_lf": "44DF18DE21C048855DA400FF41277411305A41D4A79899710D80C632207373D7"
+     },
+     "build/check_route_file_naming.py": {
+      "sha256_lf": "C09CB8D8342BB819B143C6FCF5C8A025EB1ADA15AB7BF1DB65EA4EF4E74F3F69"
+     },
+     "build/check_silent_swallows.py": {
+      "sha256_lf": "52819E9E1E470CFDF02F7D974ECB1BCFDB3A0EA5DD23DF54E3F42722E77FED11"
+     },
+     "build/check_site_capture.py": {
+      "sha256_lf": "F36379D7BF788004C53D376E35259D20D07A9B3EE0E6E43BC9E0E20146142E9D"
+     },
+     "build/check_source_zip_smoke.py": {
+      "sha256_lf": "60B2A3CB5896101FA57D207DCF60901315ACB88C77BD1AF488D7CA41FE4C550D"
+     },
+     "build/check_stable_ids.py": {
+      "sha256_lf": "43F4D29BDE83EADE7B339993C7E9495E809B57FC0DEFA2976432A30366871AD7"
+     },
+     "build/check_tsmis_pdf_parse.py": {
+      "sha256_lf": "B2169A044AB8D4101F758D1A7AF9E1904D41C3917E2B3FCB03101A1C79F8FF4A"
+     },
+     "build/check_tsmis_pdf_reconcile.py": {
+      "sha256_lf": "6C3D0F46009B20AD783DA34BC0B1791A90C179B0E92C2F51A60DD0E5B29DDDCC"
+     },
+     "build/check_tsn_canonical_consumer_identity.py": {
+      "sha256_lf": "7A87F69F19BDEA0DB549AD80A18E46304DF3A4A5417394E458DAFB0CAF3A3EB3"
+     },
+     "build/check_tsn_description_leak.py": {
+      "sha256_lf": "D6942C0BE9FFC46BE28ED87D32820CAE424AAB60A29622F755743266CA082CCF"
+     },
+     "build/check_tsn_district_source_contract.py": {
+      "sha256_lf": "2411675F87F63231F70B8ED38EA146760FFDFC54EB8367313E392A042FBAE4B4"
+     },
+     "build/check_tsn_freshness.py": {
+      "sha256_lf": "5752412B0F1E68239E8BA3D9E3F6C5E2F15F124FF25E166514497C4F116CF53C"
+     },
+     "build/check_tsn_highway_log_claims.py": {
+      "sha256_lf": "BE44EA8412DE77194049EF004896C5E85CDCF1B272D06D6D4A009B63B5BE0520"
+     },
+     "build/check_tsn_highway_log_isolation.py": {
+      "sha256_lf": "756D8860385E2047DE29DAD642149632322EA345497B3461DD6CFAE8F0F9159B"
+     },
+     "build/check_tsn_normalization_marker.py": {
+      "sha256_lf": "2E926B997439D0BF5E7E029F6EB3CD7A84CE963B44B335DC92D8FEE48C877941"
+     },
+     "build/check_tsn_normalizer.py": {
+      "sha256_lf": "E9A27F0B896AA3E14D37574B19DB6A307E1ABAC4146F464477650B6275A3D662"
+     },
+     "build/check_tsn_outcome.py": {
+      "sha256_lf": "D7BF9FCC20E89C6784F40F12C9617BD11AAE5509078ED722596152462926E020"
+     },
+     "build/check_tsn_raw_source_contract.py": {
+      "sha256_lf": "4FB05C0D86E29EDB1D9B6E38760DC85B594821D8423F10E0115B863D6BFF8202"
+     },
+     "build/check_tsn_status_coherence.py": {
+      "sha256_lf": "6703B2F77DBA71FDE128CC6A20B749EF510093CDA6C1D32CF1A2C8E5D15EC207"
+     },
+     "build/check_ui_boot.js": {
+      "sha256_lf": "D944C8A13C586FB4F5DD19F19C6B0B7D1F311700F6631D649059465F5C3A56F4"
+     },
+     "build/check_ui_contract.py": {
+      "sha256_lf": "E4ED6F4CD5F30A487C1381914378575F6C2981DEC3B292247E951CAB6625FB77"
+     },
+     "build/check_updater.py": {
+      "sha256_lf": "1C794A85C6D92CCDA2AE0243C71CB09158731ACA02B25FC5AD7C885060929675"
+     },
+     "build/check_validation.py": {
+      "sha256_lf": "AF082546260471C331888D5D02922F5792AC11454F324B9FFA1C02E34FE222B2"
+     },
+     "build/check_visual_evidence.py": {
+      "sha256_lf": "236B400B25B344858C931F324F20993320D1CB600DE84D6D8E7B3F80035D1787"
+     },
+     "build/check_workbook_presentation.py": {
+      "sha256_lf": "1FF9BFA7AD6976A39D5F485B0D3E3777BD8772DA806FF35B760E34C233B1F481"
+     },
+     "build/check_worker_lifecycle.py": {
+      "sha256_lf": "8DFD9F0DA334ED860AE378D5D57171D2183F0836E4A35306A13A34693EB0239C"
+     },
+     "build/dist_readme.txt": {
+      "sha256_lf": "F558EE5E1EADD22E10C5D460782762A1B7BFF095961CBCBA73D553A744B64E71"
+     },
+     "build/fake_site/actionbar_export_and_print.html": {
+      "sha256_lf": "D5E6CAADC5864764C6734692C6ACE9CA3BE00E29A5D1BAEAD0EED4D9C59D95CC"
+     },
+     "build/fake_site/actionbar_print_only.html": {
+      "sha256_lf": "7EE2E603048FFF9EF2D79604662FC81C15D16151FBB59BAB812F181646A71C0D"
+     },
+     "build/fake_site/blank.html": {
+      "sha256_lf": "829C248A0B8F1D72F952FEFB9D3188987726A8FC4E12D85D69DE70815F5E2283"
+     },
+     "build/fake_site/dropdown.html": {
+      "sha256_lf": "9F9F9DA16805BF38910CDD9B89ED2FC1C45C8D95709EED0EF2E2927C92F9FB8F"
+     },
+     "build/fake_site/dropdown_ambiguous.html": {
+      "sha256_lf": "24CC0099423462D75B5C73DA67B7012AD51D250682FDF014060156F4FC49DC11"
+     },
+     "build/fake_site/dropdown_nested.html": {
+      "sha256_lf": "1F0EE3C304D8F1EB21F6BAEEFB4AE73E4EC17A4D955B1E28294FBCA5173D1393"
+     },
+     "build/fake_site/dropdown_selected.html": {
+      "sha256_lf": "46F73276DCC7DF920B4C9332833D1A7D4AAF8B5AAC01849AD30C00B8EC8E78FC"
+     },
+     "build/fake_site/error.html": {
+      "sha256_lf": "9A9B9A103663F2EB049DF47CBFAEB079C29BAB68D655003C81CC48EF94C23BD8"
+     },
+     "build/fake_site/highway_log_data.html": {
+      "sha256_lf": "EF34822568349EAFF92E2C82DBA767C7369D038ADBFB75580B995E000040472A"
+     },
+     "build/fake_site/highway_log_empty.html": {
+      "sha256_lf": "6A5AB217168C9049821278DD6E4D467DA3A1BBA7A2BA61E6A7B18542B4DFC9F3"
+     },
+     "build/fake_site/highway_log_print.html": {
+      "sha256_lf": "7A14C54CB5905299157783C93FCCBE5FD23223007006A7A7735D230FDE54ADFF"
+     },
+     "build/fake_site/highway_log_print_empty.html": {
+      "sha256_lf": "166834BA20460D527F3BB255A4CBBF0DA2357D52859ADF0E6DF3B5DE4D03DFC5"
+     },
+     "build/fake_site/highway_sequence_data.html": {
+      "sha256_lf": "E95A43C9B10D843F41FBB6FDC512803F1202D2DACCEF9D0D2C26D7407C66F41A"
+     },
+     "build/fake_site/highway_sequence_empty.html": {
+      "sha256_lf": "2D0DDC49A8AB5EF06BE6F94D91BCBC69E7FD899BD4DB7A5D274C63DE482A477D"
+     },
+     "build/fake_site/intersection_detail_data.html": {
+      "sha256_lf": "E8C992ACA2FCD4909DEB03E4C8A319CB07B1349A85DCD7092E2705A3B8495D8A"
+     },
+     "build/fake_site/intersection_detail_empty.html": {
+      "sha256_lf": "DE78FA6EE09B939D07A4E5C01654B70830FE4A94789BC04EBF3E9F9F47C7974F"
+     },
+     "build/fake_site/intersection_detail_print.html": {
+      "sha256_lf": "BC46A76D2D97C6325BCFEB1FEAE1B76E4C0176D9DF0EF32BE4E00ABF14888D12"
+     },
+     "build/fake_site/intersection_summary_data.html": {
+      "sha256_lf": "08DEB20A173DFB784819E703F7A6324933D3481B34D9C6AE0101B70E5E37656D"
+     },
+     "build/fake_site/intersection_summary_empty.html": {
+      "sha256_lf": "EE9F5F39F66BF5B269B38F90E41D26753FB42B9FE2B446EDED86873FA6F44B69"
+     },
+     "build/fake_site/ramp_detail_data.html": {
+      "sha256_lf": "A850F56DE1987323C5613DD14EDD7D3DF939C269A973DBB88BE65913D7A0B001"
+     },
+     "build/fake_site/ramp_detail_empty.html": {
+      "sha256_lf": "9758B3E96B08FF32A4CB0AB895033B425AD067FBDB8567DF7F723762EAE343E8"
+     },
+     "build/fake_site/ramp_summary_data.html": {
+      "sha256_lf": "5F3F50E9B69BB0F08ED4B2B005CDBA7D32716FE0C96A88183B3B5356280118D3"
+     },
+     "build/fake_site/ramp_summary_empty.html": {
+      "sha256_lf": "354A0EA18D7782840FC03DC310547B5B8A0FFAE6517FA4D252F7A2E99D17ACAE"
+     },
+     "build/full_smoke.py": {
+      "sha256_lf": "C4240928C98678A90D211B687D989C63FC10F65941C5B38F60AB003A8001C14B"
+     },
+     "build/gen_release_notes.py": {
+      "sha256_lf": "112837DD157C0D95F26A87AB4473534FF9687F7B53D0D38C7B405D5B6CCA9CA6"
+     },
+     "build/it_readme.txt": {
+      "sha256_lf": "FF569D5D08B241F3EEF4C3A470BCDC7C18937EC928C2B7B41D0F2408F91B3E98"
+     },
+     "build/measure_baselines.py": {
+      "sha256_lf": "29A62A8AC393DA2D54F9B765F89ACF6CEE1DE1BB36EC1A9A70DE0AFFC98197AB"
+     },
+     "build/phase3_independent_oracle.py": {
+      "sha256_lf": "D629233899BE26AE1E8E09B2A10DAC390C5659307E214969A763022B916569F1"
+     },
+     "build/phase3_intersection_detail_oracle.py": {
+      "sha256_lf": "8AB96535E5C732B8F40DEA1B9127C5252529BA00F4EF2958FE4BD8396CBC7E72"
+     },
+     "build/phase3_xlsx_stream.py": {
+      "sha256_lf": "BBFDA5CCDBEA3697978C0BA4414B7DCCF3D5C248BA6762AA946C76E920FC940B"
+     },
+     "build/phase4_highway_detail_tsn_pdf_oracle.py": {
+      "sha256_lf": "34D7ACEB7717D285B48D440E0E762564615BE2F4DE0FD0B4827FA568277FC45B"
+     },
+     "build/phase4_intersection_tsn_pdf_oracle.py": {
+      "sha256_lf": "FFC364CEB8B6CDBBFB3BFF680CC0F3ED77E12C1867978C86122D221DE7C78441"
+     },
+     "build/phase4_ramp_tsn_pdf_oracle.py": {
+      "sha256_lf": "C580336CB2AA5FCEAE51230FC037F712E8AB2908E68561AA4402728ED93AE8A5"
+     },
+     "build/phase6_highway_detail_conservation.py": {
+      "sha256_lf": "E957E6C0B8FF53F79C8641F53E7452AF2FBD1492931F3B40EA828E90709D373A"
+     },
+     "build/phase6_highway_log_conservation.py": {
+      "sha256_lf": "986747344DC4C0884D0BFC2F5BF410BD923E021D7D984298919B409D5AADAB4C"
+     },
+     "build/phase6_highway_sequence_conservation.py": {
+      "sha256_lf": "0D6CACFA5A4615A80381B077780B051127958BBF325979CF24B7A5C29EB8E17B"
+     },
+     "build/phase6_id_hd_conservation_spec.md": {
+      "sha256_lf": "E693AA06F6CE04FC26097F970939D604CCB906F70812DF433479C79C720715AE"
+     },
+     "build/phase6_intersection_detail_conservation.py": {
+      "sha256_lf": "A3B19C4F4E04FDD0E9C8600FF029DF4E9AA710BF902EA1002B34093D1D4187C4"
+     },
+     "build/phase6_intersection_summary_conservation.py": {
+      "sha256_lf": "B5BD74920B4201D83A0D14A6B0A0A9C2F0635A84020D786B93C9D4C97BBBA6F6"
+     },
+     "build/phase6_ramp_detail_conservation.py": {
+      "sha256_lf": "C18F9D2A8422413FC1998DC1D57E3A312C3A4348CD93D54CF5EDB5A1EB59C6EE"
+     },
+     "build/phase6_ramp_summary_conservation.py": {
+      "sha256_lf": "7A121136B959CBC3B6CCB095A0007BCD3849787BEC7E526588994957AF508D58"
+     },
+     "build/phase8_highway_detail_comparison.py": {
+      "sha256_lf": "6112975A1FD43B3C3D33CA846C8CE9EB6B82E14C1B1DB6766DFD2060E86A9576"
+     },
+     "build/phase8_highway_detail_owner_probe.py": {
+      "sha256_lf": "9286A00D21C79CA45086A9CA6F40321BCED0A3D8E1BEF0D3CDA6ABD0826FF652"
+     },
+     "build/phase8_highway_detail_product_witness.py": {
+      "sha256_lf": "CAA985FFF851DEE0A60E72636EB97B4C226CE3F3B24E5D08D089445F99DE5F52"
+     },
+     "build/phase8_highway_detail_source_oracle.py": {
+      "sha256_lf": "B4973BD43781194C2A78286240BA3BDA297FE9165D9C58937D54FB56DBC1F67E"
+     },
+     "build/phase8_highway_log_final_family_gate.py": {
+      "sha256_lf": "C92A1C34C9460AEFFA1FA2A3B4483C416EF8EEF055A6742F0D198D330E82AD59"
+     },
+     "build/phase8_highway_log_projection_oracle.py": {
+      "sha256_lf": "5125CFFCEB913DF8DA6BF34470425FE48F58C9A2B764329B949F1A116A90F580"
+     },
+     "build/phase8_highway_sequence_capture.py": {
+      "sha256_lf": "F8DE43B676EE6E39C88AFE6A6CCD576DBF48C2EEAB887F7DF48E10F2846F5D4F"
+     },
+     "build/phase8_highway_sequence_comparison.py": {
+      "sha256_lf": "469C57D9B419B6BFBE6B0EE7A1E7171F896E3585AF47CC392C00EBB2383D9DD2"
+     },
+     "build/phase8_highway_sequence_comparison_draft.py": {
+      "sha256_lf": "90A60281B1115D67F4EDF1AD9555728428908C2BF6FC3DD07424BF9EEB1F9BCD"
+     },
+     "build/phase8_highway_sequence_final_family_gate.py": {
+      "sha256_lf": "B875437981626449810234922EEAFE5F5AA5C716E893D22A5DF5B7C65CF66A79"
+     },
+     "build/phase8_highway_sequence_source_oracle.py": {
+      "sha256_lf": "FC4038F96D09C93021919262CC0CF902AE13B962100836D4EFE7F016B4DF70B3"
+     },
+     "build/phase8_intersection_detail_comparison.py": {
+      "sha256_lf": "B4BF58EB55146B1A0AC18476C6C3137EA9F1E92DDC6C2F9D1F1C93A934DF6D51"
+     },
+     "build/phase8_intersection_detail_product_witness.py": {
+      "sha256_lf": "ECD935E11564310EFC3C253ADAEBE45F9910F9B1C6A3D563AD855CC402DF84F3"
+     },
+     "build/phase8_intersection_summary_comparison.py": {
+      "sha256_lf": "52935F6AF8BC309CC7E67A84936F472A77CDB83F11C70405C58D0D23133A4674"
+     },
+     "build/phase8_intersection_summary_product_witness.py": {
+      "sha256_lf": "6D88D1526AA48855128723F56D6F6BA438E3E089FE212BD5619990CFF37D8A7D"
+     },
+     "build/phase8_ramp_detail_comparison.py": {
+      "sha256_lf": "02D0B142445A59514722259D9190DD436C612A2A921FFC3C2BB3608287E452F0"
+     },
+     "build/phase8_ramp_detail_product_witness.py": {
+      "sha256_lf": "9BF55DA666BC1183A68C9F77600649990FF9D4BE82940B15CD873AA4F6B3330E"
+     },
+     "build/phase8_ramp_summary_comparison.py": {
+      "sha256_lf": "301611CE2688CB12CD90F5C5441D9AC341205872196A9F3A4A5F746077E7A2ED"
+     },
+     "build/phase8_ramp_summary_product_witness.py": {
+      "sha256_lf": "BF2B4C769B4AC53033CC8896BFAAC8278FE5C8AD5469F16E99E7C891793A0CE8"
+     },
+     "build/probe_phase8_highway_sequence_description_normalization.py": {
+      "sha256_lf": "803B0AA90EC45B2D5E248DCB458B62322DEA5DB658762C03E3423570725F8A6D"
+     },
+     "build/probe_phase8_highway_sequence_excel_escape.ps1": {
+      "sha256_lf": "B25FB8693759B1BA5FFEDB9A4DE1CC0A34F916755F514967A33E6E3D438D42AB"
+     },
+     "build/probe_phase8_highway_sequence_product_residuals.py": {
+      "sha256_lf": "CA4C458B5E80FAEAD676222CA8CADA74090EDAA8FB332A4A478F2173B7022CEC"
+     },
+     "build/prune_bundle.ps1": {
+      "sha256_lf": "97B237C7E4554B451B380BFD41BB580EAC99FFCD6C4C24ED0C69746CDD2D67A3"
+     },
+     "build/release_notes_header.md": {
+      "sha256_lf": "7A04406A10C1E5819CC873B45DAB7D70E96254ABD08A1D61B82A290753C46343"
+     },
+     "build/render_phase6_highway_log_visual_sample.py": {
+      "sha256_lf": "348AF384BA2107B5274F5BC9B0FCC15B84E869EFABE682D015B5B91CCF4BEDEF"
+     },
+     "build/run_checks.py": {
+      "sha256_lf": "B9B7F84AC6C55585D9D07873FE8FE410B435D52FA85B0933C3C19188554A9BE5"
+     },
+     "build/run_phase3_intersection_detail_oracle.py": {
+      "sha256_lf": "5BD9AB83CD76D4114660777A93791AE91C1804F41EB450221F72A69B6B6A1A41"
+     },
+     "build/run_phase3_production_canary.py": {
+      "sha256_lf": "BB44DDA952AC3740B3DAC0BE997DB1E7860909BFEDC9A7AA4D771FD29593C69F"
+     },
+     "build/run_phase4_tsn_source_rebaseline.py": {
+      "sha256_lf": "B5E54761D95E7884578C19A0222E7213F5D2F950CCB2FF9C445BDE359DFE2FE7"
+     },
+     "build/run_phase8_highway_log_product_comparison_leg.py": {
+      "sha256_lf": "1E801E91CB8E86DE13843D5B4F9ECA1EB13D85EF05BC0AEA5A34981482DFD360"
+     },
+     "build/run_phase8_highway_log_product_sources.py": {
+      "sha256_lf": "909DD5811680862BC50180375318BF210FB754081E167178198DA3F4FA6306E3"
+     },
+     "build/run_phase8_highway_sequence_product_comparison_leg.py": {
+      "sha256_lf": "09F59581A4806CAA87C33AD74A5BDE9B98C3001CC34B458905B88EAB0A97B15B"
+     },
+     "build/run_phase8_highway_sequence_product_comparisons.py": {
+      "sha256_lf": "D7BADD71D416596EAF4EB5D278450DCBB19260F0026DEF19183575DF15DD514D"
+     },
+     "build/run_phase8_highway_sequence_product_direct_raw_tsn_leg.py": {
+      "sha256_lf": "BCC952FB3469B0E790E72EB25E1397F4639EF78EF1427AE2EA626D22CA001E91"
+     },
+     "build/run_phase8_highway_sequence_product_raw_tsn_leg.py": {
+      "sha256_lf": "5219B65815D5738B22EB2DF63D6DCBBA4E05F6503C4D86AF8FC8DAEC1E073BBF"
+     },
+     "build/run_phase8_highway_sequence_product_sources.py": {
+      "sha256_lf": "C4935B46A051DACF188B2B9C6A4697B8C9F26C4C873AF174DB7A23D8FA0C6512"
+     },
+     "build/run_rb4_acceptance.py": {
+      "sha256_lf": "4532C2E5BA5CAAB61F8B9E28CCDC8D38EE3B07A8445E866D4EEAAE765031DE35"
+     },
+     "build/silent_swallows_baseline.txt": {
+      "sha256_lf": "ABC8C16E6EEE8E195136E4DB27ED03EC8D8137F0A003C759CC7442E56DBBA8D4"
+     }
+    },
+    "product": {
+     "requirements.txt": {
+      "sha256_lf": "73126602A463C8D427CC1F208CCBFA498D26320073D6814997409BD5164AFA0E"
+     },
+     "scripts/arcgis_layers.py": {
+      "sha256_lf": "6553FE6CEB154CF0DC8D7E34A385B5A3B6999F3D2ECE98807BAB2B7D39EA7162"
+     },
+     "scripts/artifact_store.py": {
+      "sha256_lf": "15C43F1C6286C23CFC9167F394DFB74361B99360A9508266209FE1E8E9CBC703"
+     },
+     "scripts/auth_nav.py": {
+      "sha256_lf": "7DC0FE996AE130EE54FD7641F4A98875C241E0A63A46405C3D564177220282F3"
+     },
+     "scripts/baseline_matrix.py": {
+      "sha256_lf": "3F61F8F88FF074B2F66A90F8B6F52AF97A23118351716BB59FC1AA6E806CFEBD"
+     },
+     "scripts/batch_manifest.py": {
+      "sha256_lf": "B731E88358EF4B33BF4C650699FCAE0B649F819FF6772014F4BE25464F42EC3F"
+     },
+     "scripts/browser_channels.py": {
+      "sha256_lf": "237E8C6D66C8B6E7FDF473CB8C6E0B6484C08866AEDC9BCC8CE6939663D6EA72"
+     },
+     "scripts/cache_envelope.py": {
+      "sha256_lf": "4D9E0504E38BEB3A9870EC5EFAE572F7A7EF2FE3BB14AC4E9885DB0DC31EA06A"
+     },
+     "scripts/city_codes.py": {
+      "sha256_lf": "ED78814FC3EA930202DC96EA81EDFCDF50DB0E06CBCEDB385D8712FD0E07C2C0"
+     },
+     "scripts/clean_highway_columns.py": {
+      "sha256_lf": "7D3180A0365FE4A422FCA38284603693A96F4063A5884DFAEE1BBF47D0AC9684"
+     },
+     "scripts/clean_road_layers.py": {
+      "sha256_lf": "8095EEABF884DDFB0EDB084AEF8A5C8BF3C9ACCB05806D0233E0465745BCAA88"
+     },
+     "scripts/cli.py": {
+      "sha256_lf": "48062CCB34D7826C47833696CB624B2A736FAC37DEE8970780F4FFDE0760DF26"
+     },
+     "scripts/common.py": {
+      "sha256_lf": "B39C1C1093D149FDB1BDD95AD0D59825DB9D71ACD7AC8D6C1339ABF7DC0C0F41"
+     },
+     "scripts/compare_clean_highway_tsn.py": {
+      "sha256_lf": "CF3986846C3B29FC3F5073973E6502C4567CC8648E4F443A908A88FE2E9215FD"
+     },
+     "scripts/compare_core.py": {
+      "sha256_lf": "F3285BE870A65B6E37D0A7D44911443999F500C8C102CE24F1DADF572AC4A194"
+     },
+     "scripts/compare_env.py": {
+      "sha256_lf": "0D30EA4BA4F54185D622F701DE6A17D7F0EE22B6427AE9FC88D4C53F427D898F"
+     },
+     "scripts/compare_highway_detail_pdf.py": {
+      "sha256_lf": "57CCE5D5DEA13598804735759A5555DBB01674B4BC38237A676F866681BA0072"
+     },
+     "scripts/compare_highway_detail_tsn.py": {
+      "sha256_lf": "9F8F88709090B37304FF3A093D0519A91687C3E2BA229D0544C31798B84BE47A"
+     },
+     "scripts/compare_highway_log.py": {
+      "sha256_lf": "0234B974BDA272A7B904B7111C97FE830F835AF2B666B244A276886701642795"
+     },
+     "scripts/compare_highway_log_pdf.py": {
+      "sha256_lf": "F8F2A1E03F4DDFC0B3819233712BF592B2DB5CD6A6E165BB03BD83ABFEFF876B"
+     },
+     "scripts/compare_highway_sequence_pdf.py": {
+      "sha256_lf": "0306F5D576BF7738D162ACED85C55652CAD0BCCBA3B7703695C95EB64E7D5238"
+     },
+     "scripts/compare_highway_sequence_tsn.py": {
+      "sha256_lf": "FD2B70792350E60B8A6D5E0866AECF05327A934CBFFFF6703F74AD94F9DCC46D"
+     },
+     "scripts/compare_intersection_detail_pdf.py": {
+      "sha256_lf": "3B0CA0C7645379AC13B46D22620DAC80F19D651BA445CBBD5121B968BC9DE809"
+     },
+     "scripts/compare_intersection_detail_tsn.py": {
+      "sha256_lf": "C4E69E1278FFD0FDB4CF6BA24285101B67DC710D663D0D4B5D8B9ED49212A640"
+     },
+     "scripts/compare_intersection_summary_tsn.py": {
+      "sha256_lf": "F57FE10B9677D8DACF3870F283DFC618CF7572DBF808AC272C3F2E6FCB8C19EE"
+     },
+     "scripts/compare_ramp_detail_pdf.py": {
+      "sha256_lf": "42021AB6DCB40EEF70E5A698C232C03E2FA205FFAB151498012F7C949654762E"
+     },
+     "scripts/compare_ramp_detail_tsn.py": {
+      "sha256_lf": "815F54E5DC79AB15963F59A0BDCB6823E99AB8C00EDADEA4941C61F1EA89F651"
+     },
+     "scripts/compare_ramp_summary_tsn.py": {
+      "sha256_lf": "CD6CF17510F78489F398DEF71BAF05ECC35599971A49358520A8CFD7CF605E20"
+     },
+     "scripts/compare_timings.py": {
+      "sha256_lf": "23900AECFA0EB0B699A0A7CC804A23678614FE618317663FA600BBB97270CA0F"
+     },
+     "scripts/compare_tsn_common.py": {
+      "sha256_lf": "654C010F3AFAADD1C1D35E4A940181D4B49C54AC3C18DCC39D742B0F0D55430C"
+     },
+     "scripts/comparison_contract.py": {
+      "sha256_lf": "3C16ECFF2EB7AACC42A49486DE4BE97FD6096D7DD0D2722FA50DBA8C22FA99AF"
+     },
+     "scripts/consolidate_clean_highway.py": {
+      "sha256_lf": "CC00A53FEC8646F6CE369A08EC20A5FCE1395B5D0D7A96CE8B9E005E4B975948"
+     },
+     "scripts/consolidate_highway_detail.py": {
+      "sha256_lf": "293A543AD7D56E0214EA23032DE57A4D3A4635953C3708084D24E105DE7A732D"
+     },
+     "scripts/consolidate_highway_log.py": {
+      "sha256_lf": "A01A6D93641B1F5CD91C792CFAE87A386368A2E275BEB66C9B7A73F500003C6E"
+     },
+     "scripts/consolidate_highway_sequence.py": {
+      "sha256_lf": "21D8B592821446DCDD644EECD115D1BEDAF30640C9A6BABA13528034F2F45E10"
+     },
+     "scripts/consolidate_intersection_detail.py": {
+      "sha256_lf": "B22446BBB3F67219CB1FE5B9B77AF0AF39B1DAD18648C6CBD70A6A0E0AA57EFC"
+     },
+     "scripts/consolidate_intersection_summary.py": {
+      "sha256_lf": "D9146D4B16A0299609D6D71E5B17FA5E956454479A273EC42BC9505C807BB6A7"
+     },
+     "scripts/consolidate_ramp_detail.py": {
+      "sha256_lf": "62DBC7603F07DCEAC0BF610ABA17D3E0641E370CC37FF6ED36440C46C75F94D1"
+     },
+     "scripts/consolidate_ramp_summary.py": {
+      "sha256_lf": "568E00F26EDC2B7E475FA89C743C7B1F14224FE18FBC5881ED7B5594B54EEBB5"
+     },
+     "scripts/consolidate_tsmis_highway_detail_pdf.py": {
+      "sha256_lf": "224B206F897366A415CBBDCA2325F004F195BD7799B8E49A8772A112ADB95B2E"
+     },
+     "scripts/consolidate_tsmis_highway_log_pdf.py": {
+      "sha256_lf": "C8A23237E176B5F560620AF6BD323306749797CD1FDC1CE9E4490F2529267EB8"
+     },
+     "scripts/consolidate_tsmis_highway_sequence_pdf.py": {
+      "sha256_lf": "38CE0ED4680B0C3F4B06B71D463208BD3E25ECA72912A4EA6F38837F4ED16CB1"
+     },
+     "scripts/consolidate_tsmis_intersection_detail_pdf.py": {
+      "sha256_lf": "40953FD26F7FA19F97686CFB7276E8C79EEE59651526B855D4B1F94B80E5F663"
+     },
+     "scripts/consolidate_tsmis_ramp_detail_pdf.py": {
+      "sha256_lf": "5395AE4FBD2D30FBB804F011534CAF03559A75571EBDF6584D4A0A268ADEFD0B"
+     },
+     "scripts/consolidate_tsn_highway_log.py": {
+      "sha256_lf": "B2ABE1B22392571477197C4385CF133EB3B93D21D0F8F8B7A05EB7C5BB952AEC"
+     },
+     "scripts/consolidate_tsn_highway_sequence.py": {
+      "sha256_lf": "FBF1417A73EFA009564CE82F905AAC93672017127BC0E14C739F7A0393ABA3F4"
+     },
+     "scripts/consolidate_xlsx_base.py": {
+      "sha256_lf": "FE6F39F0F43FD28D2B8BA6DD7D857A481D0D8D8D7AF451A506747BE18563E240"
+     },
+     "scripts/consolidation_meta.py": {
+      "sha256_lf": "71A5AE0E00929D16246FDA6CC30232CEEEE7A014BC0A4D1C903BA1F4FB9B0118"
+     },
+     "scripts/contract.py": {
+      "sha256_lf": "268880640E24A44C411F6AEECB5DAAA542916DC0C9B1DD09258876300406080B"
+     },
+     "scripts/credential_safety.py": {
+      "sha256_lf": "4E859E5D5D2F5CD29634FAF26716E8FDF956B2E31BD6518109F8075FD30ED97D"
+     },
+     "scripts/day_matrix.py": {
+      "sha256_lf": "72D68E5AD424361101D70E61D3C925D6F525DF96AA3A380B3797DDF5B6671B12"
+     },
+     "scripts/edge_device.py": {
+      "sha256_lf": "AD31906874C47DCFB6CF535EDA26F61E13C7D68790668ACE43EE452DF0296BAF"
+     },
+     "scripts/errors.py": {
+      "sha256_lf": "CDF867687653902EC37A656A038AD5EF7B0ECF852D22A23D239CE345858BAFF7"
+     },
+     "scripts/events.py": {
+      "sha256_lf": "9C8CF7A83EBEA71780A1A8EE90B77F71B864791A961C7C2A03097A7D6B87D8BE"
+     },
+     "scripts/evidence.py": {
+      "sha256_lf": "242AFD4F25BDA657101D72B134B0DAFAADA12F09306A57D932F0C4582DB81286"
+     },
+     "scripts/evidence_highway_detail.py": {
+      "sha256_lf": "8751532E3DD863F65D7457FE3E92F77E692F2028936E5A5DDABC23DA002D4831"
+     },
+     "scripts/evidence_highway_log.py": {
+      "sha256_lf": "E9F3DEE5AE92B3AD760434434C9702B79A226E6A5BEC65723718F7D13A78CD2A"
+     },
+     "scripts/evidence_highway_sequence.py": {
+      "sha256_lf": "2AC033ECE7928EB4DC90E983672F617711602A30BD97FC11D044196F72B15FA0"
+     },
+     "scripts/evidence_intersection_detail.py": {
+      "sha256_lf": "4D75769A0011AE025EB83CE9DFBC129553924ADF47628B4F50910855A27B217F"
+     },
+     "scripts/evidence_ledger.py": {
+      "sha256_lf": "2C1468961A32F62F2B68AEE5154439F24C1D5CB899032424ECE871AE10B4ED2D"
+     },
+     "scripts/evidence_manifest.py": {
+      "sha256_lf": "DBCEAFB26B22904C5AFBC5DE8B7EDDC889DCE3A3B32A71D4718343453EB8073E"
+     },
+     "scripts/evidence_ramp_detail.py": {
+      "sha256_lf": "B99823F059C6500FDE815D3AFD98244374CEA95FE215E3863F3505F634ACFEB3"
+     },
+     "scripts/evidence_ramp_summary.py": {
+      "sha256_lf": "40AB887AF621E82C43931CFABD9FBB035439326538DD3DC996DD6EB0DD312C63"
+     },
+     "scripts/export_clean_road.py": {
+      "sha256_lf": "966C6FFFC88D93D214B43B3EACC8E206D358C7DFBD2E4C4430BA11D0B73765ED"
+     },
+     "scripts/export_highway_detail.py": {
+      "sha256_lf": "B54C4AFF677197807C901BF926434904256C53B338E095CC9EF6761831F24F76"
+     },
+     "scripts/export_highway_detail_pdf.py": {
+      "sha256_lf": "FD3F04B578DA62F730EF17194A9CF76F4E462B05B6746BB6BBECF3FD11E1BDAE"
+     },
+     "scripts/export_highway_log.py": {
+      "sha256_lf": "5E4169A4FEE4B16073E929B7F3CDBF203C6A3B415BB17B30C9C3C9680EE2B48D"
+     },
+     "scripts/export_highway_log_pdf.py": {
+      "sha256_lf": "EB0F857CC510D832904319A3757D1A710D327A71B2BB85FFA2AD4AB065434DD6"
+     },
+     "scripts/export_highway_sequence.py": {
+      "sha256_lf": "2EF6FA63B8C2AB4838DA6AE5536ABA6D7525028B77DDF4AB3925938EB168F23A"
+     },
+     "scripts/export_highway_sequence_pdf.py": {
+      "sha256_lf": "D5AE1A14ACD5C3900C1BE70BE80AF1374039D91CF1FB9CB37497C5E04953E755"
+     },
+     "scripts/export_highway_summary.py": {
+      "sha256_lf": "D88D7AE830812DEDC5905C6FA66EE159C6B3843DE1EA787A5105DC7A6FD51CA4"
+     },
+     "scripts/export_intersection_detail.py": {
+      "sha256_lf": "40D2E72909EA21A1863176C47E54B526EC41C3B9954031E03EBDE3A6C52DB2C0"
+     },
+     "scripts/export_intersection_detail_pdf.py": {
+      "sha256_lf": "C47629AD257AD4AFF30DB826434A789151054BB884F03793C927F51DF0E45628"
+     },
+     "scripts/export_intersection_summary.py": {
+      "sha256_lf": "660BF3ED5AF952E6DBF374CC9586F5C9DCD0F086C3C5EEE2B4EF00D56E355D7D"
+     },
+     "scripts/export_intersection_summary_pdf.py": {
+      "sha256_lf": "0E46BBA11A0132F8DFE066CF91A3595D74A1D5534BD57F4D2C31242ED352B03B"
+     },
+     "scripts/export_multi.py": {
+      "sha256_lf": "D77364D0539B6B48744EE7209B1D72B53FD71EF90C55A24CD9FB35AEB088A1D1"
+     },
+     "scripts/export_ramp_detail.py": {
+      "sha256_lf": "3A81FA37678B9094CC1B494E8B26DF371077EB1009128C754C7649420E5EBC4A"
+     },
+     "scripts/export_ramp_detail_pdf.py": {
+      "sha256_lf": "58869FE293C3D178198ACC9A56B9EEFAD1B4A1449945BF9E00E3A3728E0BC2C2"
+     },
+     "scripts/export_ramp_summary.py": {
+      "sha256_lf": "DE020189317E5D3C731CBD6557A63C88B924F9594FCAC8C819C9465A73C2B48E"
+     },
+     "scripts/export_ramp_summary_excel.py": {
+      "sha256_lf": "A800A963468BA167CE13D7EF33FFFFE998326007A4CA95A7C4F7E21B4F370AD0"
+     },
+     "scripts/export_route_history.py": {
+      "sha256_lf": "EF5CA1D98A66BB2779C0255AF0FF89B814A739BB331D5CB8897DE098AAA98E93"
+     },
+     "scripts/exporter.py": {
+      "sha256_lf": "F5B24E425AB14D70FC3B3BFA1E04C8B250C3DFCF85089B79553C373F8FA3098A"
+     },
+     "scripts/exporter_parallel.py": {
+      "sha256_lf": "A04562AAF26DEB774A31E2D15F7947D5F99EC35FBEC5595F28F2E15DE7A25340"
+     },
+     "scripts/gui_api.py": {
+      "sha256_lf": "7DBBAF07F25252EED023095E7DAEBF215C9B9AAEE359032ECA200AFFEC8EFE26"
+     },
+     "scripts/gui_arcgis_api.py": {
+      "sha256_lf": "3C3E50564F11EA70DE364758ADE8B370E638DB458371EF979C3BBB86B107E9C8"
+     },
+     "scripts/gui_auth_api.py": {
+      "sha256_lf": "51D285800F08A6BE66B5B3A23EDF322491CACC7B32ED25C73DA8E4EF71F9704B"
+     },
+     "scripts/gui_compare_api.py": {
+      "sha256_lf": "38CB90D57FFB74F2C1082F5F34B911F372DBAC0E7F0DD963BC6F8C3416D3567F"
+     },
+     "scripts/gui_endpoint.py": {
+      "sha256_lf": "D3AA8AE51A38A73B99E1DBB9EF6D4429DFF3A3B033B750FD0C7F7DA4DE52FA84"
+     },
+     "scripts/gui_export_api.py": {
+      "sha256_lf": "E219BCC06906DFAE83C5B2F60AD0BD582C1E01D06C866E18DC2D93F3C85D3C14"
+     },
+     "scripts/gui_main.py": {
+      "sha256_lf": "61D8FC76E2BC809D84A00C19AA165A46D26A379F4459EC4D7B007889F1AE77AB"
+     },
+     "scripts/gui_matrix.py": {
+      "sha256_lf": "8725CD803FEEAAB1738C9D2201AAFE533B6E04B4320A740719A3C838C2326A7A"
+     },
+     "scripts/gui_settings_api.py": {
+      "sha256_lf": "4AF0FEC62AA2785FA34CD85134BD15ADA24C561584E63FDB1371D0B4113AAE3D"
+     },
+     "scripts/gui_update.py": {
+      "sha256_lf": "64356D651AB1B9498557285DC2003E534E0B5A71A368C455ADB8A46FB2347DD5"
+     },
+     "scripts/gui_win32.py": {
+      "sha256_lf": "3EF7BA807958F29093787B5A33B88B542D80B51E44726ADBC3B4B691A7832D35"
+     },
+     "scripts/gui_worker.py": {
+      "sha256_lf": "95020D709BB2CD74632C23499826C71D5EA2B31A7E343CEA9E161E9D033257FE"
+     },
+     "scripts/gui_worker_env.py": {
+      "sha256_lf": "B610CF6F700C4941FC106A0E854446DEC1551EA4244B59089805E16764DFDABC"
+     },
+     "scripts/gui_worker_export.py": {
+      "sha256_lf": "82756581CBF9F87BC5346328373DF9B3775EAD9D614CC608DE34FDF234F18A79"
+     },
+     "scripts/gui_worker_maint.py": {
+      "sha256_lf": "F4C18FF005E7DA1157115DF39418C3DDE95ED5333D12CBE03FEAB97FE2E7D9F4"
+     },
+     "scripts/gui_worker_matrix.py": {
+      "sha256_lf": "A44B5F95EBC8E50254FB569A85800AC05034B4798A1FE25B1EE12210C1D8F978"
+     },
+     "scripts/highway_detail_columns.py": {
+      "sha256_lf": "3ED64F6EEA8910AE834952BE3D2A782A41C8ABAA7F1A66CBD43F9380DC2BC2F5"
+     },
+     "scripts/highway_log_columns.py": {
+      "sha256_lf": "C3BBD160034565A625B4B5429130CA336DA0FF643721ABC98941381B9E5BA6AB"
+     },
+     "scripts/intersection_detail_columns.py": {
+      "sha256_lf": "ED3E9A7843509B780B6AD1468179D5058B035A4A5F2DB51B781009D48ED6E829"
+     },
+     "scripts/logging_setup.py": {
+      "sha256_lf": "DF42AF78A4C0BAE42337ED7D9E9139DB3457C519A95EB3D2E1E1AF3B6759DCE2"
+     },
+     "scripts/login.py": {
+      "sha256_lf": "B8DADB80B1F8482A224FFEE353F6C0CBA0ADDF1CC127CB448A816B44ED8A9893"
+     },
+     "scripts/matrix.py": {
+      "sha256_lf": "C94D7D6CF4CA475B6C0532CD301456A469485374E610D44C961596E49722367B"
+     },
+     "scripts/matrix_build.py": {
+      "sha256_lf": "C34D34DB397544B557A1527CB14DB6D6F6ACD2B7362199C1664C14DDC206231C"
+     },
+     "scripts/matrix_state.py": {
+      "sha256_lf": "199542CD742DC0300182411C92978E59B51E9A79BA22EE9F7C95FEEC72CF944F"
+     },
+     "scripts/outcome.py": {
+      "sha256_lf": "80A9C8040F359205AC2F8DEFD2D5E8AD2D14E05B1DFAB289743059E766FA83E3"
+     },
+     "scripts/owned_dir.py": {
+      "sha256_lf": "0D9723870720403FA153295544B0CC4B8D0961BAA106D441DF1308B03D704D3D"
+     },
+     "scripts/paths.py": {
+      "sha256_lf": "DC7C62C300F5AE34A2DF8EC49FB50D900B84ED07202F95B2D1464C64F70C4828"
+     },
+     "scripts/pdf_excel_matrix.py": {
+      "sha256_lf": "B73D43C0A654E2E1910AD1CBFCDB47A4D6BD142A9DF07ADBB28898E984A11CE7"
+     },
+     "scripts/pdf_row_oracle.py": {
+      "sha256_lf": "9D89AA05280F6E3277F53A47AAD4DB5779EA93953F5DEC4676B1E7A146A94F2E"
+     },
+     "scripts/pdf_table_lib.py": {
+      "sha256_lf": "2CB9232D19F59CC677706846F53016FF19BE2E33F33F3EA107B3C4F14D6B780E"
+     },
+     "scripts/published_comparison.py": {
+      "sha256_lf": "44C22F3C03B3FADD41C37101B7436AE8EA220431A6463AD843E949DC2E5519FA"
+     },
+     "scripts/report_catalog.py": {
+      "sha256_lf": "7500797C59FB5018A52AF027A803FA92727BBF5681267BB12765870B42246A4A"
+     },
+     "scripts/report_library.py": {
+      "sha256_lf": "08AEBC525AB74797BC6945E62BAB6207068907727BF3837A025E7A2ABF965705"
+     },
+     "scripts/report_nav.py": {
+      "sha256_lf": "05BFA90ECFF54F2C30D4626B154A46617B916F658C77B6989BFA4D004D1274F2"
+     },
+     "scripts/reports.py": {
+      "sha256_lf": "03181D7522410A560574EE5A971086483ED9E55AF3AEE00AAD05C6B74FC17A4F"
+     },
+     "scripts/routes.py": {
+      "sha256_lf": "5132A2E807566AB9887B6DF417D4AF5CD0D78CE2E2E5D5D1957C41EE429353EA"
+     },
+     "scripts/run_report.py": {
+      "sha256_lf": "792E920654543A9F96E36DF73D62E30D119973AB8DCA9BFD930C06D5B9DEB527"
+     },
+     "scripts/safe_delete.py": {
+      "sha256_lf": "E8B9D00D2ABDBFA3113F6B7B3011E9E5D18EBB11E53408B55A44CB7A53288B34"
+     },
+     "scripts/self_test.py": {
+      "sha256_lf": "0BC251F4E36FFB140197C0D5BE63AC3AD092AA5056782790745426259CAD9B48"
+     },
+     "scripts/session.py": {
+      "sha256_lf": "B7A3264FD61B325A015E1F767276F4FC9D8F6965EC53BC3C18F56535FDDABB6E"
+     },
+     "scripts/settings.py": {
+      "sha256_lf": "3C03EDC0910DEB8BD75FFF72B8B1274892178AD517B3AAE904E41686568B857A"
+     },
+     "scripts/site_capture.py": {
+      "sha256_lf": "B55D42F0A32AB53A8C854DE4F40B7FEA135B29E4A57F64B025F46FCC4F13120A"
+     },
+     "scripts/site_target.py": {
+      "sha256_lf": "A0E5E0ADC0A38022E3DE237F46E49E74EC71265ED719278AF4979E62730F7120"
+     },
+     "scripts/summary_layout.py": {
+      "sha256_lf": "C1F28B083538DDDC486CB03705A48602AB90DF609D108EE8BCAA0E7526E3DB31"
+     },
+     "scripts/task_coordinator.py": {
+      "sha256_lf": "4A8EAA06EAF60449064D5410B94FB93A3C5C43D5D43AA55A68D52DF2F73189B6"
+     },
+     "scripts/timeouts.py": {
+      "sha256_lf": "FA3C240C3539D943EC260FA333539D24D7FDBEC3457E4A28C1DD8E9B91BA0641"
+     },
+     "scripts/tsn_district_contract.py": {
+      "sha256_lf": "DF682C69AAC144305F026D62180E277C910A2F1472D35FBFDB598E2747985A1C"
+     },
+     "scripts/tsn_library.py": {
+      "sha256_lf": "C29A5381A8DA79081E426964C5F7E8E4F34C5F5F51E6DFFA0AF70ABFB7AE626A"
+     },
+     "scripts/tsn_load_clean_road.py": {
+      "sha256_lf": "1F08D29A5C1FA7F5BA5B78D98AF7D301E9FC1483F8748ACA85A532F571D2788B"
+     },
+     "scripts/tsn_load_highway_detail.py": {
+      "sha256_lf": "E42CD34F4E6A60801FC57BA01860E084ABC9607877F664A463E2B426A6A19F52"
+     },
+     "scripts/tsn_load_intersection_detail.py": {
+      "sha256_lf": "4B44665BCBE3D41AD5FD20FE2ECB934779C90344BEAEA3B657FD392D03461977"
+     },
+     "scripts/tsn_load_intersection_summary.py": {
+      "sha256_lf": "1F09CA6E1C54E3A09B2C1380B8C908008425BCA30FDA525AD9CC4F17CA51465F"
+     },
+     "scripts/tsn_load_ramp_detail.py": {
+      "sha256_lf": "8957769FF4D752B54E1E4AF155C6863E206088D22D9D915B6FED2C371F143E6E"
+     },
+     "scripts/tsn_load_ramp_summary.py": {
+      "sha256_lf": "963814AD8DEA58C0F87F5DFF175A00B1664A32D15FBA40609F56D2498DCEC31C"
+     },
+     "scripts/ui/app.css": {
+      "sha256_lf": "6FA9D88FEEA1F69753A5ECF8D0A7A54804FD88F4E0C7AAE6B13E1CBB14001267"
+     },
+     "scripts/ui/app.js": {
+      "sha256_lf": "0340886F05FB70BD2B9B35D4A3BB2D8A2CFE806DBF52C19CCCC6AF02B4F48F07"
+     },
+     "scripts/ui/contract.js": {
+      "sha256_lf": "414FB0D21CB2BC96A132F91339B53F93E5037B8AEC73042AE4A2CC2CEECA5B30"
+     },
+     "scripts/ui/index.html": {
+      "sha256_lf": "0385A0BFF2ADE7A5B4B6D601433B2EBBB0F278F7B994AFB047FF97853A054EBD"
+     },
+     "scripts/ui/mock.js": {
+      "sha256_lf": "682021D5CE3976E3B8E4AC266F1ABCC886EE20FEAB4E1FFF74E5701D3FB82231"
+     },
+     "scripts/ui/ui-arcgis.js": {
+      "sha256_lf": "0DB1FBC74DAA8441AE431A455CF2AD2F46FC041EF54981826387BF05D84B682E"
+     },
+     "scripts/ui/ui-batch.js": {
+      "sha256_lf": "8B2DFE9687C3C7054BB4DB7CB6CD8726279B121F91B9B44F7099C9AB2AA381FC"
+     },
+     "scripts/ui/ui-compare.js": {
+      "sha256_lf": "C6A626E8546D7134E0CA68FA171E66818D46155B9B1B52C5FB4F8ABA589F8DC6"
+     },
+     "scripts/ui/ui-dom.js": {
+      "sha256_lf": "6118FC5DFE1E91196D6C36D8204F940AE0E737A21E7A1431B44272366DAD8765"
+     },
+     "scripts/ui/ui-export.js": {
+      "sha256_lf": "8A58FA145EBEDA300D80B2A5259DB2BB80ACC5BD4E629B286ED9417CF7AE5AFB"
+     },
+     "scripts/ui/ui-matrix.js": {
+      "sha256_lf": "039907EBA32E2A7B8D82885742E945A7E3D5B5C6CCAE4AC594265397134BDF65"
+     },
+     "scripts/ui/ui-settings.js": {
+      "sha256_lf": "1FF017D1366505775DF8DE7DD1BC6EBA695B993EFD532FAC35A01D4A6B60C144"
+     },
+     "scripts/updater.py": {
+      "sha256_lf": "4A18EC43089089CFB01FDDD34A269ACDEE2EC0455A7F96113B8E939AD255CF85"
+     },
+     "scripts/validation.py": {
+      "sha256_lf": "6EE17F7938F5C913EEF26B528783D385747586C334047C09C1B26031EC115D5E"
+     },
+     "scripts/visual_evidence.py": {
+      "sha256_lf": "DA858D566CCCA28DE409A0AE3FE541C3743FF68CD40B00C9679F75BD6DEA16B2"
+     },
+     "version.py": {
+      "sha256_lf": "B5AC8D57ACECB6019BF2887C82A4087C813E89AC44D9A75DF67F1925CD905AE4"
+     }
+    }
+   },
+   "git": {
+    "author": "Yunus Shaikh",
+    "branch": "hotfix/rb-4-evidence",
+    "commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+    "date": "Sat Aug 8 01:24:28 2026 -0700",
+    "subject": "fix: mirror the trailing-blank refusal and the raw-token capture to the Highway Log TSN side"
+   },
+   "runtime_digest": "C7FC1AA0B17A1338EB7046D1CF3737979F888B532678D85539C0983E817C4996",
+   "tree": "C:\\Users\\Yunus\\Projects\\wt-rb4"
+  },
+  "lineage": {
+   "commits_since_on_head": [],
+   "runtime_last_changed_at": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+   "runtime_unchanged_since_last_product_commit": true
+  }
+ }
+}

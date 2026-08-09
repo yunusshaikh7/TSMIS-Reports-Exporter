@@ -316,6 +316,19 @@ def check_exact_head(manifest, tree, fail):
             print("  runtime files changed in between   0")
 
 
+def base_own_stamp(body):
+    """The base commit a base-side result names for ITSELF, or None.
+
+    Two spellings are legitimate and the manifest builder reads both: a
+    single-tree base phase self-stamps `tree_commit`, while checks-at-base runs
+    the HEAD's check files AGAINST the base tree and therefore names both sides
+    explicitly (`base_tree_commit` / `head_tree_commit`). The head spelling is
+    deliberately NOT consulted — falling back to it is exactly the substitution
+    the base-binding checks exist to catch, and it would turn an unbound base
+    side into a silent pass."""
+    return body.get("tree_commit") or body.get("base_tree_commit")
+
+
 def base_stamp_problems(rec, base_commit, head, export_path):
     """The manifest-recorded base stamp problems for one base-signature entry.
 
@@ -605,12 +618,19 @@ def check_corpus(manifest, tree, fail):
         if rec.get("class") == BASE_SIGNATURE_CLASS:
             # The same own-content re-read for the red half: the manifest's
             # recorded base stamp must be what the file itself says.
+            #
+            # `base_own_stamp` reads the two legitimate spellings and never the
+            # head's field; accepting only `tree_commit` failed a correctly
+            # bound checks-at-base result.
             body = json.loads(p.read_text(encoding="utf-8"))
             stamp = rec.get("base_stamp") or {}
-            if body.get("tree_commit") != stamp.get("tree_commit"):
-                fail(f"base result's OWN stamp {body.get('tree_commit')!r} "
-                     f"disagrees with the manifest's {stamp.get('tree_commit')!r}"
-                     f": {p}")
+            own = base_own_stamp(body)
+            if not own:
+                fail(f"base result names NO runtime commit of its own: {p}")
+                continue
+            if own != stamp.get("tree_commit"):
+                fail(f"base result's OWN stamp {own!r} disagrees with the "
+                     f"manifest's {stamp.get('tree_commit')!r}: {p}")
                 continue
         present += 1
     expected = sum(1 for r in manifest["results"]["entries"]
@@ -826,6 +846,22 @@ def self_test():
                      "self_stamp": {"tree_commit": head,
                                     "tree_runtime_dirty": False}}]), None, f),
                False)
+
+        print("the base side's OWN-stamp spellings (driving base_own_stamp)")
+        expect("a single-tree base result's `tree_commit` is read",
+               lambda f: (None if base_own_stamp({"tree_commit": "d" * 40})
+                          == "d" * 40 else f("tree_commit not read")), False)
+        expect("checks-at-base's `base_tree_commit` is read, NOT its "
+               "`head_tree_commit`",
+               lambda f: (None if base_own_stamp(
+                   {"base_tree_commit": "d" * 40,
+                    "head_tree_commit": "e" * 40}) == "d" * 40
+                   else f("wrong side read")), False)
+        expect("a body naming ONLY the head names no base commit of its own "
+               "(no fallback to the head field)",
+               lambda f: (None if base_own_stamp(
+                   {"head_tree_commit": "e" * 40}) is None
+                   else f("fell back to the HEAD's own field")), False)
 
         print("negative checks — the base side's binding "
               "(driving check_base_binding itself)")
