@@ -5,12 +5,12 @@ RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
 RB-2 is MERGED at `d679f388e0b12ff595751af9edd816674615b7a5`;
 RB-3 is MERGED at `61fcac611de255c56759551a95ccd2e552287bfc`; its 158/158
 post-merge gate and frozen application self-test both passed;
-**RB-4 Review 2 is DENIED — RETURN TO IMPLEMENTATION** on
-`hotfix/rb-4-evidence`, reviewed at pushed entry head `f714f1b` (runtime
-`f4b55f2`, base `72adf44`), never merged. `RB4-R1-001` remains closed by the
-owner's narrow anchorless-blank ruling; `RB4-R2-001` is a distinct HF-05
-failure: missing required print sources leave prior canonical evidence
-artifacts in place instead of the required zero-artifact result.**
+**RB-4 is JOINTLY APPROVED** on `hotfix/rb-4-evidence`. Review 2 re-reviewed
+requested evidence-record head `0191804` (runtime `d826877`, retained comparison
+generation `f4b55f2`, base `72adf44`); the later pushed protocol-only tip
+`57408b2` changes no RB-4 runtime or acceptance evidence. `RB4-R1-001` remains
+closed by the owner's narrow anchorless-blank ruling, and `RB4-R2-001` is closed
+by the missing-print retirement code fix.**
 
 Last updated: 2026-08-10
 
@@ -22,19 +22,18 @@ first pass.
 
 ## Next action
 
-Resume
-[`PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
-on the existing `hotfix/rb-4-evidence` branch with `<BUNDLE_ID> = RB-4` and
-`<IMPLEMENTER> = Claude`.
+Complete Prompt 05's final-approval sequence: commit and push the signed Review
+2 re-review, fetch and confirm `origin/main` remains at the recorded base, merge
+RB-4 without force, run the planned post-merge smoke, record the merge SHA,
+push `main`, and remove only the fully merged RB-4 worktree/branch.
 
-Codex Review 2 denied `RB4-R2-001`. After valid comparison provenance is
-accepted, `visual_evidence.generate` treats a missing required TSMIS/TSN print
-set as keep-last-good and raises before the retirement-aware refusal boundary.
-A bounded product probe reproduced the missing-print error with prior canonical
-workbook, image directory, and manifest all surviving. The focused unbindable
-fixture covers stripped comparison provenance, not this later print-source
-boundary. Review 1's owner-ruling closure remains valid and narrow. The exact
-failure and bounded return are in
+Codex Review 2 re-review closed `RB4-R2-001`. All missing-print exits now use
+the retirement-aware binding refusal. The committed six assertions passed for
+missing TSMIS, missing TSN, and both missing; an independent no-folder probe
+also raised `EvidenceSourceBindingError` with workbook, image directory, and
+manifest all absent. The rebound verifier reported zero problems against
+runtime `d826877`, and the retained full gate passed 158/158. Review 1's narrow
+owner-ruling closure remains unchanged. Both signed approvals are in
 [`hotfix-bundles/RB-4/REVIEW.md`](hotfix-bundles/RB-4/REVIEW.md).
 
 Review 1 closed both returned evidence gaps. The fail-closed self-test, cheap
@@ -104,8 +103,8 @@ did not create a branch, modify product code, or begin an acceptance run.
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-4 RETURNED FOR `RB4-R2-001`** — runtime `f4b55f2` remains accepted evidence for the prior state | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-4 REVIEW 2 DENIED — RETURN TO IMPLEMENTATION** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-4 IMPLEMENTED — JOINTLY APPROVED** at runtime `d826877` | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-4 JOINTLY APPROVED — MERGE IN PROGRESS** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

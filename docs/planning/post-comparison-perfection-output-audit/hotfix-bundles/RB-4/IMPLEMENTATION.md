@@ -1,9 +1,9 @@
 # `RB-4` — Implementation Record
 
-Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW 2 (re-review)** at head
-`d826877`. Acceptance run **chain11** passed every programmatic phase, and its
-native-scale inspection read **341 images with zero failures of any class** —
-the first fully clean round of this bundle.
+Status: **JOINTLY APPROVED** at runtime `d826877`. Acceptance run **chain11**
+passed every programmatic phase, and its native-scale inspection read **341
+images with zero failures of any class**. Review 2 re-review closed
+`RB4-R2-001`; the bundle is entering Prompt 05's merge sequence.
 
 **Review 1 (`RB4-R1-001`) is closed by the owner's 2026-08-09 ruling**: an
 Intersection Detail blank drawn from the print's OWN cell rectangle is an

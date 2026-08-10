@@ -1,6 +1,6 @@
 # `RB-4` — Adversarial Review Record
 
-Status: **REVIEW 2 DENIED — RETURN TO IMPLEMENTATION**
+Status: **JOINTLY APPROVED**
 
 ## Review 1 verdict — 2026-08-09
 
@@ -356,3 +356,130 @@ not support its generalized claim that every print-unbound pair leaves nothing.
 Do not merge. Resume Prompt 04 on the existing
 `hotfix/rb-4-evidence` branch only to close `RB4-R2-001` and rebind the affected
 acceptance evidence.
+
+---
+
+## Review 2 re-review — Codex, 2026-08-10
+
+### Verdict
+
+**APPROVED. RB-4 is JOINTLY APPROVED.**
+
+`RB4-R2-001` is closed by code at runtime `d826877`. All three missing-print
+exits now call the existing retirement-aware binding-refusal boundary. The
+committed regression check drove a fully bound comparison and passed all six
+assertions for missing TSMIS, missing TSN, and both missing: the prior workbook,
+image directory, and manifest were absent, and the exception was an
+`EvidenceSourceBindingError`. An independent probe covered the remaining
+no-export-folder exit and obtained the same zero-artifact result.
+
+Review 1's owner-ruling closure of `RB4-R1-001` remains narrow and unchanged.
+This re-review did not treat that ruling as proof of the returned failure path;
+it independently challenged the new retirement call, the validity of the
+fixture's comparison binding, the untested no-folder branch, and the retained-
+generation evidence rule.
+
+### Identity, entry state, and budget
+
+| Field | Review 2 re-review record |
+|---|---|
+| Reviewer / implemented bundle? | Codex / **No** — implementer is Claude |
+| Bundle / branch | `RB-4` (`HF-05 + HF-10`) / `hotfix/rb-4-evidence` |
+| Base / merge-base | `72adf447d45a2b74c562ba714008661a180c5d5f` / exact match |
+| Acceptance runtime | `d826877592a8443191b07ae8c3e92e53a1e9bba4` |
+| Retained comparison generation | `f4b55f2ec75598cf5f8b37c8d23fb8c151490070` |
+| Requested evidence-record head | `019180447e4916c4f9889d8b884dee76898305fe` |
+| Live pushed tip at entry | `57408b27a301fff57b0e5fe7b4434a93ec54ba07`; its only delta from `0191804` is `CLAUDE.md` plus Prompt 04/05 process text, with no RB-4 runtime, witness, manifest, or bundle-record change |
+| Active time / resources | Approximately 20 minutes; budget respected. No generation, Excel, build, full gate, corpus/archive re-hash, or image recapture. One cheap verifier, two bounded negative/focused checks, and one temporary product probe |
+
+The requested `0191804` commit is still pushed and is the exact evidence-record
+head reviewed. The later protocol-only tip is recorded separately instead of
+being mistaken for a new acceptance runtime.
+
+### Evidence reused and bounded commands
+
+| Evidence / command | Re-review result |
+|---|---|
+| Return diff | `d826877` changes only `scripts/visual_evidence.py` and `build/check_visual_evidence.py`: 101 insertions / 8 deletions. The complete base-to-record diff remains scoped and `git diff --check` is clean |
+| Manifest | SHA-256 `42E6C700599BE8218FF23F1CE49E7BDCA445DC10C0F115066A5FB1C0E7AAF0EF` |
+| Verifier | SHA-256 `651BF81E7B6AE26122B37E196018480F31484480F558BA83F0D459BD14FE7034` |
+| HF-05 / HF-10 witnesses | SHA-256 `B871AF66D3C53B0C1F4B1B468462D42911C71E9D11862B4A85776542A1F3F689` / `E9734BDAE909FBDD2D2790D51121A5B4C6BBE3CE0747270D23A436AE4A0A3771` |
+| Cheap committed verifier | **VERIFIED — 0 problems** in 73.6 seconds: 420 runtime files match `d826877`; seven claimed results bind; the retained generation differs by one evidence-layer runtime file and no other runtime file; both committed witnesses match |
+| Retained full gate | Hash-bound `checks-r2fix.log` records **158/158 passed** at `d826877`; chain11 records every selected phase passed and 26 retained comparisons re-proved at that head |
+| Focused remedy check | The six `RB4-R2-001` assertions all printed **OK** before the script later encountered a reviewer-console CP1252 error on an unrelated Unicode arrow |
+| Independent no-folder probe | Actual `generate('intersection_detail_pdf', ..., tsmis_pdf_dir=None, ...)` with a valid bound comparison and planted prior set: `EvidenceSourceBindingError`; workbook/image-directory/manifest survival `False / False / False` |
+| Verifier negative controls | The new non-evidence-diff failure, evidence-only-diff pass, and missing-tree failure all printed **OK** before the same later CP1252 console-only arrow error |
+| Retained visual record | Chain11: 12 evidence sets / 341 images; 341/341 individually inspected with zero failures under the owner-amended definition |
+
+The two console errors occurred only while printing later test labels. They came
+after every newly relevant assertion had completed, match neither a product path
+nor the retained UTF-8 full gate, and were not retried under the one-attempt
+rule.
+
+### Independent challenge to Review 1 and the return
+
+1. **Could the fix merely rename the exception?** No. Each exit calls
+   `refuse_binding`, which invokes `_retire_stale_evidence` over the canonical
+   workbook, image directory, and manifest before re-raising.
+2. **Could the committed fixture still die at provenance and miss the path?**
+   No. It publishes a valid bound comparison with matching compared-workbook
+   digests, then withholds only the named print set.
+3. **Could the untested no-folder exit still preserve stale evidence?** No. The
+   independent front-door probe exercised that exact branch and observed all
+   three canonical artifacts absent.
+4. **Could retained chain10 comparisons make chain11 stale?** No. Git and the
+   verifier re-derived exactly one intervening runtime change,
+   `scripts/visual_evidence.py`, which cannot create comparison workbooks; the
+   counts phase at `d826877` re-proved all 26 retained comparisons.
+5. **Could the remedy widen cancellation or unrelated render failures?** No.
+   The diff touches only the three pre-render missing-print exits. Cancellation,
+   source-set mutation, publication, and keep-last-good paths are unchanged.
+
+### Criterion-by-criterion disposition
+
+| Criterion | Review 2 re-review disposition |
+|---|---|
+| HF-05 · 1 | **PASS — `RB4-R2-001` CLOSED.** Missing required print sources now retire workbook, image directory, and manifest; required-silent population remains 14/14 absent |
+| HF-05 · 2 | **PASS — REUSED, REBOUND.** 258/258 TSMIS-side print re-derivations; disagreement disclosure contract unchanged |
+| HF-05 · 3 | **PASS — REUSED, REBOUND.** 110 blank-side examples remain inside the captioned record; chain11 visual inspection found zero failures |
+| HF-05 · 4 | **PASS — REUSED, REBOUND.** All read-set members remain declared under the compared selections and print folders |
+| HF-05 · 5 | **PASS — REUSED.** Classic and PDF-vs-Excel controls remain silent; the remedy cannot enter those lanes |
+| HF-05 · 6 | **PASS — REBOUND.** All 26 typed outcomes/count sets were re-proved at `d826877` |
+| HF-05 · 7 | **PASS.** Retained full gate 158/158; exact-base red classifications include the remedy assertions; verifier positive and negative bindings pass the relevant checks |
+| HF-10 · 1 | **PASS — REUSED, REBOUND.** Four bound ENV sets / 83 images; Ramp Summary remains silent |
+| HF-10 · 2 | **PASS UNDER OWNER-AMENDED CONTRACT.** Chain11 inspected 341/341 images with zero failures; `RB4-R1-001` remains a disclosed limitation, not a code closure |
+| HF-10 · 3 | **PASS — REBOUND.** ENV counts remain identical evidence-on/off and match the audit figures |
+| HF-10 · 4 | **PASS — REUSED.** Fourteen prohibited placements remain absent; 5/5 camera refusals remain exact |
+| HF-10 · 5 | **PASS.** Same retained gate and base-signature evidence as HF-05 · 7 |
+
+### Deliverable and review-domain matrix
+
+| Domain | Re-review result |
+|---|---|
+| Deliverables / discrepancies | **PASS** — 12 evidence sets / 341 PNGs; 14 prohibited placements absent; 26/26 typed comparison outcomes invariant |
+| Values / source truth | **PASS** — retained comparisons are unchanged and re-counted at `d826877`; no parser or comparison writer changed in the return |
+| Formulas / installed Excel | **PASS ON REBOUND EVIDENCE** — Excel phase stamps `d826877`; no workbook or formula input changed |
+| Visual / presentation | **PASS UNDER OWNER RULING** — chain11 341/341, zero failures; no new rendering logic beyond pre-render refusal |
+| Evidence eligibility / source binding | **PASS** — the returned missing-print boundary now reaches the same zero-artifact terminal as other unbindable pairs |
+| Sibling / neighboring behavior | **PASS** — only the evidence engine and its focused check changed; comparison and prohibited lanes remain unchanged |
+| Performance / publication / freshness / failure | **PASS** — no new expensive path; retirement occurs before render, through the existing guarded helper; retained lineage is explicit and verified |
+| Regression | **PASS** — 158/158 retained full gate at the remedy head plus bounded independent probes; console-only reviewer failures recorded separately |
+
+### Practical-impact gate and findings
+
+| Candidate | What would a user see differently? | Disposition |
+|---|---|---|
+| Requested `0191804` is no longer the live branch tip because `57408b2` adds process text | Nothing in the app or RB-4 output; runtime/evidence bytes are unchanged | **NOTE**, not a denial |
+| Reviewer console cannot encode a Unicode arrow after the relevant checks pass | Nothing in the app; retained implementation gate passed the same scripts under UTF-8 | **REVIEWER ENVIRONMENT NOTE**, not a denial |
+| `RB4-R2-001` before the remedy | Stale prior evidence could appear current beside a rebuilt comparison | **CLOSED BY CODE** at `d826877` |
+| `RB4-R1-001` | The documented anchorless blank remains exactly as the owner accepted it | **CLOSED BY OWNER RULING**, unchanged |
+
+**Actionable failures: none.** No acceptance criterion, exact-head binding,
+artifact, practical user-visible failure, or bounded adversarial probe remains
+unresolved.
+
+**Reviewer signature:** Codex, Review 2 re-review — **APPROVED** —
+`2026-08-10T11:19:42.2190630-07:00`.
+
+RB-4 is **JOINTLY APPROVED** and eligible for Prompt 05's no-force merge,
+post-merge smoke, closeout record, push, and bounded cleanup sequence.

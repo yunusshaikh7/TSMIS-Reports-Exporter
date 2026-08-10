@@ -1,15 +1,14 @@
 # `RB-4` — Bundle Contract
 
-Status: **REMEDIED — AWAITING REVIEW 2 RE-REVIEW** at head `d826877`.
-`RB4-R1-001` remains closed by the owner's narrow anchorless-blank ruling.
-`RB4-R2-001` — missing required print sources left prior canonical evidence
-artifacts in place instead of the required zero-artifact result — is closed by
-a code fix: all three missing-print exits now refuse as binding errors and
-retire the prior set, reproduced red (3/3 artifacts surviving) before the fix
-and locked by six assertions that fail against the pre-fix code. Acceptance run
-**chain11** passed every phase; its 341-image inspection found zero failures.
-The signed Review 2 denial is in [REVIEW.md](REVIEW.md); the remedy is in
-[IMPLEMENTATION.md](IMPLEMENTATION.md).
+Status: **JOINTLY APPROVED** at runtime `d826877`. `RB4-R1-001` remains closed
+by the owner's narrow anchorless-blank ruling. `RB4-R2-001` — missing required
+print sources left prior canonical evidence artifacts in place — is closed by
+code: all three exits now retire the prior set through binding refusal. The
+committed six assertions and an independent no-folder probe leave workbook,
+image folder, and manifest absent; the rebound verifier reports zero problems.
+Acceptance run **chain11** passed every phase and its 341-image inspection found
+zero failures. Both signed approvals are in [REVIEW.md](REVIEW.md); the remedy
+is in [IMPLEMENTATION.md](IMPLEMENTATION.md).
 
 > This RB-level contract carries work items **HF-05 and HF-10** and transcribes
 > both complete frozen work-item sections from
@@ -220,7 +219,7 @@ The single run must:
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to its five `source-audit/*evidence*` review ledgers and `visual-review/evidence-review/`, plus Claude's `visual_evidence.py:1270` census and the RC-2 `FT_3_stacked.png` reproduction |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-4: REVIEW 2 DENIED — RETURN TO IMPLEMENTATION** |
+| Status | **Inherits RB-4: JOINTLY APPROVED** |
 
 **Exact scope.** The visual-evidence renderer's eligibility rule, per-side source
 binding, target geometry and Excel-panel fidelity, across every path that emits
@@ -373,7 +372,7 @@ truncation census and the target-geometry measurements.
 | Implementer | Claude |
 | Review 1 | **Codex** (found the five absent-but-required cells) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-4: REVIEW 2 DENIED — RETURN TO IMPLEMENTATION** |
+| Status | **Inherits RB-4: JOINTLY APPROVED** |
 
 **Exact scope — AMENDED 2026-08-05.** Evidence for the ~~five~~ **four**
 Everything ENV cells of the `_pdf` report families — Ramp Detail (PDF),
