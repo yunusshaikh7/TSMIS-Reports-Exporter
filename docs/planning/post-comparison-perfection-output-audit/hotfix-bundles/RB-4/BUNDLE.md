@@ -71,6 +71,40 @@ read behind a planted positive control), plus the two always-silent paths
 says "11 registry cells", "18 artifact sets", "all five Everything ENV cells",
 or requires workbook-panel rendering, this amendment controls.
 
+## ⚠️ Owner ruling — 2026-08-09: what "accurate crop" means for an anchorless blank
+
+Raised by review finding `RB4-R1-001` against HF-10 criterion 2. One retained
+crop — `intersection_detail_pdf_tsn / ML_Traffic_Flow_1_pair.png`, route 232 @
+`000.807` — boxes a blank cell out in the whitespace right of the record's last
+glyph. The box is the column's REAL cell: Intersection Detail takes a blank
+target from the print's own ruled cell rectangle (`_box_at` → `meta["edges"]`),
+so it is correct by construction. But the print's cell boundaries are geometry
+rather than stroked rules, and uniquely in that crop no record in view prints
+that column, so a reader has no in-crop anchor to confirm the box by.
+
+The owner inspected the image and ruled it acceptable: *"this is fine, just
+document it."* So, for this bundle and any later evidence work:
+
+**A blank cell drawn from the print's OWN cell rectangle is ACCURATE.** Where
+no record inside the crop prints that column, the image is an anchorless — not
+a failed — crop: it is retained, and the limitation is disclosed with its
+measured incidence (`results/chain8-known-gap.md`; 1 of 336 in chain10).
+
+This does NOT relax anything else. A box that is mis-targeted, spans more than
+one column, is clipped, falls outside the record's printed extent, or shows a
+value differing from the compared one without a disclosure note remains a
+failure. In particular it does not re-permit the Highway Log defect fixed in
+`f4b55f2`: that box was a 12 px sliver drawn past the record's right edge and
+~25 px left of where its column actually prints — invented geometry, not the
+print's own cell. The distinction is the SOURCE of the rectangle, not whether
+a reader finds it convenient.
+
+Rejected alternative: extending Highway Log's bracketing rule to Intersection
+Detail. It would refuse this crop, but it bans anchoring a blank off a
+neighbouring record (PCOA-FINAL-005), so it would also refuse the many ID
+trailing blanks that a reader CAN anchor — trading one unverifiable image for
+a large, silent loss of coverage.
+
 | Field | Value |
 |---|---|
 | Bundle / work items | **RB-4 / HF-05 + HF-10** |
@@ -398,10 +432,14 @@ must still emit nothing: full gate plus every `check_evidence_*`,
 `check_pdf_excel_matrix.py`.
 
 **Measurable acceptance criteria.** *(amended 2026-08-05: four cells, not
-five — Ramp Summary's env cell joins the required-silent controls)*
+five — Ramp Summary's env cell joins the required-silent controls; criterion 2
+further amended 2026-08-09 per the owner ruling above)*
 1. All four `_pdf`-family env cells produce a bound manifest, evidence workbook
    and image set with a PDF-only read set passing the exact-source test.
-2. 100 % of retained crops accurate and readable, reviewed individually.
+2. 100 % of retained crops accurate and readable, reviewed individually —
+   "accurate" as defined by the 2026-08-09 ruling: an anchorless blank drawn
+   from the print's own cell rectangle is a disclosed coverage limitation,
+   not a failed crop.
 3. Env comparison counts identical with evidence on and off.
 4. No other lane's evidence behaviour changed.
 5. Full gate green; the new assertions fail pre-fix.

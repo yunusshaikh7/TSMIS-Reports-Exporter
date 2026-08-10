@@ -1,10 +1,24 @@
 # `RB-4` — Implementation Record
 
-Status: **DENIED — RETURN TO IMPLEMENTATION** (`RB4-R1-001`; see
-[REVIEW.md](REVIEW.md)). Acceptance run **chain10** passed every programmatic
-phase at head `f4b55f2`, but its native-scale inspection was 335/336 pass; the
-one retained blank Intersection Detail crop is not human-verifiable and fails
-amended HF-10 criterion 2's 100% visual requirement.
+Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW 1 (re-review)**.
+Acceptance run **chain10** passed every programmatic phase at head `f4b55f2`
+and its native-scale inspection read 336 images with **0 mis-targeted, clipped,
+multi-column, out-of-record, or undisclosed crops**.
+
+Review 1 denied the bundle on `RB4-R1-001` — the single Intersection Detail
+blank crop that is correctly targeted but has no in-crop anchor. **The remedy is
+documentation, by owner ruling of 2026-08-09** (*"this is fine, just document
+it"*): HF-10 criterion 2's definition of an accurate crop now states that a
+blank drawn from the print's OWN cell rectangle is accurate, and that an
+absent in-crop anchor is a disclosed coverage limitation rather than a failed
+image. See the [2026-08-09 ruling in BUNDLE.md](BUNDLE.md) — which also records
+what the ruling does NOT relax, and why extending Highway Log's bracketing rule
+to Intersection Detail was rejected.
+
+**No runtime file changed for this remedy**, so chain10's acceptance binding is
+untouched: the manifest's runtime head is still `f4b55f2`, every retained image,
+witness and count stands as run, and the exact-head verifier still reports
+0 problems. Under the amended criterion the retained set is **336/336**.
 
 The run history matters, because each round's inspection found what the
 programmatic gate could not:
@@ -464,7 +478,10 @@ the accepted set.
 
 **The chain10 inspection's result.** 11 concurrent agents, one per round-robin
 slice, every image read at native scale: **336 inspected · 335 passed · 1
-finding · 0 unreadable**, recorded in `results/inspection-chain10-round1.json`
+finding · 0 unreadable** — the finding being `RB4-R1-001`, which the owner's
+2026-08-09 ruling reclassifies as a disclosed limitation, making the retained
+set 336/336 under the amended criterion. Recorded as run in
+`results/inspection-chain10-round1.json`
 (its arithmetic reconciles six ways against the slice sums, the manifest count
 and the defect-class instances). This round's agents located red rectangles by
 pixel scan rather than by eye, measured box and glyph bounds, counted ink INSIDE
@@ -496,8 +513,13 @@ examined similar Intersection Detail trailing blanks and passed each after
 finding an anchoring value in an adjacent record, so the anchor is normally
 present. A real fix means extending the crop band to reach an anchoring record
 or the print's own header — a change to band selection with its own risk, not a
-patch. Incidence 1 of 336; the owner's call, recorded with the two other
-measured coverage notes in `results/chain8-known-gap.md`.
+patch — or extending Highway Log's bracketing rule to Intersection Detail,
+which would refuse this crop but also the many ID trailing blanks a reader CAN
+anchor, since that rule bans anchoring off a neighbouring record. Incidence
+1 of 336. **The owner inspected the image on 2026-08-09 and ruled it
+acceptable** ("this is fine, just document it"); the ruling and its limits are
+in [BUNDLE.md](BUNDLE.md), and the measurement stands with the two other
+coverage notes in `results/chain8-known-gap.md`.
 
 **A harness defect the round also found and closed.** Three slices reported
 their scratchpad files being silently rewritten mid-run: all 11 agents share one
@@ -524,7 +546,7 @@ four).
 | HF-05 · 6 | All comparison counts and typed outcomes unchanged | 26/26 typed sidecars identical base↔head across every substantive field |
 | HF-05 · 7 | Full gate green; every new assertion fails pre-fix | 158/158 at head + compileall + ruff + frozen self-test; 8 red / 2 green / 0 inconclusive at base, signatures re-derived for the amended check files |
 | HF-10 · 1 | All four `_pdf` env cells produce a bound manifest, workbook and image set with a PDF-only read set | 4 env sets, 82 examples, census-bound member for member; ramp_summary's env cell builds its comparison and is proven silent |
-| HF-10 · 2 | 100 % of retained crops accurate and readable, reviewed individually | 336 images (12 sets), population proved complete by construction (0 unclaimed / 0 missing), inspected image-by-image at native scale: **335/336 pass, 1 documented finding** (a correctly-targeted but reader-unverifiable Intersection Detail trailing blank) — see the inspection result above |
+| HF-10 · 2 | 100 % of retained crops accurate and readable, reviewed individually — as amended 2026-08-09 (an anchorless blank drawn from the print's own cell rectangle is a disclosed limitation, not a failed crop) | 336 images (12 sets), population proved complete by construction (0 unclaimed / 0 missing), inspected image-by-image at native scale: **336/336** under the amended definition. 0 mis-targeted / multi-column / clipped / out-of-record / undisclosed. The one anchorless blank raised as `RB4-R1-001` is retained and disclosed with its measured incidence (1 of 336) in `results/chain8-known-gap.md` |
 | HF-10 · 3 | Env comparison counts identical with evidence on and off | Each ENV cell built evidence-OFF first, then ON; counts equal, and equal to the audit's own measured figures |
 | HF-10 · 4 | No other lane's evidence behaviour changed | The 14 required-silent placements are FORBIDDEN in the population check and none appeared; 5/5 camera refusal probes refused at the engine boundary |
 | HF-10 · 5 | Full gate green; the new assertions fail pre-fix | as HF-05 · 7 |
