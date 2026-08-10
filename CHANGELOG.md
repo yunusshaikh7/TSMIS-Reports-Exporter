@@ -3,6 +3,58 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.34.0 — 2026-08-10
+
+Evidence images become a real spot check. Both panels are now crops of the
+actual printed PDFs, so holding an image next to the comparison sheet can
+catch a bad parse — which is the only reason the feature exists. Cross-
+environment comparisons get evidence for the first time.
+
+### Changed
+- **Both sides of an evidence image are crops of the source prints.** One side
+  used to be a panel drawn from the compared workbook. That was circular: the
+  panel and the comparison sheet were built from the same read, so no amount of
+  looking at it could catch a parsing mistake. Every panel is now a crop of an
+  actual page — the per-route TSMIS PDF export and the TSN library print — with
+  the red box on the compared cell and the caption naming the exact file and
+  page number. You can open that page yourself and check it.
+- **Evidence is collected for the four PDF-edition families only** — Highway
+  Log, Highway Sequence, Intersection Detail and Ramp Detail — in three lanes
+  each: Everything vs-TSN, By Day vs-TSN, and Everything cross-environment.
+  Everywhere else the evidence toggle and the per-cell camera are gone and
+  nothing is produced, because a crop needs a print on both sides. Highway
+  Detail joins when its pre-release freeze lifts.
+
+### Added
+- **Cross-environment comparisons produce evidence images.** Comparing the same
+  report across two environments previously had no evidence at all; both sides
+  are per-route prints, so both crop cleanly.
+- **A print that disagrees with the comparison is shown, with a note.** It used
+  to be dropped in silence — which hid exactly the parser bug the spot check
+  exists to find. The image now renders with the disagreement stated on it, and
+  its subline says the print DISAGREES instead of claiming verification.
+- **Normalization is disclosed on the image.** When the print's own text is a
+  different form of the compared value — a two-digit year, a zero-padded width,
+  a composite flag+date cell, a null marker — the image says so and quotes the
+  print's token, so a reader is never left comparing `64-01-01` against
+  `1964-01-01` and wondering.
+
+### Fixed
+- **Red boxes land on exactly one cell.** Ramp Detail's District box used to
+  swallow neighbouring columns; a blank cell could be marked with a sliver of a
+  box drawn past the end of the record's own printing, pointing at nothing. A
+  blank is now boxed only where the record's own ink brackets the column, or —
+  for the ruled Intersection Detail grid — at the print's own cell rectangle.
+  Verified by reading every one of 341 images at full size: zero mis-targeted,
+  wrong-record, multi-column, clipped or out-of-record boxes.
+- **Stale evidence is retired instead of left looking current.** If a required
+  print is missing when evidence is refreshed, the previous evidence workbook,
+  image folder and manifest used to survive at their canonical names beside a
+  comparison they no longer illustrated. They are now removed, and the run says
+  why.
+- **Captions, titles and notes are no longer cut off**, and the two captions in
+  a side-by-side image no longer overprint each other.
+
 ## v0.33.1 — 2026-08-02
 
 ### Changed
