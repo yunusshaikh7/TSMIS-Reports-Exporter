@@ -765,6 +765,20 @@ or accept as someday.**
   (`build/measure_baselines.py`); the runtime cold-start / matrix-snapshot baselines were deferred to the
   first phase that touches a hot path. Measure then, not before.
 
+### Comparison semantics — open questions (verify before changing anything)
+> Observations, **not** confirmed defects. Each needs a code-verification pass FIRST; a change here
+> moves comparison counts, so it rides the `compare_core` rules in `CLAUDE.md` (cell-for-cell proof
+> against the independent oracle, both workbook flavors, an explained canary re-bless).
+- [ ] **Ramp Detail's `-` null marker may be handled two ways** (noticed 2026-08-08 during the RB-4
+  evidence inspection). vs-TSN projects `-` to blank before comparing
+  (`compare_ramp_detail_pdf._NULL_MARK`), while the cross-environment comparator appears to compare
+  the literal `-` as a value — an env evidence image shows Area 4 as ssor-test `'-'` vs ssor-prod
+  `'Y'` with no normalization disclosure. **Both evidence images are honest about what they show, so
+  this is not an evidence defect.** It may also be correct as-is: the env lane compares two prints of
+  the same shape, so `-` against `Y` can be a genuine difference rather than a null. Verify which it
+  is; if intended, record the reasoning in [comparison-engine.md](comparison-engine.md) so it is not
+  re-litigated.
+
 ### Dormant / watch (no action unless the data changes)
 - [x] **Med Wid flavor-parity gap — resolved in Phase-3 E1 (2026-07-12).** Python, values,
   formula Comparison, and independent Spot Check now share the approved narrow ASCII grammar via
