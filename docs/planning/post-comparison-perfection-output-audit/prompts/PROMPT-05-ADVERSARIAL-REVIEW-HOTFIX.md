@@ -157,9 +157,39 @@ Update `hotfix-bundles/<BUNDLE_ID>/REVIEW.md` with:
 - final verdict `APPROVED` or `DENIED`;
 - reviewer signature and timestamp.
 
+## The practical-impact gate — apply this BEFORE any verdict
+
+This is an internal tool, not an audited system of record. A finding blocks
+only if it changes what the app DOES for a user: wrong output, stale or lost
+data presented as current, a crash, or a silent failure.
+
+For every candidate finding, write one line: **what would a user see
+differently because of this?** If the honest answer is "nothing", it is a
+NOTE in the review record — never a denial — no matter how it reads against a
+criterion's wording. A criterion whose wording is stricter than its purpose is
+a wording bug; say so and note it.
+
+Findings that are NOTES by this test, not denials:
+
+- cosmetics — widths, spacing, colours, layout;
+- which commit hash a record cites, or how a record is worded;
+- a bounded coverage limitation the implementation already disclosed with its
+  measured incidence;
+- anything the implementation already recorded as a deliberate trade-off with
+  its reasoning.
+
+**Two denials per bundle is the ceiling.** After a second denial, remaining
+findings are logged as follow-up items and the bundle proceeds. Whether a
+follow-up is worth another round is the owner's call, not the reviewer's.
+
+Never require a re-run whose only effect is to make a record cite a tidier
+commit. If the recorded facts are true and the behaviour is proved, that is
+acceptance.
+
 ## Decision protocol
 
-- A concrete acceptance failure means `DENIED — RETURN TO IMPLEMENTATION`.
+- A concrete acceptance failure **that passes the practical-impact gate** means
+  `DENIED — RETURN TO IMPLEMENTATION`.
 - A material missing or unbound artifact means `DENIED — EVIDENCE GAP`, naming
   exactly one bounded item the implementation must supply. The reviewer does
   not generate it.
