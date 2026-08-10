@@ -181,7 +181,7 @@ Two layers, because the owner wants **fewer branches, reviews and releases**
 | 2 | **RB-2** | HF-02 + HF-03 | The deliverable looks right and describes itself truthfully — **56 of the 68 denials** | None (RB-1 for the Clean Road witness) | `hotfix/rb-2-deliverable-presentation` | **MERGED** — `d679f388e0b12ff595751af9edd816674615b7a5` |
 | 3 | **RB-3** | HF-04 | Ramp Detail — restores 9 comparison placements that produce nothing today | None | `hotfix/rb-3-ramp-detail-layout` | **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc` |
 | 4 | **RB-4** | HF-05 + HF-10 | Evidence, end to end — **AMENDED by the owner 2026-08-05 and 2026-08-09**: print crops on the four `_pdf` report families only; anchorless blanks from the print's own cell geometry are disclosed limitations | None | `hotfix/rb-4-evidence` | **MERGED** — `83a24896a5a970a3686df87934210f54cea43778` |
-| 5 | **RB-5** | HF-06 + HF-09 | Difference classification — the two opposite rulings applied to the right classes | RB-1, RB-2 | `hotfix/rb-5-difference-classification` | BLOCKED |
+| 5 | **RB-5** | HF-06 + HF-09 | Difference classification — the two opposite rulings applied to the right classes | RB-1, RB-2 | `hotfix/rb-5-difference-classification` | **READY** |
 | 6 | **RB-6** | HF-07 + HF-08 + HF-11 | Engine hygiene, coverage truth, and the closeout guards | RB-2, RB-3, RB-5 | `hotfix/rb-6-hygiene-and-guards` | BLOCKED |
 
 ### Prompt and record identity
@@ -482,7 +482,7 @@ mapping also proves one primary implementation/review bundle per finding:
 | **RB-2** | HF-02, HF-03 | 002, 003, 008, 009, 014, 016, 019 | 7 | **MERGED** — `d679f388e0b12ff595751af9edd816674615b7a5` |
 | **RB-3** | HF-04 | 001, 012 | 2 | **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc` |
 | **RB-4** | HF-05, HF-10 | 004, 005, 006, 007 | 4 | **MERGED** — `83a24896a5a970a3686df87934210f54cea43778` |
-| **RB-5** | HF-06, HF-09 | 011, 013 | 2 | BLOCKED |
+| **RB-5** | HF-06, HF-09 | 011, 013 | 2 | **READY** |
 | **RB-6** | HF-07, HF-08, HF-11 | 015, 017, 018, 020, 021, 022 | 6 | BLOCKED |
 | **Total** | 11 work items | 22 unique findings | **22** | |
 
@@ -509,9 +509,8 @@ bundle is marked `READY`, combine all of its included sections into
 `hotfix-bundles/<RB-ID>/BUNDLE.md` from
 [the template](hotfix-bundles/TEMPLATE/BUNDLE.md), filling the base `main` SHA
 only when Stage 4 creates the branch. The BUNDLE.md must not diverge from these
-sections; where they disagree, this file wins. RB-1 and RB-2 are complete, and
-RB-1 through RB-3 are complete, and `RB-4/BUNDLE.md` now exists because RB-4
-is `READY`.
+sections; where they disagree, this file wins. RB-1 through RB-4 are complete,
+and `RB-5/BUNDLE.md` now exists because RB-5 is `READY`.
 
 The `Split fallback branch` rows below are dormant names reserved only if the
 owner invokes the documented split fallback. The controlling branch for the
@@ -1339,7 +1338,7 @@ truncation census and the target-geometry measurements.
 | Implementer | Claude |
 | Review 1 | **Codex** (owns the 60,254-row equation witness and the route-001 raw adjudication) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | Inherits RB-5: BLOCKED |
+| Status | **Inherits RB-5: READY** |
 
 **Exact scope.** The Highway Sequence PDF-vs-Excel **self** check only, on all
 three paths that agree today (Direct self, Everything SELF, PDF-vs-Excel by-day
@@ -1701,7 +1700,7 @@ eight datasets and the content-invariance proof.
 | Implementer | Claude |
 | Review 1 | **Codex** (owns the four semantic-classification witnesses) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | Inherits RB-5: BLOCKED |
+| Status | **Inherits RB-5: READY** |
 
 **Exact scope.** The measured representation-only Description/landmark class in
 Direct, By Day and Everything vs TSN plus the Clean Road comparison: Highway Log
@@ -2167,3 +2166,8 @@ record head `0191804`; RB-4 merged without force as
 `83a24896a5a970a3686df87934210f54cea43778` after fetched `origin/main` remained
 at the recorded base. The post-merge full gate passed 158/158 in 226 seconds,
 and the frozen application self-test passed on the exact shipped executable.
+
+The RB-4 closeout then prepared RB-5's combined HF-06/HF-09 scope contract from
+`main` at `1e9446bb7f1f9771b7698482d63980840ee5ec28` and marked RB-5
+`READY`. It did not create the RB-5 branch, modify product code, generate
+deliverables, or begin `RB5-A1`.
