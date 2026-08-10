@@ -658,6 +658,83 @@ try:
 finally:
     shutil.rmtree(_r6, ignore_errors=True)
 
+# RB4-R2-001: a MISSING REQUIRED PRINT is a binding refusal, not a keep-last-
+# good skip. The first implementation exited these three cases with a plain
+# ValueError BEFORE the retirement path, so the prior workbook, image folder
+# AND manifest all survived at their canonical names beside a comparison they
+# no longer illustrate. The provenance-stripping fixture above cannot catch it:
+# that pair dies inside _bound_provenance, which already retires. This drives
+# the shipped generate() with a fully BOUND comparison and withholds one print
+# set at a time, so only the print exits can be what fires.
+print("RB4-R2-001: a missing print set retires the prior evidence set")
+
+
+class _SilentEvents:
+    def is_cancelled(self):
+        return False
+
+    def on_log(self, _m):
+        pass
+
+
+def _print_refusal_case(tsmis_prints, tsn_prints):
+    """(survivors, exception) for generate() with the named prints present."""
+    root = Path(tempfile.mkdtemp(prefix="evidence_r2_"))
+    import compare_intersection_detail_tsn as idt7
+    import evidence_intersection_detail as eid7
+    import evidence_manifest as em7
+    import paths as _paths7
+    old_lib = _paths7.TSN_LIBRARY_ROOT
+    saved = (eid7.load_sides, eid7.enumerate_diffs)
+    try:
+        cmp7 = root / "day2 vs tsn.xlsx"
+        row7 = ["001"] + ["x"] * len(idt7.SHARED_HEADER)
+        row7[1 + idt7.SHARED_HEADER.index(idt7.KEY)] = "0.100"
+        cons7 = root / "cons.xlsx"; cons7.write_bytes(b"consolidated")
+        tsn7 = root / "tsn.xlsx"; tsn7.write_bytes(b"tsn")
+        _checklib.publish_bound_comparison(
+            cmp7, idt7._SCHEMA, [list(row7)], [list(row7)], (cons7, tsn7))
+        wb7, img7 = ve.sibling_paths(cmp7)
+        man7 = em7.manifest_path(cmp7)
+
+        tdir7 = root / "tsmis_pdf"; tdir7.mkdir()
+        if tsmis_prints:
+            (tdir7 / "intersection_detail_route_001.pdf").write_bytes(b"%PDF t")
+        _paths7.TSN_LIBRARY_ROOT = root / "tsn_library"
+        libpdf7 = root / "tsn_library" / "intersection_detail" / "pdf"
+        libpdf7.mkdir(parents=True)
+        if tsn_prints:
+            (libpdf7 / "stub.pdf").write_bytes(b"%PDF tsn")
+
+        wb7.write_bytes(b"PRIOR evidence workbook")
+        img7.mkdir()
+        (img7 / "prior.png").write_bytes(b"prior image")
+        man7.write_text('{"prior": true}', encoding="utf-8")
+
+        eid7.load_sides = lambda _c, _t: ([], [], {"ok": 1}, None)
+        eid7.enumerate_diffs = lambda _a, _b, _s: {}
+        raised = None
+        try:
+            ve.generate("intersection_detail_pdf", cons7, tsn7, cmp7, tdir7,
+                        _SilentEvents())
+        except Exception as e:                   # noqa: BLE001 — the probe
+            raised = e
+        return (wb7.exists(), img7.exists(), man7.exists()), raised
+    finally:
+        eid7.load_sides, eid7.enumerate_diffs = saved
+        _paths7.TSN_LIBRARY_ROOT = old_lib
+        shutil.rmtree(root, ignore_errors=True)
+
+
+for _label, _tsmis, _tsn in (("the TSMIS print set", False, True),
+                             ("the TSN print set", True, False),
+                             ("both print sets", False, False)):
+    _survivors, _exc = _print_refusal_case(_tsmis, _tsn)
+    check(f"{_label} missing -> no prior workbook, image folder or manifest "
+          "survives", not any(_survivors))
+    check(f"...and {_label} missing refuses as a BINDING error",
+          isinstance(_exc, ve.EvidenceSourceBindingError))
+
 # CMP-AUD-108: a comparison whose ONLY differences live inside a repeated-key
 # group must report those columns and say why no image exists — the published
 # counts decide, not the adapter's (correctly) empty candidate list. Driven

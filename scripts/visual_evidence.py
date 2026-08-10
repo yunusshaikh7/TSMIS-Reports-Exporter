@@ -1086,21 +1086,37 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
         # The prints both crops come from (the 2026-08-05 amendment): the
         # per-route TSMIS PDF export the compared workbook was built from,
         # and the TSN library print the normalized TSN workbook was built
-        # from. Absent prints are a skipped decoration (keep-last-good), not
-        # a binding refusal — a temporarily un-dropped TSN print set must not
-        # retire a valid prior evidence set.
+        # from. Under the amendment a print IS a required source, so an absent
+        # print set is a BINDING REFUSAL like any other unbindable side: the
+        # prior set is retired and nothing is published.
+        #
+        # This reverses the first implementation's keep-last-good exits
+        # (RB4-R2-001). Their rationale — "a temporarily un-dropped TSN print
+        # set must not retire a valid prior evidence set" — does not hold,
+        # because generate() runs as decoration AFTER a comparison is built:
+        # the surviving set is evidence for a PREVIOUS generation, left
+        # sitting at its canonical name beside the comparison it no longer
+        # illustrates. That is precisely the stale-looking-current artifact
+        # `refuse_binding` exists to prevent, and a plain ValueError here
+        # skipped it. Re-drop the prints and re-run the camera to get the
+        # images back.
         if not tsmis_pdf_dir:
-            raise ValueError(f"no {adapter.REPORT_LABEL} (PDF) per-route "
-                             "export folder was supplied for this cell")
+            refuse_binding(EvidenceSourceBindingError(
+                f"no {adapter.REPORT_LABEL} (PDF) per-route export folder was "
+                "supplied for this cell — the evidence sources cannot be "
+                "bound"))
         tsmis_pdf_dir = Path(tsmis_pdf_dir)
         tsn_dir = tsn_pdf_dir(row_key)
         tsmis_pdf_files, tsn_pdf_files = _pdf_source_files(tsmis_pdf_dir,
                                                            tsn_dir)
         if not tsmis_pdf_files:
-            raise ValueError(f"no {adapter.REPORT_LABEL} (PDF) export found "
-                             f"in {tsmis_pdf_dir} — run that export first")
+            refuse_binding(EvidenceSourceBindingError(
+                f"no {adapter.REPORT_LABEL} (PDF) export found in "
+                f"{tsmis_pdf_dir} — run that export first"))
         if not tsn_pdf_files:
-            raise ValueError(f"no TSN {adapter.REPORT_LABEL} PDFs in {tsn_dir}")
+            refuse_binding(EvidenceSourceBindingError(
+                f"no TSN {adapter.REPORT_LABEL} PDFs in {tsn_dir} — drop that "
+                "district print set first"))
         source_paths = (consolidated, tsn_path, comparison_path,
                         tsmis_pdf_dir, tsn_dir,
                         *tsmis_pdf_files, *tsn_pdf_files)
