@@ -71,8 +71,8 @@
    "row": "ramp_summary"
   }
  ],
- "bound_to_acceptance_head": "c974a00666ccd427a429246a9e9fde554e5e6c42",
- "built_utc": "2026-08-09T01:26:58+00:00",
+ "bound_to_acceptance_head": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
+ "built_utc": "2026-08-10T02:24:38+00:00",
  "bundle": "RB-4",
  "camera_refusals": [
   {
@@ -167,19 +167,19 @@
  "derived_from": [
   {
    "file": "generation-head.json",
-   "sha256": "E9A9F377953E9B98266CDB82893BD2116C93F116FEB38F695A8A1102407EF4FB"
+   "sha256": "2966937C966A50E123B8EC325C7F46FAD5F4ABD7BFD69AA40FFFD0E07BE7D566"
   },
   {
    "file": "counts-head.json",
-   "sha256": "611E32B62355E9B3EFDBFC67A25A49FA3EDC5A4028D70CE442452DA73BCC4EF3"
+   "sha256": "6683F4C93954BC752C0CF1F605238FCDC7F2486E462BF847BADC1FDD3C708A85"
   },
   {
    "file": "validate-head.json",
-   "sha256": "6E5018D86064EF2509E62E77163AEFA45599C7A2E7674DB3B4A7B5B7ACE32E24"
+   "sha256": "2F5B4DA0535C7D5C859BC865A590682DB40524948A74DCD6FF40B6F0FE671CE3"
   },
   {
    "file": "cameras-head.json",
-   "sha256": "9AC0366B4C6B3A1583F85831F6032D57B50903EA7DAAB605D68F6601A95D7539"
+   "sha256": "06EE93CB3A75872581898CABE632DA41679E3ECF5E7F2BBF8D3115BAACE704D1"
   }
  ],
  "env_cells": {
@@ -238,8 +238,8 @@
   {
    "checks_failed": 0,
    "comparison": "ssor-test_highway_log_pdf.xlsx",
-   "env_rederived": 58,
-   "examples": 58
+   "env_rederived": 56,
+   "examples": 56
   },
   {
    "checks_failed": 0,

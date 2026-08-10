@@ -61,8 +61,8 @@
    }
   }
  },
- "bound_to_acceptance_head": "c974a00666ccd427a429246a9e9fde554e5e6c42",
- "built_utc": "2026-08-09T01:26:58+00:00",
+ "bound_to_acceptance_head": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
+ "built_utc": "2026-08-10T02:24:38+00:00",
  "bundle": "RB-4",
  "claim": "the 12 `_pdf`-family cells render BOTH sides as crops of the source prints (per-route TSMIS export / TSN library print), each TSMIS-side value re-derived from the print or disclosed as a disagreement on the image; the 14 required-silent cells emit no evidence artifact of any kind; blank targets sit inside the captioned record; and unbindable pairs emit no artifact",
  "count_invariance": {
@@ -232,11 +232,11 @@
  "derived_from": [
   {
    "file": "generation-head.json",
-   "sha256": "E9A9F377953E9B98266CDB82893BD2116C93F116FEB38F695A8A1102407EF4FB"
+   "sha256": "2966937C966A50E123B8EC325C7F46FAD5F4ABD7BFD69AA40FFFD0E07BE7D566"
   },
   {
    "file": "counts-head.json",
-   "sha256": "611E32B62355E9B3EFDBFC67A25A49FA3EDC5A4028D70CE442452DA73BCC4EF3"
+   "sha256": "6683F4C93954BC752C0CF1F605238FCDC7F2486E462BF847BADC1FDD3C708A85"
   },
   {
    "file": "counts-base.json",
@@ -244,11 +244,11 @@
   },
   {
    "file": "validate-head.json",
-   "sha256": "6E5018D86064EF2509E62E77163AEFA45599C7A2E7674DB3B4A7B5B7ACE32E24"
+   "sha256": "2F5B4DA0535C7D5C859BC865A590682DB40524948A74DCD6FF40B6F0FE671CE3"
   },
   {
    "file": "excel-head.json",
-   "sha256": "0B55818C9E7B79D40FB286015086763F20015A294D49CC9F4E9BFEECD23109EA"
+   "sha256": "DFB8207BFAC1F19DFFBC414885C1860757EA0F441075B3BDA094F5479233F16A"
   },
   {
    "file": "prefix-defect-census.json",
@@ -268,7 +268,7 @@
   "byday-tsn": {
    "cells": 8,
    "ok": 8,
-   "png_total": 258
+   "png_total": 256
   },
   "everything-env": {
    "cells": 5,
@@ -288,7 +288,7 @@
   "everything-tsn": {
    "cells": 8,
    "ok": 8,
-   "png_total": 256
+   "png_total": 258
   },
   "pve-byday": {
    "cells": 4,
@@ -304,12 +304,12 @@
  "validate": {
   "disagreement_examples": 0,
   "elided_examples": 0,
-  "examples": 342,
+  "examples": 336,
   "problems": 0,
   "pve_stray": [],
   "sets": 12,
-  "tsmis_rederived": 258,
-  "values_over_26": 20
+  "tsmis_rederived": 254,
+  "values_over_26": 14
  },
  "work_item": "HF-05 (PCOA-FINAL-004 / -005 / -006, as amended 2026-08-05: print crops on the `_pdf` families only)"
 }

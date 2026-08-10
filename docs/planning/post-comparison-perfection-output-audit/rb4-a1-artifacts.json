@@ -1,7 +1,7 @@
 {
  "acceptance_head": {
-  "commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
-  "manifest_built_at": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+  "commit": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
+  "manifest_built_at": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
   "note": "the ONE exact git head every claimed result names and self-stamps; later commits on the branch may only touch docs"
  },
  "base_tree": {
@@ -12,7 +12,7 @@
   "note": "the pre-fix defect signatures ran against this exported tree; it equals the recorded base commit file-for-file (LF-normalized)",
   "runtime_digest_at_base": "4350EB8A2C83C859A4BA8FA845BC6CD96094F095570B088591981EB629DB97AF"
  },
- "built_utc": "2026-08-09T01:33:09+00:00",
+ "built_utc": "2026-08-10T02:34:30+00:00",
  "bundle": "RB-4",
  "deliverables": {
   "roots": [
@@ -40,9 +40,9 @@
     "rolled_sha256": "52DA12A924DDF0FCAF6ACAEA468598DAD7424987A4D3A1A25CE35E51B1DBCB3D"
    },
    "head": {
-    "bytes": 4172476057,
-    "count": 635,
-    "rolled_sha256": "08E9A455DCB55ADF71F2E56C479F766222B6305FA579C7D574D406991BC815A8"
+    "bytes": 4170433843,
+    "count": 629,
+    "rolled_sha256": "1720DF6C3990117FD9BA24B8D7935929E8C388F5C62EDCB002B336927D141414"
    },
    "hf10-retained": {
     "bytes": 1112951766,
@@ -162,8 +162,8 @@
   },
   "files": {
    "INSPECTION-PROMPT.md": {
-    "bytes": 8027,
-    "sha256": "57F9719850315F966CD847D25D09964A43D9C94D77A87B915BB5FFC2B2435F71"
+    "bytes": 8718,
+    "sha256": "6A28F13E9EAA9DED867262934BBDB8C96CD93F8E5BA1B94EAFD818703AD11F6A"
    },
    "acc_rb4_inspect_manifest.py": {
     "bytes": 8973,
@@ -178,8 +178,8 @@
     "sha256": "43D991DAC4EB3A6CD64D23C5822ACA02601F23A8109D7EB20EF9DFF06C5B9C2D"
    },
    "gather_deliverable.py": {
-    "bytes": 5036,
-    "sha256": "E9E94AE010738756820BD69BF3BA95F728A2E098BF5833D44801F594B84FD8A8"
+    "bytes": 5177,
+    "sha256": "F2D5CBFAE8002DE6FF1104CCA433CBF95F2FFAD2927B3BAA66B88510B2FC25D1"
    },
    "pilot_cell.py": {
     "bytes": 2666,
@@ -204,6 +204,10 @@
    "rb4_chain.sh": {
     "bytes": 1535,
     "sha256": "DFFBE1BC1660E9BF58CF63D511E16D4F8978CB9CB74B489C4DE196F1F1397938"
+   },
+   "rb4_chain10.sh": {
+    "bytes": 4775,
+    "sha256": "EB1745790AA6C619F6B93284911B965318CD35FCD8A8E6C6BBE414FA40D00789"
    },
    "rb4_chain2.sh": {
     "bytes": 2272,
@@ -236,6 +240,10 @@
    "rb4_chain9.sh": {
     "bytes": 4708,
     "sha256": "995278758B62DF8D754A228B5932C687F4F183730DE92ED8EA8FA92ACC2E73F5"
+   },
+   "rb4_chain_evidence_only.sh": {
+    "bytes": 5428,
+    "sha256": "D3A96AB1A6FFB4F682F50B5399BFF47604FDF19A16BAB904CE8C8CA5437BF459"
    },
    "slice_inspection.py": {
     "bytes": 2460,
@@ -340,16 +348,16 @@
   }
  },
  "inventory": {
-  "bytes": 8025009,
+  "bytes": 8023639,
   "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\rb4-a1-inventory.json",
-  "sha256": "02E917111299A9A677435DB5FED2C95F3CEF3EEC86B095A5F38B19A3F3CB19A1"
+  "sha256": "4F3082CBE11BDD2D6DBF93D9EDFBD594E7B5437FAECC89D196A09B9EBB89AA04"
  },
  "problems": [],
  "purpose": "bind the complete RB4-A1 acceptance set (HF-05 exact-source evidence + HF-10 env evidence lane) to one exact runtime head, the recorded base runtime, and the frozen inputs",
  "results": {
   "all_claimed_same_head": true,
   "claimed": 7,
-  "count": 60,
+  "count": 64,
   "entries": [
    {
     "base_commit": "72adf447d45a2b74c562ba714008661a180c5d5f",
@@ -362,7 +370,7 @@
     "class": "base-signature",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\base-red-checks.json",
     "role": "checks-at-base",
-    "sha256": "21B1030AAEAF94850E894CE4BF46FAAD930B0873728DDEFA946698C94F801CBE"
+    "sha256": "447D828FDC03A27660FA57599A564EFB8A61465E8DB642D47FD31640DAA38905"
    },
    {
     "bytes": 568,
@@ -372,23 +380,23 @@
     "sha256": "E81D360B38BA080299B1FABDC3046BF0262DE8DA0CF39B299A4D6DF29E9A2920"
    },
    {
-    "bytes": 5927,
+    "bytes": 6132,
     "class": "acceptance",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\cameras-head.json",
     "role": "cameras",
-    "runtime_head_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+    "runtime_head_commit": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
     "self_stamp": {
-     "tree_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+     "tree_commit": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
      "tree_runtime_dirty": false
     },
-    "sha256": "9AC0366B4C6B3A1583F85831F6032D57B50903EA7DAAB605D68F6601A95D7539"
+    "sha256": "06EE93CB3A75872581898CABE632DA41679E3ECF5E7F2BBF8D3115BAACE704D1"
    },
    {
     "bytes": 5986,
     "class": "log",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\checks-at-head.json",
     "role": "log",
-    "sha256": "A54D21B4B2A4D6BB4D2E2BBE92BE36430C386A809EDB92AD7A90AD8429DD569C"
+    "sha256": "286865E735191D9CFE3D688E6085DA81A532EAA9B1E24D6B9E3D3C5E5795938E"
    },
    {
     "base_commit": "72adf447d45a2b74c562ba714008661a180c5d5f",
@@ -408,24 +416,24 @@
     "class": "acceptance",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\counts-head.json",
     "role": "counts",
-    "runtime_head_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+    "runtime_head_commit": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
     "self_stamp": {
-     "tree_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+     "tree_commit": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
      "tree_runtime_dirty": false
     },
-    "sha256": "611E32B62355E9B3EFDBFC67A25A49FA3EDC5A4028D70CE442452DA73BCC4EF3"
+    "sha256": "6683F4C93954BC752C0CF1F605238FCDC7F2486E462BF847BADC1FDD3C708A85"
    },
    {
     "bytes": 27997,
     "class": "acceptance",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\excel-head.json",
     "role": "excel",
-    "runtime_head_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+    "runtime_head_commit": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
     "self_stamp": {
-     "tree_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+     "tree_commit": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
      "tree_runtime_dirty": false
     },
-    "sha256": "0B55818C9E7B79D40FB286015086763F20015A294D49CC9F4E9BFEECD23109EA"
+    "sha256": "DFB8207BFAC1F19DFFBC414885C1860757EA0F441075B3BDA094F5479233F16A"
    },
    {
     "bytes": 80386,
@@ -456,16 +464,23 @@
     "sha256": "6860095CA00FAC54E07BD2946D4D4A3D405918561A4A27CAD2101251ABAC58B8"
    },
    {
-    "bytes": 224383,
+    "bytes": 232411,
     "class": "acceptance",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\generation-head.json",
     "role": "generate",
-    "runtime_head_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+    "runtime_head_commit": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
     "self_stamp": {
-     "tree_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+     "tree_commit": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
      "tree_runtime_dirty": false
     },
-    "sha256": "E9A9F377953E9B98266CDB82893BD2116C93F116FEB38F695A8A1102407EF4FB"
+    "sha256": "2966937C966A50E123B8EC325C7F46FAD5F4ABD7BFD69AA40FFFD0E07BE7D566"
+   },
+   {
+    "bytes": 8822,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\inspection-chain10-round1.json",
+    "role": "log",
+    "sha256": "346F22F9DC9959E8429330596CE7013ADC1FE4CBBAAB7E0E73E9283B7AFC253C"
    },
    {
     "bytes": 8980,
@@ -475,11 +490,18 @@
     "sha256": "32EA53CCC775311F37569CAA512E11DCB99C6549BA06E673D89BC55AA420B881"
    },
    {
-    "bytes": 456539,
+    "bytes": 9446,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\inspection-chain9-round1.json",
+    "role": "log",
+    "sha256": "BBDE8D8B27A6E5CC067D3DF4D6C0B0878B482F59C34652CF9685D64AB8817A01"
+   },
+   {
+    "bytes": 448487,
     "class": "log",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\inspection-manifest.json",
     "role": "log",
-    "sha256": "6A955A25FCEE4B833D00FE18A945ECBAF481F26C91E76303B3151FB8E1F817D2"
+    "sha256": "5B63CFA4DCCE76F44B235CEB9C5EBE24DC933FF6B5DD71B048CB30DACF45C10F"
    },
    {
     "bytes": 176142,
@@ -510,23 +532,23 @@
     "sha256": "D4D4B2666BA8C1ED782B71DED18334F24FE766A7EEA607552C51E3C120FF0C17"
    },
    {
-    "bytes": 152201,
+    "bytes": 150412,
     "class": "acceptance",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\validate-head.json",
     "role": "validate",
-    "runtime_head_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+    "runtime_head_commit": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
     "self_stamp": {
-     "tree_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+     "tree_commit": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
      "tree_runtime_dirty": false
     },
-    "sha256": "6E5018D86064EF2509E62E77163AEFA45599C7A2E7674DB3B4A7B5B7ACE32E24"
+    "sha256": "2F5B4DA0535C7D5C859BC865A590682DB40524948A74DCD6FF40B6F0FE671CE3"
    },
    {
-    "bytes": 87372,
+    "bytes": 100349,
     "class": "log",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\cameras-head.log",
     "role": "log",
-    "sha256": "2EF58366A870E15DCF9BE68488D014D512B843B1B25E8288FB05568203DA1CEF"
+    "sha256": "3020647AF36FDEEB94E3E5A485E04397C60B0F24A28071A0CA75DF13EF3E24EA"
    },
    {
     "bytes": 3280802,
@@ -534,6 +556,20 @@
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\chain.log",
     "role": "log",
     "sha256": "407A82DC66A14B0754845E010E69F2F15755AD33DF145F49FE572D89BAA8875C"
+   },
+   {
+    "bytes": 904,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\chain10-console.log",
+    "role": "log",
+    "sha256": "938241F1DCC412C5E5786266AA38472C84497C90C37E852E0C436932D3E9EF5F"
+   },
+   {
+    "bytes": 2859531,
+    "class": "log",
+    "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\chain10.log",
+    "role": "log",
+    "sha256": "4A7FCC53666C5F90BA4F0595CA9500F08B72EE16A8770AF28A8CA2AFF5EA441A"
    },
    {
     "bytes": 2825702,
@@ -620,32 +656,32 @@
     "sha256": "AFB9D4370A2926C2D7D12508DF62C98F0265DC68795F08F4AE4E9ED90F1914E9"
    },
    {
-    "bytes": 6584,
+    "bytes": 6587,
     "class": "log",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\checks-at-head.log",
     "role": "log",
-    "sha256": "F47F7FD1E4C9439B69438B771D822C660BAEB746036924576720575280C057E1"
+    "sha256": "7D9A54DC3DEC3E90994AC3527C58D0B1AFBB935A26B47B18994B9AE95C0238C5"
    },
    {
-    "bytes": 115260,
+    "bytes": 131744,
     "class": "log",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\driver-cameras-head.log",
     "role": "log",
-    "sha256": "44A742F845CDE4C1E0DED420B2FAC3569C75D1FE4E91A95A7081D45718D0D35F"
+    "sha256": "7844CD880EBA03970965C1428C402059285CCC1A057A12E67F07A4473C4BAA3D"
    },
    {
-    "bytes": 1722,
+    "bytes": 2009,
     "class": "log",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\driver-census.log",
     "role": "log",
-    "sha256": "802DDB75F27594EE504F55EAA1DB38882016924C0083763EAD03FC123DB64E11"
+    "sha256": "8E61F239E82DD06A3DC86F43F7CD02B27B2CB971979A6F359E6CB57FAB0D5EE7"
    },
    {
-    "bytes": 11888,
+    "bytes": 14058,
     "class": "log",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\driver-checks-at-base.log",
     "role": "log",
-    "sha256": "E5D99E970995AA3F2013FC951717226FF7E7EF6647DA42376290B201C19FBD59"
+    "sha256": "7173211381031D7D0B23398419FF2DF7A905E88D69194D2EB1A263B20FCE78E3"
    },
    {
     "bytes": 1005,
@@ -655,18 +691,18 @@
     "sha256": "8210204C06852E3CF2770634C430D5E830D8726F9772AFD400163C46846DA1E9"
    },
    {
-    "bytes": 2224,
+    "bytes": 2502,
     "class": "log",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\driver-counts-head.log",
     "role": "log",
-    "sha256": "1928A3FAC44E42753717AC08AAB04AE95F0F3B98C0678A131A7CA2E04340EECC"
+    "sha256": "7F7D9575540F8E4572C4D9B374CAE83BC1B948FD61EFD2819E0042B1C62AFBA2"
    },
    {
-    "bytes": 38603,
+    "bytes": 45970,
     "class": "log",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\driver-excel-head.log",
     "role": "log",
-    "sha256": "1F4AD48B7A4DD5A7CFCDA36EDCCEF666140291378BF1F74A55F0D90F0BB3BEED"
+    "sha256": "825DAA97D8A0458774A6193827F16387A2FA219928DD86E0CD7206CD52F1EFCE"
    },
    {
     "bytes": 2159326,
@@ -676,11 +712,11 @@
     "sha256": "D91E11AFAF8ED4717794D8534DA24EA2A0CDF89DE265DCD6A3B26A3CD5A761B7"
    },
    {
-    "bytes": 19908919,
+    "bytes": 22741313,
     "class": "log",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\driver-generate-head.log",
     "role": "log",
-    "sha256": "3ABE26D87C8BD76D5921FD04621285B260C006C91D67EDB28A2601439FBDA3FC"
+    "sha256": "69C2D1F0681DEBC0EAEBEE44F170207B88D85D86D0A5122AE3CEFC77ECF7EB30"
    },
    {
     "bytes": 946,
@@ -690,11 +726,11 @@
     "sha256": "30FDDBD62F4F993D7C159C852436F9183EDBE6800914753BA343D3293B5B3BD0"
    },
    {
-    "bytes": 3404,
+    "bytes": 3740,
     "class": "log",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\driver-validate-head.log",
     "role": "log",
-    "sha256": "AC82C8C9FFCCD2C04FE4A509178EC24C20380E5962D20F94F000234F08F4C595"
+    "sha256": "74AE1BFA1CCC47B6952B35462CDA5BD7230B414C8F5A2DC0E0D79F6F40659775"
    },
    {
     "bytes": 9721,
@@ -753,11 +789,11 @@
     "sha256": "70FD1EFF63677969AEDD351BFD416907F435F847CC8602E75A08971B9C0E8C03"
    },
    {
-    "bytes": 19658039,
+    "bytes": 22478523,
     "class": "log",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\logs\\generate-head.log",
     "role": "log",
-    "sha256": "59F707AAAFFFC80FC5772F23BFD993732855CFB7E53F83F4DDF8106B0C3A1C75"
+    "sha256": "71069258A5D6F0E5FB8D71D9C3C813F84F9D29ED982ACC7D58CACA6EF3B50E22"
    },
    {
     "bytes": 791,
@@ -793,8 +829,8 @@
     "path": "C:\\Users\\Yunus\\Projects\\wt-rb4\\docs\\planning\\post-comparison-perfection-output-audit\\hotfix-bundles\\HF-05\\witness\\rb4-a1-summary.json",
     "repo_path": "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-05/witness/rb4-a1-summary.json",
     "role": "committed-witness",
-    "runtime_head_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
-    "sha256": "D4948173986187210E3EB062292817237789A1327DF2F02B22835FAD35DAF091"
+    "runtime_head_commit": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
+    "sha256": "68D48E131622D7DDCE05E66AA8E80569CA4BA37E7B09152C47FC5316B45F8A3F"
    },
    {
     "bytes": 5849,
@@ -802,15 +838,15 @@
     "path": "C:\\Users\\Yunus\\Projects\\wt-rb4\\docs\\planning\\post-comparison-perfection-output-audit\\hotfix-bundles\\HF-10\\witness\\rb4-a1-env-summary.json",
     "repo_path": "docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/HF-10/witness/rb4-a1-env-summary.json",
     "role": "committed-witness",
-    "runtime_head_commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
-    "sha256": "03B7C38BD99610CDD5EF5F9DFC433360BE1F2894D8D452E552097FD52BDD3A05"
+    "runtime_head_commit": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
+    "sha256": "F02716FC366606002C72C7E1D46DAC86B51650710C7C8B7AD7E2E055160F60E7"
    },
    {
-    "bytes": 8025009,
+    "bytes": 8023639,
     "class": "inventory",
     "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-05\\rb4-a1\\results\\rb4-a1-inventory.json",
     "role": "inventory",
-    "sha256": "02E917111299A9A677435DB5FED2C95F3CEF3EEC86B095A5F38B19A3F3CB19A1"
+    "sha256": "4F3082CBE11BDD2D6DBF93D9EDFBD594E7B5437FAECC89D196A09B9EBB89AA04"
    }
   ],
   "note": "every retained result, log and committed witness; claimed (class=acceptance) entries name AND self-stamp the one acceptance head",
@@ -1374,7 +1410,7 @@
       "sha256_lf": "AF082546260471C331888D5D02922F5792AC11454F324B9FFA1C02E34FE222B2"
      },
      "build/check_visual_evidence.py": {
-      "sha256_lf": "236B400B25B344858C931F324F20993320D1CB600DE84D6D8E7B3F80035D1787"
+      "sha256_lf": "8259D5EAFDC2FB5C0B2E3DDC8BB71ADAD69B45416C2AB27C8ECB98BD0DEA56E9"
      },
      "build/check_workbook_presentation.py": {
       "sha256_lf": "1FF9BFA7AD6976A39D5F485B0D3E3777BD8772DA806FF35B760E34C233B1F481"
@@ -1793,7 +1829,7 @@
       "sha256_lf": "8751532E3DD863F65D7457FE3E92F77E692F2028936E5A5DDABC23DA002D4831"
      },
      "scripts/evidence_highway_log.py": {
-      "sha256_lf": "E9F3DEE5AE92B3AD760434434C9702B79A226E6A5BEC65723718F7D13A78CD2A"
+      "sha256_lf": "C3C7FAD85A2618A0A36EB1E5997A01214CF7FA9E072275F021F1998C2D590191"
      },
      "scripts/evidence_highway_sequence.py": {
       "sha256_lf": "2AC033ECE7928EB4DC90E983672F617711602A30BD97FC11D044196F72B15FA0"
@@ -2088,16 +2124,16 @@
    "git": {
     "author": "Yunus Shaikh",
     "branch": "hotfix/rb-4-evidence",
-    "commit": "c974a00666ccd427a429246a9e9fde554e5e6c42",
-    "date": "Sat Aug 8 01:24:28 2026 -0700",
-    "subject": "fix: mirror the trailing-blank refusal and the raw-token capture to the Highway Log TSN side"
+    "commit": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
+    "date": "Sat Aug 8 20:37:19 2026 -0700",
+    "subject": "fix: box a blank Highway Log cell only where the record's own printing brackets it"
    },
-   "runtime_digest": "C7FC1AA0B17A1338EB7046D1CF3737979F888B532678D85539C0983E817C4996",
+   "runtime_digest": "1C8F5D1691DC125E0D3C15998348852CF17DE535F821DBC57770E90786E84662",
    "tree": "C:\\Users\\Yunus\\Projects\\wt-rb4"
   },
   "lineage": {
    "commits_since_on_head": [],
-   "runtime_last_changed_at": "c974a00666ccd427a429246a9e9fde554e5e6c42",
+   "runtime_last_changed_at": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
    "runtime_unchanged_since_last_product_commit": true
   }
  }

@@ -6,14 +6,16 @@ RB-2 is MERGED at `d679f388e0b12ff595751af9edd816674615b7a5`;
 RB-3 is MERGED at `61fcac611de255c56759551a95ccd2e552287bfc`; its 158/158
 post-merge gate and frozen application self-test both passed;
 **RB-4 is IMPLEMENTED and AWAITING ADVERSARIAL REVIEW** on
-`hotfix/rb-4-evidence` at `adfa9f4` (base `72adf44`), never merged. Its scope
+`hotfix/rb-4-evidence` at `f4b55f2` (base `72adf44`), never merged. Its scope
 was AMENDED BY THE OWNER on 2026-08-05 mid-implementation — evidence is print
 crops on the four `_pdf`-edition report families only (12 cells), refused at
 the engine boundary everywhere else; the amendment section in
 [RB-4/BUNDLE.md](hotfix-bundles/RB-4/BUNDLE.md) controls over that bundle's
-frozen text. The amended acceptance run (`RB4-A1`, chain7) passed every phase**
+frozen text. The amended acceptance run (`RB4-A1`, chain10) passed every phase,
+and all 336 retained images were inspected individually at native scale
+(335 pass, 1 documented finding).**
 
-Last updated: 2026-08-06
+Last updated: 2026-08-09
 
 This is the entry point for every new Codex or Claude chat. Read this file
 before opening the other audit documents. The project deliberately separates
@@ -26,7 +28,7 @@ first pass.
 Invoke
 [`PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md)
 in a fresh task with `<BUNDLE_ID> = RB-4` and `<REVIEWER> = Codex`, against
-`hotfix/rb-4-evidence` at `adfa9f4`.
+`hotfix/rb-4-evidence` at `f4b55f2`.
 
 **Read the owner's amendment FIRST** (the amendment section of
 [RB-4/BUNDLE.md](hotfix-bundles/RB-4/BUNDLE.md) and "The 2026-08-05
@@ -105,7 +107,7 @@ did not create a branch, modify product code, or begin an acceptance run.
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-4 COMPLETE** — implemented at `adfa9f4`, scope amended by the owner 2026-08-05 mid-implementation | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 4 | Implement one bounded RB bundle | **RB-4 COMPLETE** — implemented at `f4b55f2`, scope amended by the owner 2026-08-05 mid-implementation; three inspection-driven evidence fixes after the first acceptance run | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
 | 5 | Adversarially review and approve that bundle | **RB-3 COMPLETE; RB-4 AWAITING REVIEW 1** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
