@@ -5,15 +5,11 @@ RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
 RB-2 is MERGED at `d679f388e0b12ff595751af9edd816674615b7a5`;
 RB-3 is MERGED at `61fcac611de255c56759551a95ccd2e552287bfc`; its 158/158
 post-merge gate and frozen application self-test both passed;
-**RB-4 is IMPLEMENTED and AWAITING ADVERSARIAL REVIEW** on
-`hotfix/rb-4-evidence` at `f4b55f2` (base `72adf44`), never merged. Its scope
-was AMENDED BY THE OWNER on 2026-08-05 mid-implementation — evidence is print
-crops on the four `_pdf`-edition report families only (12 cells), refused at
-the engine boundary everywhere else; the amendment section in
-[RB-4/BUNDLE.md](hotfix-bundles/RB-4/BUNDLE.md) controls over that bundle's
-frozen text. The amended acceptance run (`RB4-A1`, chain10) passed every phase,
-and all 336 retained images were inspected individually at native scale
-(335 pass, 1 documented finding).**
+**RB-4 Review 1 is DENIED — RETURN TO IMPLEMENTATION** on
+`hotfix/rb-4-evidence`, reviewed through `3cda54f` (runtime `f4b55f2`, base
+`72adf44`), never merged. `RB4-R1-001` is one concrete HF-10 visual acceptance
+failure: the retained native-scale result is 335/336 pass because one blank
+Intersection Detail crop gives the reader no visible way to verify its field.**
 
 Last updated: 2026-08-09
 
@@ -25,20 +21,19 @@ first pass.
 
 ## Next action
 
-Invoke
-[`PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md)
-in a fresh task with `<BUNDLE_ID> = RB-4` and `<REVIEWER> = Codex`, against
-`hotfix/rb-4-evidence` at `f4b55f2`.
+Resume
+[`PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
+on the existing `hotfix/rb-4-evidence` branch with `<BUNDLE_ID> = RB-4` and
+`<IMPLEMENTER> = Claude`.
 
-**Read the owner's amendment FIRST** (the amendment section of
-[RB-4/BUNDLE.md](hotfix-bundles/RB-4/BUNDLE.md) and "The 2026-08-05
-amendment" in [RB-4/IMPLEMENTATION.md](hotfix-bundles/RB-4/IMPLEMENTATION.md)):
-the bundle's frozen HF-05 remedy — redrawing both evidence panels from the
-compared workbooks — WAS implemented, DID pass a full acceptance run, and was
-then rejected by the owner as circular. Reviewing the delivered branch against
-the frozen text alone would re-litigate a decision the owner already made. The
-controlling contract is: evidence is print crops, on the `_pdf` families only,
-refused at the engine boundary everywhere else.
+Codex Review 1 denied `RB4-R1-001`. The amended HF-10 criterion requires 100%
+of retained crops accurate and readable, but the signed chain10 inspection
+records `intersection_detail_pdf_tsn / ML_Traffic_Flow_1_pair.png` as its sole
+failure: invisible PDF rectangle metadata locates the blank cell for code, but
+the crop has no header or populated same-column neighbor that lets a reader
+verify the field. The exact evidence, source probe, and bounded return are in
+[`hotfix-bundles/RB-4/REVIEW.md`](hotfix-bundles/RB-4/REVIEW.md). Do not merge
+or begin Review 2.
 
 Review 1 closed both returned evidence gaps. The fail-closed self-test, cheap
 exact-head verifier, and full corpus/archive verifier all passed; all seven
@@ -107,8 +102,8 @@ did not create a branch, modify product code, or begin an acceptance run.
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-4 COMPLETE** — implemented at `f4b55f2`, scope amended by the owner 2026-08-05 mid-implementation; three inspection-driven evidence fixes after the first acceptance run | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-3 COMPLETE; RB-4 AWAITING REVIEW 1** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-4 DENIED — RETURN TO IMPLEMENTATION** (`RB4-R1-001`) | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-4 REVIEW 1 DENIED — CONCRETE ACCEPTANCE FAILURE** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

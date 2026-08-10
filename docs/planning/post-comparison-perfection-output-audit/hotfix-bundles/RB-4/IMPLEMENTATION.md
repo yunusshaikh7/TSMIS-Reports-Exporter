@@ -1,9 +1,10 @@
 # `RB-4` — Implementation Record
 
-Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW**
-(acceptance run **chain10** passed every phase at head `f4b55f2`; all 336
-retained images were inspected individually at native scale; the witness,
-manifest and fail-closed verifier are green at that head.)
+Status: **DENIED — RETURN TO IMPLEMENTATION** (`RB4-R1-001`; see
+[REVIEW.md](REVIEW.md)). Acceptance run **chain10** passed every programmatic
+phase at head `f4b55f2`, but its native-scale inspection was 335/336 pass; the
+one retained blank Intersection Detail crop is not human-verifiable and fails
+amended HF-10 criterion 2's 100% visual requirement.
 
 The run history matters, because each round's inspection found what the
 programmatic gate could not:
