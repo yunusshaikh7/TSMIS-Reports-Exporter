@@ -1,6 +1,6 @@
 # `RB-4` — Adversarial Review Record
 
-Status: **JOINTLY APPROVED**
+Status: **MERGED** — `83a24896a5a970a3686df87934210f54cea43778`
 
 ## Review 1 verdict — 2026-08-09
 
@@ -483,3 +483,17 @@ unresolved.
 
 RB-4 is **JOINTLY APPROVED** and eligible for Prompt 05's no-force merge,
 post-merge smoke, closeout record, push, and bounded cleanup sequence.
+
+## Merge closeout
+
+- Review 1 and Review 2 re-review approve; neither reviewer implemented RB-4.
+- Fetched remote `main` remained exactly at recorded base
+  `72adf447d45a2b74c562ba714008661a180c5d5f` before merge.
+- RB-4 merged without force as
+  `83a24896a5a970a3686df87934210f54cea43778`.
+- Post-merge smoke: full gate **158/158 PASS** in 226 seconds; frozen application
+  self-test **PASS** on the exact built executable.
+- The user-owned unstaged `docs/roadmap.md` edit was outside the bundle diff and
+  remained untouched.
+- Branch/worktree cleanup follows only after this merge record and RB-5 readiness
+  state are pushed.

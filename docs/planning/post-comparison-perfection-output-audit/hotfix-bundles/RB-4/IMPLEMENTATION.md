@@ -1,9 +1,9 @@
 # `RB-4` — Implementation Record
 
-Status: **JOINTLY APPROVED** at runtime `d826877`. Acceptance run **chain11**
-passed every programmatic phase, and its native-scale inspection read **341
-images with zero failures of any class**. Review 2 re-review closed
-`RB4-R2-001`; the bundle is entering Prompt 05's merge sequence.
+Status: **MERGED** — `83a24896a5a970a3686df87934210f54cea43778`.
+Accepted runtime `d826877`; chain11 passed every programmatic phase and its
+native-scale inspection read **341 images with zero failures of any class**.
+Review 2 re-review closed `RB4-R2-001` before merge.
 
 **Review 1 (`RB4-R1-001`) is closed by the owner's 2026-08-09 ruling**: an
 Intersection Detail blank drawn from the print's OWN cell rectangle is an
@@ -692,3 +692,17 @@ audit recorded (evidence on all ten rows from sometimes-borrowed prints, the
 silent disagreement drop, no env lane) — the owner's amendment rulings would
 be un-shipped with it, so a rollback is a return to planning, not a safe
 steady state.
+
+## Merge closeout
+
+- Both Codex reviews approved the amended HF-05/HF-10 acceptance set; neither
+  reviewer implemented RB-4.
+- `origin/main` was fetched and remained at the recorded base
+  `72adf447d45a2b74c562ba714008661a180c5d5f`.
+- RB-4 merged without force as
+  `83a24896a5a970a3686df87934210f54cea43778`.
+- The post-merge full gate passed **158/158** in 226 seconds.
+- The post-merge frozen application self-test passed on the exact shipped
+  executable, including the evidence render stack and GUI bridge.
+- The pre-existing unstaged `docs/roadmap.md` change in the main worktree was
+  outside the RB-4 diff and remained untouched.
