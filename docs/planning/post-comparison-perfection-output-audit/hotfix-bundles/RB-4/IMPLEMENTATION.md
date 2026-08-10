@@ -1,6 +1,6 @@
 # `RB-4` — Implementation Record
 
-Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW 1 (re-review)**.
+Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**.
 Acceptance run **chain10** passed every programmatic phase at head `f4b55f2`
 and its native-scale inspection read 336 images with **0 mis-targeted, clipped,
 multi-column, out-of-record, or undisclosed crops**.
@@ -539,7 +539,7 @@ four).
 | # | Criterion (amended) | Where it is met |
 |---|---|---|
 | HF-05 · 1 | Zero artifacts — manifest included — for a pair that cannot bind; and the required-silent cells emit nothing | `phase_validate` population: `required 12 · forbidden 14 · discovered 12`, 0 missing/extra/forbidden-present/duplicate, behind a planted control. The unbindable-pair terminal is locked by `check_evidence_manifest` (nothing published, prior set retired) |
-| HF-05 · 2 | *(superseded)* every drawn panel string equals the compared value or is visibly elided → **every crop's value is re-derived from the print, or the disagreement is disclosed** | 258/258 TSMIS-side re-derivations in `phase_validate`, disagreement contract closed both ways; 0 disagreements in this corpus, so the disclosure path is proved by the end-to-end fixture in `check_evidence_source_role` |
+| HF-05 · 2 | *(superseded)* every drawn panel string equals the compared value or is visibly elided → **every crop's value is re-derived from the print, or the disagreement is disclosed** | 254/254 TSMIS-side re-derivations in `phase_validate`, disagreement contract closed both ways; 0 disagreements in this corpus, so the disclosure path is proved by the end-to-end fixture in `check_evidence_source_role` |
 | HF-05 · 3 | 100 % of blank-side examples: target inside the captioned record, touching no other record or field | 117 blank-side examples, all listed by identity; the engine refuses any box outside the record's own lines/width (`_box_within_record`, both axes, both print lanes) — locked by `check_visual_evidence` + the source-role end-to-end fixture; visually confirmed by the native-scale inspection |
 | HF-05 · 4 | No prose asserts an unread source | Summary declares the compared selections PLUS the two print folders actually read; validate asserts every non-workbook read-set member is a `.pdf` under a DECLARED folder (453 print members); legends pinned per flavor |
 | HF-05 · 5 | The two already-correct paths still emit nothing | Classic Compare comparator driven for real in both lanes (file 389.7 s · folder 1106.3 s) + the by-day PvE lane with the toggle ON — zero artifacts, each read behind a planted control |

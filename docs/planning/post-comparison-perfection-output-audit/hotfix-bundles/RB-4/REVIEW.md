@@ -1,6 +1,6 @@
 # `RB-4` — Adversarial Review Record
 
-Status: **REVIEW 1 DENIED — RETURN TO IMPLEMENTATION**
+Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
 
 ## Review 1 verdict — 2026-08-09
 
@@ -143,3 +143,122 @@ the reason for denial.
 Do not merge and do not begin Review 2. Resume Prompt 04 on the existing
 `hotfix/rb-4-evidence` branch only to close `RB4-R1-001` and rebind the affected
 acceptance evidence.
+
+---
+
+## Review 1 re-review — Codex, 2026-08-09
+
+### Verdict
+
+**APPROVED.**
+
+`RB4-R1-001` is **CLOSED BY OWNER RULING, NOT BY CODE**. At pushed re-review
+head `14475ff1786bdfbb975f3f2341c3634ddf2dfbb7`, the owner amended HF-10
+criterion 2 to define an anchorless blank drawn from the print's own cell
+rectangle as an accurate crop with a disclosed coverage limitation rather than
+a failed crop. The ruling names the exact image, records the owner's inspection
+and decision, preserves the measured 1-of-336 incidence, and does not
+reclassify mis-targeted, multi-column, clipped, out-of-record, invented-
+geometry, or undisclosed-difference boxes.
+
+No runtime file changed. The accepted runtime remains `f4b55f2`; the cheap
+verifier re-derived its 420-file digest, exact base, seven claimed results, and
+both committed witnesses with **0 problems**. Under the controlling owner
+definition, all 336 retained images satisfy HF-10 criterion 2 and no unresolved
+acceptance contradiction remains.
+
+### Review identity, entry state, and budget
+
+| Field | Approval record |
+|---|---|
+| Reviewer / pass | Codex / Review 1 re-review |
+| Implemented bundle? | **No** — implementer is Claude |
+| Bundle / branch | `RB-4` / `hotfix/rb-4-evidence` |
+| Recorded base | `72adf447d45a2b74c562ba714008661a180c5d5f` |
+| Acceptance runtime head | `f4b55f2ec75598cf5f8b37c8d23fb8c151490070` |
+| Initial Review 1 denial commit | `b8dc3c1` |
+| Re-review entry / review-record head | `14475ff1786bdfbb975f3f2341c3634ddf2dfbb7` |
+| Remote branch head on entry | `14475ff1786bdfbb975f3f2341c3634ddf2dfbb7` — local `HEAD` and `origin/hotfix/rb-4-evidence` matched |
+| Runtime drift | **None** — the return commit changes only `BUNDLE.md` and `IMPLEMENTATION.md`; zero runtime files changed after `f4b55f2` |
+| Review 2 | **REQUIRED** — separate fresh review; do not merge yet |
+| Elapsed active re-review | Approximately 15 minutes |
+| Resource budget | **RESPECTED** — no generation, Excel, build, full gate, corpus re-hash, archive re-match, image recapture, or bulk output; one 45-second exact-head verifier plus Git/doc/source/retained-note inspection |
+
+### Evidence reused and small commands
+
+| Evidence | Re-review result |
+|---|---|
+| Prior signed Review 1 | Reused the complete criterion, deliverable, discrepancy, values/formulas, evidence, and regression matrices recorded at `b8dc3c1`; only `RB4-R1-001` required re-adjudication |
+| Owner-ruling commit | `14475ff1786bdfbb975f3f2341c3634ddf2dfbb7`; two documentation files only |
+| Amended `BUNDLE.md` | SHA-256 `232F5074E8DE622A7B1EBFCBC2879C54F3FF5AD207F453362DC80FE33A2EF704`; exact image, owner quote, acceptance definition, exclusions, incidence, and rejected alternative recorded |
+| Amended `IMPLEMENTATION.md` | SHA-256 `1F4BDC37073430AA5F2ED4D2F5877F5C739AE7F164E10B49292A4801F1567E13`; runtime unchanged and HF-10 · 2 mapped to 336/336 under the ruling |
+| Retained limitation note | `results/chain8-known-gap.md`, SHA-256 `4931F6BAFCA4DABE568414F4AD8FE682CB76850A1856B118DAC3453D622A42E9`; exact image, geometry distinction, 1/336 incidence, owner decision, and unchanged failure classes recorded |
+| Native-scale inspection | `inspection-chain10-round1.json`, SHA-256 `346F22F9DC9959E8429330596CE7013ADC1FE4CBBAAB7E0E73E9283B7AFC253C`; measured facts stand unchanged and are reclassified only by the amended criterion |
+| Cheap exact-head verifier | **VERIFIED — 0 problems**; 420 runtime files/digest matched `f4b55f2`, base digest matched `72adf44`, 7/7 claims named the acceptance head, and both witnesses matched |
+| Complete branch diff | Base-to-entry diff checked with no whitespace error; return diff contains only the two owner-ruling documents and no unrelated runtime change |
+
+### Adversarial challenge to the ruling
+
+Four plausible ways a documentation-only closure could falsely pass were
+checked:
+
+1. **A broad waiver could re-permit real geometry defects.** It does not. The
+   ruling preserves failures for mis-targeting, multi-column boxes, clipping,
+   out-of-record placement, invented geometry, and undisclosed differences;
+   the `f4b55f2` Highway Log sliver remains explicitly defective.
+2. **The named box could be guessed geometry rather than print geometry.** It
+   is not. `ML Traffic Flow` maps to Intersection Detail line 1 / column 18;
+   `_box_at` uses `meta["edges"][18]`, derived from that print's rectangle bands.
+   The earlier Review 1 source probe independently reproduced this path.
+3. **The ruling could silently reduce coverage.** It does not. The image stays
+   retained; the measured incidence remains 1 of 336. The rejected bracketing
+   alternative would instead suppress other anchorable Intersection Detail
+   blanks and lose coverage.
+4. **A docs-only return could leave stale runtime evidence.** It does not. The
+   exact-head verifier proves zero runtime drift and preserves every chain10
+   result and witness at `f4b55f2`.
+
+The implementation record's stale `258/258` summary arithmetic was corrected
+to the committed chain10 witness value `254/254` in this review-state update;
+that record correction changes no acceptance evidence or runtime bytes.
+
+### Criterion-by-criterion disposition
+
+| Criterion | Review 1 re-review disposition |
+|---|---|
+| HF-05 · 1–7 | **PASS — REUSED** from signed Review 1; the ruling does not change eligibility, source binding, disagreement disclosure, blank-target containment, silent controls, count invariance, or gate evidence |
+| HF-10 · 1 | **PASS — REUSED** — four bound ENV sets / 82 images; Ramp Summary evidence remains correctly silent |
+| HF-10 · 2 | **PASS UNDER OWNER-AMENDED CONTRACT** — all 336 images were individually inspected; 0 mis-targeted, multi-column, clipped, out-of-record, or undisclosed crops. The sole anchorless blank is accurate by the ruling and disclosed at 1/336 |
+| HF-10 · 3 | **PASS — REUSED** — all ENV counts identical evidence-on/off and equal to the audit figures |
+| HF-10 · 4 | **PASS — REUSED** — 14 forbidden placements absent; 5/5 camera refusals refused |
+| HF-10 · 5 | **PASS — REUSED** — retained 158/158 gate, compileall, ruff, frozen self-test, and 8-red/2-green exact-base classifications |
+
+### Deliverable, discrepancy, and review-domain matrices
+
+| Domain | Review 1 re-review result |
+|---|---|
+| Exact deliverables | **PASS** — 12 evidence sets / 336 PNGs; 14 required-silent placements absent; 12/12 evidence workbooks opened with 336 embedded pictures |
+| Values / source truth | **PASS** — 26/26 base/head typed outcomes equal; retained ENV discrepancy figures unchanged |
+| Formulas / installed Excel | **PASS** — 26/26 settled twins agree; no expensive Excel leg repeated |
+| Visual / presentation | **PASS UNDER OWNER RULING** — 336/336 under the amended definition; anchorless limitation retained and documented, with all actual defect classes still excluded |
+| Evidence eligibility / source binding | **PASS** — four `_pdf` TSN/ENV rows only; exact print sources declared; prohibited lanes remain silent |
+| Sibling / neighboring behavior | **PASS** — comparison semantics unchanged, classic/PDF-vs-Excel controls silent, Highway Detail still pre-release |
+| Performance / publication / freshness / failure | **PASS** — prior transaction evidence reused; generation binding and fail-closed verifier unchanged |
+| Regression | **PASS** — no runtime drift since `f4b55f2`; full retained gate and frozen self-test remain exact-head evidence |
+
+### Findings and approval
+
+| Finding | Re-review status | Resolution |
+|---|---|---|
+| `RB4-R1-001` | **CLOSED** | Owner ruling at `14475ff`; acceptance definition amended, exact limitation documented, runtime intentionally unchanged |
+
+**Actionable failures: none.** No acceptance criterion, artifact binding,
+runtime identity, visual failure class, discrepancy result, or regression gate
+remains unresolved under the controlling contract.
+
+**Reviewer signature:** Codex, Review 1 re-review — **APPROVED** —
+`2026-08-09T23:56:12.9711248-07:00`.
+
+Mark RB-4 **REVIEW 1 APPROVED — AWAITING REVIEW 2**. Do not merge. Run Prompt
+05 in a separate fresh task for Review 2 against the pushed branch head after
+this review record is committed.
