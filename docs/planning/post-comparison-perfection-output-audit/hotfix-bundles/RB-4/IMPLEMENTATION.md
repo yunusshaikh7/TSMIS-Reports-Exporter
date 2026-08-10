@@ -1,24 +1,20 @@
 # `RB-4` — Implementation Record
 
-Status: **REVIEW 2 DENIED — RETURN TO IMPLEMENTATION** (`RB4-R2-001`).
-Acceptance run **chain10** passed every programmatic phase at head `f4b55f2`
-and its native-scale inspection read 336 images with **0 mis-targeted, clipped,
-multi-column, out-of-record, or undisclosed crops**.
+Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW 2 (re-review)** at head
+`d826877`. Acceptance run **chain11** passed every programmatic phase, and its
+native-scale inspection read **341 images with zero failures of any class** —
+the first fully clean round of this bundle.
 
-Review 1 denied the bundle on `RB4-R1-001` — the single Intersection Detail
-blank crop that is correctly targeted but has no in-crop anchor. **The remedy is
-documentation, by owner ruling of 2026-08-09** (*"this is fine, just document
-it"*): HF-10 criterion 2's definition of an accurate crop now states that a
-blank drawn from the print's OWN cell rectangle is accurate, and that an
-absent in-crop anchor is a disclosed coverage limitation rather than a failed
-image. See the [2026-08-09 ruling in BUNDLE.md](BUNDLE.md) — which also records
-what the ruling does NOT relax, and why extending Highway Log's bracketing rule
-to Intersection Detail was rejected.
+**Review 1 (`RB4-R1-001`) is closed by the owner's 2026-08-09 ruling**: an
+Intersection Detail blank drawn from the print's OWN cell rectangle is an
+accurate crop, and an absent in-crop anchor is a disclosed limitation, not a
+failed image. The ruling and its limits are in [BUNDLE.md](BUNDLE.md).
 
-**No runtime file changed for this remedy**, so chain10's acceptance binding is
-untouched: the manifest's runtime head is still `f4b55f2`, every retained image,
-witness and count stands as run, and the exact-head verifier still reports
-0 problems. Under the amended criterion the retained set is **336/336**.
+**Review 2 (`RB4-R2-001`) is closed by a code fix.** A missing TSMIS or TSN
+print set exited through a plain `ValueError` BEFORE the retirement path, so
+the prior evidence workbook, image folder and manifest all survived at their
+canonical names beside a comparison they no longer illustrate. Reproduced
+first, then fixed: see "The RB4-R2-001 fix" below.
 
 The run history matters, because each round's inspection found what the
 programmatic gate could not:
@@ -28,7 +24,23 @@ programmatic gate could not:
 | chain6 | `a21e0ba` | passed on the ORIGINAL workbook-panel contract — the owner rejected those images and re-ruled the bundle |
 | chain7 | `adfa9f4` | first print-crop run; passed every phase. Its 341-image inspection found **9 defects in 3 classes** |
 | chain9 | `c974a00` | passed every phase. Its 342-image inspection found **3 defects**, all one class — a trailing-blank sliver my chain7 fix had only half-closed |
-| **chain10** | **`f4b55f2`** | **the acceptance.** Passed every phase; its 336-image inspection found **1 finding**, documented and not a mis-targeted box (below) |
+| chain10 | `f4b55f2` | passed every phase; its 336-image inspection found **1 finding** — `RB4-R1-001`, closed by owner ruling, not a mis-targeted box |
+| **chain11** | **`d826877`** | **the acceptance.** The RB4-R2-001 fix. Passed every phase; its 341-image inspection found **0 findings** |
+
+**chain11 was an EVIDENCE-ONLY chain and the record says so plainly.** It
+reused chain10's 35-cell generation and re-ran only what an evidence change can
+move — cameras, validate, excel, counts, census — because the sole runtime file
+differing between the two heads is `scripts/visual_evidence.py`. So the
+comparisons carry generation head `f4b55f2` while every other claimed result
+stamps `d826877`. That is not smoothed over anywhere: both witnesses record
+`comparisons_generated_at`, the manifest records `retained_from_head`, and the
+verifier re-derives the runtime diff between the two heads from git and fails
+on anything outside the evidence layer (proved by three new self-test cases —
+a retained generation against the base commit fails naming 8 non-evidence
+files). The `counts` phase, which does stamp `d826877`, re-proved all 26
+retained comparisons identical to base. **Practically this changes nothing
+about the product**: the same code, the same bytes, the same behaviour — only
+which commit each record cites.
 
 Evidence is PRINT CROPS on the 12 `_pdf`-family PDF-vs-PDF cells only, refused
 at the engine boundary everywhere else; see the BUNDLE.md amendment section and
@@ -40,7 +52,7 @@ at the engine boundary everywhere else; see the BUNDLE.md amendment section and
 | Branch | `hotfix/rb-4-evidence` (worktree `C:\Users\Yunus\Projects\wt-rb4`; the user's `main` checkout untouched) |
 | Base `main` commit | `72adf447d45a2b74c562ba714008661a180c5d5f` (the RB-4 readiness commit on top of readiness source `ff780af…`; verified clean and identical to `origin/main` at branch creation) |
 | Work items | HF-05 (PCOA-FINAL-004 P1, -005 P1, -006 P1) + HF-10 (PCOA-FINAL-007 P2) |
-| Generated-output root | `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-05\rb4-a1\` (lib copy + base/head stores + results + logs); the four env image sets copied to `…\HF-10\rb4-a1\`; the owner's 12-set deliverable at `…\post-comparison-hotfixes\RB-4 evidence deliverable 2026-08-09\` (chain10's images; the superseded chain7/chain9 folders are retained beside it, renamed `(SUPERSEDED …)`); committed machine-readable witnesses in `../HF-05/witness/` and `../HF-10/witness/` |
+| Generated-output root | `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-05\rb4-a1\` (lib copy + base/head stores + results + logs); the four env image sets copied to `…\HF-10\rb4-a1\`; the owner's 12-set deliverable at `…\post-comparison-hotfixes\RB-4 evidence deliverable 2026-08-10\` (chain11's 341 images; the superseded chain7/chain9/chain10 folders are retained beside it, renamed `(SUPERSEDED …)`); committed machine-readable witnesses in `../HF-05/witness/` and `../HF-10/witness/` |
 
 ## Changes
 
@@ -52,7 +64,7 @@ at the engine boundary everywhere else; see the BUNDLE.md amendment section and
 
 | File | Change | Finding IDs |
 |---|---|---|
-| `scripts/visual_evidence.py` | **The print-crop engine (owner amendment 2026-08-05).** Evidence exists ONLY for the `_pdf` families: `_ADAPTER_MODULES` names exactly the four `_pdf` rows — the registry IS the engine-boundary refusal, and `capable()`/`evidence_opts_for`/both cameras/the UI all gate through it; `FLAVORS = (tsn, env)` so `generate()` refuses FLAVOR_SELF outright; `self_capable()` is always False; `_ENV_ADAPTER_MODULES` drops ramp_summary (the third ruling — its adapter goes dormant). The provenance binding from the first implementation is KEPT UNCHANGED: `_bound_provenance` requires the `.provenance.json` sidecar + a trusted/current typed outcome with a matching committed `generation_id`; the compared workbooks' live bytes digest against the recorded sha256 before anything else runs; a pair that cannot bind RETIRES any prior set and raises `EvidenceSourceBindingError` with NOTHING published. The vs-TSN branch renders PRINT CROPS on both sides: print discovery restored (`_pdf_source_files`/`_ensure_pdf_source_set`), the TSMIS side resolved per route through `find_route_print` (dated/legacy/store-tagged names) and located by `_locate_tsmis_sources` (CMP-AUD-049 identity refusals; resolved paths carried), the TSN side through the adapter district/locate loop; the snapshot buckets hold the prints PLUS the two compared workbooks. `_try_example`'s tsn branch crops both prints under the shared `_box_within_record` engine backstop (both axes — the PCOA-FINAL-005 rule now uniform across print lanes) and implements the amendment's disagreement contract: a print whose parsed value differs from the compared value renders WITH a disclosure note (the image note line AND the Summary's new `Note` column) and a subline that says DISAGREES instead of claiming verification — never the old silent drop. The Summary declares the two print folders under the compared selections (`read_lines`; the data header row floats below them), and `_legend_for(tsn)` states the crop rule + the disclosure promise. `FLAVOR_ENV` (HF-10) is unchanged from the first implementation apart from riding the shared backstop: provenance-resolved run folders (`compare_env._find_input_dir`), candidates from the published universe, `_locate_env_sides` → adapter `env_locate`, per-example COMPOSE-to-published verification. The workbook-panel renderer (`_workbook_side`/`_excel_strip`/`panel_cell_text`/`_workbook_rows_at`/`_display_header`/`_normalization_note`) is DORMANT — kept in code, reachable from nothing ("keeping the code is fine but ts shouldnt be possible") | amendment; 004/005/007 kept, 006's surface retired with the panels |
+| `scripts/visual_evidence.py` | **The print-crop engine (owner amendment 2026-08-05).** Evidence exists ONLY for the `_pdf` families: `_ADAPTER_MODULES` names exactly the four `_pdf` rows — the registry IS the engine-boundary refusal, and `capable()`/`evidence_opts_for`/both cameras/the UI all gate through it; `FLAVORS = (tsn, env)` so `generate()` refuses FLAVOR_SELF outright; `self_capable()` is always False; `_ENV_ADAPTER_MODULES` drops ramp_summary (the third ruling — its adapter goes dormant). The provenance binding from the first implementation is KEPT UNCHANGED: `_bound_provenance` requires the `.provenance.json` sidecar + a trusted/current typed outcome with a matching committed `generation_id`; the compared workbooks' live bytes digest against the recorded sha256 before anything else runs; a pair that cannot bind RETIRES any prior set and raises `EvidenceSourceBindingError` with NOTHING published. The vs-TSN branch renders PRINT CROPS on both sides: print discovery restored (`_pdf_source_files`/`_ensure_pdf_source_set`), the TSMIS side resolved per route through `find_route_print` (dated/legacy/store-tagged names) and located by `_locate_tsmis_sources` (CMP-AUD-049 identity refusals; resolved paths carried), the TSN side through the adapter district/locate loop; the snapshot buckets hold the prints PLUS the two compared workbooks. `_try_example`'s tsn branch crops both prints under the shared `_box_within_record` engine backstop (both axes — the PCOA-FINAL-005 rule now uniform across print lanes) and implements the amendment's disagreement contract: a print whose parsed value differs from the compared value renders WITH a disclosure note (the image note line AND the Summary's new `Note` column) and a subline that says DISAGREES instead of claiming verification — never the old silent drop. The Summary declares the two print folders under the compared selections (`read_lines`; the data header row floats below them), and `_legend_for(tsn)` states the crop rule + the disclosure promise. `FLAVOR_ENV` (HF-10) is unchanged from the first implementation apart from riding the shared backstop: provenance-resolved run folders (`compare_env._find_input_dir`), candidates from the published universe, `_locate_env_sides` → adapter `env_locate`, per-example COMPOSE-to-published verification. The workbook-panel renderer (`_workbook_side`/`_excel_strip`/`panel_cell_text`/`_workbook_rows_at`/`_display_header`/`_normalization_note`) is DORMANT — kept in code, reachable from nothing ("keeping the code is fine but ts shouldnt be possible") **RB4-R2-001 (`d826877`):** the three missing-print exits in the vs-TSN branch (no export folder supplied / no TSMIS export / no TSN prints) raised a plain `ValueError` BEFORE `refuse_binding`, so a prior evidence workbook + image folder + manifest survived at their canonical names beside a comparison they no longer illustrate. All three now refuse as `EvidenceSourceBindingError` (a `ValueError` subclass, so caller handling is unchanged) and retire the prior set. The `source_set_check` mid-render exit deliberately still raises plain — `_retire_stale_evidence` gates retirement on that same check, so routing it would change only the log wording. | amendment; 004/005/007 kept, 006's surface retired with the panels; RB4-R2-001 |
 | `scripts/evidence_highway_log.py` | `pdf_excel_column_for`/`tsn_excel_column_for` = the one corrected-header gate (all three compared HL workbooks share it); `tsn_project`; `workbook_sheet`; `locate_tsmis` gains `key_fn` + `src` capture; blank-Description boxes now REFUSE on both prints (the below-the-record guesses that boxed the NEXT record are gone). **`_blank_cell_span` (post-inspection, `f4b55f2`): a blank cell is boxable ONLY where the record's own ink BRACKETS the column — ink left AND right — and then the full window is the rectangle.** Both sides use it (`_line_cell_box`, `tsn_box`) and the env lane inherits it because `env_box` delegates to `tsmis_box`; `Sig Chg. Date`, being last, can never be bracketed and always refuses. This replaced two earlier partial fixes that the native-scale inspections caught: the first mirrored the refusal to only the TSMIS side, the second refused only an EMPTY window overlap and still drew a 7–12 px sliver where the record's ink merely grazed the window. **`tsn_raw` reads a PRE-normalization snapshot** captured in `_scan_tsn_print` before `ctnl._normalize_row` rewrites the row IN PLACE — reading `rowd` made the hook return the compared value itself and silenced the disclosure on exactly the padded numeric cells that needed it. Env hooks (`env_fields` = the 30 corrected fields, `env_locate` keyed by the projected Location, `env_value`/`env_box`) | 004, 005, 007 |
 | `scripts/evidence_highway_sequence.py` | Panel hooks (`pdf_excel_column_for` alias — the conversion reproduces the export header verbatim; `tsn_excel_column_for` over `['Route'] + SHARED_HEADER`; side-aware `tsn_project`; `workbook_sheet` incl. the normalized sheet); `locate_tsmis` gains `key_fn` + `src`; synthetic equate rows are MARKED and their blank fields REFUSE geometry (the final-'O'-of-'EQUATES TO' class), the no-segs Description fixed-zone guess removed; env hooks (`env_fields` incl. the env comparison's own `(col C)`/`(col E)` names for the unnamed postmile columns, `env_locate` keyed by the plain PM cell, strict `env_project`, `env_box` with prefix/suffix zones) | 004, 005, 007 |
 | `scripts/evidence_intersection_detail.py` | Panel hooks (`pdf_excel_column_for` alias — the legacy labels ride the same value positions; `tsn_excel_column_for` under the v3-sidecar gate; `tsn_project`; `workbook_sheet`); `locate_tsmis` gains `key_fn` + `src`; env hooks (`env_fields` = the canonical export header minus Route/Post Mile, `_ENV_TO_SHARED` derived from `idt._TSMIS_POS` × `_TSMIS_HEADER` so the mapping can never drift from the loader, padded-PM env keying, strict `env_project`, Location special-cased to its print cell). Probe-driven fix on the real corpus: the two env display columns OUTSIDE the vs-TSN map that the print nevertheless carries as grid cells (`PS` = rowA window 2, `Intrte S` = rowB window 13) get `_ENV_CELL_EXTRA` geometry + positional value reads (`tsmis_box` refactored over `_box_at`); without them every published `PS` diff refused (`box None` on all 12 sampled) | 004, 007 |
@@ -528,7 +540,51 @@ because the content was visibly from another report), abandoned the shared file
 and re-verified. Exposure is bounded — each image's PRIMARY read always goes to
 its real path, only derived zoom crops land in the scratchpad — and
 `INSPECTION-PROMPT.md` now requires a per-slice subdirectory plus disclosure if
-a written file comes back unexpected.
+a written file comes back unexpected. **chain11 proves the fix**: all 11 agents
+confirmed they wrote only under their own slice subdirectory and that no file
+came back with foreign content.
+
+## The RB4-R2-001 fix — a missing print must retire the prior set
+
+Review 2's finding, and the reason it was invisible to Review 1's fixture.
+
+**The defect.** Under the 2026-08-05 amendment a print is a REQUIRED source.
+But the three missing-print exits in `visual_evidence.generate`'s vs-TSN branch
+raised a plain `ValueError` — before `refuse_binding`, which is what retires a
+prior set. So a rebuilt comparison kept its old `(evidence).xlsx`,
+`(evidence images)` folder AND manifest sitting at their canonical names,
+looking like the evidence for a comparison they no longer illustrate. Review
+1's unbindable-pair fixture strips comparison provenance, which dies inside
+`_bound_provenance` and DOES retire, so it never reached these exits.
+
+**The old rationale, and why it does not hold.** The code claimed keep-last-good
+deliberately: *"a temporarily un-dropped TSN print set must not retire a valid
+prior evidence set."* But `generate()` runs as decoration AFTER a comparison is
+built, so the surviving set is by definition evidence for a PREVIOUS generation.
+The behaviour it protected was the hazard `refuse_binding` exists to prevent.
+
+**Reproduced before it was fixed.** A probe drove the shipped `generate()` front
+door with a fully BOUND comparison (valid provenance, matching digests) and
+withheld one print set at a time: 3 of 3 cases left workbook, images AND
+manifest standing. After the fix: 0 of 3. All three exits — no export folder
+supplied, no TSMIS export, no TSN prints — now refuse as
+`EvidenceSourceBindingError`, which subclasses `ValueError`, so every caller's
+handling is unchanged.
+
+**Locked, with teeth.** Six new assertions in `build/check_visual_evidence.py`
+drive the real `generate()` over a bound comparison and assert that nothing of
+the prior set survives and that the refusal is a BINDING error. Verified to FAIL
+against the pre-fix code (6/6 red), not merely to pass after it.
+
+**One deliberate asymmetry, stated so it is not read as another missed exit.**
+`source_set_check`'s "the PDF source set changed while evidence was rendering"
+still raises a plain `ValueError`. Routing it through `refuse_binding` would
+change nothing: `_retire_stale_evidence` itself calls `source_set_check()` per
+member and treats its raise as "could not retire", so the set would stay
+standing anyway. Retirement is intentionally gated on a stable source read —
+the engine does not delete under an unstable one. Every OTHER exit between the
+binding point and publication now routes through `refuse_binding`; this was
+audited line by line, not assumed.
 
 ## The bundle's measurable criteria, as amended — where each one is met
 
@@ -538,15 +594,15 @@ four).
 
 | # | Criterion (amended) | Where it is met |
 |---|---|---|
-| HF-05 · 1 | Zero artifacts — manifest included — for a pair that cannot bind; and the required-silent cells emit nothing | `phase_validate` population: `required 12 · forbidden 14 · discovered 12`, 0 missing/extra/forbidden-present/duplicate, behind a planted control. The unbindable-pair terminal is locked by `check_evidence_manifest` (nothing published, prior set retired) |
-| HF-05 · 2 | *(superseded)* every drawn panel string equals the compared value or is visibly elided → **every crop's value is re-derived from the print, or the disagreement is disclosed** | 254/254 TSMIS-side re-derivations in `phase_validate`, disagreement contract closed both ways; 0 disagreements in this corpus, so the disclosure path is proved by the end-to-end fixture in `check_evidence_source_role` |
-| HF-05 · 3 | 100 % of blank-side examples: target inside the captioned record, touching no other record or field | 117 blank-side examples, all listed by identity; the engine refuses any box outside the record's own lines/width (`_box_within_record`, both axes, both print lanes) — locked by `check_visual_evidence` + the source-role end-to-end fixture; visually confirmed by the native-scale inspection |
-| HF-05 · 4 | No prose asserts an unread source | Summary declares the compared selections PLUS the two print folders actually read; validate asserts every non-workbook read-set member is a `.pdf` under a DECLARED folder (453 print members); legends pinned per flavor |
+| HF-05 · 1 | Zero artifacts — manifest included — for a pair that cannot bind; and the required-silent cells emit nothing | `phase_validate` population: `required 12 · forbidden 14 · discovered 12`, 0 missing/extra/forbidden-present/duplicate, behind a planted control. The unbindable-pair terminal is locked by `check_evidence_manifest` (nothing published, prior set retired), and since `d826877` a MISSING required print set takes the same terminal — six assertions in `check_visual_evidence` drive the shipped `generate()` and prove no workbook, image folder or manifest of a prior set survives (`RB4-R2-001`; red 6/6 against the pre-fix code) |
+| HF-05 · 2 | *(superseded)* every drawn panel string equals the compared value or is visibly elided → **every crop's value is re-derived from the print, or the disagreement is disclosed** | 258/258 TSMIS-side re-derivations in `phase_validate`, disagreement contract closed both ways; 0 disagreements in this corpus, so the disclosure path is proved by the end-to-end fixture in `check_evidence_source_role` |
+| HF-05 · 3 | 100 % of blank-side examples: target inside the captioned record, touching no other record or field | 110 blank-side examples, all listed by identity; the engine refuses any box outside the record's own lines/width (`_box_within_record`, both axes, both print lanes) — locked by `check_visual_evidence` + the source-role end-to-end fixture; visually confirmed by the native-scale inspection |
+| HF-05 · 4 | No prose asserts an unread source | Summary declares the compared selections PLUS the two print folders actually read; validate asserts every non-workbook read-set member is a `.pdf` under a DECLARED folder (467 print members); legends pinned per flavor |
 | HF-05 · 5 | The two already-correct paths still emit nothing | Classic Compare comparator driven for real in both lanes (file 389.7 s · folder 1106.3 s) + the by-day PvE lane with the toggle ON — zero artifacts, each read behind a planted control |
 | HF-05 · 6 | All comparison counts and typed outcomes unchanged | 26/26 typed sidecars identical base↔head across every substantive field |
-| HF-05 · 7 | Full gate green; every new assertion fails pre-fix | 158/158 at head + compileall + ruff + frozen self-test; 8 red / 2 green / 0 inconclusive at base, signatures re-derived for the amended check files |
-| HF-10 · 1 | All four `_pdf` env cells produce a bound manifest, workbook and image set with a PDF-only read set | 4 env sets, 82 examples, census-bound member for member; ramp_summary's env cell builds its comparison and is proven silent |
-| HF-10 · 2 | 100 % of retained crops accurate and readable, reviewed individually — as amended 2026-08-09 (an anchorless blank drawn from the print's own cell rectangle is a disclosed limitation, not a failed crop) | 336 images (12 sets), population proved complete by construction (0 unclaimed / 0 missing), inspected image-by-image at native scale: **336/336** under the amended definition. 0 mis-targeted / multi-column / clipped / out-of-record / undisclosed. The one anchorless blank raised as `RB4-R1-001` is retained and disclosed with its measured incidence (1 of 336) in `results/chain8-known-gap.md` |
+| HF-05 · 7 | Full gate green; every new assertion fails pre-fix | 158/158 at head + compileall + ruff + the verifier self-test (now covering the retained-generation rule); 8 red / 2 green / 0 inconclusive at base, signatures re-derived for the amended check files |
+| HF-10 · 1 | All four `_pdf` env cells produce a bound manifest, workbook and image set with a PDF-only read set | 4 env sets, 83 examples, census-bound member for member; ramp_summary's env cell builds its comparison and is proven silent |
+| HF-10 · 2 | 100 % of retained crops accurate and readable, reviewed individually — as amended 2026-08-09 (an anchorless blank drawn from the print's own cell rectangle is a disclosed limitation, not a failed crop) | **341/341** (12 sets), population proved complete by construction (0 unclaimed / 0 missing), inspected image-by-image at native scale by 11 concurrent agents: **0 failures of any class** — 0 mis-targeted / wrong-record / multi-column / clipped / out-of-record / undisclosed / workbook-panel. This is a NEW sample, not chain10's: the renderer reseeds its example choice from `os.urandom` every run, so no prior verdict was carried forward. Blank-column identity was proved three independent ways (cross-panel offset arithmetic, a neighbouring record printing the column, and mapping the box back into PDF coordinates against the print's own ruled cell rects); two slices rendered the source PDFs directly to confirm the panels are faithful rasters. `results/inspection-chain11-round1.json` |
 | HF-10 · 3 | Env comparison counts identical with evidence on and off | Each ENV cell built evidence-OFF first, then ON; counts equal, and equal to the audit's own measured figures |
 | HF-10 · 4 | No other lane's evidence behaviour changed | The 14 required-silent placements are FORBIDDEN in the population check and none appeared; 5/5 camera refusal probes refused at the engine boundary |
 | HF-10 · 5 | Full gate green; the new assertions fail pre-fix | as HF-05 · 7 |

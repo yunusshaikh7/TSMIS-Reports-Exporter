@@ -34,7 +34,15 @@ Checks, each reported separately:
   EXACT HEAD every claimed entry names the acceptance commit exactly, the
              manifest's recorded self-stamps agree, and commits between the
              head and the manifest build head touch no runtime file. A
-             manifest that claims NO acceptance result fails.
+             manifest that claims NO acceptance result fails. ONE narrow
+             exception: a GENERATION the evidence-only chain retained from an
+             earlier head, which the manifest must declare as
+             `retained_from_head` — the runtime diff between that head and the
+             acceptance head is re-derived from git here and must lie entirely
+             inside the evidence layer (the adapters + the engine), and the
+             `counts` role, which does stamp the acceptance head, re-proves
+             the retained comparisons. Undeclared, or one non-evidence runtime
+             file changed, still fails.
   BASE TREE  re-derive the runtime set at the recorded base commit; its digest
              must equal the manifest's `runtime_digest_at_base` and the
              manifest must assert the export matched file-for-file. The base
@@ -81,6 +89,7 @@ Usage:
 """
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import zipfile
@@ -93,6 +102,12 @@ SKIP_PARTS = ("__pycache__", ".ruff_cache", ".venv", "node_modules")
 CHUNK = 1 << 20
 SELF_STAMPED_ROLES = ("generate", "cameras", "counts", "validate", "excel")
 BASE_SIGNATURE_CLASS = "base-signature"
+# The evidence layer — the adapters plus the engine. A generation retained from
+# an earlier head may be claimed only when every runtime file differing between
+# that head and the acceptance head is one of these. Nothing here writes a
+# comparison workbook, and the `counts` role re-proves the retained comparisons
+# at the acceptance head regardless.
+EVIDENCE_LAYER = re.compile(r"^scripts/(evidence_[a-z_]+|visual_evidence)\.py$")
 
 
 def git(tree, *args):
@@ -243,18 +258,57 @@ def check_lineage(manifest, tree, fail):
           f"{len(lineage.get('commits_since_on_head') or [])} recorded")
 
 
-def stamp_problems(rec, head):
-    """The manifest-recorded self-stamp problems for one claimed entry."""
+def stamp_problems(rec, head, tree=None):
+    """The manifest-recorded self-stamp problems for one claimed entry.
+
+    One entry may legitimately name an EARLIER head: a generation RETAINED by
+    the evidence-only chain, which reuses the comparison workbooks and re-runs
+    only what an evidence change can move. That is not taken on trust — the
+    manifest must declare it (`retained_from_head`), and the runtime diff
+    between the two heads is re-derived from git here and must be entirely
+    inside the evidence layer. A retained generation with any other runtime
+    file changed, or one the manifest did not declare, still fails.
+    """
     out = []
     if rec.get("role") in SELF_STAMPED_ROLES:
         stamp = rec.get("self_stamp") or {}
+        retained = rec.get("retained_from_head")
         if stamp.get("tree_commit") != head:
-            out.append(f"self-stamp names {str(stamp.get('tree_commit'))[:12]}"
-                       f", not the head: {rec['path']}")
+            if retained and retained == stamp.get("tree_commit"):
+                out.extend(retained_generation_problems(retained, head, tree,
+                                                        rec["path"]))
+            else:
+                out.append(f"self-stamp names "
+                           f"{str(stamp.get('tree_commit'))[:12]}"
+                           f", not the head: {rec['path']}")
         if stamp.get("tree_runtime_dirty") is not False:
             out.append(f"self-stamp does not record a CLEAN runtime tree: "
                        f"{rec['path']}")
     return out
+
+
+def retained_generation_problems(retained, head, tree, path):
+    """Re-derive the runtime diff between a retained generation's head and the
+    acceptance head; anything outside the evidence layer is a problem."""
+    if tree is None:
+        return [f"a retained generation is declared but the tree was not "
+                f"supplied, so its runtime diff cannot be re-derived: {path}"]
+    proc = subprocess.run(
+        ["git", "-C", str(tree), "diff", "--name-only", retained, head,
+         "--", "scripts", "version.py", "requirements.txt"],
+        capture_output=True, text=True)
+    if proc.returncode != 0:
+        return [f"cannot re-derive the runtime diff {retained[:12]}..{head[:12]}"
+                f": {path}"]
+    changed = proc.stdout.split()
+    stray = [p for p in changed if not EVIDENCE_LAYER.match(p)]
+    if stray:
+        return [f"the retained generation at {retained[:12]} differs from the "
+                f"head in {len(stray)} non-evidence runtime file(s) "
+                f"({', '.join(sorted(stray)[:4])}): {path}"]
+    print(f"  retained generation                {retained[:12]} — "
+          f"{len(changed)} evidence-layer file(s) changed since, none other")
+    return []
 
 
 def check_exact_head(manifest, tree, fail):
@@ -284,7 +338,7 @@ def check_exact_head(manifest, tree, fail):
         fail(f"claimed entry names {got[:12]}, not {head[:12]}: {path}")
     stamped = 0
     for rec in claimed:
-        problems = stamp_problems(rec, head)
+        problems = stamp_problems(rec, head, tree)
         for p in problems:
             fail(p)
         stamped += rec.get("role") in SELF_STAMPED_ROLES and not problems
@@ -846,6 +900,67 @@ def self_test():
                      "self_stamp": {"tree_commit": head,
                                     "tree_runtime_dirty": False}}]), None, f),
                False)
+
+        # A RETAINED generation is the one entry allowed to name an earlier
+        # head. It is not a free pass: the runtime diff between the two heads
+        # is re-derived from real git history here, and only an evidence-layer
+        # diff may be claimed. (The undeclared wrong-head case above already
+        # covers "stamps another head without declaring it".)
+        print("negative checks — a retained generation is not a free pass")
+        real_tree = Path(__file__).resolve().parents[3]
+
+        def rev(*args):
+            proc = subprocess.run(["git", "-C", str(real_tree), *args],
+                                  capture_output=True, text=True)
+            return proc.stdout.strip() if proc.returncode == 0 else ""
+
+        real_head = rev("rev-parse", "HEAD")
+        far = rev("merge-base", "HEAD", "origin/main")
+
+        def retained_manifest(retained):
+            return {"acceptance_head": {"commit": real_head},
+                    "results": {"entries": [
+                        {"path": "p5", "class": "acceptance", "role": "generate",
+                         "runtime_head_commit": real_head,
+                         "retained_from_head": retained,
+                         "self_stamp": {"tree_commit": retained,
+                                        "tree_runtime_dirty": False}}],
+                        "all_claimed_same_head": True,
+                        "off_head": [], "unstamped": []}}
+
+        if real_head and far and far != real_head:
+            expect("a retained generation whose diff touches a NON-evidence "
+                   "runtime file fails",
+                   lambda f: check_exact_head(retained_manifest(far),
+                                              real_tree, f),
+                   True, "non-evidence runtime file")
+        else:
+            print("  SKIP non-evidence retained case — no distinct merge-base")
+
+        near = ""
+        for candidate in rev("rev-list", "-n", "40", "HEAD").split():
+            proc = subprocess.run(
+                ["git", "-C", str(real_tree), "diff", "--name-only",
+                 candidate, real_head, "--", "scripts", "version.py",
+                 "requirements.txt"], capture_output=True, text=True)
+            names = proc.stdout.split()
+            if names and all(EVIDENCE_LAYER.match(n) for n in names):
+                near = candidate
+                break
+        if near:
+            expect("a retained generation whose diff is evidence-layer only "
+                   "passes",
+                   lambda f: check_exact_head(retained_manifest(near),
+                                              real_tree, f),
+                   False)
+        else:
+            print("  SKIP evidence-only retained case — no such commit in the "
+                  "last 40")
+        expect("a retained generation declared without a tree to check it "
+               "against fails",
+               lambda f: check_exact_head(retained_manifest(far or "c" * 40),
+                                          None, f),
+               True, "cannot be re-derived")
 
         print("the base side's OWN-stamp spellings (driving base_own_stamp)")
         expect("a single-tree base result's `tree_commit` is read",

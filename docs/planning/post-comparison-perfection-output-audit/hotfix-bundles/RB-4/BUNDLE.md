@@ -1,10 +1,15 @@
 # `RB-4` — Bundle Contract
 
-Status: **REVIEW 2 DENIED — RETURN TO IMPLEMENTATION** — `RB4-R1-001` remains
-closed by the owner's narrow anchorless-blank ruling. `RB4-R2-001` is a distinct
-HF-05 criterion 1 failure: missing required print sources leave prior canonical
-evidence artifacts in place instead of the required zero-artifact result. The
-signed denial is in [REVIEW.md](REVIEW.md).
+Status: **REMEDIED — AWAITING REVIEW 2 RE-REVIEW** at head `d826877`.
+`RB4-R1-001` remains closed by the owner's narrow anchorless-blank ruling.
+`RB4-R2-001` — missing required print sources left prior canonical evidence
+artifacts in place instead of the required zero-artifact result — is closed by
+a code fix: all three missing-print exits now refuse as binding errors and
+retire the prior set, reproduced red (3/3 artifacts surviving) before the fix
+and locked by six assertions that fail against the pre-fix code. Acceptance run
+**chain11** passed every phase; its 341-image inspection found zero failures.
+The signed Review 2 denial is in [REVIEW.md](REVIEW.md); the remedy is in
+[IMPLEMENTATION.md](IMPLEMENTATION.md).
 
 > This RB-level contract carries work items **HF-05 and HF-10** and transcribes
 > both complete frozen work-item sections from

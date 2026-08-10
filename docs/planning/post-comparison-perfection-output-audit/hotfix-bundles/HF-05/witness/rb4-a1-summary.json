@@ -61,10 +61,11 @@
    }
   }
  },
- "bound_to_acceptance_head": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
- "built_utc": "2026-08-10T02:24:38+00:00",
+ "bound_to_acceptance_head": "d826877592a8443191b07ae8c3e92e53a1e9bba4",
+ "built_utc": "2026-08-10T17:36:29+00:00",
  "bundle": "RB-4",
  "claim": "the 12 `_pdf`-family cells render BOTH sides as crops of the source prints (per-route TSMIS export / TSN library print), each TSMIS-side value re-derived from the print or disclosed as a disagreement on the image; the 14 required-silent cells emit no evidence artifact of any kind; blank targets sit inside the captioned record; and unbindable pairs emit no artifact",
+ "comparisons_generated_at": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
  "count_invariance": {
   "all_equal": true,
   "cells": 26,
@@ -236,7 +237,7 @@
   },
   {
    "file": "counts-head.json",
-   "sha256": "6683F4C93954BC752C0CF1F605238FCDC7F2486E462BF847BADC1FDD3C708A85"
+   "sha256": "18D7E6ED4B9CB26EB6A1249CFC357F9C1C7CB61FC107C82C7A4A613F795DCDC1"
   },
   {
    "file": "counts-base.json",
@@ -244,11 +245,11 @@
   },
   {
    "file": "validate-head.json",
-   "sha256": "2F5B4DA0535C7D5C859BC865A590682DB40524948A74DCD6FF40B6F0FE671CE3"
+   "sha256": "9FE02881644A957CC11ABB061478A25197D2D741B6419074D5294104E65B4BE8"
   },
   {
    "file": "excel-head.json",
-   "sha256": "DFB8207BFAC1F19DFFBC414885C1860757EA0F441075B3BDA094F5479233F16A"
+   "sha256": "20DB4AA9CBC4A17E88C5363624247522BCBA3224A840934CD22CF996FC39151F"
   },
   {
    "file": "prefix-defect-census.json",
@@ -264,6 +265,7 @@
   "all_opened": true,
   "books": 12
  },
+ "generation_head_note": "the comparisons were RETAINED from this earlier head and not rebuilt; every runtime file differing between it and the acceptance head is evidence-layer only, and the counts phase re-proved all 26 retained comparisons equal to base at the acceptance head",
  "generation_lanes": {
   "byday-tsn": {
    "cells": 8,
@@ -299,17 +301,17 @@
  "id": "RB4-A1-HF05",
  "produced_by": {
   "script": "acc_rb4_witness.py",
-  "script_sha256": "43D991DAC4EB3A6CD64D23C5822ACA02601F23A8109D7EB20EF9DFF06C5B9C2D"
+  "script_sha256": "956476D579C7BCB804FC66B4A70C77C7088C78306CCDD9E1A3FAA50852E611D1"
  },
  "validate": {
   "disagreement_examples": 0,
   "elided_examples": 0,
-  "examples": 336,
+  "examples": 341,
   "problems": 0,
   "pve_stray": [],
   "sets": 12,
-  "tsmis_rederived": 254,
-  "values_over_26": 14
+  "tsmis_rederived": 258,
+  "values_over_26": 16
  },
  "work_item": "HF-05 (PCOA-FINAL-004 / -005 / -006, as amended 2026-08-05: print crops on the `_pdf` families only)"
 }

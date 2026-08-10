@@ -71,8 +71,8 @@
    "row": "ramp_summary"
   }
  ],
- "bound_to_acceptance_head": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
- "built_utc": "2026-08-10T02:24:38+00:00",
+ "bound_to_acceptance_head": "d826877592a8443191b07ae8c3e92e53a1e9bba4",
+ "built_utc": "2026-08-10T17:36:29+00:00",
  "bundle": "RB-4",
  "camera_refusals": [
   {
@@ -164,6 +164,7 @@
   }
  ],
  "claim": "the four `_pdf` Everything ENV cells render PDF-vs-PDF evidence from the two compared environments' own per-route prints; all five env COMPARISONS (ramp_summary included) keep counts equal to the audit's measured numbers; and the required-silent cameras REFUSE at the engine boundary",
+ "comparisons_generated_at": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
  "derived_from": [
   {
    "file": "generation-head.json",
@@ -171,15 +172,15 @@
   },
   {
    "file": "counts-head.json",
-   "sha256": "6683F4C93954BC752C0CF1F605238FCDC7F2486E462BF847BADC1FDD3C708A85"
+   "sha256": "18D7E6ED4B9CB26EB6A1249CFC357F9C1C7CB61FC107C82C7A4A613F795DCDC1"
   },
   {
    "file": "validate-head.json",
-   "sha256": "2F5B4DA0535C7D5C859BC865A590682DB40524948A74DCD6FF40B6F0FE671CE3"
+   "sha256": "9FE02881644A957CC11ABB061478A25197D2D741B6419074D5294104E65B4BE8"
   },
   {
    "file": "cameras-head.json",
-   "sha256": "06EE93CB3A75872581898CABE632DA41679E3ECF5E7F2BBF8D3115BAACE704D1"
+   "sha256": "112D4D0C7F03520FD2E5BDCC12066567B8B9B69C8F01A23D0E8F2D7C25C612D8"
   }
  ],
  "env_cells": {
@@ -229,17 +230,18 @@
    "verdict": "diff"
   }
  },
+ "generation_head_note": "the comparisons were RETAINED from this earlier head and not rebuilt; every runtime file differing between it and the acceptance head is evidence-layer only, and the counts phase re-proved all 26 retained comparisons equal to base at the acceptance head",
  "id": "RB4-A1-HF10",
  "produced_by": {
   "script": "acc_rb4_witness.py",
-  "script_sha256": "43D991DAC4EB3A6CD64D23C5822ACA02601F23A8109D7EB20EF9DFF06C5B9C2D"
+  "script_sha256": "956476D579C7BCB804FC66B4A70C77C7088C78306CCDD9E1A3FAA50852E611D1"
  },
  "validate_env_sets": [
   {
    "checks_failed": 0,
    "comparison": "ssor-test_highway_log_pdf.xlsx",
-   "env_rederived": 56,
-   "examples": 56
+   "env_rederived": 57,
+   "examples": 57
   },
   {
    "checks_failed": 0,
