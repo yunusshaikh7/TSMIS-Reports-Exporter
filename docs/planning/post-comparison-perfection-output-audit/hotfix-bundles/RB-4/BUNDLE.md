@@ -1,9 +1,10 @@
 # `RB-4` — Bundle Contract
 
-Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2** — `RB4-R1-001` is closed by
-the owner's 2026-08-09 acceptance-definition ruling, not by code. Codex Review
-1 re-review approved the retained 336-image set under that narrow ruling. The
-signed record is in [REVIEW.md](REVIEW.md).
+Status: **REVIEW 2 DENIED — RETURN TO IMPLEMENTATION** — `RB4-R1-001` remains
+closed by the owner's narrow anchorless-blank ruling. `RB4-R2-001` is a distinct
+HF-05 criterion 1 failure: missing required print sources leave prior canonical
+evidence artifacts in place instead of the required zero-artifact result. The
+signed denial is in [REVIEW.md](REVIEW.md).
 
 > This RB-level contract carries work items **HF-05 and HF-10** and transcribes
 > both complete frozen work-item sections from
@@ -214,7 +215,7 @@ The single run must:
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to its five `source-audit/*evidence*` review ledgers and `visual-review/evidence-review/`, plus Claude's `visual_evidence.py:1270` census and the RC-2 `FT_3_stacked.png` reproduction |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-4: REVIEW 1 APPROVED — AWAITING REVIEW 2** |
+| Status | **Inherits RB-4: REVIEW 2 DENIED — RETURN TO IMPLEMENTATION** |
 
 **Exact scope.** The visual-evidence renderer's eligibility rule, per-side source
 binding, target geometry and Excel-panel fidelity, across every path that emits
@@ -367,7 +368,7 @@ truncation census and the target-geometry measurements.
 | Implementer | Claude |
 | Review 1 | **Codex** (found the five absent-but-required cells) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-4: REVIEW 1 APPROVED — AWAITING REVIEW 2** |
+| Status | **Inherits RB-4: REVIEW 2 DENIED — RETURN TO IMPLEMENTATION** |
 
 **Exact scope — AMENDED 2026-08-05.** Evidence for the ~~five~~ **four**
 Everything ENV cells of the `_pdf` report families — Ramp Detail (PDF),

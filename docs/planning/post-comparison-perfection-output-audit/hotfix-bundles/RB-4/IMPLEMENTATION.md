@@ -1,6 +1,6 @@
 # `RB-4` — Implementation Record
 
-Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**.
+Status: **REVIEW 2 DENIED — RETURN TO IMPLEMENTATION** (`RB4-R2-001`).
 Acceptance run **chain10** passed every programmatic phase at head `f4b55f2`
 and its native-scale inspection read 336 images with **0 mis-targeted, clipped,
 multi-column, out-of-record, or undisclosed crops**.

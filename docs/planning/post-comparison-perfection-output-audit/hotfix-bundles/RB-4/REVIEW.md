@@ -1,6 +1,6 @@
 # `RB-4` — Adversarial Review Record
 
-Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
+Status: **REVIEW 2 DENIED — RETURN TO IMPLEMENTATION**
 
 ## Review 1 verdict — 2026-08-09
 
@@ -262,3 +262,97 @@ remains unresolved under the controlling contract.
 Mark RB-4 **REVIEW 1 APPROVED — AWAITING REVIEW 2**. Do not merge. Run Prompt
 05 in a separate fresh task for Review 2 against the pushed branch head after
 this review record is committed.
+
+---
+
+## Review 2 — Codex, 2026-08-10
+
+### Verdict
+
+**DENIED — RETURN TO IMPLEMENTATION.**
+
+`RB4-R2-001` is one concrete HF-05 criterion 1 failure. The amended contract
+states that where either side cannot bind to its required print, no evidence
+artifact of any kind may remain, manifest included. At runtime `f4b55f2`, the
+vs-TSN path deliberately classifies an absent TSMIS or TSN print set as an
+ordinary keep-last-good `ValueError`, before the binding-refusal retirement
+path. A bounded probe through the actual `visual_evidence.generate` front door
+supplied valid comparison-workbook bindings, planted the three canonical prior
+evidence artifacts, and withheld the TSMIS print set. The product raised the
+missing-print error while workbook, image directory, and manifest all survived.
+
+This is independent of `RB4-R1-001`. The owner's anchorless-blank ruling remains
+narrow and valid for the retained 336-image set. Review 1 could miss this because
+its unbindable-pair fixture strips comparison provenance, which enters
+`refuse_binding()` and retires the prior set; it never challenges the separate
+missing-print exits at `visual_evidence.py:1092-1103`.
+
+### Identity, entry state, and budget
+
+| Field | Review 2 record |
+|---|---|
+| Reviewer / implemented bundle? | Codex / **No** — implementer is Claude |
+| Bundle / branch | `RB-4` (`HF-05 + HF-10`) / `hotfix/rb-4-evidence` |
+| Base / re-derived merge-base | `72adf447d45a2b74c562ba714008661a180c5d5f` / exact match |
+| Acceptance runtime | `f4b55f2ec75598cf5f8b37c8d23fb8c151490070` |
+| Review 1 approval / Review 2 entry head | `f714f1b1bb25d5d475f0c836b0e932fe01c4f83f` |
+| Pushed-head check | Local `HEAD`, fetched branch, and live `git ls-remote` matched `f714f1b…` |
+| Runtime drift | **None** — `f4b55f2..f714f1b` changes eight documentation/evidence-record paths and zero runtime files |
+| Active time / resources | Approximately 24 minutes; budget respected. No generation, Excel, build, full gate, corpus/archive re-hash, image recapture, or bulk output; one 38-second cheap verifier and one small temporary probe |
+
+### Evidence reused and bounded commands
+
+| Evidence / command | Result |
+|---|---|
+| Complete base-to-entry diff | 41 paths, 11,658 insertions / 831 deletions; `git diff --check` clean; scope remains evidence engine/adapters, matrix/UI capability plumbing, focused checks/tooling, witnesses, and records |
+| Runtime-to-entry diff | Eight record paths only; no runtime change after `f4b55f2` |
+| Manifest / verifier | `rb4-a1-artifacts.json` SHA-256 `D4E176D54F688C3C596520147B579EBD56D7DB0AB4FCD7BD5E5CC7AA307048F2`; verifier SHA-256 `12A7C2BF7DF95EBB566D82DBF608BDF7133C6D85958D00E0056D00066E549B54` |
+| Cheap committed verifier | **VERIFIED — 0 problems**: 420-file runtime digest, exact base digest, all 7 claimed results at `f4b55f2`, and both witnesses matched |
+| HF-05 / HF-10 witnesses | SHA-256 `68D48E131622D7DDCE05E66AA8E80569CA4BA37E7B09152C47FC5316B45F8A3F` / `F02716FC366606002C72C7E1D46DAC86B51650710C7C8B7AD7E2E055160F60E7` |
+| Signed Review 1 | Reused its deliverable, discrepancy, values/formulas, visual, evidence, neighboring, and regression matrices; independently challenged failure behavior outside its provenance-removal fixture |
+| Targeted probe | Actual `generate('intersection_detail_pdf', ...)` with matching compared-workbook digests, one TSN PDF, an empty required TSMIS print folder, and planted canonical workbook/image/manifest. Result: missing-print `ValueError`; artifact survival `True / True / True` |
+
+The verifier proves retained bytes and runtime identity. It cannot override a
+newly reproduced product failure in an uncovered code path.
+
+### Review 2 challenge and criterion disposition
+
+After valid workbook provenance is accepted, `visual_evidence.py:1086-1103`
+states that absent prints are keep-last-good and raises plain `ValueError`.
+Those exits precede the print snapshot and retirement-aware binding checks. The
+caller treats the exception as a skipped decoration while the old canonical
+evidence names remain. The existing `strip_provenance=True` test therefore does
+not support its generalized claim that every print-unbound pair leaves nothing.
+
+| Criterion | Review 2 disposition |
+|---|---|
+| HF-05 · 1 | **FAIL — `RB4-R2-001`**. Missing a required print side leaves the prior canonical workbook, image directory, and manifest in place |
+| HF-05 · 2–7 | **No new contradiction; Review 1 evidence reused** — re-derivation/disclosure, geometry, source prose, silent controls, count invariance, and retained gates remain bound |
+| HF-10 · 1 | **No new contradiction** — four retained ENV sets / 82 images remain bound |
+| HF-10 · 2 | **PASS under the owner-amended definition, reused** — the 1-of-336 anchorless ruling is not broadened by this finding |
+| HF-10 · 3–5 | **No new contradiction; retained evidence reused** — ENV parity, neighboring behavior, and gate/base signatures remain bound |
+
+### Deliverable and review-domain matrix
+
+| Domain | Result |
+|---|---|
+| Deliverables / discrepancies | **Retained result verified** — 12 sets / 336 PNGs, 14 required-silent placements, 26/26 typed outcomes, and the five ENV audit figures |
+| Formulas / Excel | **Pass on retained evidence** — 26/26 twins and 12/12 evidence books; not repeated |
+| Visual | **Pass under owner ruling on the retained set** — 336/336 under the controlling definition |
+| Eligibility / failure behavior | **FAIL** — missing-print front door preserves canonical evidence despite the zero-artifact print-binding rule |
+| Sibling / neighboring behavior | **No new contradiction** — prohibited lanes and comparisons remain unchanged |
+| Publication / freshness | **FAIL at this failure boundary only** — keep-last-good is applied where the bundle requires retirement |
+| Regression | **Coverage gap** — the green retained gate covers missing provenance, not missing required prints with a prior set |
+
+### Actionable failure and bounded return
+
+| ID | Priority | Required return |
+|---|---|---|
+| `RB4-R2-001` | P1 / blocking | Route missing-required-print exits through the retirement-aware refusal boundary without changing cancellation or unrelated render-failure keep-last-good behavior. Add a focused check that plants a valid prior workbook/image/manifest and proves both missing-TSMIS and missing-TSN cases refuse loudly with all three canonical artifacts absent. Rebind the affected exact-head runtime, focused/full-gate results, manifest, and witnesses under the bundle protocol, then return Prompt 05 for Review 2 re-review. |
+
+**Reviewer signature:** Codex, Review 2 — **DENIED — RETURN TO IMPLEMENTATION** —
+`2026-08-10T00:48:02.6068086-07:00`.
+
+Do not merge. Resume Prompt 04 on the existing
+`hotfix/rb-4-evidence` branch only to close `RB4-R2-001` and rebind the affected
+acceptance evidence.
