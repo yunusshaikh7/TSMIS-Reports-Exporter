@@ -199,6 +199,37 @@ def excel_column_for(field, excel_header):
     return idt._TSMIS_POS.get(field)
 
 
+def pdf_excel_column_for(field, excel_header):
+    """The PDF-edition consolidated workbook carries the LEGACY site labels
+    over the same value positions (the swap is labels-only), which the shared
+    gate already accepts — one resolution serves both editions."""
+    return excel_column_for(field, excel_header)
+
+
+def tsn_excel_column_for(field, excel_header):
+    """The normalized TSN library workbook: ['Route'] + SHARED_HEADER + the v3
+    sidecars ('TSN County' among them — its absence is the loader's own
+    rebuild-the-library refusal)."""
+    header = ["" if c is None else str(c).strip() for c in excel_header]
+    want = ["Route"] + list(idt.SHARED_HEADER)
+    if header[:len(want)] != want or "TSN County" not in header:
+        return None
+    if field in idt.SHARED_HEADER:
+        return 1 + idt.SHARED_HEADER.index(field)
+    return None
+
+
+def tsn_project(field, raw):
+    """The TSN-side panel check: the comparator's own per-field projection is
+    idempotent over the normalized workbook's cells, so the same projection
+    verifies both the cell and the compared value."""
+    return project(field, raw)
+
+
+def workbook_sheet(kind):
+    return idt.NORMALIZED_SHEET if kind == "tsn" else idt.TSMIS_SHEET
+
+
 # --------------------------------------------------------------------------- #
 # TSMIS side — the per-route "Intersection Detail (PDF)" export
 # --------------------------------------------------------------------------- #
@@ -264,9 +295,11 @@ def _lmeta(chars, page_no, win, edges):
             "bottom": max(c["bottom"] for c in chars)}
 
 
-def locate_tsmis(pdf_path, needed_keys):
-    """{normalized_pm: [record]} for `needed_keys`; a record carries the parsed
+def locate_tsmis(pdf_path, needed_keys, key_fn=None):
+    """{key: [record]} for `needed_keys`; a record carries the parsed
     35-column row plus per-line meta (page, y-extent, windows, edges, chars).
+    `key_fn(row)` overrides the vs-TSN normalized-PM keying — the env flavor
+    keys records by the padded PM text the env comparison publishes.
 
     LOCKSTEP: this walk mirrors consolidate_tsmis_intersection_detail_pdf
     .parse_pdf step for step (the document grids from both band shapes, the
@@ -323,10 +356,12 @@ def locate_tsmis(pdf_path, needed_keys):
                     vals_b = idpdf._assign_columns(chars, win_b)
                     if idpdf.INT_ROWB_RE.match(vals_b[1] or ""):
                         row = idpdf._make_row(pending, vals_b)
-                        key = idt._norm_pm(row[1])
+                        key = (key_fn(row) if key_fn is not None
+                               else idt._norm_pm(row[1]))
                         if key in needed_keys:
                             found[key].append(
                                 {"row": row, "m1": pending_meta,
+                                 "src": str(pdf_path),
                                  "m2": _lmeta(chars, page_no, win_b, edges_b)})
                         pending = pending_meta = None
     require_identity()
@@ -343,13 +378,27 @@ def tsmis_value(rec, field):
     return project(field, rec["row"][_TSMIS_SRC[field]])
 
 
+def tsmis_raw(rec, field):
+    """The print's OWN token for `field` — what a reader SEES inside the red
+    box, before `project` normalizes it. The engine discloses it on the image
+    whenever it differs from the compared value (ID prints two-digit years and
+    carries District/County/Route Suffix inside the composite Location cell)."""
+    if field in ("Route Suffix", "District", "County"):
+        return rec["row"][3]
+    return rec["row"][_TSMIS_SRC[field]]
+
+
 def tsmis_box(rec, field):
     """(page_no, cell_box, record_yspan, table_xspan) for `field`'s cell.
     Rejects (returns None) a record whose two lines landed on different pages —
     a single-page strip can't show both, and the record box would be wrong."""
+    return _box_at(rec, _TSMIS_CELL[field])
+
+
+def _box_at(rec, cell):
     if rec["m1"]["page"] != rec["m2"]["page"]:
         return None
-    line, idx = _TSMIS_CELL[field]
+    line, idx = cell
     meta = rec["m1"] if line == 1 else rec["m2"]
     lo, hi = meta["win"][idx]
     hits = [c for c in meta["chars"] if lo <= (c["x0"] + c["x1"]) / 2 < hi]
@@ -572,6 +621,19 @@ def tsn_value(rec, field):
     return project(field, _tsn_raw(rec, field))
 
 
+def tsn_raw(rec, field):
+    """The TSN print's OWN token for `field` (see `tsmis_raw`).
+
+    Deliberately NOT `_tsn_raw`: that one strips a date's signature flag and
+    resolves the three composite-derived fields, both of which are exactly the
+    form differences the reader needs told about — the box encloses the whole
+    `Y86-04-07` cell, and the whole `12-ORA-090` Location cell."""
+    if field in ("Route Suffix", "District", "County"):
+        return rec["a1"]["LOC"][0]
+    line, name = TSN_CELL[field]
+    return (rec["a1"] if line == 1 else rec["a2"])[name][0]
+
+
 def tsn_box(rec, field):
     """(page_no, cell_box, record_yspan, record_xspan) for `field`'s cell. A
     blank cell boxes its fixed template window — on a line-printer template the
@@ -592,3 +654,72 @@ def tsn_box(rec, field):
              else (lrec["top"], lrec["bottom"]))
     return (lrec["page"], (x0 - 2, lrec["top"] - 2, x1 + 2, lrec["bottom"] + 2),
             yspan, xspan)
+
+
+# --------------------------------------------------------------------------- #
+# cross-environment (HF-10) — both sides are per-route TSMIS prints
+# --------------------------------------------------------------------------- #
+# The env comparison publishes the EXPORT's own canonicalized labels (PP /
+# Post Mile / H-G / INT Eff-Date …), not the vs-TSN shared names. The bridge is
+# the comparator's own position map: each shared field's export label sits at
+# its _TSMIS_POS position in _TSMIS_HEADER, so the mapping can never drift from
+# the loader. Columns with no single print cell (the site's PS column, blank by
+# design) honestly refuse.
+_ENV_TO_SHARED = {}
+for _shared, _pos in idt._TSMIS_POS.items():
+    _ENV_TO_SHARED.setdefault(str(idt._TSMIS_HEADER[_pos]), _shared)
+del _shared, _pos
+
+
+def env_fields():
+    """The env comparison's display columns minus Route and the Post Mile key,
+    in the export's own canonical order."""
+    return [f for f in idt._TSMIS_HEADER if f not in ("Route", "Post Mile")]
+
+
+def _env_key(row):
+    """The env comparison's published row key: the export's padded Post Mile
+    text (the env loader applies only the generic cell normalization)."""
+    return _xl_trim("" if row[1] is None else str(row[1]))
+
+
+def env_locate(pdf_path, needed_keys):
+    return locate_tsmis(pdf_path, needed_keys, key_fn=_env_key)
+
+
+def env_project(field, raw):
+    """Strict: the env comparison applies only the generic cell normalization,
+    so the print's parsed token must equal the published value verbatim."""
+    del field
+    return _xl_trim("" if raw is None else str(raw))
+
+
+# The two env display columns OUTSIDE the vs-TSN shared map that the print
+# nevertheless carries as real grid cells: the postmile L/R marker (rowA window
+# 2, between Post Mile and Location) and the intersecting route's marker (rowB
+# window 13 — _make_row's b[13] -> col 29). Verified against the grid the same
+# way _TSMIS_CELL was; their values read positionally off the 35-column row.
+_ENV_CELL_EXTRA = {"PS": (1, 2), "Intrte S": (2, 13)}
+
+
+def env_value(rec, field):
+    if field == "Location":
+        return env_project(field, rec["row"][3])
+    if field in _ENV_CELL_EXTRA:
+        return env_project(field, rec["row"][idt._TSMIS_HEADER.index(field) - 1])
+    shared = _ENV_TO_SHARED.get(field)
+    if shared is None:
+        return ""
+    return env_project(field, rec["row"][_TSMIS_SRC[shared]])
+
+
+def env_box(rec, field):
+    if field == "Location":
+        return tsmis_box(rec, "District")     # District boxes the Location cell
+    extra = _ENV_CELL_EXTRA.get(field)
+    if extra is not None:
+        return _box_at(rec, extra)
+    shared = _ENV_TO_SHARED.get(field)
+    if shared is None:
+        return None                # no single print cell for this site column
+    return tsmis_box(rec, shared)

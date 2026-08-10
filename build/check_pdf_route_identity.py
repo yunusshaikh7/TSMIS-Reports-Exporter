@@ -412,12 +412,13 @@ def evidence_adapter_pins():
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
-    # The engine excludes (never captions) an identity-refused PDF: the
-    # extracted locate loop turns RouteIdentityError into a missing route +
-    # a loud note, and other errors keep their unreadable path.
+    # The engine excludes (never captions) an identity-refused PDF: the env
+    # locate loop (the one production print-rendering lane since HF-05) turns
+    # RouteIdentityError into a missing route + a loud note, and other errors
+    # keep their unreadable path.
     import visual_evidence as ve
-    if not hasattr(ve, "_locate_tsmis_sources"):
-        check("visual_evidence._locate_tsmis_sources exists", False)
+    if not hasattr(ve, "_locate_env_sides"):
+        check("visual_evidence._locate_env_sides exists", False)
         return
 
     class _StubAdapter:
@@ -428,7 +429,7 @@ def evidence_adapter_pins():
             return Path(pdf_dir) / f"stub_route_{route}.pdf"
 
         @staticmethod
-        def locate_tsmis(pdf_path, keys):
+        def env_locate(pdf_path, keys):
             if "002" in pdf_path.name:
                 raise RouteIdentityError(f"{pdf_path.name}: claims route 005")
             return {"k": ["rec"]}
@@ -437,15 +438,22 @@ def evidence_adapter_pins():
     try:
         for name in ("stub_route_001.pdf", "stub_route_002.pdf"):
             (tmp2 / name).write_bytes(b"%PDF-1.4\n%%EOF")
+
+        class _StubReadSet:
+            @staticmethod
+            def dir_for(_side):
+                return tmp2
+
         logs = []
-        loc, missing = ve._locate_tsmis_sources(
-            _StubAdapter, {"001": {"k"}, "002": {"k"}, "003": {"k"}}, tmp2,
-            Events(on_log=logs.append))
+        located = ve._locate_env_sides(
+            _StubAdapter, {"001": {"k"}, "002": {"k"}, "003": {"k"}},
+            _StubReadSet(), Events(on_log=logs.append))
+        (loc_a, _loc_b), missing = located
         check("engine: the identity-refused PDF is excluded, not captioned",
-              "002" in missing and "002" not in loc
+              "002" in missing and "002" not in loc_a
               and any("claims route 005" in ln for ln in logs), str(logs))
         check("engine: the confirmed PDF still locates; the absent one is missing",
-              loc.get("001") == {"k": ["rec"]} and "003" in missing)
+              loc_a.get("001") == {"k": ["rec"]} and "003" in missing)
     finally:
         shutil.rmtree(tmp2, ignore_errors=True)
 

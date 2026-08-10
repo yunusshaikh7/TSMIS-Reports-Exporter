@@ -133,6 +133,7 @@ APP_MODULES = [
     # adapters (lazy-imported by matrix_build/gui_api, so they MUST be declared).
     "visual_evidence", "evidence_highway_detail", "evidence_intersection_detail",
     "evidence_highway_log", "evidence_highway_sequence", "evidence_ramp_detail",
+    "evidence_ramp_summary",
     "gui_main", "gui_api", "gui_worker", "gui_win32", "gui_endpoint", "gui_matrix",
     # Matrix-tab modules (imported dynamically by gui_api/gui_worker) + the TSN
     # report library they read -- previously MISSING from this list (F6). They are

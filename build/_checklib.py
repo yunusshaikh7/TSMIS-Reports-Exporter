@@ -123,3 +123,82 @@ def build_published_comparison(path, schema, rows_a, rows_b, has_route=True):
         raise AssertionError(
             f"fixture comparison did not publish: {result.message}")
     return path
+
+
+def publish_bound_comparison(path, schema, rows_a, rows_b, side_paths,
+                             has_route=True, roles=("TSMIS", "TSN")):
+    """Publish a fixture comparison WITH its committed generation, typed
+    outcome sidecar, and input-provenance sidecar — the production commit
+    boundary in miniature, through the REAL writers (HF-05).
+
+    The exact-source rule binds every evidence source to the comparison's own
+    recorded provenance, so a fixture that drives `visual_evidence.generate`
+    must publish the way production does: `artifact_store.commit_workbook`
+    (which also persists the typed outcome beside every member) plus
+    `compare_tsn_common.write_comparison_provenance` over the pre-read side
+    identities. `side_paths` are the two compared documents — the same paths
+    later handed to generate() as its sides.
+    """
+    import artifact_store
+    import compare_tsn_common as ctc
+    from compare_core import run_compare
+    from pathlib import Path
+    path = Path(path)
+    inputs = ctc.capture_input_provenance(
+        ((roles[0], side_paths[0]), (roles[1], side_paths[1])))
+    committed = artifact_store.commit_workbook(
+        path,
+        lambda tmp: run_compare(schema, rows_a, rows_b, has_route, tmp,
+                                mode="values",
+                                confirm_overwrite=lambda _p: True,
+                                name_a=Path(side_paths[0]).name,
+                                name_b=Path(side_paths[1]).name),
+        expect_sheet="Comparison", confirm_overwrite=lambda _p: True,
+        source_paths=tuple(Path(p) for p in side_paths),
+        requested_mode="values")
+    if committed.status != "ok":
+        raise AssertionError(
+            f"fixture comparison did not publish: {committed.message}")
+    if not ctc.write_comparison_provenance(
+            committed, path, report=getattr(schema, "report_name", "fixture"),
+            banner="fixture", inputs=inputs):
+        raise AssertionError("fixture provenance sidecar did not publish")
+    return committed
+
+
+def mini_pdf(path, texts, page_w=300, page_h=200):
+    """A minimal one-page PDF with absolutely positioned Helvetica strings
+    [(x, top, size, text)...] — `top` measured from the page TOP the way
+    pdfplumber reports it. Hand-assembled bytes (uncompressed streams), so a
+    check can produce REAL parseable per-route prints without any PDF-writing
+    dependency."""
+    from pathlib import Path
+    parts = []
+    for x, top, size, text in texts:
+        y = page_h - top - size          # PDF user space is y-up
+        safe = (str(text).replace("\\", r"\\")
+                .replace("(", r"\(").replace(")", r"\)"))
+        parts.append(f"BT /F1 {size} Tf {x} {y} Td ({safe}) Tj ET")
+    stream = "\n".join(parts).encode("latin-1")
+    objs = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        (f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {page_w} {page_h}] "
+         f"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>"
+         ).encode(),
+        b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n"
+        + stream + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for i, body in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += f"{i} 0 obj\n".encode() + body + b"\nendobj\n"
+    xref = len(out)
+    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode()
+    for off in offsets:
+        out += f"{off:010} 00000 n \n".encode()
+    out += (f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\n"
+            f"startxref\n{xref}\n%%EOF\n").encode()
+    Path(path).write_bytes(bytes(out))

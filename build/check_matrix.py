@@ -34,6 +34,28 @@ def check(name, cond):
         _fail.append(name)
 
 
+# Stated FIRST as an assertion, not an import-time crash: against a runtime
+# with no evidence call site this file died on the first new keyword and
+# printed nothing, so it could not demonstrate the defect it exists to catch.
+def check_evidence_contract():
+    import inspect
+
+    import matrix_build
+    print("the matrix evidence contract this file depends on")
+    check("a cell comparison can be asked for evidence "
+          "(build_cell_comparison(evidence=…))",
+          "evidence" in inspect.signature(
+              matrix_build.build_cell_comparison).parameters)
+    check("the cross-environment camera exists and is reachable through the "
+          "facade (run_env_evidence_only)",
+          hasattr(matrix_build, "run_env_evidence_only")
+          and hasattr(matrix, "run_env_evidence_only"))
+    check("the camera is routed by the row's selected mode "
+          "(evidence_for_cell(mode_id=…))",
+          "mode_id" in inspect.signature(
+              matrix_build.evidence_for_cell).parameters)
+
+
 def test_enumeration():
     print("matrix_snapshot enumeration (empty store):")
     dest = Path(tempfile.mkdtemp(prefix="tsmis_mx_"))
@@ -245,11 +267,44 @@ def test_orchestration_and_cache():
                      HEADER, CELL)
 
         res = matrix.build_cell_comparison(dest, "ssor-prod", "ramp_detail",
-                                           "ars-prod", events=Events())
+                                           "ars-prod", events=Events(),
+                                           evidence={"enabled": True,
+                                                     "examples": 2,
+                                                     "layout": "pair"})
         check("compare ran ok", res.status == "ok")
         check("verdict = diff", res.verdict == "diff")
         out = matrix.comparison_path(dest, "ssor-prod", "ramp_detail", "ars-prod")
         check("comparison workbook written", out.exists())
+        # HF-10 (amended 2026-08-05): the evidence request is honored ONLY on
+        # the four `_pdf`-family env placements; an XLSX env row stays silent
+        # — zero artifacts — and so does ramp_summary's env cell now.
+        check("an XLSX env cell writes NO evidence artifact with the toggle on",
+              not list(out.parent.glob("*evidence*")))
+        # The env camera refuses honestly when there is nothing to illustrate.
+        try:
+            matrix.run_env_evidence_only(dest, "ssor-prod", "ramp_detail",
+                                         "ars-prod", Events())
+            env_cam_refused = False
+        except ValueError as e:
+            env_cam_refused = "cross-environment evidence" in str(e)
+        check("the env camera refuses a row outside the four env placements",
+              env_cam_refused)
+        try:
+            matrix.run_env_evidence_only(dest, "ssor-prod", "ramp_summary",
+                                         "ars-prod", Events())
+            env_cam_rs = False
+        except ValueError as e:
+            env_cam_rs = "cross-environment evidence" in str(e)
+        check("the env camera refuses ramp_summary too (the third ruling: "
+              "no evidence lane at all)", env_cam_rs)
+        try:
+            matrix.run_env_evidence_only(dest, "ssor-prod", "ramp_detail_pdf",
+                                         "ars-prod", Events())
+            env_cam_missing = False
+        except ValueError as e:
+            env_cam_missing = "build the comparison first" in str(e)
+        check("the env camera refuses an env-capable cell with no comparison",
+              env_cam_missing)
 
         results = matrix.load_results(dest, "ssor-prod")
         rec = results.get("ramp_detail", {}).get("ars-prod", {})
@@ -300,6 +355,7 @@ def test_orchestration_and_cache():
 
 
 def main():
+    check_evidence_contract()
     test_enumeration()
     test_reorder()
     test_comparison_path_stable()

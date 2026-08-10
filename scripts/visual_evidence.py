@@ -1,18 +1,47 @@
-"""Visual evidence for vs-TSN comparisons: highlighted PDF snippets per diff.
+"""Visual evidence: an INDEPENDENT spot check made of print crops (the owner's
+2026-08-05 amendment to the PCOA-FINAL-004 ruling).
 
-For each shared column the comparison flags somewhere, sample random example
-rows (random routes — not just the first), find that exact cell in BOTH source
-PDFs (the TSMIS per-route "(PDF)" export and the TSN district print), render
-the region and box the cell on each side, and compose captioned evidence
-images — the manual screenshot-and-circle workflow, automated.
+Evidence exists so a human can hold the actual PRINTS against the comparison
+sheet — the manual screenshot-and-circle workflow, automated. That independence
+is the entire value: a panel rendered from a compared workbook shares the
+comparison's own read and can never catch a bad parse, so no workbook-rendered
+panel appears anywhere. Evidence collection exists ONLY for the `_pdf`-edition
+report families, in exactly two flavors:
 
-Trust contract: an example is only used when the value parsed back OUT of each
-PDF, normalized with the comparator's own projections, equals the value the
-comparison actually compared — so an image can never illustrate something other
-than what was diffed, and every rendered pair doubles as an end-to-end check of
-the comparison at that cell. Candidates that fail (the TSMIS PDF/Excel editions
-disagreeing at that cell, a TSN reference-date skew, a duplicated key) are
-skipped with a recorded reason, never shown.
+- vs-TSN: the TSMIS side is a highlighted crop of the per-route PDF export the
+  compared consolidated workbook was built from; the TSN side is a crop of the
+  TSN library print the normalized TSN workbook was built from. Each crop's
+  value is read back through the adapter's LOCKSTEP walk; where a print
+  DISAGREES with the compared value, the image is rendered WITH a disclosure
+  note, never silently dropped — disagreement is exactly the parser-bug signal
+  this spot check exists to catch.
+- cross-environment ENV comparisons compare the per-route PDF exports the two
+  environments' folders hold (through the report's own per-route conversion),
+  so both panels are highlighted crops of those census-bound prints, each value
+  read back through the adapter's LOCKSTEP walk and required to COMPOSE to the
+  published cell before anything renders.
+
+Everything else is REFUSED at this engine boundary: the Excel-edition rows'
+vs-TSN cells and every PDF-vs-Excel SELF cell produce no artifact of any kind
+(`capable()` names only the `_pdf` rows; `generate()` refuses FLAVOR_SELF).
+The workbook-panel renderer (`_workbook_side` / `_excel_strip` and friends) is
+kept in code but reachable from nothing.
+
+Before anything renders, the COMPARISON is bound to its own recorded provenance
+(`.provenance.json`): each compared workbook's bytes must equal the sha256 the
+comparison recorded reading (vs-TSN), or the run folders' prints must sit
+inside the recorded per-side census (env). A pair that cannot bind retires any
+prior evidence set and refuses — no workbook, no images, no manifest. The
+prints the crops come from are declared honestly: captions name the exact
+print and page, and the manifest read set lists every print actually read.
+
+Trust contract: each example's value is read back OUT of the print through the
+comparator's own projections and checked against the value the comparison
+compared — agreement makes the image an end-to-end check of the comparison at
+that cell; disagreement is DISCLOSED on the image. Candidates that cannot be
+located at all (a print missing for the route, a key that resolves
+ambiguously, geometry that is not evidence-grade) are skipped with a recorded
+reason, never shown.
 
 Outputs, next to the comparison workbook (the "(formulas).xlsx" sibling
 convention): `<comparison> (evidence).xlsx` — a Summary sheet + one tab PER
@@ -52,6 +81,7 @@ except ImportError:
     _DEPS_OK = False
 
 import artifact_store
+import consolidation_meta
 import evidence_ledger
 import evidence_manifest
 import owned_dir
@@ -63,50 +93,35 @@ log = logging.getLogger("tsmis.evidence")
 
 DEPS_MSG = "Required components are missing (pdfplumber/Pillow/openpyxl)."
 
-# row_key -> adapter module name (lazy import; each report's Excel + PDF rows
-# share one adapter — the Excel row's images render from the PDF-edition export,
-# the PDF row's from the same files it was compared from).
+# row_key -> adapter module name (lazy import). The 2026-08-05 owner amendment:
+# evidence collection exists ONLY for the `_pdf`-edition report families — the
+# rows whose compared export genuinely comes from a per-route print set. The
+# Excel rows are absent ON PURPOSE (their vs-TSN cells emit nothing; the
+# engine refuses them through this one registry). Highway Detail (PDF) joins
+# as the fifth family when the owner lifts his 2026-07-21 pre-release freeze.
 _ADAPTER_MODULES = {
-    "highway_detail": "evidence_highway_detail",
-    "highway_detail_pdf": "evidence_highway_detail",
-    "intersection_detail": "evidence_intersection_detail",
     "intersection_detail_pdf": "evidence_intersection_detail",
-    "highway_log": "evidence_highway_log",
     "highway_log_pdf": "evidence_highway_log",
-    "highway_sequence": "evidence_highway_sequence",
     "highway_sequence_pdf": "evidence_highway_sequence",
-    "ramp_detail": "evidence_ramp_detail",
     "ramp_detail_pdf": "evidence_ramp_detail",
 }
 # Where each row's TSMIS-side PDFs live (the per-route export subdir) and which
-# TSN library report holds the TSN prints (per-district files for Highway
-# Detail/Log; the single statewide TASAS print for Intersection Detail — the
-# adapters read district/county per record, so filenames never matter).
-TSMIS_PDF_SUBDIR = {"highway_detail": "highway_detail_pdf",
-                    "highway_detail_pdf": "highway_detail_pdf",
-                    "intersection_detail": "intersection_detail_pdf",
-                    "intersection_detail_pdf": "intersection_detail_pdf",
-                    "highway_log": "highway_log_pdf",
+# TSN library report holds the TSN prints (per-district files for Highway Log /
+# Highway Sequence; the single statewide TASAS print for Intersection Detail /
+# Ramp Detail — the adapters read district/county per record, so filenames
+# never matter).
+TSMIS_PDF_SUBDIR = {"intersection_detail_pdf": "intersection_detail_pdf",
                     "highway_log_pdf": "highway_log_pdf",
-                    "highway_sequence": "highway_sequence_pdf",
                     "highway_sequence_pdf": "highway_sequence_pdf",
-                    "ramp_detail": "ramp_detail_pdf",
                     "ramp_detail_pdf": "ramp_detail_pdf"}
-TSN_PDF_REPORT = {"highway_detail": "highway_detail",
-                  "highway_detail_pdf": "highway_detail",
-                  "intersection_detail": "intersection_detail",
-                  "intersection_detail_pdf": "intersection_detail",
-                  "highway_log": "highway_log",
+TSN_PDF_REPORT = {"intersection_detail_pdf": "intersection_detail",
                   "highway_log_pdf": "highway_log",
-                  "highway_sequence": "highway_sequence",
                   "highway_sequence_pdf": "highway_sequence",
-                  "ramp_detail": "ramp_detail",
                   "ramp_detail_pdf": "ramp_detail"}
 # Report labels for the availability probe (static so the probe never has to
 # import an adapter — a state push must stay cheap; check_visual_evidence pins
 # these maps against report_catalog so they can't drift).
-_TSN_PDF_LABELS = {"highway_detail": "Highway Detail",
-                   "intersection_detail": "Intersection Detail",
+_TSN_PDF_LABELS = {"intersection_detail": "Intersection Detail",
                    "highway_log": "Highway Log",
                    "highway_sequence": "Highway Sequence",
                    "ramp_detail": "Ramp Detail"}
@@ -157,29 +172,57 @@ def _layout_keys(layout):
 
 
 FLAVOR_TSN = "tsn"        # a TSMIS export against the normalized TSN library
-FLAVOR_SELF = "self"      # the PDF-vs-Excel self check: both sides are TSMIS
-FLAVORS = (FLAVOR_TSN, FLAVOR_SELF)
+FLAVOR_SELF = "self"      # RETIRED 2026-08-05 (owner): the self checks carry
+                          # no evidence — the constant stays for identity
+                          # checks, but generate() refuses it (not in FLAVORS)
+FLAVOR_ENV = "env"        # cross-environment: both sides are per-route prints
+FLAVORS = (FLAVOR_TSN, FLAVOR_ENV)
+
+# The ENV cells that carry evidence: the same four `_pdf` report families as
+# the vs-TSN lane (the 2026-08-05 amendment — the rule is by REPORT TYPE, not
+# source format, so Ramp Summary's env cell is out even though its export is
+# PDF-native; its adapter module stays on disk, dormant).
+_ENV_ADAPTER_MODULES = {
+    "ramp_detail_pdf": "evidence_ramp_detail",
+    "intersection_detail_pdf": "evidence_intersection_detail",
+    "highway_log_pdf": "evidence_highway_log",
+    "highway_sequence_pdf": "evidence_highway_sequence",
+}
+
+
+def env_capable(row_key):
+    """Whether the cross-environment PDF-vs-PDF comparison of `row_key` can be
+    illustrated: the row is one of the four `_pdf`-family ENV placements and
+    its adapter exposes the env hooks (`env_locate` + `env_fields`)."""
+    if row_key not in _ENV_ADAPTER_MODULES:
+        return False
+    adapter = env_adapter_for(row_key)
+    return hasattr(adapter, "env_locate") and hasattr(adapter, "env_fields")
+
+
+def env_rows():
+    return sorted(_ENV_ADAPTER_MODULES)
+
+
+def env_adapter_for(row_key):
+    import importlib
+    return importlib.import_module(_ENV_ADAPTER_MODULES[row_key])
 
 
 def self_capable(row_key):
-    """Whether the PDF-vs-Excel self check of `row_key` can be illustrated —
-    the adapter has to expose the SELF comparator's own loader pair and schema,
-    so evidence and comparison can never diverge (CMP-AUD-107)."""
-    if not capable(row_key):
-        return False
-    return hasattr(adapter_for(row_key), "load_sides_self")
+    """RETIRED 2026-08-05 (owner ruling): the PDF-vs-Excel SELF checks carry
+    no evidence — a panel rendered from a compared workbook is circular, and
+    the self lane has no independent print to crop. Always False; `generate()`
+    refuses FLAVOR_SELF at the engine boundary too, so evidence for a self
+    cell is not possible from any path."""
+    return False
 
 
 def tsmis_source_role(row_key):
-    """Which TSMIS export a row's comparison actually READ: 'pdf' or 'excel'.
-
-    CMP-AUD-210: both of a report's rows used to be evidenced from the
-    PDF-edition export, and a candidate was dropped whenever that print
-    disagreed with the compared value — so anything the Excel export has and the
-    print does not (Highway Sequence route 037's Description is the censused
-    case) could never be illustrated at all. An Excel row is now evidenced from
-    the workbook it was compared from.
-    """
+    """Which TSMIS consolidated EDITION a row's comparison actually read.
+    Every `capable()` row is a `_pdf` edition under the 2026-08-05 amendment,
+    so this returns 'pdf' for all of them — kept as a function because the
+    checks pin the registry through it."""
     return "pdf" if str(row_key).endswith("_pdf") else "excel"
 
 
@@ -216,12 +259,14 @@ def clamp_examples(n):
 
 
 def availability():
-    """Cheap probe for the GUI toggle: which rows support evidence and, PER
-    REPORT, whether that report's TSN prints are in place (the TSMIS side varies
-    per run/day and is reported per cell instead). `ready` = deps present and at
-    least one report has its prints — the toggle enables then, and a still-empty
-    report notes per cell where to drop its prints. The aggregate `tsn_pdfs`/`dir`
-    keys stay for the hint's simple cases."""
+    """Cheap probe for the GUI toggle.
+
+    Evidence is print crops (the 2026-08-05 amendment). `ready` = the imaging
+    dependencies alone: the env cells carry their own per-route prints in each
+    run folder, and a vs-TSN cell whose TSN library prints are not dropped yet
+    reports that per cell as a skip note rather than disabling the whole
+    toggle. The per-report TSN print counts feed the Settings panel;
+    `env_rows` names the four cross-environment PDF-vs-PDF placements."""
     reports = []
     total = 0
     for key, label in sorted(_TSN_PDF_LABELS.items()):
@@ -229,17 +274,17 @@ def availability():
              else paths.tsn_library_pdf_dir(key))
         try:
             n = sum(1 for _ in Path(d).glob("*.pdf"))
-        except OSError:          # silent-ok: a pure probe; unreadable = not ready
+        except OSError:          # silent-ok: a pure probe; unreadable = zero
             n = 0
         total += n
         reports.append({"key": key, "label": label, "tsn_pdfs": n, "dir": str(d),
                         "source": "raw" if key in _TSN_PDFS_IN_RAW else "pdf"})
     return {"rows": rows(), "tsn_pdfs": total,
-            "ready": _DEPS_OK and any(r["tsn_pdfs"] for r in reports),
+            "ready": _DEPS_OK and bool(_ADAPTER_MODULES),
             "dir": next((r["dir"] for r in reports if not r["tsn_pdfs"]),
                         reports[0]["dir"] if reports else ""),
             "reports": reports, "row_reports": dict(TSN_PDF_REPORT),
-            "deps_ok": _DEPS_OK}
+            "env_rows": env_rows(), "deps_ok": _DEPS_OK}
 
 
 def sibling_paths(comparison_path):
@@ -288,7 +333,7 @@ def _pdf_content_digests(paths):
 
 
 class _ReadSet:
-    """The private copy of every PDF one evidence generation will read.
+    """The private copy of every source one evidence generation will read.
 
     CMP-AUD-098: digesting the live file before parsing and again at the commit
     boundary cannot see an A→B→A swap — digest A, parse B, restore A, and the
@@ -302,26 +347,48 @@ class _ReadSet:
     files the user actually has (a source that changed mid-run makes the evidence
     a picture of superseded bytes, which is a refusal, not a render fault).
 
-    Basenames are preserved — the adapters look their PDFs up by name.
+    Basenames are preserved — the adapters look their PDFs up by name. Buckets
+    are labelled per SIDE ('tsmis'/'tsn'/'compared' for the workbook flavors;
+    'side_a'/'side_b' for the env flavor, whose two run folders may hold
+    same-named per-route files).
     """
 
-    def __init__(self, root, tsmis_dir, tsn_dir, digests, members, identity,
-                 fs_identity, extra=()):
+    def __init__(self, root, digests, members, identity, fs_identity,
+                 extra=(), stats=()):
         self.root = root
-        self.tsmis_dir = tsmis_dir
-        self.tsn_dir = tsn_dir
+        self.tsmis_dir = root / "tsmis"
+        self.tsn_dir = root / "tsn"
         # {original path -> its snapshot copy} for sources addressed by path
-        # rather than discovered in a folder (the compared Excel workbooks).
+        # rather than discovered in a folder (the compared workbooks).
         self.extra = dict(extra)
         self.digests = digests          # {resolved ORIGINAL path: sha256 of copy}
         self.members = members          # manifest read set, stable order
+        # {resolved ORIGINAL path: (size, mtime_ns)} statted BEFORE the copy —
+        # what the env census binding compares against.
+        self.stats = dict(stats)
         self._identity = identity
         self._fs_identity = fs_identity
+
+    def dir_for(self, label):
+        return self.root / label
 
     def snapshot_of(self, path):
         """The private copy of a by-path source, or the original when it was
         not copied (a caller that asks for one it did not snapshot)."""
         return self.extra.get(str(path), path)
+
+    def rename_member(self, original_path, durable_name):
+        """Publish a member under its DURABLE selection name (PCOA-FINAL-003:
+        a %TEMP% capture path in the manifest would name a directory the reader
+        can never open). The digest/size stay those of the bytes read."""
+        original = str(original_path)
+        renamed = []
+        for m in self.members:
+            if m.name == original:
+                m = evidence_manifest.Member(name=str(durable_name),
+                                             size=m.size, sha256=m.sha256)
+            renamed.append(m)
+        self.members = tuple(sorted(renamed, key=lambda m: m.name))
 
     def ensure_sources_unchanged(self):
         """Refuse when a live source no longer matches the bytes we copied."""
@@ -329,10 +396,10 @@ class _ReadSet:
         for path, digest in self.digests.items():
             if digest is None or current.get(path) != digest:
                 raise ValueError(
-                    "Refusing to publish evidence: a source PDF's contents "
+                    "Refusing to publish evidence: a source file's contents "
                     "changed while evidence was rendering (the images would "
-                    "illustrate superseded bytes). Re-run after the PDFs are "
-                    "stable.")
+                    "illustrate superseded bytes). Re-run after the sources "
+                    "are stable.")
 
     def discard(self):
         """Remove the private copy, never a path that replaced it."""
@@ -349,13 +416,15 @@ class _ReadSet:
         shutil.rmtree(self.root, ignore_errors=True)
 
 
-def _snapshot_read_set(tsmis_paths, tsn_paths, extra=()):
+def _snapshot_read_set(tsmis_paths, tsn_paths, extra=(), buckets=None):
     """Copy the sources this generation will READ into a private snapshot and
     digest the COPIES (CMP-AUD-098). Returns a `_ReadSet`; the caller must
     `discard()` it. A missing source is simply absent from the snapshot — the
     locate step already treats an unreadable route PDF as a miss. `extra` holds
-    sources addressed by path rather than found in a folder (the compared Excel
-    workbook, CMP-AUD-210)."""
+    sources addressed by path rather than found in a folder (the compared
+    workbooks, CMP-AUD-210). `buckets` replaces the default
+    tsmis/tsn/compared layout with explicit (label, sources) pairs (the env
+    flavor's two same-named run folders)."""
     root = Path(tempfile.mkdtemp(prefix=".tsmis-evidence-readset-"))
     fs_identity = owned_dir.directory_identity(root)
     if fs_identity is None:
@@ -364,20 +433,36 @@ def _snapshot_read_set(tsmis_paths, tsn_paths, extra=()):
             "The evidence read-set snapshot has no stable local identity; it "
             "was not used.")
     identity = artifact_store.capture_source_identities((root,))
-    digests, members, extra_map = {}, [], {}
+    if buckets is None:
+        buckets = (("tsmis", tsmis_paths), ("tsn", tsn_paths),
+                   ("compared", extra))
+    digests, members, extra_map, stats = {}, [], {}, {}
     try:
-        for label, sources in (("tsmis", tsmis_paths), ("tsn", tsn_paths),
-                               ("compared", extra)):
+        for label, sources in buckets:
             side = root / label
             side.mkdir()
             for src in sources:
                 src = Path(src)
+                try:
+                    st = src.stat()
+                except OSError:   # silent-ok: a missing source is absent from the snapshot (the locate step reports the miss)
+                    continue
                 if not src.is_file():
                     continue
                 copy = side / src.name
+                if copy.exists():
+                    # Two same-named sources in one bucket would silently
+                    # overwrite — the digests dict would then vouch for bytes
+                    # the panel never reads (RB-4 audit: the exact-source
+                    # rule must not rest on a naming coincidence).
+                    raise EvidenceSourceBindingError(
+                        f"two evidence sources share the name {src.name!r} — "
+                        "the read set cannot hold both apart")
                 shutil.copyfile(src, copy)
                 digest = artifact_store.content_digest(copy)
-                digests[str(src.resolve())] = digest
+                resolved = str(src.resolve())
+                digests[resolved] = digest
+                stats[resolved] = (st.st_size, st.st_mtime_ns)
                 members.append(evidence_manifest.Member(
                     name=str(src), size=copy.stat().st_size, sha256=digest))
                 if label == "compared":
@@ -386,8 +471,116 @@ def _snapshot_read_set(tsmis_paths, tsn_paths, extra=()):
         shutil.rmtree(root, ignore_errors=True)
         raise
     members.sort(key=lambda m: m.name)
-    return _ReadSet(root, root / "tsmis", root / "tsn", digests,
-                    tuple(members), identity, fs_identity, extra_map)
+    return _ReadSet(root, digests, tuple(members), identity, fs_identity,
+                    extra_map, stats)
+
+
+class EvidenceSourceBindingError(ValueError):
+    """The evidence sources could not be bound to the comparison's own recorded
+    read set — the exact-source test failed. No artifact of any kind is
+    published for such a pair (PCOA-FINAL-004), and a prior set is retired so
+    it cannot survive looking current."""
+
+
+def _bound_provenance(comparison_path, flavor):
+    """The comparison's own recorded read set, bound to its committed
+    generation — the authority every evidence source must match.
+
+    Returns (side_a_record, side_b_record). Refuses (raises
+    EvidenceSourceBindingError) when the sidecar is absent/typed wrong, the
+    strict outcome sidecar does not vouch for a committed current generation,
+    or the two records disagree with the flavor's expected input kinds."""
+    import compare_tsn_common as ctc
+    prov = ctc.read_comparison_provenance(comparison_path)
+    if not isinstance(prov, dict):
+        raise EvidenceSourceBindingError(
+            "the comparison records no input provenance, so evidence sources "
+            "cannot be bound to what it compared — rebuild the comparison")
+    inputs = prov.get("inputs")
+    if not (isinstance(inputs, list) and len(inputs) == 2
+            and all(isinstance(s, dict) for s in inputs)):
+        raise EvidenceSourceBindingError(
+            "the comparison's recorded provenance does not carry exactly two "
+            "input records — rebuild the comparison")
+    record = consolidation_meta.read_comparison_outcome(comparison_path)
+    generation = getattr(record, "artifact_generation", None)
+    if (record is None or not record.trusted or not record.current
+            or generation is None
+            or generation.generation_id != prov.get("generation_id")):
+        raise EvidenceSourceBindingError(
+            "the comparison's provenance does not match its committed "
+            "generation — rebuild the comparison before generating evidence")
+    want_kind = "folder" if flavor == FLAVOR_ENV else "file"
+    for side in inputs:
+        if side.get("kind") != want_kind:
+            raise EvidenceSourceBindingError(
+                f"the comparison read a {side.get('kind') or 'unknown'}-kind "
+                f"input where this evidence flavor illustrates a {want_kind} "
+                "input — the pair cannot be bound")
+    return inputs[0], inputs[1]
+
+
+def _require_workbook_binding(read_set, side_record, workbook_path, role):
+    """One compared workbook's snapshot bytes must equal the sha256 the
+    comparison recorded reading for that side."""
+    digest = read_set.digests.get(str(Path(workbook_path).resolve()))
+    recorded = side_record.get("sha256")
+    if not digest or not recorded or digest != recorded:
+        raise EvidenceSourceBindingError(
+            f"the {role} workbook's bytes do not equal what the comparison "
+            "recorded reading for that side — the evidence source is not the "
+            "compared document")
+
+
+def _require_live_census(side_record, live_dir, role):
+    """FRONT-DOOR half of the env binding (RB-4 audit): every per-file census
+    member the comparison recorded for this side must still exist in the LIVE
+    resolved folder with the same size+mtime_ns, BEFORE any exit — including
+    the no-differences/no-examples paths, which publish a manifest — can run.
+    The snapshot-time `_require_census_binding` then re-holds the rendered
+    subset to the same census."""
+    members = side_record.get("members")
+    if not isinstance(members, list) or not members:
+        raise EvidenceSourceBindingError(
+            f"the {role} side's comparison recorded no folder census — the "
+            "evidence sources cannot be bound")
+    live_dir = Path(live_dir)
+    for m in members:
+        if not isinstance(m, dict):
+            continue
+        name = str(m.get("name") or "")
+        try:
+            st = (live_dir / name).stat()
+        except OSError:
+            raise EvidenceSourceBindingError(
+                f"{name} from the {role} side's recorded read set is no longer "
+                "in the compared folder — the evidence sources cannot be bound")
+        if (st.st_size, st.st_mtime_ns) != (m.get("size"), m.get("mtime_ns")):
+            raise EvidenceSourceBindingError(
+                f"{name} changed since the {role} side's comparison read it — "
+                "the evidence source is not the compared document")
+
+
+def _require_census_binding(read_set, side_record, side_paths, role):
+    """Every per-route print rendered for one env side must be a member of the
+    folder census that side's comparison recorded: same basename, same size,
+    same mtime — plus the end-to-end value verification every example gets."""
+    members = side_record.get("members")
+    if not isinstance(members, list):
+        raise EvidenceSourceBindingError(
+            f"the {role} side's comparison recorded no folder census — the "
+            "evidence sources cannot be bound")
+    census = {m.get("name"): (m.get("size"), m.get("mtime_ns"))
+              for m in members if isinstance(m, dict)}
+    for p in side_paths:
+        resolved = str(Path(p).resolve())
+        stat = read_set.stats.get(resolved)
+        want = census.get(Path(p).name)
+        if stat is None or want is None or stat != tuple(want):
+            raise EvidenceSourceBindingError(
+                f"{Path(p).name} is not a member of the {role} side's recorded "
+                "read set (or changed since the comparison read it) — the "
+                "evidence source is not the compared document")
 
 
 def _safe_sibling_paths(comparison_path, source_paths, captured_sources=(),
@@ -409,6 +602,46 @@ def _safe_sibling_paths(comparison_path, source_paths, captured_sources=(),
         directory_destinations=(img_dir,),
         captured_sources=captured_sources, require_sources_current=True)
     return wb_path, img_dir, man_path
+
+
+def retire_unsupported(comparison_path, events=None, commit_guard=None):
+    """Retire a prior evidence set beside a comparison whose lane can no longer
+    produce one, and return a short note (or "" when there was nothing).
+
+    The 2026-08-05 amendment retired WHOLE LANES — the Excel rows' vs-TSN
+    cells, every PDF-vs-Excel self cell, ramp_summary's env cell. Those cells
+    are refused before `generate()` is ever entered, so `generate()`'s own
+    retirement never runs for them, and a set produced by a PRE-amendment
+    build would sit beside its rebuilt comparison looking current forever.
+    The bundle's own rule is the opposite: a cell that no longer generates
+    must have its prior set PROVED RETIRED, not left looking current. So each
+    gate that refuses a lane calls this on its way out.
+
+    Safe by construction: it only ever touches the three canonical sibling
+    names beside the comparison, through the same guarded, quarantine-then-
+    delete path every other evidence retirement uses — a locked, foreign or
+    source-aliased artifact is left in place with a note rather than forced.
+    Never raises: a decoration gate must not fail a comparison."""
+    try:
+        if not os.path.lexists(comparison_path):
+            return ""
+        sources = (Path(comparison_path),)
+        captured = artifact_store.capture_source_identities(sources)
+        wb_path, img_dir, man_path = _safe_sibling_paths(
+            comparison_path, sources, captured, None,
+            commit_guard=commit_guard)
+        if not any(os.path.lexists(p) for p in (wb_path, img_dir, man_path)):
+            return ""
+        note = _retire_stale_evidence(wb_path, img_dir, sources, captured,
+                                      None, commit_guard, man_path)
+    except Exception as e:                       # noqa: BLE001 — never a gate
+        log.warning("evidence: could not sweep the unsupported set beside "
+                    "%s: %s: %s", comparison_path, type(e).__name__, e)
+        return ""
+    if note and events is not None:
+        events.on_log(f"  evidence: {note} — this report no longer collects "
+                      "evidence")
+    return note or ""
 
 
 def _ensure_captured_current(captured):
@@ -513,26 +746,125 @@ def _retire_stale_evidence(wb_path, img_dir, source_paths, captured_sources,
 # --------------------------------------------------------------------------- #
 # generation
 # --------------------------------------------------------------------------- #
-def _locate_tsmis_sources(adapter, need_tsmis, tsmis_pdf_dir, events):
-    """Locate every needed TSMIS row, one parse per route PDF. Returns
-    (tsmis_loc, missing_routes), or None when cancelled.
+def _env_candidates(published, fields_with_diffs, ledger):
+    """Candidate examples for the env flavor, drawn from the published
+    comparison itself: solo matched rows whose state at the column is a counted
+    difference. The side values are NOT read from the workbook cell (a
+    differing cell displays both sides composed) — each side's value is read
+    back from its own environment's print at locate time, and the composed
+    display must then equal the published cell before anything renders."""
+    import published_comparison as pc
+    cand, misses = {}, {}
+    for f in fields_with_diffs:
+        pos = published.position_of(f)
+        pool = []
+        for row in published.rows:
+            if not row.matched or not published.is_solo(row):
+                continue
+            if row.state(pos) != pc.STATE_DIFFERENT:
+                continue
+            # A route-keyed comparison (Ramp Summary) publishes no separate
+            # route column — the key IS the route token the per-route print
+            # files carry, so it serves as the route for print resolution too.
+            pool.append({"field": f, "route": row.route or row.key,
+                         "key": row.key,
+                         "display": row.value(pos),
+                         "published_row": row.excel_row,
+                         "published_occurrence": row.occurrence,
+                         "published_state": pc.STATE_DIFFERENT,
+                         "published_token": row.token})
+        if pool:
+            cand[f] = pool
+        else:
+            why = evidence_ledger.unrenderable_reason(ledger.for_field(f), None)
+            misses[f] = why or ("every published difference in this column "
+                                "sits on a repeated or one-sided row")
+    return cand, misses
+
+
+def find_route_print(dir_path, adapter, route, files=None):
+    """The route's print inside `dir_path`: the adapter's own resolution when
+    that exact file exists (run folders — honors the dated/legacy filename
+    preference), else the ONE file honoring the end-anchored
+    `…_route_<token>.<ext>` contract. The fallback is what makes the env lane
+    live outside a run folder (the RB-4 audit): an Export Everything store
+    tags each name with its env (`ssor-prod tsar_…_route_001.pdf`), and the
+    read-set buckets keep the source's original basename — both spell the
+    bare name only as a suffix. Absent or ambiguous -> None (never a guess)."""
+    exact = Path(adapter.tsmis_pdf_path(Path(dir_path), route))
+    if exact.is_file():
+        return exact
+    spec = exact.name
+    pool = (files if files is not None
+            else [p for p in Path(dir_path).iterdir() if p.is_file()])
+    hits = [p for p in pool if p.name.endswith(spec)]
+    if len(hits) > 1:
+        log.warning("evidence: %d files end with %r in %s — ambiguous, "
+                    "refusing to pick one", len(hits), spec, dir_path)
+        return None
+    return hits[0] if hits else None
+
+
+def _locate_env_sides(adapter, need_routes, read_set, events):
+    """Locate every needed record in BOTH environments' per-route prints.
+    Returns ((loc_a, loc_b), missing_routes) — each loc maps
+    route -> {published_key_text: [record]} — or None when cancelled.
 
     CMP-AUD-049 (evidence half): a PDF whose own route claims fail to confirm
     the expected route (the adapter raises pdf_table_lib.RouteIdentityError)
     is EXCLUDED — its examples become misses — never captioned as that route;
     a merely unreadable PDF keeps its separate unreadable path."""
-    tsmis_loc, missing_routes = {}, set()
+    locs = ({}, {})
+    missing = set()
+    for si, side in enumerate(("side_a", "side_b")):
+        base = read_set.dir_for(side)
+        pool = [p for p in base.iterdir() if p.is_file()]
+        for ri, (route, keys) in enumerate(sorted(need_routes.items()), 1):
+            if events.is_cancelled():
+                return None
+            if ri % 10 == 0:
+                events.on_log(f"    …{side} prints {ri}/{len(need_routes)}")
+            p = find_route_print(base, adapter, route, files=pool)
+            if p is None:
+                missing.add(route)
+                continue
+            try:
+                locs[si][route] = adapter.env_locate(p, keys)
+            except RouteIdentityError as e:
+                log.warning("evidence: %s excluded: %s", p.name, e)
+                events.on_log(f"    ⚠ {e} — excluded from evidence")
+                missing.add(route)
+            except Exception as e:                        # a corrupt route PDF
+                log.warning("evidence: %s unparseable: %s: %s",
+                            p.name, type(e).__name__, e)
+                missing.add(route)
+    return locs, missing
+
+
+def _locate_tsmis_sources(adapter, need_tsmis, tsmis_dir, events):
+    """Locate every needed TSMIS row, one parse per route PDF. Returns
+    (tsmis_loc, tsmis_pdf_by_route, missing_routes), or None when cancelled.
+    Prints resolve through `find_route_print` (the snapshot keeps original
+    basenames, so dated/legacy/store-tagged names all resolve).
+
+    CMP-AUD-049 (evidence half): a PDF whose own route claims fail to confirm
+    the expected route (the adapter raises pdf_table_lib.RouteIdentityError)
+    is EXCLUDED — its examples become misses — never captioned as that route;
+    a merely unreadable PDF keeps its separate unreadable path."""
+    tsmis_loc, tsmis_pdf, missing_routes = {}, {}, set()
+    pool = [p for p in Path(tsmis_dir).iterdir() if p.is_file()]
     for ri, (route, keys) in enumerate(sorted(need_tsmis.items()), 1):
         if events.is_cancelled():
             return None
         if ri % 10 == 0:
             events.on_log(f"    …TSMIS PDFs {ri}/{len(need_tsmis)}")
-        p = adapter.tsmis_pdf_path(tsmis_pdf_dir, route)
-        if not p.is_file():
+        p = find_route_print(tsmis_dir, adapter, route, files=pool)
+        if p is None or not p.is_file():
             missing_routes.add(route)
             continue
         try:
             tsmis_loc[route] = adapter.locate_tsmis(p, keys)
+            tsmis_pdf[route] = p
         except RouteIdentityError as e:
             log.warning("evidence: %s excluded: %s", p.name, e)
             events.on_log(f"    ⚠ {e} — excluded from evidence")
@@ -541,7 +873,66 @@ def _locate_tsmis_sources(adapter, need_tsmis, tsmis_pdf_dir, events):
             log.warning("evidence: %s unparseable: %s: %s",
                         p.name, type(e).__name__, e)
             missing_routes.add(route)
-    return tsmis_loc, missing_routes
+    return tsmis_loc, tsmis_pdf, missing_routes
+
+
+def _box_within_record(cell_box, yspan, xspan):
+    """The PCOA-FINAL-005 engine backstop, both axes, for every print render:
+    the reason a target rectangle is refused, or None when it is contained.
+    The vertical check catches a target that left the record's own lines; the
+    horizontal one (RB-4 audit — the previous backstop was vertical-only,
+    which is exactly how a mis-anchored blank-cell guess slipped through)
+    catches a target outside the record's printed width. The x tolerance is
+    wider because adapters legitimately pad blank-cell windows a few points
+    past the line's glyph extent at the row's edges."""
+    if cell_box[1] < yspan[0] - 3 or cell_box[3] > yspan[1] + 3:
+        return ("the target rectangle falls outside the record's own "
+                "printed lines — not evidence-grade")
+    if cell_box[0] < xspan[0] - 8 or cell_box[2] > xspan[1] + 8:
+        return ("the target rectangle falls outside the record's own "
+                "printed width — not evidence-grade")
+    return None
+
+
+def _adapter_sheet(adapter, kind):
+    """The sheet the compared workbook of `kind` ('excel'/'pdf'/'tsn') carries
+    its data on, or None for the first sheet. Adapters expose `workbook_sheet`
+    when a kind's data sheet is not the workbook's first."""
+    hook = getattr(adapter, "workbook_sheet", None)
+    return hook(kind) if hook is not None else None
+
+
+def _legend_for(flavor):
+    """The image-sheet legend — it must assert only what was actually read.
+
+    Every panel is a CROP of a print: its glyphs are the document's own, never
+    a drawn restatement. A normalizing comparison (dates, padding, case) can
+    compare two forms the prints spell differently, so the boxed text may
+    differ in FORM from the compared value named in the title; and a print
+    whose parsed value DISAGREES with the compared value is still rendered,
+    with a note line disclosing it (the 2026-08-05 amendment: disagreement is
+    the parser-bug signal this spot check exists to catch)."""
+    if flavor == FLAVOR_ENV:
+        return ("Red box = the compared cell in each environment's printed "
+                "export; gray box = the record (its printed lines). Each box "
+                "is a CROP of the print itself, so it shows that print's own "
+                "rendering — separators, padding and date form may differ "
+                "from the compared value the title names, which is the form "
+                "the comparison compared.")
+    return ("Red box = the compared cell in each source print — the TSMIS "
+            "per-route PDF export and the TSN print the library was built "
+            "from; gray box = the record (its printed lines). Each box is a "
+            "CROP of the print itself, so it shows that print's own rendering "
+            "— and where a print's text disagrees with the compared value the "
+            "title names, the image carries a note line saying so.")
+
+
+class _FieldsView:
+    """A minimal adapter view for `published_universe` when the compared field
+    list is flavor-specific (the env flavor's schema differs from vs-TSN)."""
+
+    def __init__(self, fields):
+        self.FIELDS = tuple(fields)
 
 
 def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
@@ -552,65 +943,205 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
     folder} — `note` is the one summary line for the run log. `layout` selects
     which image layout(s) to render (Settings: 'pair'/'stacked'/'both').
 
-    `flavor` picks which comparison is being illustrated: 'tsn' (the default —
-    a TSMIS export against the normalized TSN library) or 'self' (the
-    PDF-vs-Excel self check, where `tsn_path` is the EXCEL consolidated
-    workbook and both sides are TSMIS). CMP-AUD-210: each side is evidenced
-    from the source that side was actually read from.
+    `flavor` picks which comparison is being illustrated. Both supported
+    flavors render PRINT CROPS on both sides (the 2026-08-05 owner amendment
+    — evidence is an independent spot check, so no side ever renders from a
+    compared workbook):
 
-    Raises ValueError for a not-runnable setup (missing deps/PDFs); the caller
-    treats any failure as a skipped decoration, never a failed comparison."""
+    - 'tsn' (default): a `_pdf`-edition consolidated export against the
+      normalized TSN library. The TSMIS side crops the per-route PDF export
+      in `tsmis_pdf_dir` (the prints the compared workbook was built from);
+      the TSN side crops the TSN library print. Each crop's value is read
+      back through the adapter's LOCKSTEP walk; a print that DISAGREES with
+      the compared value renders with a disclosure note, never a silent drop.
+    - 'env': a cross-environment PDF-vs-PDF cell. Both run folders come from
+      the comparison's OWN recorded provenance — never a caller's guess — and
+      both panels are highlighted crops of the census-bound per-route prints
+      those folders hold (every rendered value re-reads the print and must
+      compose to the published cell). `consolidated`/`tsn_path`/
+      `tsmis_pdf_dir` are ignored.
+
+    'self' is REFUSED here at the engine boundary (the amendment: the
+    PDF-vs-Excel self checks carry no evidence; `FLAVOR_SELF` is not in
+    `FLAVORS`), as is every row `capable()`/`env_capable()` does not name.
+
+    Every flavor binds the COMPARISON to its own recorded provenance before
+    rendering; a pair that cannot bind retires any prior evidence set and
+    raises EvidenceSourceBindingError with NOTHING published — no workbook,
+    no images, no manifest.
+
+    Raises ValueError for a not-runnable setup; the caller treats any failure
+    as a skipped decoration, never a failed comparison."""
     if not _DEPS_OK:
         raise ValueError(DEPS_MSG)
-    if not capable(row_key):
-        raise ValueError(f"no visual-evidence support for {row_key}")
-    adapter = adapter_for(row_key)
     if flavor not in FLAVORS:
         raise ValueError(f"unknown evidence flavor: {flavor!r}")
-    if flavor == FLAVOR_SELF and not self_capable(row_key):
-        raise ValueError(f"no PDF-vs-Excel evidence support for {row_key}")
+    if flavor == FLAVOR_ENV:
+        if not env_capable(row_key):
+            raise ValueError(f"no cross-environment evidence support for {row_key}")
+        adapter = env_adapter_for(row_key)
+    else:
+        if not capable(row_key):
+            raise ValueError(f"no visual-evidence support for {row_key}")
+        adapter = adapter_for(row_key)
     examples = clamp_examples(examples)
     layout = normalize_layout(layout)
     render_keys = _layout_keys(layout)
-    tsmis_pdf_dir = Path(tsmis_pdf_dir)
-    # CMP-AUD-210: which SOURCE each side of this comparison was read from. The
-    # self check diffs two TSMIS renderings, so side A is the print and side B
-    # is the workbook; a vs-TSN comparison always renders side B from the TSN
-    # print and takes side A from whichever export the row compared.
-    role_a = ("pdf" if flavor == FLAVOR_SELF else tsmis_source_role(row_key))
-    role_b = ("excel" if flavor == FLAVOR_SELF else "tsn")
-    tsn_dir = tsn_pdf_dir(row_key)
-    tsmis_pdf_files, tsn_pdf_files = _pdf_source_files(tsmis_pdf_dir, tsn_dir)
-    if role_b != "tsn":
-        tsn_pdf_files = ()
-        tsn_dir = tsmis_pdf_dir          # nothing else is discovered from it
-    source_paths = (consolidated, tsn_path, comparison_path,
-                    tsmis_pdf_dir, tsn_dir, *tsmis_pdf_files, *tsn_pdf_files)
-    initial_pdf_set = artifact_store.canonical_path_identities(
-        (*tsmis_pdf_files, *tsn_pdf_files))
 
-    def source_set_check():
-        _ensure_pdf_source_set(tsmis_pdf_dir, tsn_dir, initial_pdf_set)
+    # Bind FIRST: the comparison's own recorded read set decides what this
+    # generation may read at all. The sibling paths derive from the comparison
+    # alone, so a binding refusal can retire a prior set before any source
+    # discovery happens.
+    pre_sources = (comparison_path,)
+    pre_captured = artifact_store.capture_source_identities(pre_sources)
+    wb_path, img_dir, man_path = _safe_sibling_paths(
+        comparison_path, pre_sources, pre_captured, None,
+        commit_guard=commit_guard)
+
+    def refuse_binding(exc):
+        """A pair that fails the exact-source test publishes NOTHING, and a
+        prior set is retired so it cannot survive looking current."""
+        retire_note = _retire_stale_evidence(
+            wb_path, img_dir, pre_sources, pre_captured, None, commit_guard,
+            man_path)
+        if retire_note:
+            events.on_log(f"  evidence: {retire_note}")
+        events.on_log(f"  evidence: {exc}")
+        raise exc
+
+    try:
+        side_rec_a, side_rec_b = _bound_provenance(comparison_path, flavor)
+    except EvidenceSourceBindingError as e:
+        refuse_binding(e)
+
+    if flavor == FLAVOR_ENV:
+        # The provenance records each side's run-folder ROOT; the per-route
+        # prints live in the report's subdir beneath it, resolved the ENV
+        # COMPARISON'S OWN way (compare_env._find_input_dir — the same legacy-
+        # layout probing), so evidence can never discover a different set than
+        # the comparison did. The per-file census binding then holds each
+        # rendered print to the recorded members.
+        import compare_env
+        roots = (Path(str(side_rec_a.get("selection") or "")),
+                 Path(str(side_rec_b.get("selection") or "")))
+        if not roots[0].is_dir() or not roots[1].is_dir():
+            refuse_binding(EvidenceSourceBindingError(
+                "a compared environment folder the comparison recorded reading "
+                "no longer exists — the evidence sources cannot be bound"))
+        try:
+            dir_a, pdfs_a = compare_env._find_input_dir(roots[0], row_key,
+                                                        "*.pdf")
+            dir_b, pdfs_b = compare_env._find_input_dir(roots[1], row_key,
+                                                        "*.pdf")
+        except ValueError as e:
+            refuse_binding(EvidenceSourceBindingError(
+                f"the compared environment folders cannot be resolved the "
+                f"comparison's way: {e}"))
+        pdfs_a = tuple(sorted(Path(p) for p in pdfs_a))
+        pdfs_b = tuple(sorted(Path(p) for p in pdfs_b))
+        if not pdfs_a or not pdfs_b:
+            refuse_binding(EvidenceSourceBindingError(
+                f"a compared environment folder holds no {adapter.REPORT_LABEL} "
+                "per-route PDFs anymore — the evidence sources cannot be bound"))
+        # FRONT DOOR (RB-4 audit): the live folders must still hold every
+        # per-file census member the comparison recorded BEFORE anything can
+        # publish — the file flavors' byte check has this, and without it a
+        # drifted pair could exit through the no-differences/no-examples
+        # paths with a fresh manifest.
+        for rec_side, live_dir in ((side_rec_a, dir_a), (side_rec_b, dir_b)):
+            try:
+                _require_live_census(rec_side, live_dir,
+                                     rec_side.get("role") or "a compared side")
+            except EvidenceSourceBindingError as e:
+                refuse_binding(e)      # retire the prior set, publish nothing
+        source_paths = (comparison_path, dir_a, dir_b, *pdfs_a, *pdfs_b)
+        initial_pdf_set = artifact_store.canonical_path_identities(
+            (*pdfs_a, *pdfs_b))
+
+        def source_set_check():
+            current = (tuple(sorted(dir_a.glob("*.pdf")))
+                       + tuple(sorted(dir_b.glob("*.pdf"))))
+            if artifact_store.canonical_path_identities(current) != initial_pdf_set:
+                raise ValueError(
+                    "Refusing to publish evidence: the discovered PDF source "
+                    "set changed while evidence was rendering. Re-run after "
+                    "the export folders are stable.")
+    else:
+        consolidated = Path(consolidated)
+        tsn_path = Path(tsn_path)
+        # The live bytes must equal what the comparison recorded reading BEFORE
+        # anything else runs — a failing pair must not exit through the
+        # no-examples path with a fresh manifest (the snapshot re-verifies the
+        # copies later; this closes the front door).
+        for book, rec in ((consolidated, side_rec_a), (tsn_path, side_rec_b)):
+            try:
+                digest = artifact_store.content_digest(book)
+            except OSError:   # silent-ok: unreadable -> the binding refusal below
+                digest = None
+            if not digest or digest != rec.get("sha256"):
+                refuse_binding(EvidenceSourceBindingError(
+                    f"{Path(book).name} does not equal what the comparison "
+                    "recorded reading for its side — the evidence source is "
+                    "not the compared document"))
+        # The prints both crops come from (the 2026-08-05 amendment): the
+        # per-route TSMIS PDF export the compared workbook was built from,
+        # and the TSN library print the normalized TSN workbook was built
+        # from. Under the amendment a print IS a required source, so an absent
+        # print set is a BINDING REFUSAL like any other unbindable side: the
+        # prior set is retired and nothing is published.
+        #
+        # This reverses the first implementation's keep-last-good exits
+        # (RB4-R2-001). Their rationale — "a temporarily un-dropped TSN print
+        # set must not retire a valid prior evidence set" — does not hold,
+        # because generate() runs as decoration AFTER a comparison is built:
+        # the surviving set is evidence for a PREVIOUS generation, left
+        # sitting at its canonical name beside the comparison it no longer
+        # illustrates. That is precisely the stale-looking-current artifact
+        # `refuse_binding` exists to prevent, and a plain ValueError here
+        # skipped it. Re-drop the prints and re-run the camera to get the
+        # images back.
+        if not tsmis_pdf_dir:
+            refuse_binding(EvidenceSourceBindingError(
+                f"no {adapter.REPORT_LABEL} (PDF) per-route export folder was "
+                "supplied for this cell — the evidence sources cannot be "
+                "bound"))
+        tsmis_pdf_dir = Path(tsmis_pdf_dir)
+        tsn_dir = tsn_pdf_dir(row_key)
+        tsmis_pdf_files, tsn_pdf_files = _pdf_source_files(tsmis_pdf_dir,
+                                                           tsn_dir)
+        if not tsmis_pdf_files:
+            refuse_binding(EvidenceSourceBindingError(
+                f"no {adapter.REPORT_LABEL} (PDF) export found in "
+                f"{tsmis_pdf_dir} — run that export first"))
+        if not tsn_pdf_files:
+            refuse_binding(EvidenceSourceBindingError(
+                f"no TSN {adapter.REPORT_LABEL} PDFs in {tsn_dir} — drop that "
+                "district print set first"))
+        source_paths = (consolidated, tsn_path, comparison_path,
+                        tsmis_pdf_dir, tsn_dir,
+                        *tsmis_pdf_files, *tsn_pdf_files)
+        initial_pdf_set = artifact_store.canonical_path_identities(
+            (*tsmis_pdf_files, *tsn_pdf_files))
+
+        def source_set_check():
+            _ensure_pdf_source_set(tsmis_pdf_dir, tsn_dir, initial_pdf_set)
 
     captured_sources = artifact_store.capture_source_identities(source_paths)
     wb_path, img_dir, man_path = _safe_sibling_paths(
         comparison_path, source_paths, captured_sources, source_set_check,
         commit_guard=commit_guard)
-    if role_a == "pdf" and not tsmis_pdf_files:
-        raise ValueError(f"no {adapter.REPORT_LABEL} (PDF) export found in "
-                         f"{tsmis_pdf_dir} — run that export first")
-    if role_b == "tsn" and not tsn_pdf_files:
-        raise ValueError(f"no TSN {adapter.REPORT_LABEL} PDFs in {tsn_dir}")
 
     seed = int.from_bytes(os.urandom(4), "big")
     rng = random.Random(seed)
-    log.info("evidence: %s seed=%08x examples=%d layout=%s tsmis=%s tsn=%s",
-             row_key, seed, examples, layout, tsmis_pdf_dir, tsn_dir)
+    log.info("evidence: %s flavor=%s seed=%08x examples=%d layout=%s",
+             row_key, flavor, seed, examples, layout)
     events.on_log(f"  evidence: sampling up to {examples} example(s) per column "
                   f"(seed {seed:08x})…")
 
+    fields_view = (_FieldsView(adapter.env_fields()) if flavor == FLAVOR_ENV
+                   else adapter)
     published, ledger, ledger_digest, fields_with_diffs = (
-        evidence_ledger.published_universe(comparison_path, adapter, events))
+        evidence_ledger.published_universe(comparison_path, fields_view, events))
 
     def record_no_artifacts(state, note, misses=None):
         """CMP-AUD-106: a generation that publishes no images is still a CURRENT
@@ -648,25 +1179,33 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
             "evidence: the published comparison counts no differing columns "
             "to illustrate")
 
-    load = (adapter.load_sides_self if flavor == FLAVOR_SELF
-            else adapter.load_sides)
-    rows_a, rows_b, sidecar, note = load(consolidated, tsn_path)
-    if sidecar is None:
-        raise ValueError(note or "the TSN workbook carries no district info")
-    if events.is_cancelled():
-        return _cancelled()
-    # The adapter PROPOSES rows that can be photographed; every one of them is
-    # then checked against the published cell it claims to illustrate. The self
-    # check judges cells with the SELF comparator's own schema, which the
-    # adapter puts in the sidecar (CMP-AUD-107: never a second equality engine).
-    proposed = adapter.enumerate_diffs(
-        rows_a, rows_b, sidecar,
-        **({"schema": sidecar["schema"]} if flavor == FLAVOR_SELF else {}))
-    renderable, rejected = evidence_ledger.reconcile(published, proposed)
-    refused = sum(sum(why.values()) for why in rejected.values())
-    if refused:
-        events.on_log(f"  evidence: {refused:,} proposed example(s) did not "
-                      "match the published cell and were not rendered")
+    rejected = {}
+    if flavor == FLAVOR_ENV:
+        # The env candidates come from the published comparison itself: solo
+        # matched rows whose state at the column is a counted difference. The
+        # side values are NOT taken from the workbook cell (a differing cell
+        # displays both sides composed) — each is read back from its own
+        # environment's print and the composed display is then required to
+        # equal the published cell before anything renders.
+        renderable, env_misses = _env_candidates(published, fields_with_diffs,
+                                                 ledger)
+    else:
+        rows_a, rows_b, sidecar, note = adapter.load_sides(consolidated,
+                                                           tsn_path)
+        if sidecar is None:
+            raise ValueError(note or "the TSN workbook carries no district info")
+        if events.is_cancelled():
+            return _cancelled()
+        # The adapter PROPOSES rows that can be photographed; every one of them
+        # is then checked against the published cell it claims to illustrate
+        # (CMP-AUD-107: never a second equality engine).
+        proposed = adapter.enumerate_diffs(rows_a, rows_b, sidecar)
+        renderable, rejected = evidence_ledger.reconcile(published, proposed)
+        env_misses = {}
+        refused = sum(sum(why.values()) for why in rejected.values())
+        if refused:
+            events.on_log(f"  evidence: {refused:,} proposed example(s) did not "
+                          "match the published cell and were not rendered")
 
     # pick candidates, then group the lookups by source file so each PDF is
     # parsed exactly once
@@ -675,7 +1214,9 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
     for f in fields_with_diffs:
         pool = renderable.get(f) or []
         if not pool:
-            why = evidence_ledger.unrenderable_reason(ledger.for_field(f), rejected.get(f))
+            why = (env_misses.get(f)
+                   or evidence_ledger.unrenderable_reason(ledger.for_field(f),
+                                                          rejected.get(f)))
             if why:
                 misses[f] = why
                 log.info("evidence: %s — %s", f, why)
@@ -693,86 +1234,154 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
             f"across {len(fields_with_diffs)} column(s), none of them with a "
             "row that can be illustrated on its own (reasons in the log)",
             misses)
-    need_tsmis = {}
-    need_tsn_routes, need_tsn_keys = {}, {}
+    need_routes = {}
     for f in cand:
         for ex in cand[f]:
-            need_tsmis.setdefault(ex["route"], set()).add(ex["key"])
-            need_tsn_routes.setdefault(ex["dist"], set()).add(ex["route"])
-            need_tsn_keys.setdefault(ex["dist"], set()).add(
-                (ex["cnty"], ex["route"], ex["key"]))
+            need_routes.setdefault(ex["route"], set()).add(ex["key"])
 
     # CMP-AUD-098/112: copy every source this generation will READ into a
     # private snapshot NOW and digest the COPIES. Every locate and render below
     # reads that snapshot, so what the images illustrate cannot be changed by
-    # anything that happens to the live files afterwards. CMP-AUD-210: only the
-    # sources the compared SIDES actually came from are copied — a companion
-    # print that took no part in this comparison is not a source of it.
-    excel_books = ([consolidated] if role_a == "excel" else []) \
-        + ([tsn_path] if role_b == "excel" else [])
-    read_set = _snapshot_read_set(
-        ([adapter.tsmis_pdf_path(tsmis_pdf_dir, r) for r in need_tsmis]
-         if role_a == "pdf" else []),
-        tsn_pdf_files, extra=excel_books)
+    # anything that happens to the live files afterwards.
+    if flavor == FLAVOR_ENV:
+        # Resolve each needed route's print by the end-anchored contract (a
+        # store env dir tags names with its env; RB-4 audit) — a route with no
+        # single resolvable print is dropped here and becomes a locate miss.
+        files_a = [p for p in (find_route_print(dir_a, adapter, r,
+                                                files=pdfs_a)
+                               for r in need_routes) if p is not None]
+        files_b = [p for p in (find_route_print(dir_b, adapter, r,
+                                                files=pdfs_b)
+                               for r in need_routes) if p is not None]
+        read_set = _snapshot_read_set(
+            (), (), buckets=(("side_a", files_a), ("side_b", files_b)))
+    else:
+        # The prints the crops come from: the needed routes' TSMIS exports
+        # (resolved by the end-anchored contract — dated, legacy, and
+        # store-tagged names all resolve) and the TSN library prints; the two
+        # compared workbooks ride along for the enumerate/candidate binding.
+        need_tsn_routes, need_tsn_keys = {}, {}
+        for f in cand:
+            for ex in cand[f]:
+                need_tsn_routes.setdefault(ex["dist"], set()).add(ex["route"])
+                need_tsn_keys.setdefault(ex["dist"], set()).add(
+                    (ex["cnty"], ex["route"], ex["key"]))
+        tsmis_files = [p for p in (find_route_print(tsmis_pdf_dir, adapter, r,
+                                                    files=tsmis_pdf_files)
+                                   for r in need_routes) if p is not None]
+        read_set = _snapshot_read_set(tsmis_files, tsn_pdf_files,
+                                      extra=[consolidated, tsn_path])
     try:
-        tsmis_loc, missing_routes = {}, set()
-        excel_a = excel_b = ({}, [])
-        if role_a == "excel":
-            # Address the compared cells in the workbook the comparison read,
-            # not in a companion print that may hold something else — or
-            # nothing — at that row.
-            excel_a = _excel_rows_at(
-                read_set.snapshot_of(consolidated),
-                {e["row_index"] for f in cand for e in cand[f]
-                 if e.get("row_index") is not None})
-            events.on_log(f"  evidence: addressing {len(excel_a[0])} row(s) in "
-                          "the compared TSMIS workbook…")
+        # The exact-source test (PCOA-FINAL-004): the snapshot bytes must BE the
+        # documents the comparison's own provenance records reading. A pair that
+        # cannot bind publishes nothing and retires any prior set.
+        try:
+            if flavor == FLAVOR_ENV:
+                # Non-vacuous by construction (RB-4 audit): every resolved
+                # print must have made it into the snapshot — a file vanishing
+                # between resolution and snapshot refuses instead of shrinking
+                # the bound set.
+                snap_a = [p for p in files_a
+                          if str(Path(p).resolve()) in read_set.stats]
+                snap_b = [p for p in files_b
+                          if str(Path(p).resolve()) in read_set.stats]
+                if len(snap_a) != len(files_a) or len(snap_b) != len(files_b):
+                    raise EvidenceSourceBindingError(
+                        "a per-route print vanished while the evidence "
+                        "snapshot was being taken — the evidence sources "
+                        "cannot be bound")
+                _require_census_binding(read_set, side_rec_a, snap_a,
+                                        side_rec_a.get("role") or "side A")
+                _require_census_binding(read_set, side_rec_b, snap_b,
+                                        side_rec_b.get("role") or "side B")
+            else:
+                _require_workbook_binding(read_set, side_rec_a, consolidated,
+                                          side_rec_a.get("role") or "side A")
+                _require_workbook_binding(read_set, side_rec_b, tsn_path,
+                                          side_rec_b.get("role") or "side B")
+                # Manifest members carry the DURABLE selections the comparison
+                # recorded (PCOA-FINAL-003: never a private capture path).
+                for book, rec in ((consolidated, side_rec_a),
+                                  (tsn_path, side_rec_b)):
+                    sel = rec.get("selection")
+                    if sel and str(book) != str(sel):
+                        read_set.rename_member(book, sel)
+        except EvidenceSourceBindingError as e:
+            refuse_binding(e)
+
+        side_labels = tuple(published.side_labels)
+        env_loc = ({}, {})
+        tsn_ctx = None
+        missing_routes = set()
+        if flavor == FLAVOR_ENV:
+            # STRUCTURAL side-order guarantee (RB-4 audit): the provenance
+            # roles must BE the published side labels, in order — until now
+            # the alignment held only by compare_env's construction, and a
+            # swap would caption each side's crop with the other's label.
+            roles = (str(side_rec_a.get("role") or ""),
+                     str(side_rec_b.get("role") or ""))
+            if roles != tuple(str(s) for s in side_labels):
+                refuse_binding(EvidenceSourceBindingError(
+                    f"the comparison's recorded side roles {roles!r} do not "
+                    f"match its published side labels {tuple(side_labels)!r} "
+                    "— the evidence sides cannot be ordered"))
+            events.on_log(f"  evidence: locating candidates in {len(need_routes)}"
+                          " per-route print(s) on each side…")
+            located = _locate_env_sides(adapter, need_routes, read_set, events)
+            if located is None:
+                return _cancelled()
+            env_loc, missing_routes = located
+            if missing_routes:
+                events.on_log("    note: no single readable/confirmable print "
+                              "on at least one side for route(s) "
+                              f"{', '.join(sorted(missing_routes))}"
+                              " — sampling around them")
         else:
-            events.on_log(f"  evidence: locating candidates in {len(need_tsmis)} "
-                          "TSMIS PDF(s)…")
-            located = _locate_tsmis_sources(adapter, need_tsmis,
+            # Locate the compared cells in the PRINTS (the 2026-08-05
+            # amendment): each needed route's TSMIS export and each needed
+            # district's TSN library print, all read from the snapshot.
+            events.on_log(f"  evidence: locating candidates in "
+                          f"{len(need_routes)} TSMIS PDF(s)…")
+            located = _locate_tsmis_sources(adapter, need_routes,
                                             read_set.tsmis_dir, events)
             if located is None:
                 return _cancelled()
-            tsmis_loc, missing_routes = located
-        if missing_routes:
-            events.on_log(f"    note: no readable/confirmable TSMIS PDF for route(s) "
-                          f"{', '.join(sorted(missing_routes))} — sampling around them")
-        if role_b == "excel":
-            excel_b = _excel_rows_at(
-                read_set.snapshot_of(tsn_path),
-                {e["row_index_b"] for f in cand for e in cand[f]
-                 if e.get("row_index_b") is not None})
-            events.on_log(f"  evidence: addressing {len(excel_b[0])} row(s) in "
-                          "the compared TSMIS Excel workbook…")
-            dist_index, tsn_loc = {}, {}
-            need_tsn_keys = {}
-        else:
+            tsmis_loc, tsmis_pdf_by_route, missing_routes = located
+            if missing_routes:
+                events.on_log("    note: no readable/confirmable TSMIS PDF "
+                              "for route(s) "
+                              f"{', '.join(sorted(missing_routes))} — "
+                              "sampling around them")
             events.on_log(f"  evidence: reading {len(need_tsn_keys)} TSN "
                           "district print(s)…")
-        dist_index = ({} if role_b == "excel"
-                      else adapter.district_index(read_set.tsn_dir, events))
-        tsn_loc = {}
-        # The district prints are the slow half (word extraction on every page), so
-        # narrate each one — a stalled run must name where it stalled.
-        for di, dist in enumerate(sorted(need_tsn_keys), 1):
-            if events.is_cancelled():
-                return _cancelled()
-            p = dist_index.get(dist)
-            if p is None:
-                continue
-            try:
-                tsn_loc[dist] = adapter.locate_tsn(p, need_tsn_routes[dist],
-                                                   need_tsn_keys[dist])
-                events.on_log(f"    …TSN district {dist}: "
-                              f"{sum(len(v) for v in tsn_loc[dist].values())} "
-                              f"candidate row(s) ({di}/{len(need_tsn_keys)})")
-            except Exception as e:
-                log.warning("evidence: %s unparseable: %s: %s",
-                            p.name, type(e).__name__, e)
+            dist_index = adapter.district_index(read_set.tsn_dir, events)
+            tsn_loc = {}
+            # The district prints are the slow half (word extraction on every
+            # page), so narrate each one — a stalled run must name where it
+            # stalled.
+            for di, dist in enumerate(sorted(need_tsn_keys), 1):
+                if events.is_cancelled():
+                    return _cancelled()
+                p = dist_index.get(dist)
+                if p is None:
+                    continue
+                try:
+                    tsn_loc[dist] = adapter.locate_tsn(
+                        p, need_tsn_routes[dist], need_tsn_keys[dist])
+                    events.on_log(
+                        f"    …TSN district {dist}: "
+                        f"{sum(len(v) for v in tsn_loc[dist].values())} "
+                        f"candidate row(s) ({di}/{len(need_tsn_keys)})")
+                except Exception as e:
+                    log.warning("evidence: %s unparseable: %s: %s",
+                                p.name, type(e).__name__, e)
+            tsn_ctx = {"tsmis_loc": tsmis_loc, "tsn_loc": tsn_loc,
+                       "dist_index": dist_index,
+                       "tsmis_pdf": tsmis_pdf_by_route}
 
         # render into a temp folder; swap in only on success (keep-last-good)
-        source_set_check()
+        if source_set_check is not None:
+            source_set_check()
         _require_output_guard(commit_guard, img_dir.parent,
                               "evidence output-folder creation")
         img_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -804,16 +1413,11 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
                         commit_guard, tmp_dir, "evidence image write",
                         directory_identity=tmp_dir_fs_identity)
                     ok, reason = _try_example(
-                        adapter, ex, f, tsmis_loc, tsn_loc, dist_index,
-                        read_set.tsmis_dir, tmp_dir, got + 1, page_cache,
-                        render_keys, commit_guard=commit_guard,
-                        out_dir_identity=tmp_dir_fs_identity,
-                        tsmis_role=role_a, excel_rows=excel_a[0],
-                        excel_header=excel_a[1],
-                        consolidated_name=Path(consolidated).name,
-                        role_b=role_b, excel_b=excel_b[0],
-                        excel_b_header=excel_b[1],
-                        excel_b_name=Path(tsn_path).name)
+                        adapter, ex, f, tmp_dir, got + 1, page_cache,
+                        render_keys, flavor=flavor, side_labels=side_labels,
+                        tsn_ctx=tsn_ctx, env_loc=env_loc,
+                        commit_guard=commit_guard,
+                        out_dir_identity=tmp_dir_fs_identity)
                     if ok:
                         got += 1
                         rendered += 1
@@ -874,12 +1478,24 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
                 wb_path, img_dir, tmp_dir, entries, misses, dict(
                     comparison=Path(comparison_path).name,
                     report=adapter.REPORT_LABEL, seed=f"{seed:08x}",
-                    examples=examples, tsmis_dir=str(tsmis_pdf_dir),
-                    tsn_dir=str(tsn_dir),
+                    examples=examples,
+                    # The truthful source declaration: each side's recorded
+                    # selection from the comparison's own provenance — never a
+                    # directory this generation did not read (PCOA-FINAL-004)
+                    # — plus, on the vs-TSN lane, the print folders the crops
+                    # were actually read from (the 2026-08-05 amendment).
+                    source_lines=[
+                        (side_labels[0], str(side_rec_a.get("selection") or "")),
+                        (side_labels[1], str(side_rec_b.get("selection") or ""))],
+                    read_lines=([] if flavor == FLAVOR_ENV else
+                                [("TSMIS PDFs (read)", str(tsmis_pdf_dir)),
+                                 ("TSN PDFs (read)", str(tsn_dir))]),
+                    legend=_legend_for(flavor),
                     sides=published.side_labels,
                     reader_version=ledger.reader_version,
                     ledger_digest=ledger_digest,
-                    ledger=evidence_ledger.ledger_rows(ledger, adapter.FIELDS, sampled),
+                    ledger=evidence_ledger.ledger_rows(ledger, fields_view.FIELDS,
+                                                       sampled),
                     ledger_totals=ledger),
                 layout, source_paths, captured_sources, source_set_check,
                 commit_guard, tmp_dir_fs_identity, man_path, manifest_for)
@@ -970,144 +1586,286 @@ def _quote_note(va, vb, b_label="TSN"):
             f"{_QUOTE_NAMES[pair[1]]}")
 
 
-def _tsmis_excel_side(adapter, ex, field, excel_rows, excel_header,
-                      consolidated_name, index_key="row_index",
-                      value_key="va", side_label="TSMIS (Excel)"):
-    """Render one side from the WORKBOOK the comparison read (CMP-AUD-210).
+def _display_header(adapter, header, resolve):
+    """The POSITION-AUTHORITATIVE display header for a workbook strip.
+
+    Some consolidated editions carry header LABELS that sit beside their own
+    values — the Intersection Detail PDF workbook labels value position 9
+    ('73-10-19', the INT Type Eff-Date) as 'INT Type' and position 10 ('T') as
+    'INT Eff-Date', the same label-shift class `compare_env._RD_ENV_HEADER`
+    corrects for the classic Ramp Detail export. The comparator resolves the
+    compared cell by POSITION (so the red box always lands on the right
+    value), but a strip that drew the workbook's own labels put the boxed date
+    under 'INT Type' — the image then reads as landing on the wrong column.
+
+    Each position a compared field resolves to is therefore labelled with THAT
+    FIELD'S name (the comparison's own label, the one the title uses); every
+    other position keeps the workbook's label as context. Where the labels are
+    already correct this is a no-op — the field name and the workbook label
+    agree."""
+    if resolve is None:
+        return header
+    out = list(header)
+    placed = {}
+    for f in getattr(adapter, "FIELDS", ()) or ():
+        try:
+            at = resolve(f, header)
+        except Exception as e:
+            # Only this ONE context label goes uncorrected — the compared
+            # column resolves through the same hook in `_workbook_side`, which
+            # does not guard it, so a hook that really is broken still refuses
+            # the panel there rather than being hidden here.
+            log.warning("evidence: %s could not place the context label %r: "
+                        "%s: %s", getattr(adapter, "__name__", adapter), f,
+                        type(e).__name__, str(e).splitlines()[:1])
+            continue
+        if at is not None and 0 <= at < len(out):
+            out[at] = f
+            placed[f] = at
+    # A shifted layout leaves the workbook's own copy of a placed name on an
+    # UNCLAIMED position (the classic RD export labels position 11
+    # 'Description' while the Description VALUE sits at 10) — showing both
+    # would put two identical headers in one strip (RB-4 audit). The stale
+    # duplicate is blanked; a correctly-labelled layout has no such position.
+    for i, label in enumerate(out):
+        if i not in placed.values() and placed.get(str(label), i) != i:
+            out[i] = ""
+    return out
+
+
+def _workbook_side(adapter, ex, field, ctx):
+    """Render one side from the WORKBOOK the comparison read (CMP-AUD-210 →
+    the PCOA-FINAL-004 exact-source rule).
 
     Returns (image, label, address, None) or (None, None, None, reason). The
-    cell is only rendered once its own workbook value, put through the adapter's
-    projection, equals the value the comparison compared — the Excel counterpart
-    of the PDF side's parse-back check. A companion print's disagreement is
-    irrelevant here, which is the point: an Excel value the print never carried
-    stays evidenceable as Excel truth.
-    """
-    index = ex.get(index_key)
-    located = excel_rows.get(index) if index is not None else None
+    cell is only rendered once its own workbook value, put through the
+    adapter's projection for THIS side, equals the value the comparison
+    compared — the panel counterpart of the print side's parse-back check.
+
+    The compared column is resolved through the COMPARATOR'S OWN column
+    resolution for this side's workbook edition (`ctx["resolve"]` names the
+    adapter hook: excel_column_for / pdf_excel_column_for /
+    tsn_excel_column_for — each the same position map that side's loader reads
+    the workbook with, under the loader's own header gate), because the
+    compared labels are the COMPARISON's shared names while the workbook
+    carries its own. Adapters without the Excel hook keep the exact-label
+    default; a None from a hook is the honest refusal (a derived column with
+    no single workbook cell, or a workbook the comparison would refuse)."""
+    index = ex.get(ctx["index_key"])
+    located = ctx["rows"].get(index) if index is not None else None
     if located is None:
-        return None, None, None, "row not found in the compared TSMIS workbook"
+        return None, None, None, "row not found in the compared workbook", None
     sheet, excel_row, values = located
-    # The compared column is resolved through the COMPARATOR'S OWN column
-    # resolution when the adapter exposes it (excel_column_for — the same
-    # position map its loader reads the workbook with, under the loader's own
-    # exact-header gate), because the compared labels are the COMPARISON's
-    # shared names while the workbook carries the SITE's labels — Intersection
-    # Detail compares 'PM'/'PR'/'HG' where the workbook says 'Post Mile'/'PP'/
-    # 'H/G', so the old exact-label lookup silently dropped those columns'
-    # Excel-side evidence, and Ramp Detail's label-shifted header could box a
-    # NEIGHBOURING blank cell. Adapters without the hook keep the exact-label
-    # default; a None from the hook is the honest refusal (a derived column
-    # with no single workbook cell, or a workbook the comparator would refuse).
-    resolve = getattr(adapter, "excel_column_for", None)
+    header = ctx["header"]
+    resolve = getattr(adapter, ctx["resolve"], None)
     if resolve is not None:
-        col = resolve(field, excel_header)
+        col = resolve(field, header)
         if col is None:
             return None, None, None, (
                 "the compared column has no single cell in this workbook "
-                "(a derived column, or a header the comparison would refuse)")
-    elif field in excel_header:
-        col = excel_header.index(field)
+                "(a derived column, or a header the comparison would refuse)"), None
+    elif ctx["resolve"] == "excel_column_for" and field in header:
+        col = header.index(field)
     else:
-        return None, None, None, "the compared column is not in the workbook header"
+        return None, None, None, (
+            "the compared column cannot be resolved in this workbook edition"), None
     if col >= len(values):
-        return None, None, None, "the workbook row is short of the compared column"
-    if adapter.project(field, values[col]) != adapter.project(field, ex[value_key]):
-        return None, None, None, ("the compared TSMIS workbook cell no longer "
-                                  "holds the compared value")
+        return None, None, None, ("the workbook row is short of the compared "
+                                  "column"), None
+    project = getattr(adapter, ctx["project"], None) or adapter.project
+    # A ROUTE-AWARE projection (HSL: the comparator strips a Description's
+    # leading route label only when it names the row's OWN route, CMP-AUD-204)
+    # gets the example's route — the RB-4 audit caught this call passing none,
+    # which refused every prefixed-row Description with a false "no longer
+    # holds the compared value" reason.
+    kwargs = ({"route": ex.get("route")}
+              if ctx["project"] == "project"
+              and getattr(adapter, "PROJECT_ROUTE_AWARE", False) else {})
+    if (project(field, values[col], **kwargs)
+            != project(field, ex[ctx["value_key"]], **kwargs)):
+        return None, None, None, ("the compared workbook cell no longer "
+                                  "holds the compared value"), None
     key_cols = [0]
     if resolve is not None:
-        key_col = resolve(adapter.KEY_LABEL, excel_header)
+        key_col = resolve(adapter.KEY_LABEL, header)
         if key_col is not None:
             key_cols.append(key_col)
-    elif adapter.KEY_LABEL in excel_header:
-        key_cols.append(excel_header.index(adapter.KEY_LABEL))
-    img = _excel_strip(excel_header, values, col, key_cols)
+    elif adapter.KEY_LABEL in header:
+        key_cols.append(header.index(adapter.KEY_LABEL))
+    img = _excel_strip(_display_header(adapter, header, resolve), values, col,
+                       key_cols)
     address = f"{sheet}!{_column_letter(col + 1)}{excel_row}"
-    label = f"{side_label}  —  {consolidated_name} · {address}"
-    return img, label, address, None
+    label = f"{ctx['label']}  —  {ctx['book_name']} · {address}"
+    return img, label, address, None, panel_cell_text(str(values[col]))[0]
 
 
-def _try_example(adapter, ex, field, tsmis_loc, tsn_loc, dist_index,
-                 tsmis_pdf_dir, out_dir, k, page_cache,
-                 render_keys=("stacked", "pair"), commit_guard=None,
-                 out_dir_identity=None, tsmis_role="pdf", excel_rows=None,
-                 excel_header=(), consolidated_name="", role_b="tsn",
-                 excel_b=None, excel_b_header=(), excel_b_name=""):
+def _env_example_sides(adapter, ex, field, env_loc, side_labels, page_cache):
+    """Both sides of one env example: locate the record in each environment's
+    own print, read the value back through the env projection, require the
+    composed display to equal the published cell, and render the crops.
+
+    Returns ([(img, label, verified_phrase), (…)], None) or (None, reason).
+    The engine enforces the PCOA-FINAL-005 row-rectangle half here for every
+    env render: a target box outside the captioned record's own printed lines
+    is refused, whatever an adapter returned."""
+    import compare_core
+    sides, values = [], []
+    for si, label in enumerate(side_labels):
+        which = "A" if si == 0 else "B"
+        recs = env_loc[si].get(ex["route"], {}).get(ex["key"], [])
+        if len(recs) != 1:
+            return None, (f"row not found uniquely in the side-{which} print"
+                          if ex["route"] in env_loc[si]
+                          else f"no readable print for the route on side {which}")
+        rec = recs[0]
+        box = adapter.env_box(rec, field)
+        if box is None:
+            return None, "the record's geometry isn't evidence-grade here"
+        page_no, cell_box, yspan, xspan = box
+        # Containment in BOTH axes — the shared engine backstop, so a bad
+        # adapter box is refused identically on every print lane.
+        contain = _box_within_record(cell_box, yspan, xspan)
+        if contain is not None:
+            return None, contain
+        pdf = Path(rec.get("src") or "")
+        if not pdf.is_file():
+            return None, "the located record names no readable source print"
+        img = _strip(pdf, page_no, cell_box, yspan, xspan, page_cache)
+        sides.append((img, f"{label}  —  {pdf.name} · page {page_no}",
+                      f"the side-{which} print"))
+        values.append(adapter.env_value(rec, field))
+    composed = (f"{values[0] or compare_core._BLANK_MARK}"
+                f"{compare_core._DIFF_MARK}"
+                f"{values[1] or compare_core._BLANK_MARK}")
+    if composed != ex.get("display"):
+        return None, ("the print values do not compose to the published cell "
+                      "at this row")
+    ex["va"], ex["vb"] = values[0], values[1]
+    return sides, None
+
+
+def _try_example(adapter, ex, field, out_dir, k, page_cache,
+                 render_keys=("stacked", "pair"), *, flavor=FLAVOR_TSN,
+                 side_labels=("TSMIS", "TSN"), tsn_ctx=None,
+                 env_loc=({}, {}), commit_guard=None, out_dir_identity=None):
     """Verify one candidate end-to-end and render the selected layout(s).
-    `render_keys` is the subset of ('stacked', 'pair') the user chose.
-    `tsmis_role`/`role_b` say which source each compared SIDE was read from, so
-    each side is evidenced from THAT source (CMP-AUD-210). Returns
-    (entry_dict, None) on success, (None, reason) otherwise."""
+    `render_keys` is the subset of ('stacked', 'pair') the user chose. Both
+    sides are PRINT CROPS (the 2026-08-05 amendment): the per-route TSMIS
+    export and the TSN library print on the vs-TSN lane, the two
+    environments' per-route prints on the env lane.
+    Returns (entry_dict, None) on success, (None, reason) otherwise."""
     dist = cnty = ""
-    n_pdf = None
-    if role_b == "excel":
-        n_img, n_label, b_address, reason = _tsmis_excel_side(
-            adapter, ex, field, excel_b or {}, excel_b_header, excel_b_name,
-            index_key="row_index_b", value_key="vb",
-            side_label="TSMIS (Excel)")
-        if reason is not None:
-            return None, reason.replace("TSMIS workbook",
-                                        "TSMIS Excel workbook")
-        n_verified = f"the Excel cell {b_address}"
-    else:
-        nrecs = tsn_loc.get(ex["dist"], {}).get(
-            (ex["cnty"], ex["route"], ex["key"]), [])
-        if len(nrecs) != 1:
-            return None, "row not found uniquely in the TSN district print"
-        nrec = nrecs[0]
-        nv = adapter.tsn_value(nrec, field)
-        if nv != ex["vb"]:
-            return None, "the TSN print differs from the TSN workbook at this cell"
-        nb = adapter.tsn_box(nrec, field)
-        if nb is None:
-            return None, "the TSN record's geometry isn't evidence-grade here"
-        npage, nbox, nyspan, nxspan = nb
-        # A record that names its own source print (the Highway Log's per-print
-        # routing) wins over the district index; likewise its district/county
-        # provenance (learned from the print's own headers) enriches the captions.
-        n_pdf = Path(nrec.get("src") or dist_index[ex["dist"]])
-        dist = nrec.get("dist") or ex["dist"]
-        cnty = nrec.get("cnty") or ex["cnty"]
-        n_img = _strip(n_pdf, npage, nbox, nyspan, nxspan, page_cache)
-        n_label = (f"TSN  —  {n_pdf.name} · page {npage} · "
-                   f"{(cnty + '-') if cnty else ''}{ex['route']}")
-        n_verified = "the TSN print"
-
-    if tsmis_role == "excel":
-        t_img, t_label, address, reason = _tsmis_excel_side(
-            adapter, ex, field, excel_rows or {}, excel_header,
-            consolidated_name)
-        if reason is not None:
+    disagreements = []
+    # The per-side print TOKEN the normalization disclosure reads, or None for
+    # a side that says nothing (the env lane already REQUIRES both print
+    # values to compose to the published cell, so its crops carry the compared
+    # forms by construction and have nothing to disclose).
+    drawn = (None, None)
+    if flavor == FLAVOR_ENV:
+        got, reason = _env_example_sides(adapter, ex, field, env_loc,
+                                         side_labels, page_cache)
+        if got is None:
             return None, reason
-        t_verified = f"the workbook cell {address}"
+        (t_img, t_label, t_verified), (n_img, n_label, n_verified) = got
     else:
-        trecs = tsmis_loc.get(ex["route"], {}).get(ex["key"], [])
+        ctx = tsn_ctx or {}
+        # TSMIS side: the crop of the route's own per-route print.
+        trecs = ctx.get("tsmis_loc", {}).get(ex["route"], {}).get(ex["key"], [])
         if len(trecs) != 1:
-            return None, ("no readable TSMIS PDF for the route" if
-                          ex["route"] not in tsmis_loc
+            return None, ("no readable TSMIS PDF for the route"
+                          if ex["route"] not in ctx.get("tsmis_loc", {})
                           else "row not found uniquely in the TSMIS PDF")
         trec = trecs[0]
         tb = adapter.tsmis_box(trec, field)
         if tb is None:
-            return None, "record on an approximate-geometry page"
-        tv = adapter.tsmis_value(trec, field)
-        if tv != ex["va"]:
-            return None, ("the TSMIS PDF prints a different value than the "
-                          "compared export")
+            return None, "the TSMIS record's geometry isn't evidence-grade here"
         tpage, tbox, tyspan, txspan = tb
-        t_pdf = adapter.tsmis_pdf_path(tsmis_pdf_dir, ex["route"])
+        contain = _box_within_record(tbox, tyspan, txspan)
+        if contain is not None:
+            return None, contain
+        t_pdf = Path(trec.get("src")
+                     or ctx.get("tsmis_pdf", {}).get(ex["route"]) or "")
+        if not t_pdf.is_file():
+            return None, "the located record names no readable source print"
+        tv = adapter.tsmis_value(trec, field)
         t_img = _strip(t_pdf, tpage, tbox, tyspan, txspan, page_cache)
-        t_label = f"TSMIS (PDF)  —  {t_pdf.name} · page {tpage}"
+        t_label = f"{side_labels[0]}  —  {t_pdf.name} · page {tpage}"
         t_verified = "the TSMIS print"
 
-    b_name = "TSMIS (Excel)" if role_b == "excel" else "TSN"
-    title = (f"{field} — TSMIS '{ex['va'] or '(blank)'}'  vs  "
-             f"{b_name} '{ex['vb'] or '(blank)'}'")
-    note = _quote_note(ex["va"], ex["vb"], b_name)
+        # TSN side: the crop of the district's library print. A record that
+        # names its own source print (the Highway Log's per-print routing)
+        # wins over the district index; likewise its district/county
+        # provenance (learned from the print's own headers) enriches the
+        # captions.
+        nrecs = ctx.get("tsn_loc", {}).get(ex["dist"], {}).get(
+            (ex["cnty"], ex["route"], ex["key"]), [])
+        if len(nrecs) != 1:
+            return None, "row not found uniquely in the TSN district print"
+        nrec = nrecs[0]
+        nb = adapter.tsn_box(nrec, field)
+        if nb is None:
+            return None, "the TSN record's geometry isn't evidence-grade here"
+        npage, nbox, nyspan, nxspan = nb
+        contain = _box_within_record(nbox, nyspan, nxspan)
+        if contain is not None:
+            return None, contain
+        n_pdf = Path(nrec.get("src")
+                     or ctx.get("dist_index", {}).get(ex["dist"]) or "")
+        if not n_pdf.is_file():
+            return None, "the located record names no readable source print"
+        dist = nrec.get("dist") or ex["dist"]
+        cnty = nrec.get("cnty") or ex["cnty"]
+        nv = adapter.tsn_value(nrec, field)
+        n_img = _strip(n_pdf, npage, nbox, nyspan, nxspan, page_cache)
+        n_label = (f"{side_labels[1]}  —  {n_pdf.name} · page {npage} · "
+                   f"{(cnty + '-') if cnty else ''}{ex['route']}")
+        n_verified = "the TSN print"
+
+        # The 2026-08-05 amendment: a print whose parsed value DISAGREES with
+        # the compared value still renders — with the disagreement disclosed
+        # on the image, never silently dropped. Disagreement is the
+        # parser-bug signal this spot check exists to catch; the old drop hid
+        # exactly that.
+        if tv != ex["va"]:
+            disagreements.append(
+                f"⚠ the TSMIS print reads '{tv or '(blank)'}' at this cell, "
+                f"not the compared '{ex['va'] or '(blank)'}'")
+        if nv != ex["vb"]:
+            disagreements.append(
+                f"⚠ the TSN print reads '{nv or '(blank)'}' at this cell, "
+                f"not the compared '{ex['vb'] or '(blank)'}'")
+        # And the quieter half of the same honesty rule: a print whose own
+        # TOKEN differs in FORM from the compared value, while still
+        # NORMALIZING to it, is disclosed too. The reader is looking at the
+        # print's glyphs — Ramp Detail's '-' null marker under a title saying
+        # '(blank)', a two-digit year, a signalized code the comparator
+        # crosswalks to 'S', a composite Location cell a District is derived
+        # from. Without this the box and the title appear to disagree and
+        # nothing on the image resolves it (the RB4-A1 native-scale
+        # inspection caught exactly these). A side that already carries a
+        # DISAGREEMENT note is left to it — that one is the louder statement.
+        drawn = (None if tv != ex["va"] else _raw_token(adapter, "tsmis_raw",
+                                                        trec, field),
+                 None if nv != ex["vb"] else _raw_token(adapter, "tsn_raw",
+                                                        nrec, field))
+
+    title = (f"{field} — {side_labels[0]} '{ex['va'] or '(blank)'}'  vs  "
+             f"{side_labels[1]} '{ex['vb'] or '(blank)'}'")
+    # EVERY note that applies (RB-4 audit): a quote-character difference must
+    # not swallow a disagreement disclosure, and neither may swallow the
+    # normalization disclosure — each answers a different question a reader
+    # asks of the same box.
+    note = "   —   ".join(n for n in (
+        _quote_note(ex["va"], ex["vb"], side_labels[1]),
+        *disagreements,
+        _normalization_note(drawn, (ex["va"], ex["vb"]), side_labels)) if n)
+    verified_phrase = ("re-read and verified against the compared values"
+                       if not disagreements else
+                       "re-read against the compared values — a print "
+                       "DISAGREES here (see the note line)")
     where = f" — TSN district D{dist} ({cnty})" if dist or cnty else ""
     sub = (f"Route {ex['route']} @ {ex['key']} — {t_verified} and "
-           f"{n_verified} re-read and verified against the compared "
-           f"values{where}")
+           f"{n_verified} {verified_phrase}{where}")
     safe = re.sub(r"[^A-Za-z0-9]+", "_", field).strip("_")
     guard_kwargs = ({"anchor_path": out_dir,
                      "anchor_identity": out_dir_identity}
@@ -1185,32 +1943,50 @@ def _strip(path, page_no, cell_box, record_yspan, xspan, cache):
     return img.crop(_crop_window(img.width, img.height, cell_box, record_yspan))
 
 
-def _excel_rows_at(workbook_path, wanted):
-    """{data_index: (sheet, excel_row_no, [values])} for the wanted 0-based DATA
-    row indexes of a consolidated export (CMP-AUD-210).
+def _workbook_cell_str(v):
+    """One workbook cell as the text Excel shows for it: strings verbatim,
+    ints plainly, an integral float without the '.0' (Excel's General format —
+    `str(5.0)` would draw a form the workbook never displays and then refuse
+    against the compared '5'; RB-4 audit). Every compared workbook in the
+    corpus stores strings and ints only — this keeps the float case honest
+    rather than reachable."""
+    if v is None:
+        return ""
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    return str(v)
 
-    The export is a flat labelled table — header on row 1, one data row after —
-    so the loader's row order IS the sheet's row order. Nothing downstream
-    trusts that: the caller renders a cell only once its own value matches what
-    the comparison compared, which is the Excel counterpart of the PDF side's
-    parse-back check.
+
+def _workbook_rows_at(workbook_path, wanted, sheet=None):
+    """{data_index: (sheet, excel_row_no, [values])} for the wanted 0-based DATA
+    row indexes of a compared workbook (CMP-AUD-210).
+
+    The compared workbooks are flat labelled tables — header on row 1 of the
+    data sheet, one data row after — so the loader's row order IS the sheet's
+    row order. Nothing downstream trusts that: the caller renders a cell only
+    once its own value matches what the comparison compared, which is the panel
+    counterpart of the print side's parse-back check. `sheet` names the data
+    sheet when it is not the workbook's first (the normalized TSN workbooks and
+    the PDF-edition consolidations carry marker sheets).
     """
     if not wanted:
         return {}, []
     wb = load_workbook(workbook_path, read_only=True, data_only=True)
     try:
-        ws = wb[wb.sheetnames[0]]
+        if sheet is not None and sheet not in wb.sheetnames:
+            return {}, []
+        ws = wb[sheet] if sheet is not None else wb[wb.sheetnames[0]]
         header, out = [], {}
         last = max(wanted)
         for excel_row, row in enumerate(
                 ws.iter_rows(min_row=1, max_row=last + 2, values_only=True), 1):
             if excel_row == 1:
-                header = ["" if v is None else str(v) for v in row]
+                header = [_workbook_cell_str(v) for v in row]
                 continue
             index = excel_row - 2
             if index in wanted:
                 out[index] = (ws.title, excel_row,
-                              ["" if v is None else str(v) for v in row])
+                              [_workbook_cell_str(v) for v in row])
         return out, header
     finally:
         wb.close()
@@ -1231,30 +2007,57 @@ _XL_PAD = 16
 _XL_ROW_H = 46
 _XL_HEAD_H = 34
 _XL_MIN_COL_W = 92
-_XL_CHAR_W = 13                # rough per-character width at the value font size
 _XL_CONTEXT_COLS = 3           # columns shown either side of the compared one
+# The one bound on a drawn panel string. Real report values top out well under
+# this (the longest censused Description is 55 chars); anything longer draws as
+# a VISIBLY elided prefix ending in the ellipsis, never a silent cut
+# (PCOA-FINAL-006: `text[:26]` with no marker endorsed a different string).
+PANEL_TEXT_MAX = 120
+PANEL_LABEL_MAX = 60
+_ELLIPSIS = "…"
+
+
+def panel_cell_text(value, limit=PANEL_TEXT_MAX):
+    """(drawn_string, elided) for one Excel-panel cell — the pure decision the
+    renderer draws with, exposed so a check or an acceptance harness can assert
+    fidelity over 100 % of rendered examples without OCR: the drawn string
+    equals the value, or ends in '…' and is a prefix of it."""
+    s = str(value)
+    if len(s) <= limit:
+        return s, False
+    return s[: limit - 1] + _ELLIPSIS, True
 
 
 def _excel_strip(header, values, target_index, key_indexes=(0,)):
-    """Render one CONSOLIDATED-workbook row as a boxed cell strip.
+    """Render one compared-workbook row as a boxed cell strip.
 
     The Excel counterpart of `_strip`: same conventions, so the two sides of a
     composed image read alike — gray box around the row that was compared, red
     box around the compared cell. It is a rendering of the workbook's own
-    values, never a screenshot of Excel, and the caller's label says so.
+    values, never a screenshot of Excel, and the caller's label says so. Every
+    drawn string is the full value (or a visibly elided prefix — see
+    panel_cell_text); the column is sized to what is drawn.
     """
     show = sorted(set(key_indexes) | {
         i for i in range(max(0, target_index - _XL_CONTEXT_COLS),
                          min(len(values), target_index + _XL_CONTEXT_COLS + 1))})
+    drawn = {i: (panel_cell_text(str(header[i] if i < len(header) else ""),
+                                 PANEL_LABEL_MAX)[0],
+                 panel_cell_text(str(values[i]))[0]) for i in show}
+    # Columns are sized to the MEASURED width of what is actually drawn, in
+    # the drawing fonts — the RB-4 audit showed the old per-character estimate
+    # (13 px) under-allocates wide-glyph text (an all-caps M/W-heavy name
+    # inks ~18 px/char at the value font), which overflowed the neighbouring
+    # cell exactly like the silent truncation this bundle retires.
+    head_font, cell_font = _font(15, True), _font(19)
     widths = [max(_XL_MIN_COL_W,
-                  _XL_CHAR_W * max(len(str(header[i] if i < len(header) else "")),
-                                   len(str(values[i])), 1) + 18)
+                  _text_w(drawn[i][0], head_font) + 18,
+                  _text_w(drawn[i][1], cell_font) + 18)
               for i in show]
     w = sum(widths) + 2 * _XL_PAD
     h = _XL_HEAD_H + _XL_ROW_H + 2 * _XL_PAD
     img = Image.new("RGB", (w, h), (255, 255, 255))
     d = ImageDraw.Draw(img)
-    head_font, cell_font = _font(15, True), _font(19)
     x = _XL_PAD
     gap_after = None
     for i, col in enumerate(show):
@@ -1262,12 +2065,10 @@ def _excel_strip(header, values, target_index, key_indexes=(0,)):
         top = _XL_PAD
         d.rectangle([x, top, x + cw, top + _XL_HEAD_H], fill=(242, 242, 242),
                     outline=(196, 196, 196))
-        label = str(header[col] if col < len(header) else "")
-        d.text((x + 8, top + 8), label[:24], font=head_font, fill=(70, 70, 70))
+        d.text((x + 8, top + 8), drawn[col][0], font=head_font, fill=(70, 70, 70))
         d.rectangle([x, top + _XL_HEAD_H, x + cw, top + _XL_HEAD_H + _XL_ROW_H],
                     outline=(196, 196, 196))
-        text = str(values[col])
-        d.text((x + 8, top + _XL_HEAD_H + 12), text[:26], font=cell_font,
+        d.text((x + 8, top + _XL_HEAD_H + 12), drawn[col][1], font=cell_font,
                fill=(20, 20, 20))
         if col == target_index:
             d.rectangle([x, top + _XL_HEAD_H, x + cw,
@@ -1311,10 +2112,84 @@ def _scaled(im, width):
 _NOTE_H = 30            # extra header height when the quote-characters note line shows
 
 
+def _raw_token(adapter, hook, rec, field):
+    """The print's OWN token for one side's boxed cell, or None when this
+    adapter does not expose it.
+
+    Optional by design: an adapter that has not declared how to reach its raw
+    token simply discloses nothing, which is the pre-amendment behaviour —
+    never a guess at what the box contains."""
+    fn = getattr(adapter, hook, None)
+    if fn is None:
+        return None
+    try:
+        raw = fn(rec, field)
+    except Exception as e:                       # noqa: BLE001 — cosmetic only
+        log.warning("evidence: %s(%s) failed: %s: %s", hook, field,
+                    type(e).__name__, e)
+        return None
+    return "" if raw is None else str(raw).strip()
+
+
+def _normalization_note(drawn, compared, side_labels):
+    """The note line for a box whose SOURCE text differs in form from the
+    compared value the title names (PCOA-FINAL-006's truthfulness half, now
+    serving the print crops).
+
+    A comparison that normalizes (dates, padding, case, a null-render marker,
+    a code crosswalk) or DERIVES (Ramp Detail's District is the leading
+    component of the composite Location cell) legitimately compares a value
+    the source spells differently — the ID print shows '64-01-01' where the
+    comparison compared '1964-01-01', the RD print shows '-' where it compared
+    a blank, a TSN print shows the signalized code 'P' where the comparator
+    crosswalks to 'S'. The box must keep showing the source's own text (it is
+    a crop of the document — that is the whole point), so the image states
+    both forms outright rather than leaving the reader with a title and a box
+    that appear to disagree. Returns "" when every side's token IS its
+    compared value, or when a side has nothing to say (`None` — the env lane,
+    a side already carrying the louder disagreement note, or an adapter that
+    does not expose its raw token)."""
+    parts = []
+    for text, value, label in zip(drawn, compared, side_labels):
+        if text is None:
+            continue
+        want = panel_cell_text(str(value or ""))[0]
+        if text != want:
+            parts.append(f"{label}'s boxed cell holds '{text}'")
+    if not parts:
+        return ""
+    return (" and ".join(parts)
+            + " — the comparison read the compared value out of it; the title "
+              "names that compared value.")
+
+
+def _text_w(text, font):
+    """Rendered width of one line (Pillow ≥ 8 removed ImageDraw.textsize)."""
+    if not text:
+        return 0
+    try:
+        box = font.getbbox(text)
+        return int(box[2] - box[0])
+    except AttributeError:                       # the built-in bitmap fallback
+        return int(font.getlength(text))
+
+
+def _header_w(title, sub, note=""):
+    """The canvas width the title block needs. The composers size the canvas
+    from the widest of {panels, header}: a title clipped at the canvas edge
+    mid-glyph is the very truncation-without-a-marker defect this bundle
+    retires, so the canvas grows to the text instead of cutting it."""
+    return 32 + max(_text_w(title, _font(26, True)),
+                    _text_w(sub, _font(17)),
+                    _text_w(note, _font(17, True)) if note else 0)
+
+
 def _header(canvas, w, title, sub, note=""):
-    """The title block; returns the y where content starts. `note` (the
-    _quote_note line) renders dark red under the subtitle — it flags a REAL
-    difference the printed values themselves don't show."""
+    """The title block; returns the y where content starts. `note` renders
+    dark red under the subtitle — it flags something the boxed values
+    themselves don't show (a quote-character difference, or a source form the
+    comparison normalized before comparing)."""
+    del w                        # the canvas is sized to fit; nothing to clip
     d = ImageDraw.Draw(canvas)
     d.text((16, 12), title, font=_font(26, True), fill=(20, 20, 20))
     d.text((16, 50), sub, font=_font(17), fill=(90, 90, 90))
@@ -1326,8 +2201,11 @@ def _header(canvas, w, title, sub, note=""):
 def _compose_stacked(title, sub, top_label, top_img, bot_label, bot_img, out,
                      note=""):
     top_img, bot_img = _scaled(top_img, _STACK_W), _scaled(bot_img, _STACK_W)
-    w = max(top_img.width, bot_img.width) + 32
     lab = 30
+    w = max(top_img.width, bot_img.width) + 32
+    w = max(w, _header_w(title, sub, note),
+            32 + max(_text_w(top_label, _font(16, True)),
+                     _text_w(bot_label, _font(16, True))))
     hd = 84 + (_NOTE_H if note else 0)
     h = hd + lab + top_img.height + 14 + lab + bot_img.height + 16
     canvas = Image.new("RGB", (w, h), (255, 255, 255))
@@ -1347,18 +2225,24 @@ def _compose_pair(title, sub, l_label, l_img, r_label, r_img, out, note=""):
     l_img, r_img = _scaled(l_img, _PAIR_SIDE_W), _scaled(r_img, _PAIR_SIDE_W)
     lab = 30
     col_h = max(l_img.height, r_img.height)
-    w = l_img.width + r_img.width + 48
+    # Each caption gets its OWN column: a long left caption used to run under
+    # the right caption and the two overprinted into an unreadable mash. The
+    # columns widen to hold their captions, so neither can reach the other.
+    lab_font = _font(16, True)
+    l_w = max(l_img.width, _text_w(l_label, lab_font))
+    r_w = max(r_img.width, _text_w(r_label, lab_font))
+    w = max(l_w + r_w + 48, _header_w(title, sub, note))
     h = 84 + (_NOTE_H if note else 0) + lab + col_h + 16
     canvas = Image.new("RGB", (w, h), (255, 255, 255))
     y0 = _header(canvas, w, title, sub, note)
     d = ImageDraw.Draw(canvas)
     x = 16
-    for label, im in ((l_label, l_img), (r_label, r_img)):
-        d.text((x, y0 + 4), label, font=_font(16, True), fill=(31, 56, 100))
+    for label, im, col_w in ((l_label, l_img, l_w), (r_label, r_img, r_w)):
+        d.text((x, y0 + 4), label, font=lab_font, fill=(31, 56, 100))
         canvas.paste(im, (x, y0 + lab))
         d.rectangle([x - 1, y0 + lab - 1, x + im.width, y0 + lab + im.height],
                     outline=(200, 200, 200), width=1)
-        x += im.width + 16
+        x += col_w + 16
     canvas.save(out)
 
 
@@ -1398,12 +2282,14 @@ def _sheet_name(base, used, suffix=""):
 
 
 def _column_image_sheets(wb, entries, img_dir, img_key, embed_w, label,
-                         fonts, used, suffix=""):
+                         fonts, used, suffix="", legend="", sides=("TSMIS", "TSN")):
     """Per-COMPARISON-COLUMN tabs of ONE layout: each differing column gets its
     own sheet (named for the field, tagged with the layout `suffix` only when
     both layouts show), holding that column's captioned example images scaled
     to `embed_w`. Columns with no rendered example in this layout are skipped —
-    the Summary lists those as misses. Returns [(field, sheet_name)]."""
+    the Summary lists those as misses. `legend` states what the boxes were
+    drawn from — it must assert only sources that were read. Returns
+    [(field, sheet_name)]."""
     bold, small = fonts
     by_field = {}
     for e in entries:
@@ -1418,16 +2304,13 @@ def _column_image_sheets(wb, entries, img_dir, img_key, embed_w, label,
         _safe_cell(ev, 1, 1,
                    f"{field} — {label} evidence   ·   {len(group)} example(s)",
                    bold)
-        _safe_cell(ev, 2, 1,
-                   "Red box = the compared cell in each source PDF; gray box = "
-                   "the record (its printed lines). Values shown are the "
-                   "compared (normalized) forms.", small)
+        _safe_cell(ev, 2, 1, legend or _legend_for(FLAVOR_TSN), small)
         r = 4
         for e in group:
             note = e.get("note") or ""
             _safe_cell(ev, r, 1, (
                 f"route {e['route']} @ {e['key']}   —   "
-                f"TSMIS '{e['va']}' vs TSN '{e['vb']}'"
+                f"{sides[0]} '{e['va']}' vs {sides[1]} '{e['vb']}'"
                 + (f"   —   {note}" if note else "")), bold)
             img = XLImage(str(img_dir / e[img_key]))
             scale = min(1.0, embed_w / img.width)
@@ -1525,14 +2408,23 @@ def _write_workbook(wb_path, img_dir, entries, misses, info,
     _safe_cell(ws, 2, 1,
                f"Comparison: {info['comparison']}   ·   examples per column: "
                f"{info['examples']}   ·   sample seed: {info['seed']}", small)
-    _safe_cell(ws, 3, 1,
-               f"TSMIS PDFs: {info['tsmis_dir']}   ·   TSN PDFs: {info['tsn_dir']}",
-               small)
+    # The declared sources are exactly the comparison's own recorded read set
+    # (PCOA-FINAL-004: never a directory this generation did not read), plus —
+    # on the vs-TSN lane — the print folders the crops were read from (the
+    # 2026-08-05 amendment: the read set IS prints, declared honestly).
+    sides = tuple(info.get("sides") or ("TSMIS", "TSN"))
+    src_lines = [f"Compared {side_label}: {selection}"
+                 for side_label, selection in (info.get("source_lines") or ())]
+    src_lines += [f"{label}: {text}"
+                  for label, text in (info.get("read_lines") or ())]
+    for i, text in enumerate(src_lines):
+        _safe_cell(ws, 3 + i, 1, text, small)
+    hdr_row = 3 + max(len(src_lines) + 1, 3)   # row 6 for the two-line layout
     for col, value in enumerate(
-            ("Column", "Route @ Post Mile", "TSMIS", "TSN", "Images",
-             "Published cell", "Source rows"), start=1):
-        _safe_cell(ws, 5, col, value, bold)
-    r = 6
+            ("Column", "Route @ Post Mile", sides[0], sides[1], "Images",
+             "Published cell", "Source rows", "Note"), start=1):
+        _safe_cell(ws, hdr_row, col, value, bold)
+    r = hdr_row + 1
     for e in entries:
         _safe_cell(ws, r, 1, e["field"], body)
         _safe_cell(ws, r, 2, f"{e['route']} @ {e['key']}", body)
@@ -1543,13 +2435,16 @@ def _write_workbook(wb_path, img_dir, entries, misses, info,
         # CMP-AUD-208: the published coordinates this image illustrates.
         _safe_cell(ws, r, 6, _published_cell_text(e), small)
         _safe_cell(ws, r, 7, _source_rows_text(e), small)
+        # The image's note line, repeated where a reviewer can FILTER for it —
+        # a disagreement disclosure must not live only in pixels (2026-08-05).
+        _safe_cell(ws, r, 8, e.get("note") or "", small)
         r += 1
     for f, why in misses.items():
         _safe_cell(ws, r, 1, f, body)
         _safe_cell(ws, r, 2, f"no verifiable example — {why}", small)
         r += 1
     for col, width in (("A", 14), ("B", 24), ("C", 26), ("D", 26), ("E", 46),
-                       ("F", 34), ("G", 26)):
+                       ("F", 34), ("G", 26), ("H", 40)):
         ws.column_dimensions[col].width = width
 
     used_sheet_names = {"Summary"}
@@ -1559,7 +2454,8 @@ def _write_workbook(wb_path, img_dir, entries, misses, info,
         embed_w, label, layout_suffix = _LAYOUT_SPEC[img_key]
         _column_image_sheets(wb, entries, img_dir, img_key, embed_w, label,
                              (bold, small), used_sheet_names,
-                             suffix=layout_suffix if len(keys) > 1 else "")
+                             suffix=layout_suffix if len(keys) > 1 else "",
+                             legend=info.get("legend", ""), sides=sides)
 
     tmp = None
     tmp_identity = ()

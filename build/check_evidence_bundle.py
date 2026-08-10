@@ -80,6 +80,16 @@ def _plant(root):
         '{"side_a":"consolidated.xlsx","sha256":"' + "a" * 64 + '"}', encoding="utf-8")
     (cmp_dir / "hsl_values (evidence).json").write_text(
         '{"version":1,"state":"rendered","images":[]}', encoding="utf-8")
+    # RB-4 (HF-05/HF-10): the visual-evidence WORKBOOK and IMAGE renders are
+    # report data — highlighted renders of compared source rows — and must
+    # stay out of the diagnostic bundle exactly like the comparison workbook,
+    # while the JSON generation manifest above (state, no data) comes in.
+    (cmp_dir / "hsl_values (evidence).xlsx").write_bytes(
+        b"PK\x03\x04 evidence panels " + _ROW_DATA.encode())
+    ev_imgs = cmp_dir / "hsl_values (evidence images)"
+    ev_imgs.mkdir(parents=True, exist_ok=True)
+    (ev_imgs / "Description_1_pair.png").write_bytes(
+        b"\x89PNG rendered row " + _ROW_DATA.encode())
     (cmp_dir / "_attempts.json").write_text(
         '{"version":1,"cells":{"highway_log|tsn":"ok"}}', encoding="utf-8")
     # The compressed comparison payload carries compared ROWS — its NAME may be
@@ -187,6 +197,14 @@ def test_credential_exclusion_and_manifest():
         # THE BOUNDARY: the sweep walks the same folders the artifacts live in.
         check("the compared ROW DATA appears in NO bundle file",
               _ROW_DATA.encode() not in blob)
+        check("the visual-evidence WORKBOOK is NOT bundled (RB-4: it renders "
+              "compared rows)",
+              not any(n.endswith("hsl_values (evidence).xlsx") for n in names))
+        check("no visual-evidence IMAGE is bundled (RB-4)",
+              not any("(evidence images)" in n for n in names))
+        check("...but the inventory NAMES both without carrying them",
+              "hsl_values (evidence).xlsx" in _inv
+              and "Description_1_pair.png" in _inv)
         check("the comparison workbook itself is NOT bundled",
               not any(n.endswith("hsl_values.xlsx") for n in names))
         check("the compressed comparison PAYLOAD is NOT bundled",

@@ -143,17 +143,18 @@ function makeMockApi() {
     evidence: {                  // v0.21.0 visual-evidence toggle (shared); v0.22.0 per-report;
       // v0.24.0 Highway Log (raw-sourced prints) + the named unsupported rows;
       // v0.25.0 Highway Sequence (raw-sourced like Highway Log);
-      // v0.26.0 Ramp Detail (statewide print like Intersection Detail)
-      on: false, examples: 2, layout: "pair", ready: true, deps_ok: true, tsn_pdfs: 38,
-      rows: ["highway_detail", "highway_detail_pdf",
-             "highway_log", "highway_log_pdf",
-             "highway_sequence", "highway_sequence_pdf",
-             "intersection_detail", "intersection_detail_pdf",
-             "ramp_detail", "ramp_detail_pdf"],
-      dir: "C:\\demo\\tsn_library\\highway_detail\\pdf",
+      // v0.26.0 Ramp Detail (statewide print like Intersection Detail);
+      // 2026-08-05 owner ruling: evidence is PRINT CROPS on the PDF-edition
+      // report families ONLY — rows = the four `_pdf` vs-TSN rows, env_rows =
+      // the same four env placements (Ramp Summary removed), and every other
+      // matrix row is named in `unsupported`.
+      on: false, examples: 2, layout: "pair", ready: true, deps_ok: true, tsn_pdfs: 26,
+      rows: ["highway_log_pdf", "highway_sequence_pdf",
+             "intersection_detail_pdf", "ramp_detail_pdf"],
+      env_rows: ["highway_log_pdf", "highway_sequence_pdf",
+                 "intersection_detail_pdf", "ramp_detail_pdf"],
+      dir: "C:\\demo\\tsn_library\\intersection_detail\\pdf",
       reports: [
-        { key: "highway_detail", label: "Highway Detail", tsn_pdfs: 12,
-          dir: "C:\\demo\\tsn_library\\highway_detail\\pdf", source: "pdf" },
         { key: "highway_log", label: "Highway Log", tsn_pdfs: 12,
           dir: "C:\\demo\\tsn_library\\highway_log\\raw", source: "raw" },
         { key: "highway_sequence", label: "Highway Sequence", tsn_pdfs: 12,
@@ -164,16 +165,15 @@ function makeMockApi() {
           dir: "C:\\demo\\tsn_library\\ramp_detail\\pdf", source: "pdf" },
       ],
       row_reports: {
-        highway_detail: "highway_detail", highway_detail_pdf: "highway_detail",
-        highway_log: "highway_log", highway_log_pdf: "highway_log",
-        highway_sequence: "highway_sequence",
+        highway_log_pdf: "highway_log",
         highway_sequence_pdf: "highway_sequence",
-        intersection_detail: "intersection_detail",
         intersection_detail_pdf: "intersection_detail",
-        ramp_detail: "ramp_detail",
         ramp_detail_pdf: "ramp_detail",
       },
-      unsupported: ["TSAR: Ramp Summary", "Intersection Summary"],
+      unsupported: ["TSAR: Ramp Summary", "TSAR: Ramp Detail",
+                    "Highway Sequence Listing", "Highway Log",
+                    "Intersection Summary", "Intersection Detail",
+                    "Highway Detail", "Highway Detail (PDF)"],
     },
   };
   const mockSettings = {

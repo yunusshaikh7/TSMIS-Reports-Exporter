@@ -59,7 +59,24 @@ Implementation rules:
   helpers.
 - Keep compatibility with already approved neighboring behavior.
 
-Verification requirements:
+Spend compute only where it proves something. Match the proof to what the
+change can actually reach:
+
+- The proof of a fix is a targeted probe through the SHIPPED entry point — red
+  before, green after — plus a check that fails against the pre-fix code. Run
+  that first; it is cheap and it is the real evidence.
+- Re-run only the acceptance phases the change can move, and say which and
+  why. A change confined to one layer does not require re-running phases it
+  cannot reach; reuse the retained ones and re-prove the invariant instead
+  (e.g. counts identical to base).
+- **Never re-run compute so a record can cite a tidier commit.** Record the
+  two heads and the reason. A verifier that refuses this should be taught the
+  rule, with a negative case proving the rule still fails closed.
+- Before any long re-run or long write-up, state in one line what a user would
+  see differently. If the answer is "nothing", keep it to that one line.
+
+Verification requirements — apply the ones the change can actually reach, and
+record which you skipped and why:
 
 1. Run the bundle's unit and integration tests.
 2. Generate the exact affected comparisons from frozen or newly supplied

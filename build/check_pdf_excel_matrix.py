@@ -181,6 +181,26 @@ def test_build_records_cache():
         cmp = snap["cells"]["highway_log_pdf"]["2026-07-22"]["cmp"]
         check("the snapshot now reads the cell built (has a verdict, not stale)",
               cmp.get("verdict") is not None and not cmp.get("stale"))
+        # HF-05 acceptance criterion 5: the PDF-vs-Excel by-day matrix is one of
+        # the two already-correct SILENT paths — a build must write no evidence
+        # artifact of any kind anywhere under its tree.
+        #
+        # A bare "the glob found nothing" is not evidence of silence: it reads
+        # the same whether the lane is silent, the tree is the wrong one, or the
+        # pattern is broken. So the probe is CONTROLLED first — plant an
+        # evidence-named artifact where one would land, prove the probe sees it,
+        # remove it, and only then read the lane's own silence.
+        tree = out.parent
+        check("the lane produced output in the tree being searched",
+              any(tree.rglob("*")))
+        planted = tree / "highway_log_pdf (evidence).xlsx"
+        planted.write_bytes(b"PK planted positive control")
+        found = [p.name for p in tree.rglob("*evidence*")]
+        planted.unlink()
+        check("the silence probe can SEE an evidence artifact when one exists",
+              found == [planted.name])
+        check("the by-day PDF-vs-Excel lane writes ZERO evidence artifacts",
+              not list(tree.rglob("*evidence*")))
     finally:
         paths.OUTPUT_ROOT = saved
         shutil.rmtree(tmp, ignore_errors=True)

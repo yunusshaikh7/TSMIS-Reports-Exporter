@@ -351,6 +351,18 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
 - **Git:** commit/push only when asked; if on `main`, branch first. Commit messages
   are short, imperative (`add route 395`). Release branches share the tag name, so
   push tags explicitly: `git push origin refs/tags/<tag>`.
+- **Process is proportional to practical impact.** This is an internal tool, not
+  an audited system of record. Before a review round, a long re-run, or a long
+  write-up, answer in ONE line: *what would a user see differently?* If the answer
+  is "nothing", write that line and move on. Specifically: never spend compute to
+  make a record cite a tidier commit hash; never block on cosmetics or on wording;
+  a disclosed, measured limitation is a note, not a defect. Prove a fix with a
+  targeted probe through the shipped path plus a check that fails pre-fix — then
+  re-run only the phases the change can actually reach, and say which you skipped
+  and why. **Two review denials per change is the ceiling**; after that, remaining
+  findings are follow-ups the owner ranks. Correctness of what the app DOES is
+  never traded away — wrong output, stale data shown as current, crashes and
+  silent failures still block, always.
 
 ---
 

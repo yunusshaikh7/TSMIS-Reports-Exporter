@@ -1,0 +1,266 @@
+{
+ "audit_count_check": [
+  {
+   "equal": true,
+   "expected": {
+    "differing_cells": 88238,
+    "side_a_only": 1174,
+    "side_b_only": 2095
+   },
+   "got": {
+    "differing_cells": 88238,
+    "side_a_only": 1174,
+    "side_b_only": 2095
+   },
+   "row": "highway_log_pdf"
+  },
+  {
+   "equal": true,
+   "expected": {
+    "differing_cells": 1904,
+    "side_a_only": 246,
+    "side_b_only": 7
+   },
+   "got": {
+    "differing_cells": 1904,
+    "side_a_only": 246,
+    "side_b_only": 7
+   },
+   "row": "highway_sequence_pdf"
+  },
+  {
+   "equal": true,
+   "expected": {
+    "differing_cells": 17562,
+    "side_a_only": 0,
+    "side_b_only": 0
+   },
+   "got": {
+    "differing_cells": 17562,
+    "side_a_only": 0,
+    "side_b_only": 0
+   },
+   "row": "intersection_detail_pdf"
+  },
+  {
+   "equal": true,
+   "expected": {
+    "differing_cells": 376,
+    "side_a_only": 8,
+    "side_b_only": 5
+   },
+   "got": {
+    "differing_cells": 376,
+    "side_a_only": 8,
+    "side_b_only": 5
+   },
+   "row": "ramp_detail_pdf"
+  },
+  {
+   "equal": true,
+   "expected": {
+    "differing_cells": 67,
+    "side_a_only": 0,
+    "side_b_only": 0
+   },
+   "got": {
+    "differing_cells": 67,
+    "side_a_only": 0,
+    "side_b_only": 0
+   },
+   "row": "ramp_summary"
+  }
+ ],
+ "bound_to_acceptance_head": "d826877592a8443191b07ae8c3e92e53a1e9bba4",
+ "built_utc": "2026-08-10T17:36:29+00:00",
+ "bundle": "RB-4",
+ "camera_refusals": [
+  {
+   "kind": "refuse-tsn",
+   "row": "highway_log",
+   "status": "refused"
+  },
+  {
+   "kind": "refuse-tsn",
+   "row": "highway_sequence",
+   "status": "refused"
+  },
+  {
+   "kind": "refuse-tsn",
+   "row": "intersection_detail",
+   "status": "refused"
+  },
+  {
+   "kind": "refuse-tsn",
+   "row": "ramp_detail",
+   "status": "refused"
+  },
+  {
+   "kind": "refuse-env",
+   "row": "ramp_summary",
+   "status": "refused"
+  }
+ ],
+ "cameras": [
+  {
+   "kind": "camera-tsn",
+   "row": "highway_log_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-byday",
+   "row": "highway_log_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-tsn",
+   "row": "highway_sequence_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-byday",
+   "row": "highway_sequence_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-tsn",
+   "row": "intersection_detail_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-byday",
+   "row": "intersection_detail_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-tsn",
+   "row": "ramp_detail_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-byday",
+   "row": "ramp_detail_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-env",
+   "row": "highway_log_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-env",
+   "row": "highway_sequence_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-env",
+   "row": "ramp_detail_pdf",
+   "status": "ok"
+  },
+  {
+   "kind": "camera-env",
+   "row": "intersection_detail_pdf",
+   "status": "ok"
+  }
+ ],
+ "claim": "the four `_pdf` Everything ENV cells render PDF-vs-PDF evidence from the two compared environments' own per-route prints; all five env COMPARISONS (ramp_summary included) keep counts equal to the audit's measured numbers; and the required-silent cameras REFUSE at the engine boundary",
+ "comparisons_generated_at": "f4b55f2ec75598cf5f8b37c8d23fb8c151490070",
+ "derived_from": [
+  {
+   "file": "generation-head.json",
+   "sha256": "2966937C966A50E123B8EC325C7F46FAD5F4ABD7BFD69AA40FFFD0E07BE7D566"
+  },
+  {
+   "file": "counts-head.json",
+   "sha256": "18D7E6ED4B9CB26EB6A1249CFC357F9C1C7CB61FC107C82C7A4A613F795DCDC1"
+  },
+  {
+   "file": "validate-head.json",
+   "sha256": "9FE02881644A957CC11ABB061478A25197D2D741B6419074D5294104E65B4BE8"
+  },
+  {
+   "file": "cameras-head.json",
+   "sha256": "112D4D0C7F03520FD2E5BDCC12066567B8B9B69C8F01A23D0E8F2D7C25C612D8"
+  }
+ ],
+ "env_cells": {
+  "highway_log_pdf": {
+   "completion": "complete",
+   "differing_cells": 88238,
+   "differing_rows": 22724,
+   "paired_rows": 50712,
+   "side_a_only_rows": 1174,
+   "side_b_only_rows": 2095,
+   "verdict": "diff"
+  },
+  "highway_sequence_pdf": {
+   "completion": "complete",
+   "differing_cells": 1904,
+   "differing_rows": 1895,
+   "paired_rows": 60247,
+   "side_a_only_rows": 246,
+   "side_b_only_rows": 7,
+   "verdict": "diff"
+  },
+  "intersection_detail_pdf": {
+   "completion": "complete",
+   "differing_cells": 17562,
+   "differing_rows": 16328,
+   "paired_rows": 16459,
+   "side_a_only_rows": 0,
+   "side_b_only_rows": 0,
+   "verdict": "diff"
+  },
+  "ramp_detail_pdf": {
+   "completion": "complete",
+   "differing_cells": 376,
+   "differing_rows": 316,
+   "paired_rows": 15208,
+   "side_a_only_rows": 8,
+   "side_b_only_rows": 5,
+   "verdict": "diff"
+  },
+  "ramp_summary": {
+   "completion": "complete",
+   "differing_cells": 67,
+   "differing_rows": 15,
+   "paired_rows": 126,
+   "side_a_only_rows": 0,
+   "side_b_only_rows": 0,
+   "verdict": "diff"
+  }
+ },
+ "generation_head_note": "the comparisons were RETAINED from this earlier head and not rebuilt; every runtime file differing between it and the acceptance head is evidence-layer only, and the counts phase re-proved all 26 retained comparisons equal to base at the acceptance head",
+ "id": "RB4-A1-HF10",
+ "produced_by": {
+  "script": "acc_rb4_witness.py",
+  "script_sha256": "956476D579C7BCB804FC66B4A70C77C7088C78306CCDD9E1A3FAA50852E611D1"
+ },
+ "validate_env_sets": [
+  {
+   "checks_failed": 0,
+   "comparison": "ssor-test_highway_log_pdf.xlsx",
+   "env_rederived": 57,
+   "examples": 57
+  },
+  {
+   "checks_failed": 0,
+   "comparison": "ssor-test_highway_sequence_pdf.xlsx",
+   "env_rederived": 8,
+   "examples": 8
+  },
+  {
+   "checks_failed": 0,
+   "comparison": "ssor-test_ramp_detail_pdf.xlsx",
+   "env_rederived": 10,
+   "examples": 10
+  },
+  {
+   "checks_failed": 0,
+   "comparison": "ars-prod_intersection_detail_pdf.xlsx",
+   "env_rederived": 8,
+   "examples": 8
+  }
+ ],
+ "work_item": "HF-10 (PCOA-FINAL-007, as amended 2026-08-05: four `_pdf` env cells; ramp_summary's cell required-silent)"
+}

@@ -669,12 +669,16 @@ def _twin_inputs_unchanged(fp_before, folders, out_name, events=None):
 # --------------------------------------------------------------------------- #
 def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
                           confirm_overwrite=None, row_defs=None, also_formulas=False,
-                          commit_guard=None):
+                          evidence=None, commit_guard=None):
     """Compare (row's report, cell env) against the baseline env, writing the
     VALUES workbook to comparison_path(...), and record its verdict + discrepancy
     counts in the cache. Pure delegation to the adapter's compare_folders — the
     comparison engine is untouched. Returns the ConsolidateResult. With
     `also_formulas`, also writes a live-formulas twin beside the values copy.
+    `evidence` ({'enabled','examples','layout'}) requests the visual-evidence
+    decoration on the four `_pdf`-family PDF-vs-PDF env cells (HF-10, amended
+    2026-08-05) — additive, never a gate: the comparison result is identical
+    with it on or off.
 
     Raises ValueError on an unknown row_key or a baseline cell (nothing to
     compare); compare_folders itself returns a clean error result when a side
@@ -737,7 +741,47 @@ def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
                       generation_id=published.artifact_generation.generation_id,
                       producer_versions=producer_identity(),
                       commit_guard=commit_guard)
+        _run_env_evidence(row_key, out_path, evidence, events, result,
+                          commit_guard)
     return result
+
+
+def _run_env_evidence(row_key, out_path, evidence, events, result,
+                      commit_guard):
+    """The HF-10 env-cell decoration: after a committed COMPLETE env
+    comparison, render the PDF-vs-PDF evidence set beside it. Both run folders
+    come from the comparison's own recorded provenance inside the generator
+    (the exact-source rule); a failed decoration only logs — it never changes
+    the comparison result (the existing evidence contract)."""
+    if not (evidence and evidence.get("enabled")):
+        return
+    import visual_evidence
+    if not visual_evidence.env_capable(row_key):
+        # The lane is retired for this row (the 2026-08-05 amendment). Sweep
+        # any set a PRE-amendment build left beside this comparison so it
+        # can't survive looking current.
+        visual_evidence.retire_unsupported(out_path, events, commit_guard)
+        return
+    try:
+        _require_commit_guard(commit_guard, "visual-evidence write")
+        published = consolidation_meta.require_published_comparison(out_path,
+                                                                    result)
+        if published.comparison_outcome.completion != outcome.COMPLETE:
+            raise ValueError("the comparison is partial — evidence would "
+                             "illustrate an incomplete universe")
+        ev = visual_evidence.generate(
+            row_key, None, None, out_path, None, events,
+            examples=visual_evidence.clamp_examples(evidence.get("examples")),
+            layout=visual_evidence.normalize_layout(evidence.get("layout")),
+            commit_guard=commit_guard, flavor=visual_evidence.FLAVOR_ENV)
+        if ev.get("note"):
+            result.summary_lines.append(ev["note"])
+    except Exception as e:                       # noqa: BLE001 — decoration only
+        log.warning("env evidence for %s skipped: %s: %s", row_key,
+                    type(e).__name__, e)
+        msg = str(e).splitlines()[0] if str(e) else type(e).__name__
+        events.on_log(f"  evidence images skipped — {msg}")
+        result.summary_lines.append(f"evidence images skipped — {msg}")
 
 
 def cells_to_rebuild(snapshot, scope="stale", row=None, env=None):
@@ -1219,18 +1263,95 @@ def run_evidence_only(row_key, store_dir, subdir, tsn_path, comparison_path,
     return ConsolidateResult(status="ok", message=note, summary_lines=[note])
 
 
-def evidence_for_cell(dest, row_key, cell_key, baseline_key, events,
-                      tsn_files=None, examples=None, layout=None,
-                      commit_guard=None):
-    """On-demand evidence for one Everything-matrix cell's EXISTING vs-TSN
-    comparison. Resolves the same paths build_comparison's tsn branch uses —
-    but consolidates nothing, compares nothing, and does NOT heal the TSN
-    library (a heal would rebuild it newer than the comparison and the
-    freshness gate would then rightly refuse; a version-stale library needs a
-    comparison refresh anyway)."""
+def run_env_evidence_only(dest, baseline_key, row_key, cell_key, events,
+                          examples=None, layout=None, commit_guard=None):
+    """On-demand HF-10 evidence for one Everything-matrix cell's EXISTING env
+    comparison. Compares nothing; the freshness gates mirror the vs-TSN
+    camera's: the comparison must exist with a trusted, current, COMPLETE
+    committed generation whose id matches the cell cache, and neither side's
+    export folder may have changed since it was built. The run folders
+    themselves come from the comparison's own recorded provenance inside the
+    generator (the exact-source rule)."""
+    import visual_evidence
+    if not visual_evidence.env_capable(row_key):
+        raise ValueError(f"no cross-environment evidence support for {row_key}")
     rows = _row_defs()
     if row_key not in rows:
         raise ValueError(f"unknown matrix row: {row_key}")
+    _label, subdir, _idx, _adapter, _hr = rows[row_key]
+    dest = Path(dest)
+    out_path = comparison_path(dest, baseline_key, row_key, cell_key)
+    evidence_guard = _compose_source_guard(commit_guard, None)
+    _require_commit_guard(evidence_guard, "visual-evidence write", out_path)
+    if not out_path.exists():
+        raise ValueError("build the comparison first — evidence illustrates an "
+                         "existing comparison")
+    comparison_record = consolidation_meta.read_comparison_outcome(out_path)
+    if (comparison_record is None or not comparison_record.trusted
+            or not comparison_record.current
+            or comparison_record.comparison_outcome is None):
+        raise ValueError("the comparison workbook has no trusted, current "
+                         "generation record — refresh the comparison first")
+    generation = comparison_record.artifact_generation
+    cached = _m.load_results(dest, baseline_key).get(row_key, {}).get(cell_key)
+    if (not cached or generation is None
+            or cached.get("generation_id") != generation.generation_id):
+        raise ValueError("the comparison is not the one the matrix recorded — "
+                         "refresh the comparison first")
+    typed = comparison_record.comparison_outcome
+    if typed.completion != outcome.COMPLETE:
+        raise ValueError(_partial_comparison_reason(typed))
+    fp_folders = (dest / cell_key / subdir, dest / baseline_key / subdir)
+    # The export-changed gate ALWAYS evaluates (RB-4 audit — a cell cached
+    # before fingerprints were recorded must refuse, not skip the gate the
+    # vs-TSN camera always applies).
+    if cached.get("input_fingerprint") is None:
+        raise ValueError("the matrix cache records no input fingerprint for "
+                         "this comparison — refresh the comparison first")
+    if _cell_input_fingerprint(*fp_folders) != cached.get("input_fingerprint"):
+        raise ValueError("the exports changed since the comparison was built — "
+                         "refresh the comparison first")
+    ev = visual_evidence.generate(
+        row_key, None, None, out_path, None, events,
+        examples=visual_evidence.clamp_examples(examples),
+        layout=visual_evidence.normalize_layout(layout),
+        commit_guard=evidence_guard, flavor=visual_evidence.FLAVOR_ENV)
+    # The same post-render generation re-check the vs-TSN camera makes (RB-4
+    # audit): a comparison refresh landing mid-render would leave images of
+    # generation N under a manifest digesting generation N+1.
+    after_record = consolidation_meta.read_comparison_outcome(out_path)
+    if (after_record is None or not after_record.trusted
+            or after_record.artifact_generation
+            != comparison_record.artifact_generation):
+        raise ValueError(
+            "the comparison generation changed while evidence was rendering — "
+            "refresh the comparison and evidence")
+    note = ev.get("note") or "evidence run finished"
+    return ConsolidateResult(status="ok", message=note, summary_lines=[note])
+
+
+def evidence_for_cell(dest, row_key, cell_key, baseline_key, events,
+                      tsn_files=None, examples=None, layout=None,
+                      commit_guard=None, mode_id="tsn"):
+    """On-demand evidence for one Everything-matrix cell's EXISTING comparison.
+    The vs-TSN mode resolves the same paths build_comparison's tsn branch uses —
+    but consolidates nothing, compares nothing, and does NOT heal the TSN
+    library (a heal would rebuild it newer than the comparison and the
+    freshness gate would then rightly refuse; a version-stale library needs a
+    comparison refresh anyway). The env mode delegates to the HF-10 camera."""
+    if mode_id == "env":
+        return run_env_evidence_only(dest, baseline_key, row_key, cell_key,
+                                     events, examples=examples, layout=layout,
+                                     commit_guard=commit_guard)
+    rows = _row_defs()
+    if row_key not in rows:
+        raise ValueError(f"unknown matrix row: {row_key}")
+    import visual_evidence                               # lazy: pulls PIL/pdfium
+    if not visual_evidence.capable(row_key):
+        # run_evidence_only refuses too — this earlier gate keeps the refusal
+        # a clean sentence instead of a registry KeyError (2026-08-05 ruling:
+        # only the `_pdf` rows carry evidence).
+        raise ValueError("this report doesn't support evidence images")
     _label, subdir, _idx, adapter, _hr = rows[row_key]
     mode = _mode_by_id(_row_modes(row_key, subdir, adapter), "tsn")
     if not mode["supported"]:
@@ -1251,7 +1372,6 @@ def evidence_for_cell(dest, row_key, cell_key, baseline_key, events,
     cached = _m.load_tsn_results(dest)
     record = cached.get(f"{row_key}|{mode['id']}", {}).get(cell_key)
     expected_generation_id = require_cached_tsn_identity(record, token)
-    import visual_evidence                               # lazy: pulls PIL/pdfium
     result = run_evidence_only(
         row_key, dest / cell_key / mode["env_subdir"], mode["env_subdir"],
         src["path"], mode_out_path(dest, baseline_key, row_key, cell_key, mode),
@@ -1378,6 +1498,15 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, su
     # changes the comparison's status/completion/counts, and any failure only
     # logs + notes (the comparison already succeeded). `evidence_opts` is set by
     # the callers when the user's toggle is on AND the row supports it.
+    if result.status == "ok" and not evidence_opts:
+        # `evidence_opts_for` returns None both when the toggle is off and
+        # when the ROW can no longer collect evidence. Only the second case
+        # owes a sweep, so the capability is re-asked here rather than
+        # inferred from the None (2026-08-05 amendment).
+        import visual_evidence                           # lazy: pulls PIL/pdfium
+        if not visual_evidence.capable(row_key):
+            visual_evidence.retire_unsupported(out_path, events,
+                                               comparison_guard)
     if result.status == "ok" and evidence_opts:
         try:
             _require_commit_guard(comparison_guard, "visual-evidence write")
@@ -1413,18 +1542,23 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, su
 def _run_self_evidence(row_key, pdf_consolidated, excel_consolidated, out_path,
                        tsmis_pdf_dir, evidence_opts, events, result,
                        commit_guard):
-    """Illustrate a finished PDF-vs-Excel self check (CMP-AUD-210).
+    """RETIRED LANE (owner ruling 2026-08-05): the PDF-vs-Excel self checks
+    carry no evidence — `visual_evidence.self_capable()` is always False, so
+    this returns silently for every row and the engine refuses FLAVOR_SELF
+    besides. The call site stays so the decoration contract is documented in
+    one place; nothing renders.
 
-    Same decoration contract as the vs-TSN path: it never changes the
-    comparison's status, completion or counts, and any failure only logs and
-    notes. Both compared sides are TSMIS here, so there is no TSN library to
-    certify — the published comparison must still be COMPLETE before anything
-    is drawn from it."""
+    Same decoration contract as the vs-TSN path applied while it was live: it
+    never changes the comparison's status, completion or counts, and any
+    failure only logs and notes."""
     if not evidence_opts:
         return
     try:
         import visual_evidence                          # lazy: pulls PIL/pdfium
         if not visual_evidence.self_capable(row_key):
+            # The self lane is retired for EVERY row (2026-08-05). Sweep any
+            # set a pre-amendment build left beside this comparison.
+            visual_evidence.retire_unsupported(out_path, events, commit_guard)
             return
         _require_commit_guard(comparison_guard := commit_guard,
                               "visual-evidence write")
@@ -1502,7 +1636,7 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
         return _m.build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
                                      confirm_overwrite=confirm_overwrite, row_defs=rows,
                                      also_formulas=also_formulas,
-                                     commit_guard=commit_guard)
+                                     evidence=evidence, commit_guard=commit_guard)
 
     dest = Path(dest)
     out_path = mode_out_path(dest, baseline_key, row_key, cell_key, mode)

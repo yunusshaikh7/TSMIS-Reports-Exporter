@@ -430,6 +430,11 @@ def evidence_for_day_cell(source, date, row_key, dest, events, tsn_files=None,
     rows = _row_lookup()
     if row_key not in rows:
         raise ValueError(f"unknown by-day matrix row: {row_key}")
+    import visual_evidence                               # lazy: pulls PIL/pdfium
+    if not visual_evidence.capable(row_key):
+        # The engine refuses too (run_evidence_only) — this earlier gate keeps
+        # the refusal a clean sentence instead of a registry KeyError.
+        raise ValueError("this report doesn't support evidence images")
     if not parse_run_folder(day_folder_name(date, source)):
         raise ValueError(f"invalid date\\source for the by-day matrix: {date!r} / {source!r}")
     _k, _label, subdir, _fmt, supported, tsn_subdir = rows[row_key]
@@ -451,7 +456,6 @@ def evidence_for_day_cell(source, date, row_key, dest, events, tsn_files=None,
     record = load_results().get(
         f"{day_folder_name(date, source)}|{row_key}")
     expected_generation_id = matrix.require_cached_tsn_identity(record, token)
-    import visual_evidence                               # lazy: pulls PIL/pdfium
     result = matrix.run_evidence_only(
         row_key, tsmis_dir(date, source, subdir), subdir, src_tsn["path"],
         day_out_path(date, source, row_key),

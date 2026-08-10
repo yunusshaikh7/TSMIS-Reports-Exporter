@@ -488,11 +488,11 @@ def test_both_evidence_entry_points():
 
         with patch(matrix_build, "tsn_source", lambda *_a, **_k: source), \
                 patch(matrix, "load_tsn_results", lambda _dest: {
-                    "highway_log|tsn": {"ars-prod": wrong}}), \
+                    "highway_log_pdf|tsn": {"ars-prod": wrong}}), \
                 patch(matrix_build, "run_evidence_only", everything_run):
             try:
                 matrix_build.evidence_for_cell(
-                    root, "highway_log", "ars-prod", "ssor-prod", Events(),
+                    root, "highway_log_pdf", "ars-prod", "ssor-prod", Events(),
                     tsn_files={"highway_log": selection})
                 everything_wrong = ""
             except ValueError as e:
@@ -503,23 +503,23 @@ def test_both_evidence_entry_points():
 
         with patch(matrix_build, "tsn_source", lambda *_a, **_k: source), \
                 patch(matrix, "load_tsn_results", lambda _dest: {
-                    "highway_log|tsn": {"ars-prod": exact}}), \
+                    "highway_log_pdf|tsn": {"ars-prod": exact}}), \
                 patch(matrix_build, "run_evidence_only", everything_run):
             matrix_build.evidence_for_cell(
-                root, "highway_log", "ars-prod", "ssor-prod", Events(),
+                root, "highway_log_pdf", "ars-prod", "ssor-prod", Events(),
                 tsn_files={"highway_log": selection})
         check("Everything evidence forwards its exact cached generation",
               len(everything_calls) == 1
               and everything_calls[0].get("expected_generation_id") == "g1"
               and callable(everything_calls[0].get("source_identity_check")))
 
-        day_key = "2026-07-12 ssor-prod|highway_log"
+        day_key = "2026-07-12 ssor-prod|highway_log_pdf"
         with patch(matrix, "tsn_source", lambda *_a, **_k: source), \
                 patch(day_matrix, "load_results", lambda: {day_key: wrong}), \
                 patch(matrix, "run_evidence_only", day_run):
             try:
                 day_matrix.evidence_for_day_cell(
-                    "ssor-prod", "2026-07-12", "highway_log", root, Events(),
+                    "ssor-prod", "2026-07-12", "highway_log_pdf", root, Events(),
                     tsn_files={"highway_log": selection})
                 day_wrong = ""
             except ValueError as e:
@@ -532,7 +532,7 @@ def test_both_evidence_entry_points():
                 patch(day_matrix, "load_results", lambda: {day_key: exact}), \
                 patch(matrix, "run_evidence_only", day_run):
             day_matrix.evidence_for_day_cell(
-                "ssor-prod", "2026-07-12", "highway_log", root, Events(),
+                "ssor-prod", "2026-07-12", "highway_log_pdf", root, Events(),
                 tsn_files={"highway_log": selection})
         check("by-day evidence forwards its exact cached generation",
               len(day_calls) == 1
@@ -544,7 +544,7 @@ def test_both_evidence_entry_points():
                 patch(matrix_build, "run_evidence_only", everything_run):
             try:
                 matrix_build.evidence_for_cell(
-                    root, "highway_log", "ars-prod", "ssor-prod", Events())
+                    root, "highway_log_pdf", "ars-prod", "ssor-prod", Events())
                 everything_stale = ""
             except ValueError as e:
                 everything_stale = str(e)
@@ -553,7 +553,7 @@ def test_both_evidence_entry_points():
                 patch(matrix, "run_evidence_only", day_run):
             try:
                 day_matrix.evidence_for_day_cell(
-                    "ssor-prod", "2026-07-12", "highway_log", root, Events())
+                    "ssor-prod", "2026-07-12", "highway_log_pdf", root, Events())
                 day_stale = ""
             except ValueError as e:
                 day_stale = str(e)

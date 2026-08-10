@@ -480,11 +480,13 @@ class GuiMatrixMixin:
                 examples=examples, layout=layout, commit_guard=commit_guard))
         else:
             base = ident.get("baseline") or self._current_baseline()
+            mode_id = ident.get("mode") or "tsn"
             comparisons_dest = dest
             run_fn = (lambda events, commit_guard=None:
                       matrix.evidence_for_cell(
                 dest, row, cell, base, events, tsn_files=tsn_files,
-                examples=examples, layout=layout, commit_guard=commit_guard))
+                examples=examples, layout=layout, commit_guard=commit_guard,
+                mode_id=mode_id))
         with self._lock:
             self._matrix = {"phase": "comparing", "row": row, "cell": cell,
                             "done": 0, "total": 1}
@@ -700,21 +702,36 @@ class GuiMatrixMixin:
 
     @_api_method
     def matrix_evidence_cell(self, row_key, env_key):
-        """Queue an ON-DEMAND evidence run for ONE cell's EXISTING vs-TSN
-        comparison — images only, no re-compare (runs even with the Evidence
-        images toggle off). The worker refuses stale/missing comparisons with
-        an actionable message."""
+        """Queue an ON-DEMAND evidence run for ONE cell's EXISTING comparison —
+        images only, no re-compare (runs even with the Evidence images toggle
+        off). Evidence exists ONLY on the PDF-vs-PDF lanes (the 2026-08-05
+        ruling): the vs-TSN and cross-environment comparisons of the
+        PDF-edition reports, both rendered as crops of the source prints. A
+        self-check (vs_pdf/vs_excel) cell or an Excel row is refused here AND
+        at the engine boundary. The worker refuses stale/missing comparisons
+        with an actionable message."""
         if row_key not in {r[0] for r in matrix_rows()}:
             return {"error": "Unknown report for the matrix."}
         if not self._parse_env_keys([env_key]):
             return {"error": "Unknown environment."}
+        mode = settings.get_matrix_row_modes().get(row_key, "env")
         import visual_evidence                       # lazy: pulls PIL/pdfium
-        if not visual_evidence.capable(row_key):
-            return {"error": "This report doesn't support evidence images."}
+        if mode == "env":
+            if not visual_evidence.env_capable(row_key):
+                return {"error": "This report's cross-environment comparison "
+                                 "doesn't support evidence images."}
+            if env_key == self._current_baseline():
+                return {"error": "The baseline column has no comparison to "
+                                 "illustrate."}
+        elif mode != "tsn" or not visual_evidence.capable(row_key):
+            return {"error": "Evidence images exist only for the vs-TSN and "
+                             "cross-environment comparisons of the "
+                             "PDF-edition reports."}
         job = self._make_job("evidence", "cell",
                              self._job_label("evidence", "cell", row_key, env_key),
                              row=row_key, env=env_key)
         job["evidence"] = self._capture_evidence_identity("env")
+        job["evidence"]["mode"] = mode
         return self._enqueue_matrix_job(job)
 
     @_api_method

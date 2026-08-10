@@ -85,6 +85,20 @@ def test_ramp_detail():
                 for f in ("Ramp Name", "On/Off", "Ramp Type", "ADT")))
     c.check("a junk header refuses every field",
             all(erd.excel_column_for(f, JUNK) is None for f in rd._TSMIS_POS))
+    # HF-05 closes RB-3's deferred evidence half: the July-2026 consolidated
+    # edition the loader ALREADY accepts resolves through its own positions.
+    hdr26 = rd._TSMIS_HEADER_2026
+    # NO None filter (RB-4 audit): the old comprehension discarded every field
+    # the hook failed to resolve — the exact silent-drop class that cost 26 of
+    # 35 columns — so a hook resolving only Description passed. Every mapped
+    # field must resolve, to its own recorded position.
+    c.check("the July-2026 edition resolves EVERY mapped field through "
+            "_TSMIS_POS_2026 — a silent drop fails",
+            all(erd.excel_column_for(f, hdr26) == rd._TSMIS_POS_2026[f]
+                for f in rd._TSMIS_POS_2026))
+    c.check("July District also resolves to its Location cell",
+            erd.excel_column_for("District", hdr26)
+            == rd._TSMIS_POS_2026["Location"])
 
 
 def test_highway_detail():
@@ -142,28 +156,102 @@ class _PlainAdapter:
         return "" if raw is None else str(raw).strip()
 
 
+def _ctx(rows, header, resolve="excel_column_for"):
+    return {"rows": rows, "header": header, "book_name": "book.xlsx",
+            "resolve": resolve, "project": "project",
+            "index_key": "row_index", "value_key": "va",
+            "label": "TSMIS (Excel)"}
+
+
 def test_seam():
-    print("_tsmis_excel_side prefers the hook; default + refusal stay honest:")
+    print("_workbook_side prefers the hook; default + refusal stay honest:")
     rows = {0: ("Data", 2, ["r1", "kv", "fv"])}
     header = ["Route", "K", "SiteLabel"]
     ex = {"row_index": 0, "va": "fv"}
-    img, label, addr, reason = visual_evidence._tsmis_excel_side(
-        _HookAdapter, ex, "F", rows, header, "book.xlsx")
+    img, label, addr, reason, _drawn = visual_evidence._workbook_side(
+        _HookAdapter, ex, "F", _ctx(rows, header))
     c.check("hook resolution renders from the mapped cell",
             reason is None and addr == "Data!C2", f"addr={addr} reason={reason}")
-    img, label, addr, reason = visual_evidence._tsmis_excel_side(
-        _HookAdapter, ex, "Unknown", rows, header, "book.xlsx")
+    img, label, addr, reason, _drawn = visual_evidence._workbook_side(
+        _HookAdapter, ex, "Unknown", _ctx(rows, header))
     c.check("hook None is the honest refusal",
             img is None and "no single cell" in reason, f"reason={reason}")
-    img, label, addr, reason = visual_evidence._tsmis_excel_side(
-        _PlainAdapter, ex, "SiteLabel", rows, header, "book.xlsx")
+    img, label, addr, reason, _drawn = visual_evidence._workbook_side(
+        _PlainAdapter, ex, "SiteLabel", _ctx(rows, header))
     c.check("an adapter without the hook keeps the exact-label default",
             reason is None and addr == "Data!C2", f"addr={addr} reason={reason}")
-    img, label, addr, reason = visual_evidence._tsmis_excel_side(
-        _PlainAdapter, ex, "F", rows, header, "book.xlsx")
-    c.check("exact-label miss keeps the old refusal wording",
-            img is None and reason == "the compared column is not in the workbook header",
+    img, label, addr, reason, _drawn = visual_evidence._workbook_side(
+        _PlainAdapter, ex, "F", _ctx(rows, header))
+    c.check("exact-label miss refuses (unresolvable in this edition)",
+            img is None and "cannot be resolved" in reason,
             f"reason={reason}")
+    img, label, addr, reason, _drawn = visual_evidence._workbook_side(
+        _PlainAdapter, ex, "SiteLabel",
+        _ctx(rows, header, resolve="tsn_excel_column_for"))
+    c.check("a MISSING side-specific hook refuses — no exact-label fallback "
+            "for the TSN/PDF editions",
+            img is None and "cannot be resolved" in reason, f"reason={reason}")
+
+
+def test_tsn_and_pdf_hooks():
+    print("HF-05: the TSN-workbook and PDF-edition hooks gate their own shapes:")
+    tsn_rd = ["Route"] + list(rd.SHARED_HEADER) + ["District", "TSN County",
+                                                   "TSN PM Suffix"]
+    c.check("RD tsn hook: SHARED positions + District to its OWN sidecar column",
+            erd.tsn_excel_column_for("HG", tsn_rd)
+            == 1 + rd.SHARED_HEADER.index("HG")
+            and erd.tsn_excel_column_for("District", tsn_rd)
+            == tsn_rd.index("District"))
+    c.check("RD tsn hook refuses junk and the raw statewide shape",
+            erd.tsn_excel_column_for("HG", JUNK) is None)
+    pdf_rd = list(erd._PDF_BOOK_HEADER)
+    # The RB-4 audit's lesson: the PDF conversion reproduces the export's
+    # SHIFTED layout, so this map must be checked against the PRODUCER'S OWN
+    # row-key table (where each value is written), never against the header
+    # labels (which sit one cell right of their values from City Code on).
+    import consolidate_tsmis_ramp_detail_pdf as rdpdf
+    _pdf_value_pos = {k: i + 1 for i, k in enumerate(rdpdf._ROW_KEYS)
+                      if k is not None}
+    c.check("RD pdf hook: every field resolves to the PRODUCER'S value "
+            "position (rdpdf._ROW_KEYS), never the label position",
+            erd.pdf_excel_column_for("City Code", pdf_rd)
+            == _pdf_value_pos["city"] == 8
+            and erd.pdf_excel_column_for("R/U", pdf_rd)
+            == _pdf_value_pos["ru"] == 9
+            and erd.pdf_excel_column_for("Description", pdf_rd)
+            == _pdf_value_pos["desc"] == 10
+            and erd.pdf_excel_column_for("On/Off", pdf_rd)
+            == _pdf_value_pos["onoff"] == 12
+            and erd.pdf_excel_column_for("Ramp Type", pdf_rd)
+            == _pdf_value_pos["rtype"] == 13
+            and erd.pdf_excel_column_for("District", pdf_rd) == 1)
+    c.check("RD pdf hook: the label positions for the shifted trio are NOT "
+            "the resolved positions (the audit's exact defect)",
+            pdf_rd[9] == "City Code" and pdf_rd[10] == "R/U"
+            and pdf_rd[11] == "Description"
+            and erd.pdf_excel_column_for("City Code", pdf_rd) != 9
+            and erd.pdf_excel_column_for("R/U", pdf_rd) != 10
+            and erd.pdf_excel_column_for("Description", pdf_rd) != 11)
+    c.check("RD pdf hook refuses the Excel-edition header",
+            erd.pdf_excel_column_for("HG", rd._TSMIS_HEADER) is None)
+    tsn_id = ["Route"] + list(idt.SHARED_HEADER) + ["TSN County"]
+    c.check("ID tsn hook: SHARED positions under the v3-sidecar gate",
+            eid.tsn_excel_column_for("HG", tsn_id)
+            == 1 + idt.SHARED_HEADER.index("HG")
+            and eid.tsn_excel_column_for("HG", tsn_id[:-1]) is None)
+    hl_hdr = ["Route"] + list(hlc.HEADER)
+    c.check("HL: one corrected header serves all three compared workbooks",
+            ehl.pdf_excel_column_for("City", hl_hdr)
+            == ehl.tsn_excel_column_for("City", hl_hdr)
+            == ehl.excel_column_for("City", hl_hdr))
+    tsn_hsl = ["Route"] + list(chsl.SHARED_HEADER)
+    c.check("HSL tsn hook: Route + SHARED_HEADER positions",
+            ehs.tsn_excel_column_for("FT", tsn_hsl)
+            == 1 + chsl.SHARED_HEADER.index("FT")
+            and ehs.tsn_excel_column_for("FT", chsl._TSMIS_HEADER) is None)
+    c.check("every family names its data sheets for all three editions",
+            all(callable(m.workbook_sheet) and m.workbook_sheet("tsn")
+                for m in (erd, eid, ehl, ehs, ehd)))
 
 
 if __name__ == "__main__":
@@ -173,4 +261,5 @@ if __name__ == "__main__":
     test_highway_detail()
     test_highway_log_and_sequence()
     test_seam()
+    test_tsn_and_pdf_hooks()
     raise SystemExit(c.summary())

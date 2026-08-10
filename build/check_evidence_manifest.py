@@ -25,8 +25,6 @@ sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 import _checklib
-import compare_highway_detail_tsn as cht
-import evidence_highway_detail as ehd
 import evidence_manifest as em
 import visual_evidence as ve
 from PIL import Image
@@ -38,6 +36,24 @@ def check(name, cond):
     print(f"  [{'OK ' if cond else 'FAIL'}] {name}")
     if not cond:
         _fail.append(name)
+
+
+# Stated FIRST as an assertion, not an import-time crash: against a runtime
+# without the print-crop amendment this file died on the first new call and
+# printed nothing, so it could not demonstrate the defect it exists to catch.
+print("the print-crop contract this file depends on (owner amendment 2026-08-05)")
+check("the vs-TSN lane locates PRINTS (_locate_tsmis_sources) and evidence "
+      "exists only for the four `_pdf` rows",
+      hasattr(ve, "_locate_tsmis_sources")
+      and sorted(ve.rows()) == ["highway_log_pdf", "highway_sequence_pdf",
+                                "intersection_detail_pdf", "ramp_detail_pdf"])
+check("a pair that cannot be bound to what the comparison read has its own "
+      "refusal type (EvidenceSourceBindingError)",
+      hasattr(ve, "EvidenceSourceBindingError"))
+check("the cross-environment lane exists and names its four placements "
+      "(Ramp Summary removed by the third ruling)",
+      hasattr(ve, "FLAVOR_ENV") and hasattr(ve, "env_rows")
+      and len(list(ve.env_rows())) == 4)
 
 
 def refuses(fn, *a, **k):
@@ -244,24 +260,46 @@ check("...and the note says what happened, rather than claiming success",
 
 # --------------------------------------------------------------------------- #
 print("end to end: every terminal state records itself (CMP-AUD-106)")
-_HD_ROW = ["001"] + ["0.100"] + ["x"] * (len(cht.SHARED_HEADER) - 1)
-_DESC = 1 + cht.SHARED_HEADER.index("Description")
+import compare_intersection_detail_tsn as idt                # noqa: E402
+import evidence_intersection_detail as eid                   # noqa: E402
+import paths as _paths_tsn                                   # noqa: E402
+
+_ID_ROW = ["001"] + ["x"] * len(idt.SHARED_HEADER)
+_ID_ROW[1 + idt.SHARED_HEADER.index(idt.KEY)] = "0.100"
+_DESC = 1 + idt.SHARED_HEADER.index("Description")
 
 
 def hd_row(desc=None):
-    row = list(_HD_ROW)
+    row = list(_ID_ROW)
     if desc is not None:
         row[_DESC] = desc
     return row
 
 
-def run_generate(name, rows_a, rows_b, proposals, locate=None,
-                 cancel_at_locate=False, plant_prior=True):
-    """Drive the SHIPPED generate() over a real published comparison."""
+def run_generate(name, rows_a, rows_b, proposals, cancel_at_locate=False,
+                 plant_prior=True, strip_provenance=False):
+    """Drive the SHIPPED generate() over a real BOUND comparison — published
+    the production way (committed generation + typed outcome + provenance
+    sidecar over the two side files), so the exact-source binding passes and
+    every terminal state below is reached through the real front door. The
+    fixture family is intersection_detail_pdf (the 2026-08-05 ruling: only
+    `_pdf` rows are capable); both print sets are unparseable stubs, so a
+    candidate that reaches the locate step becomes a miss, never a render."""
     root = _r / name
     root.mkdir()
     cmp_path = root / "day vs tsn.xlsx"
-    _checklib.build_published_comparison(cmp_path, cht._SCHEMA, rows_a, rows_b)
+    cons = root / "cons.xlsx"; cons.write_bytes(b"consolidated")
+    tsn = root / "tsn.xlsx"; tsn.write_bytes(b"tsn")
+    _checklib.publish_bound_comparison(cmp_path, idt._SCHEMA, rows_a, rows_b,
+                                       (cons, tsn))
+    if strip_provenance:
+        cmp_path.with_name(cmp_path.name + ".provenance.json").unlink()
+    tdir = root / "tsmis_pdf"
+    tdir.mkdir()
+    (tdir / "intersection_detail_route_001.pdf").write_bytes(b"%PDF tsmis")
+    lib = root / "tsn_library" / "intersection_detail" / "pdf"
+    lib.mkdir(parents=True)
+    (lib / "stub.pdf").write_bytes(b"%PDF tsn")
     wb, img = ve.sibling_paths(cmp_path)
     man = em.manifest_path(cmp_path)
     if plant_prior:
@@ -269,40 +307,29 @@ def run_generate(name, rows_a, rows_b, proposals, locate=None,
         img.mkdir()
         (img / "prior.png").write_bytes(b"prior image")
         man.write_text(em.dumps(em.build(
-            state=em.STATE_RENDERED, report="HD", comparison_path=cmp_path,
+            state=em.STATE_RENDERED, report="ID", comparison_path=cmp_path,
             ledger_digest="c" * 64, reader_version=1, difference_cells=9,
             differing_columns=1, workbook=wb,
             images=(em.member_for(img / "prior.png"),))), encoding="utf-8")
-    cons = root / "cons.xlsx"; cons.write_bytes(b"consolidated")
-    tsn = root / "tsn.xlsx"; tsn.write_bytes(b"tsn")
-    tdir = root / "tsmis_pdf"; tdir.mkdir()
-    (tdir / "highway_detail_route_001.pdf").write_bytes(b"%PDF tsmis")
-    ndir = root / "tsn_pdf"; ndir.mkdir()
-    (ndir / "d01.pdf").write_bytes(b"%PDF tsn")
-    saved = (ehd.load_sides, ehd.enumerate_diffs, ve.tsn_pdf_dir,
-             ve._locate_tsmis_sources)
-    ehd.load_sides = lambda _c, _t: ([], [], {"ok": 1}, None)
-    ehd.enumerate_diffs = lambda _x, _y, _s: proposals
-    ve.tsn_pdf_dir = lambda _rk: ndir
+    saved = (eid.load_sides, eid.enumerate_diffs, ve._locate_tsmis_sources,
+             _paths_tsn.TSN_LIBRARY_ROOT)
+    eid.load_sides = lambda _c, _t: ([], [], {"ok": 1}, None)
+    eid.enumerate_diffs = lambda _x, _y, _s: proposals
+    _paths_tsn.TSN_LIBRARY_ROOT = root / "tsn_library"
     events = Ev()
-    if locate is not None:
-        ve._locate_tsmis_sources = locate
-    saved_index = ehd.district_index
     if cancel_at_locate:
-        # Cancel once the sources have been located — the render boundary, where
-        # a late cancel must still leave the previous set untouched. Hooked on
-        # district_index because BOTH source roles reach it (the Excel role
-        # never calls _locate_tsmis_sources).
-        def cancel_then_index(*_a, **_k):
+        # Cancel once the prints are being located — the render boundary,
+        # where a late cancel must still leave the previous set untouched.
+        def cancel_then_locate(*_a, **_k):
             events.cancelled = True
-            return {}
-        ehd.district_index = cancel_then_index
+            return None
+        ve._locate_tsmis_sources = cancel_then_locate
     try:
-        res = ve.generate("highway_detail", cons, tsn, cmp_path, tdir, events)
+        res = ve.generate("intersection_detail_pdf", cons, tsn, cmp_path,
+                          tdir, events)
     finally:
-        ehd.district_index = saved_index
-        (ehd.load_sides, ehd.enumerate_diffs, ve.tsn_pdf_dir,
-         ve._locate_tsmis_sources) = saved
+        (eid.load_sides, eid.enumerate_diffs, ve._locate_tsmis_sources,
+         _paths_tsn.TSN_LIBRARY_ROOT) = saved
     return cmp_path, wb, img, man, res
 
 
@@ -322,10 +349,10 @@ check("...and a reader (a RESTART, holding no state) agrees it is current",
 check("...the recorded ledger digest is the published comparison's own",
       len(em.read(_m).ledger_digest) == 64)
 
-# differences exist, but none can be photographed: the PDFs never resolve.
+# differences exist, but none can be photographed: both print sets are
+# unparseable stubs, so every candidate becomes a locate miss.
 _c, _w, _i, _m, _res = run_generate(
-    "no_examples", [hd_row("ALPHA")], [hd_row("BETA")], _PROPOSAL,
-    locate=lambda *a, **k: ({}, {"001"}))
+    "no_examples", [hd_row("ALPHA")], [hd_row("BETA")], _PROPOSAL)
 check("a run that renders nothing records 'no_examples', not 'no_differences'",
       _res["manifest_state"] == em.STATE_NO_EXAMPLES
       and em.read(_m).state == em.STATE_NO_EXAMPLES)
@@ -359,7 +386,249 @@ _c, _w, _i, _m, _res = run_generate(
 check("a first run with nothing to retire still records its state",
       _m.is_file() and em.describe(_c)["status"] == em.CURRENT)
 
+# --------------------------------------------------------------------------- #
+print("the exact-source binding (PCOA-FINAL-004): an unbindable pair "
+      "publishes NOTHING — manifest included — and retires the prior set")
+try:
+    _c, _w, _i, _m, _res = run_generate(
+        "unbound", [hd_row("ALPHA")], [hd_row("BETA")], _PROPOSAL,
+        strip_provenance=True)
+    check("an unbindable pair refuses loudly", False)
+except ve.EvidenceSourceBindingError:
+    _c = _r / "unbound" / "day vs tsn.xlsx"
+    _w, _i = ve.sibling_paths(_c)
+    _m = em.manifest_path(_c)
+    check("an unbindable pair refuses loudly", True)
+check("...zero artifacts survive at canonical names — manifest included",
+      not _w.exists() and not _i.exists() and not _m.exists())
+
 shutil.rmtree(_r, ignore_errors=True)
+
+# --------------------------------------------------------------------------- #
+# HF-10 (the bundle's named env case): an env PDF-vs-PDF cell with positive
+# differences produces a BOUND manifest, workbook and image set with a
+# PDF-only read set that passes the exact-source test; a pair that cannot
+# bind publishes nothing; and the comparison content is untouched by the
+# render. The prints are REAL hand-authored PDFs (mini_pdf), one side spelled
+# the store-tagged way so the end-anchored print resolution is on the path;
+# only the ADAPTER is a fixture — the engine, binding, snapshot, composition
+# check and manifest commit are all production code.
+# --------------------------------------------------------------------------- #
+print("HF-10: an env cell renders a bound, PDF-only evidence set")
+import json as _json
+import types as _types
+
+import artifact_store as _astore
+import compare_tsn_common as _ctc
+import events as _events_mod
+from compare_core import CompareSchema as _CS, run_compare as _rc
+from _checklib import mini_pdf as _mini_pdf
+
+
+def _env_fixture_adapter():
+    import pdfplumber as _pp
+    import paths as _paths
+    mod = _types.ModuleType("_fixture_env_adapter")
+    mod.REPORT_LABEL = "Fixture Env"
+    mod.KEY_LABEL = "Route"
+    mod.FIELDS = ("F",)
+    mod.env_fields = lambda: ["F"]
+    mod.tsmis_pdf_path = lambda d, route: _paths.resolve_route_file(
+        Path(d), f"fixt_route_{route}.pdf")
+
+    def env_locate(pdf_path, needed_keys):
+        with _pp.open(pdf_path) as pdf:
+            words = pdf.pages[0].extract_words()
+        rec = {"src": str(pdf_path), "page": 1, "words": words}
+        return {k: [rec] for k in needed_keys}
+
+    def env_box(rec, field):
+        del field
+        w = rec["words"][-1]
+        xs = ([x["x0"] for x in rec["words"]], [x["x1"] for x in rec["words"]])
+        top = min(x["top"] for x in rec["words"])
+        bottom = max(x["bottom"] for x in rec["words"])
+        return (rec["page"], (w["x0"] - 2, top - 2, w["x1"] + 2, bottom + 2),
+                (top, bottom), (min(xs[0]) - 4, max(xs[1]) + 4))
+
+    mod.env_locate = env_locate
+    mod.env_value = lambda rec, _f: rec["words"][-1]["text"]
+    mod.env_box = env_box
+    mod.env_project = lambda _f, raw: "" if raw is None else str(raw)
+    sys.modules[mod.__name__] = mod
+    return mod
+
+
+def _census(files):
+    out = []
+    for f in files:
+        st = Path(f).stat()
+        out.append({"name": Path(f).name, "size": st.st_size,
+                    "mtime_ns": st.st_mtime_ns})
+    return out
+
+
+_er = Path(tempfile.mkdtemp(prefix="check_ev_env_"))
+try:
+    _ra, _rb = _er / "envA", _er / "envB"
+    _ra.mkdir(), _rb.mkdir()
+    _pa = _ra / "fixt_route_001.pdf"
+    _pb = _rb / "envB fixt_route_001.pdf"       # the store-tagged spelling
+    _mini_pdf(_pa, [(20, 50, 12, "001"), (120, 50, 12, "X")])
+    _mini_pdf(_pb, [(20, 50, 12, "001"), (120, 50, 12, "Y")])
+    _row5 = "_fixture_env_row"
+    _mod5 = _env_fixture_adapter()
+    ve._ENV_ADAPTER_MODULES[_row5] = _mod5.__name__
+    _schema5 = _CS(report_name="Fixture Env", header=["Route", "F"],
+                   side_a="envB", side_b="envA")
+    _cmp5 = _er / "envB_fixture.xlsx"
+    _inputs5 = [
+        {"kind": "folder", "role": "envB",
+         "selection": str(_rb.resolve()), "member_count": 1,
+         "members": _census([_pb])},
+        {"kind": "folder", "role": "envA",
+         "selection": str(_ra.resolve()), "member_count": 1,
+         "members": _census([_pa])},
+    ]
+    _committed5 = _astore.commit_workbook(
+        _cmp5,
+        lambda tmp: _rc(_schema5, [["001", "Y"]], [["001", "X"]], False, tmp,
+                        mode="values", confirm_overwrite=lambda _p: True,
+                        name_a="envB", name_b="envA"),
+        expect_sheet="Comparison", confirm_overwrite=lambda _p: True,
+        source_paths=(_rb, _ra), requested_mode="values")
+    check("the env fixture comparison publishes through the front door",
+          _committed5.status == "ok"
+          and _ctc.write_comparison_provenance(
+              _committed5, _cmp5, report="Fixture Env", banner="fixture",
+              inputs=_inputs5))
+    _before5 = _astore.content_digest(_cmp5)
+    _ev5 = _events_mod.Events(on_log=lambda _m: None)
+    _res5 = ve.generate(_row5, None, None, _cmp5, None, _ev5, examples=1,
+                        layout="pair", flavor=ve.FLAVOR_ENV)
+    _wb5, _img5 = ve.sibling_paths(_cmp5)
+    _man5 = em.manifest_path(_cmp5)
+    check("bound manifest + workbook + image set exist",
+          _res5.get("rendered") == 1 and _wb5.exists() and _man5.exists()
+          and len(list(_img5.glob("*.png"))) == 1)
+    _m5 = _json.loads(_man5.read_text(encoding="utf-8"))
+    _names5 = [x["name"] for x in _m5.get("read_set", [])]
+    check("the read set is PDF-ONLY and exactly the two compared prints",
+          _m5.get("state") == em.STATE_RENDERED
+          and sorted(Path(n).name for n in _names5)
+          == sorted([_pa.name, _pb.name])
+          and all(n.lower().endswith(".pdf") for n in _names5))
+    _census5 = {m["name"] for s in _inputs5 for m in s["members"]}
+    check("every read-set member is a recorded census member (exact-source)",
+          {Path(n).name for n in _names5} == _census5)
+    check("the render leaves the comparison content byte-identical "
+          "(counts unchanged with evidence on)",
+          _astore.content_digest(_cmp5) == _before5)
+
+    print("HF-10: an env pair that cannot bind publishes NOTHING")
+    _pb.touch()                          # drift side B against the census
+    try:
+        ve.generate(_row5, None, None, _cmp5, None, _ev5, examples=1,
+                    layout="pair", flavor=ve.FLAVOR_ENV)
+        check("a census-drifted env pair refuses loudly", False)
+    except ve.EvidenceSourceBindingError:
+        check("a census-drifted env pair refuses loudly", True)
+    check("...and zero artifacts survive — manifest included, prior set "
+          "retired",
+          not _wb5.exists() and not _img5.exists() and not _man5.exists())
+
+    # The drift above renders one example first, so the snapshot-time census
+    # binding catches it too — deleting the FRONT-DOOR check still passed.
+    # A comparison with NO differences publishes a manifest without rendering
+    # anything, so nothing but the front door stands between a drifted source
+    # and that manifest. This is the case that locks it.
+    print("HF-10: the no-EXAMPLES path is bound at the front door")
+    _inputs6 = [
+        {"kind": "folder", "role": "envB", "selection": str(_rb.resolve()),
+         "member_count": 1, "members": _census([_pb])},
+        {"kind": "folder", "role": "envA", "selection": str(_ra.resolve()),
+         "member_count": 1, "members": _census([_pa])},
+    ]
+    _cmp6 = _er / "envB_fixture_same.xlsx"
+    _committed6 = _astore.commit_workbook(
+        _cmp6,
+        lambda tmp: _rc(_schema5, [["001", "X"]], [["001", "X"]], False, tmp,
+                        mode="values", confirm_overwrite=lambda _p: True,
+                        name_a="envB", name_b="envA"),
+        expect_sheet="Comparison", confirm_overwrite=lambda _p: True,
+        source_paths=(_rb, _ra), requested_mode="values")
+    check("the no-differences env fixture publishes through the front door",
+          _committed6.status == "ok"
+          and _ctc.write_comparison_provenance(
+              _committed6, _cmp6, report="Fixture Env", banner="fixture",
+              inputs=_inputs6))
+    _man6 = em.manifest_path(_cmp6)
+    _wb6, _img6 = ve.sibling_paths(_cmp6)
+    _res6 = ve.generate(_row5, None, None, _cmp6, None, _ev5, examples=1,
+                        layout="pair", flavor=ve.FLAVOR_ENV)
+    check("a no-differences env comparison publishes a manifest and NO images",
+          _res6.get("rendered") == 0 and _man6.exists()
+          and not _img6.exists())
+    with open(_pa, "ab") as _fh:            # drift side A: size AND mtime move
+        _fh.write(b"\n% drifted after the comparison recorded its census\n")
+    try:
+        ve.generate(_row5, None, None, _cmp6, None, _ev5, examples=1,
+                    layout="pair", flavor=ve.FLAVOR_ENV)
+        check("a drifted source refuses even when there is nothing to render",
+              False)
+    except ve.EvidenceSourceBindingError:
+        check("a drifted source refuses even when there is nothing to render",
+              True)
+    check("...and the manifest the no-examples path would have published is "
+          "retired, not left behind",
+          not _man6.exists() and not _wb6.exists() and not _img6.exists())
+
+    # Side ORDER is structural, not conventional. The provenance records each
+    # side's role positionally; if the roles are not the published side labels
+    # in order, every crop would be captioned with the OTHER environment's
+    # name — an image that looks right and says the wrong thing.
+    print("HF-10: the recorded side roles must BE the published side labels")
+    _inputs8 = [
+        {"kind": "folder", "role": "envA", "selection": str(_rb.resolve()),
+         "member_count": 1, "members": _census([_pb])},
+        {"kind": "folder", "role": "envB", "selection": str(_ra.resolve()),
+         "member_count": 1, "members": _census([_pa])},
+    ]                                        # roles SWAPPED against the schema
+    _cmp8 = _er / "envB_fixture_swapped.xlsx"
+    _committed8 = _astore.commit_workbook(
+        _cmp8,
+        lambda tmp: _rc(_schema5, [["001", "Y"]], [["001", "X"]], False, tmp,
+                        mode="values", confirm_overwrite=lambda _p: True,
+                        name_a="envB", name_b="envA"),
+        expect_sheet="Comparison", confirm_overwrite=lambda _p: True,
+        source_paths=(_rb, _ra), requested_mode="values")
+    check("the swapped-role fixture publishes through the front door",
+          _committed8.status == "ok"
+          and _ctc.write_comparison_provenance(
+              _committed8, _cmp8, report="Fixture Env", banner="fixture",
+              inputs=_inputs8))
+    _man8 = em.manifest_path(_cmp8)
+    try:
+        ve.generate(_row5, None, None, _cmp8, None, _ev5, examples=1,
+                    layout="pair", flavor=ve.FLAVOR_ENV)
+        check("roles that are not the published side labels refuse", False)
+    except ve.EvidenceSourceBindingError as _e8:
+        check("roles that are not the published side labels refuse",
+              "cannot be ordered" in str(_e8))
+    check("...and that refusal publishes nothing either",
+          not _man8.exists() and not ve.sibling_paths(_cmp8)[0].exists())
+
+    print("HF-10: a cell whose sides are not both PDFs produces nothing")
+    try:
+        ve.generate("highway_log", None, None, _cmp5, None, _ev5,
+                    examples=1, layout="pair", flavor=ve.FLAVOR_ENV)
+        check("a row with no env adapter refuses", False)
+    except Exception:
+        check("a row with no env adapter refuses", True)
+finally:
+    ve._ENV_ADAPTER_MODULES.pop(_row5, None)
+    sys.modules.pop("_fixture_env_adapter", None)
+    shutil.rmtree(_er, ignore_errors=True)
 
 print()
 if _fail:

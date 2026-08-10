@@ -181,6 +181,12 @@ def enumerate_diffs(tsmis_rows, tsn_rows, sidecar, schema=None):
 # --------------------------------------------------------------------------- #
 # verification projection
 # --------------------------------------------------------------------------- #
+# The engine passes each example's route into `project` (CMP-AUD-204's
+# own-route-only Description strip needs it; without the route the projection
+# strips nothing and every prefixed-row example refuses — RB-4 audit).
+PROJECT_ROUTE_AWARE = True
+
+
 def project(field, raw, side="tsmis", route=None):
     """A raw PDF cell value -> the compared form, per the comparator's own
     per-field normalization + the engine's Excel TRIM. Description is
@@ -214,6 +220,39 @@ def excel_column_for(field, excel_header):
            "Distance To Next Point": chsl._TSMIS["dist"],
            "Description": chsl._TSMIS["desc"]}
     return pos.get(field)
+
+
+def pdf_excel_column_for(field, excel_header):
+    """The PDF-edition consolidated workbook reproduces the Excel export's
+    header verbatim (CMP-AUD-032, censused), so one gate resolves both."""
+    return excel_column_for(field, excel_header)
+
+
+def tsn_excel_column_for(field, excel_header):
+    """The normalized TSN library workbook: ['Route'] + SHARED_HEADER, read
+    positionally under the loader's own exact-prefix gate."""
+    header = ["" if c is None else str(c).strip() for c in excel_header]
+    want = ["Route"] + list(chsl.SHARED_HEADER)
+    if header[:len(want)] != want:
+        return None
+    if field in chsl.SHARED_HEADER:
+        return 1 + chsl.SHARED_HEADER.index(field)
+    return None
+
+
+def tsn_project(field, raw):
+    """The TSN-side panel check: the normalized workbook already carries the
+    compared forms (Description verbatim — CMP-AUD-204), so the strict shared
+    normalization is the whole projection."""
+    return project(field, raw, side="tsn")
+
+
+def workbook_sheet(kind):
+    """Both TSMIS editions carry their data on the export's own sheet; the
+    normalized TSN workbook on the normalizer's sheet."""
+    if kind == "tsn":
+        return ctnsl.NORMALIZED_SHEET
+    return "Highway Locations"
 
 
 # --------------------------------------------------------------------------- #
@@ -255,10 +294,12 @@ def _classify_line_words(line_words, b):
     return cols
 
 
-def locate_tsmis(pdf_path, needed_keys):
-    """{composite_key: [record]} for `needed_keys`; a record carries the parsed
+def locate_tsmis(pdf_path, needed_keys, key_fn=None):
+    """{key: [record]} for `needed_keys`; a record carries the parsed
     column words plus geometry (page, y-extent, boundaries, wrapped-Description
-    fragment boxes).
+    fragment boxes). `key_fn(vals)` overrides the vs-TSN composite keying —
+    the env flavor keys records by the plain PM cell the env comparison
+    publishes.
 
     LOCKSTEP: this walk mirrors consolidate_tsmis_highway_sequence_pdf
     .parse_pdf step for step (per-page header windows, the trailer hard-stop,
@@ -314,14 +355,17 @@ def locate_tsmis(pdf_path, needed_keys):
                                   vals["desc"]))
             for pr in page_rows:
                 top, cols, vals, _ = pr
-                glued = f"{vals['prefix']}{vals['pm']}{vals['suffix']}"
-                canon = _canon(vals["county"], glued)
+                if key_fn is not None:
+                    canon = key_fn(vals)
+                else:
+                    glued = f"{vals['prefix']}{vals['pm']}{vals['suffix']}"
+                    canon = _canon(vals["county"], glued)
                 if canon not in needed_keys:
                     continue
                 line_words = [w for ws in cols.values() for w in ws]
                 bottom = max(w["bottom"] for w in line_words)
                 rec = {"cols": cols, "vals": vals, "boundaries": b,
-                       "route": file_route,
+                       "route": file_route, "src": str(pdf_path),
                        "page": page_no, "top": top, "bottom": bottom,
                        "desc": []}
                 if cols["desc"]:
@@ -370,6 +414,18 @@ def tsmis_value(rec, field):
                    route=rec.get("route"))
 
 
+def tsmis_raw(rec, field):
+    """The print's OWN token for `field` — what a reader SEES inside the red
+    box, before `project` normalizes it (PM is the print's three windows glued
+    the way the comparison glues them; a Description keeps its own-route label
+    that the comparison strips). The engine discloses it on the image whenever
+    it differs from the compared value."""
+    if field == "PM":
+        v = rec["vals"]
+        return f"{v['prefix']}{v['pm']}{v['suffix']}"
+    return rec["vals"][_TSMIS_COL[field]]
+
+
 def tsmis_box(rec, field):
     """(page_no, cell_box, record_yspan, record_xspan) for `field`'s cell."""
     line_words = [w for ws in rec["cols"].values() for w in ws]
@@ -379,10 +435,9 @@ def tsmis_box(rec, field):
              max([rec["bottom"]] + [d["bottom"] for d in rec["desc"]]))
     if field == "Description":
         if not rec["desc"]:
-            # a blank Description: box the gap where it would print
-            x0 = rec["boundaries"]["dist_desc"] + 6
-            return (rec["page"], (x0, rec["top"] - 2, x0 + 180,
-                                  rec["bottom"] + 2), yspan, xspan)
+            # a blank Description REFUSES — the print anchors no cell for it,
+            # and the old 180pt gap guess was the PCOA-FINAL-005 class.
+            return None
         segs = rec["desc"]
         box = (min(d["x0"] for d in segs) - 2, min(d["top"] for d in segs) - 2,
                max(d["x1"] for d in segs) + 2, max(d["bottom"] for d in segs) + 2)
@@ -469,7 +524,7 @@ def _scan_tsn_print(path, needed_routes, needed_keys, found):
                                     ft=None, dist=None, description="EQUATES TO")
                     open_rec = _keep_tsn(found, needed_routes, needed_keys, path,
                                          district, county, route, open_row,
-                                         page_no, line)
+                                         page_no, line, equate=True)
                     continue
                 if ctnsl.COUNTY_RE.match(co) and pm:
                     if route is None:
@@ -513,15 +568,17 @@ def _scan_tsn_print(path, needed_routes, needed_keys, found):
 
 
 def _keep_tsn(found, needed_routes, needed_keys, path, district, county, route,
-              rowd, page_no, line):
-    """Record `rowd` if its (route, key) is wanted; returns the record or None."""
+              rowd, page_no, line, equate=False):
+    """Record `rowd` if its (route, key) is wanted; returns the record or None.
+    `equate` marks the synthetic equate-annotation rows, whose printed line has
+    no column grid — their blank fields have no cell rectangle to box."""
     if route not in needed_routes:
         return None
     canon = _canon(county, rowd["pm"])
     if ("", route, canon) not in needed_keys:
         return None
     rec = {"rowd": rowd, "src": str(path), "dist": district, "cnty": county,
-           "page": page_no,
+           "page": page_no, "equate": equate,
            "top": min(w["top"] for w in line),
            "bottom": max(w["bottom"] for w in line),
            "words": list(line), "desc": []}
@@ -541,10 +598,17 @@ def _keep_tsn(found, needed_routes, needed_keys, path, district, county, route,
 def tsn_value(rec, field):
     """The compared value this print record carries for `field` (TSN side:
     Description verbatim — CMP-AUD-204)."""
-    key = {"County": "county", "PM": "pm", "City": "city", "HG": "hg",
-           "FT": "ft", "Distance To Next Point": "dist",
-           "Description": "description"}[field]
-    return project(field, rec["rowd"].get(key), side="tsn")
+    return project(field, rec["rowd"].get(_TSN_ROWD_KEY[field]), side="tsn")
+
+
+_TSN_ROWD_KEY = {"County": "county", "PM": "pm", "City": "city", "HG": "hg",
+                 "FT": "ft", "Distance To Next Point": "dist",
+                 "Description": "description"}
+
+
+def tsn_raw(rec, field):
+    """The TSN print's OWN token for `field` (see `tsmis_raw`)."""
+    return rec["rowd"].get(_TSN_ROWD_KEY[field])
 
 
 def tsn_box(rec, field):
@@ -566,14 +630,23 @@ def tsn_box(rec, field):
                      "x0": min(w["x0"] for w in base),
                      "x1": max(w["x1"] for w in base)}] + rec["desc"]
         if not segs:
-            lo, hi = ctnsl.W_DESC
-            return (rec["page"], (lo, rec["top"] - 2, lo + 180,
-                                  rec["bottom"] + 2), yspan, xspan)
+            # No printed words in the description band — the synthesized
+            # equate Description ('EQUATES TO' prints far left of the column)
+            # or a truly blank cell. A fixed-zone guess landed ~100 pt right
+            # of the text it claimed to show (PCOA-FINAL-005); no geometry.
+            return None
         if {d["page"] for d in segs} != {rec["page"]}:
             return None                          # split across pages
         box = (min(d["x0"] for d in segs) - 2, min(d["top"] for d in segs) - 2,
                max(d["x1"] for d in segs) + 2, max(d["bottom"] for d in segs) + 2)
         return rec["page"], box, yspan, xspan
+    if rec.get("equate") and field not in ("County", "PM"):
+        # A collapsed equate line has no column grid: its printed words belong
+        # to the annotation text, never to the blank HG/FT/City/Distance cells
+        # — boxing the nearest word put the target on the final 'O' of
+        # 'EQUATES TO' (the PCOA-FINAL-005 witness, HSL FT blanks). No
+        # geometry; the example is skipped with a recorded reason.
+        return None
     lo, hi = _TSN_WIN[field]
     hits = [w for w in words if lo <= w["x0"] < hi]
     if hits:
@@ -586,3 +659,99 @@ def tsn_box(rec, field):
         x0, x1 = lo, min(hi, lo + 30)
     return (rec["page"],
             (x0 - 2, rec["top"] - 2, x1 + 2, rec["bottom"] + 2), yspan, xspan)
+
+
+# --------------------------------------------------------------------------- #
+# cross-environment (HF-10) — both sides are per-route TSMIS prints
+# --------------------------------------------------------------------------- #
+# env display field -> the TSMIS print's column bucket. The env comparison
+# publishes the per-route export layout's own names: the two unnamed postmile
+# columns surface as '(col C)' (prefix) and '(col E)' (suffix) — compare_env's
+# _load_xlsx_side positional relabel rule, pinned by check_visual_evidence.
+_ENV_COL = {"County": "county", "City": "city", "(col C)": "prefix",
+            "(col E)": "suffix", "HG": "hg", "FT": "ft",
+            "Distance To Next Point": "dist", "Description": "desc"}
+# Each column's OWN window between the measured header boundaries (None = the
+# record line's left edge). A BLANK cell boxes this window, inset so it can
+# never cross a boundary — the RB-4 audit measured the previous fixed
+# `boundary + offset … +30pt` guesses enclosing the NEIGHBOURING column's
+# glyphs on thousands of rows (a blank '(col C)' boxed the PM value, a blank
+# '(col E)' boxed the HG letter): the PCOA-FINAL-005 class this bundle
+# retires, reintroduced by the guess. On this header-anchored layout the
+# window IS the cell, the same rule the RD/ID adapters use.
+_ENV_WINDOW = {"county": (None, "county_city"),
+               "city": ("county_city", "city_prefix"),
+               "prefix": ("city_prefix", "prefix_pm"),
+               "suffix": ("pm_suffix", "suffix_hg"),
+               "hg": ("suffix_hg", "hg_ft"),
+               "ft": ("hg_ft", "ft_dist"),
+               "dist": ("ft_dist", "dist_desc")}
+
+
+def env_fields():
+    """The env comparison's display columns minus the PM key, in the per-route
+    export's own order."""
+    return ["County", "City", "(col C)", "(col E)", "HG", "FT",
+            "Distance To Next Point", "Description"]
+
+
+def _env_key(vals):
+    """The env comparison's published row key: the PM cell alone (key_col='PM'
+    — no prefix/suffix glue), through the generic cell normalization the env
+    loader applies."""
+    return _xl_trim(chsl._v(vals.get("pm")))
+
+
+def env_locate(pdf_path, needed_keys):
+    """{published_key: [record]} in one per-route print — the LOCKSTEP TSMIS
+    parse, re-keyed the env comparison's way (the plain PM cell)."""
+    return locate_tsmis(pdf_path, needed_keys, key_fn=_env_key)
+
+
+def env_project(field, raw):
+    """The env loader applies the generic cell normalization only (no county
+    or Description reshaping — the conversion already wrote the print's parsed
+    tokens), so the panel check stays strict."""
+    del field
+    return _xl_trim(chsl._v(raw))
+
+
+def env_value(rec, field):
+    col = _ENV_COL[field]
+    return env_project(field, rec["vals"].get(col))
+
+
+def env_box(rec, field):
+    """Geometry for one env display column: the printed words' own extent, or
+    for a BLANK cell the column's boundary-delimited window inset to stay
+    inside it (see `_ENV_WINDOW`). A blank Description REFUSES — the print has
+    no anchored cell for it, and a guessed rectangle is the PCOA-FINAL-005
+    class (its siblings all refuse the same case)."""
+    col = _ENV_COL[field]
+    line_words = [w for ws in rec["cols"].values() for w in ws]
+    xspan = (min(w["x0"] for w in line_words) - 4,
+             max(w["x1"] for w in line_words) + 4)
+    yspan = (rec["top"],
+             max([rec["bottom"]] + [d["bottom"] for d in rec["desc"]]))
+    if col == "desc":
+        if not rec["desc"]:
+            return None
+        segs = rec["desc"]
+        box = (min(d["x0"] for d in segs) - 2, min(d["top"] for d in segs) - 2,
+               max(d["x1"] for d in segs) + 2,
+               max(d["bottom"] for d in segs) + 2)
+        return rec["page"], box, yspan, xspan
+    ws = rec["cols"].get(col) or []
+    if ws:
+        x0, x1 = min(w["x0"] for w in ws), max(w["x1"] for w in ws)
+        return (rec["page"],
+                (x0 - 2, rec["top"] - 2, x1 + 2, rec["bottom"] + 2),
+                yspan, xspan)
+    lo_key, hi_key = _ENV_WINDOW[col]
+    lo = xspan[0] + 2 if lo_key is None else rec["boundaries"][lo_key]
+    hi = rec["boundaries"][hi_key]
+    x0, x1 = lo + 2, hi - 2
+    if x1 <= x0:
+        return None                  # a window too narrow to box honestly
+    return (rec["page"], (x0, rec["top"] - 2, x1, rec["bottom"] + 2),
+            yspan, xspan)

@@ -230,19 +230,28 @@ function syncEvidenceControls(cbId, countRowId, countId, hintId, layoutId) {
   for (const r of ev.reports || []) {
     if (r.tsn_pdfs) {
       lines.push(line("ok",
-        `${r.label} — will generate (${r.tsn_pdfs} TSN print${r.tsn_pdfs === 1 ? "" : "s"})`,
-        `TSN prints read from ${r.dir}. Cells whose run lacks the ${r.label} (PDF) ` +
-        "export skip with a note (that export is the TSMIS-side image source)."));
+        `${r.label} (PDF) — will generate (${r.tsn_pdfs} TSN print${r.tsn_pdfs === 1 ? "" : "s"})`,
+        `Print crops of the per-route TSMIS export and the TSN print, read from ${r.dir}. ` +
+        `Cells whose run lacks the ${r.label} (PDF) export skip with a note.`));
     } else {
       lines.push(line("todo",
-        `${r.label} — needs its TSN PDFs in ${r.dir}`,
-        "Evidence is supported for this report, but its TSN prints aren't there yet."));
+        `${r.label} (PDF) — needs its TSN PDFs in ${r.dir}`,
+        "Evidence is supported for this report's PDF edition, but its TSN " +
+        "prints aren't there yet."));
     }
   }
+  if ((ev.env_rows || []).length) {
+    lines.push(line("ok",
+      "Cross-environment PDF-vs-PDF cells — both environments' own prints",
+      "The env cells of the PDF-edition reports render highlighted crops of " +
+      "the exact per-route prints each side's comparison parsed (checked per " +
+      "cell against the comparison's own recorded read set)."));
+  }
   if ((ev.unsupported || []).length) {
-    lines.push(line("na", `No evidence support yet: ${ev.unsupported.join(", ")}.`,
-      "Evidence images need both sides as PDFs; these reports don't have " +
-      "verified PDF sources yet."));
+    lines.push(line("na", `No evidence: ${ev.unsupported.join(", ")}.`,
+      "Evidence collection exists only for the PDF-edition reports — a crop " +
+      "of an independent print is what makes it a valid spot check of the " +
+      "comparison sheet."));
   }
   hint.replaceChildren(...lines);
 }
@@ -255,16 +264,20 @@ function syncDayMatrixEvidence() {
     "dayMatrixEvidenceCount", "dayMatrixEvidenceHint", "dayMatrixEvidenceLayout");
 }
 
-// Whether a row can run the ON-DEMAND per-cell evidence action right now:
-// deps in the build, the row has an adapter, and ITS report's TSN prints are
-// dropped in (per-report since v0.22.0). Returns the report info (for the
-// tooltip) or null.
-function evidenceActionInfo(rowKey) {
+// Whether a row can run the ON-DEMAND per-cell evidence action right now for
+// the given mode. Evidence exists ONLY on the PDF-vs-PDF lanes (the 2026-08-05
+// ruling): the vs-TSN and cross-environment comparisons of the PDF-edition
+// reports. Self-check (vs_pdf/vs_excel) cells and Excel rows never offer the
+// action. Returns {label} for the tooltip, or null.
+function evidenceActionInfo(rowKey, mode) {
   const ev = (S.st && S.st.evidence) || {};
-  if (!ev.deps_ok || !(ev.rows || []).includes(rowKey)) return null;
+  if (!ev.deps_ok) return null;
+  const lane = mode === "env" ? ev.env_rows
+    : mode === "tsn" ? ev.rows : null;
+  if (!(lane || []).includes(rowKey)) return null;
   const repKey = (ev.row_reports || {})[rowKey];
   const rep = (ev.reports || []).find((r) => r.key === repKey);
-  return rep && rep.tsn_pdfs ? rep : null;
+  return { label: (rep && rep.label) || rowKey };
 }
 
 // Whether the Evidence images toggle is ON. The per-cell CAMERA (which GENERATES
@@ -275,22 +288,22 @@ function evidenceOn() {
   return !!(S.st && S.st.evidence && S.st.evidence.on);
 }
 
-// A small camera badge on an evidence-SUPPORTED row's header (both matrices):
-// lit when its TSN prints are in place (images will render for its vs-TSN
-// comparisons), dimmed with the drop-folder in the tooltip when not. Rows with
-// no evidence support get no badge — the toggle's status lines name them.
+// A small camera badge on an evidence-SUPPORTED row's header (both matrices).
+// Only the PDF-edition rows carry one (the 2026-08-05 ruling): their vs-TSN
+// and env lanes render print crops. Every other row gets no badge — the
+// toggle's status lines name them.
 function evidenceRowBadge(rowKey) {
   const ev = (S.st && S.st.evidence) || {};
-  if (!ev.deps_ok || !(ev.rows || []).includes(rowKey)) return null;
+  const anyLane = (ev.rows || []).includes(rowKey)
+    || (ev.env_rows || []).includes(rowKey);
+  if (!ev.deps_ok || !anyLane) return null;
   const repKey = (ev.row_reports || {})[rowKey];
   const rep = (ev.reports || []).find((r) => r.key === repKey);
-  if (!rep) return null;
+  const label = (rep && rep.label) || rowKey;
   const b = document.createElement("span");
-  b.className = "mxrh-evbadge" + (rep.tsn_pdfs ? "" : " mxrh-evbadge-off");
+  b.className = "mxrh-evbadge";
   b.appendChild(icon("i-camera", "ic"));
-  b.title = rep.tsn_pdfs
-    ? `Evidence images supported — the toggle (or a cell's camera) renders ${rep.label} diffs as highlighted PDF snippets.`
-    : `Evidence images supported once ${rep.label}'s TSN PDFs are in ${rep.dir}.`;
+  b.title = `Evidence images supported — the toggle (or a cell's camera) renders ${label} diffs as crops of both source prints.`;
   return b;
 }
 
@@ -837,7 +850,9 @@ async function renderMatrix() {
           // the Evidence images toggle ON and a FRESH cell (a stale cell needs a
           // comparison rebuild first, which regenerates evidence itself). The
           // IMAGE button OPENS an already-generated set — toggle-agnostic.
-          if (snap.modes[rk] === "tsn" && evidenceActionInfo(rk)) {
+          if ((snap.modes[rk] === "tsn" || snap.modes[rk] === "env")
+              && evidenceActionInfo(rk, snap.modes[rk])
+              && !(snap.modes[rk] === "env" && env === snap.baseline)) {
             if (evidenceOn() && !cmp.stale) {
               acts.appendChild(mxActBtn("i-camera",
                 "Generate/refresh the evidence images for this comparison (no re-compare)",
@@ -1129,7 +1144,7 @@ async function renderDayMatrix() {
           // Evidence for the EXISTING comparison (by-day cells are always
           // vs-TSN). The CAMERA generates (toggle ON + fresh cell only); the
           // IMAGE button opens an already-generated set (toggle-agnostic).
-          if (evidenceActionInfo(rk)) {
+          if (evidenceActionInfo(rk, "tsn")) {
             if (evidenceOn() && !cmp.stale) {
               acts.appendChild(mxActBtn("i-camera",
                 "Generate/refresh the evidence images for this comparison (no re-compare)",
