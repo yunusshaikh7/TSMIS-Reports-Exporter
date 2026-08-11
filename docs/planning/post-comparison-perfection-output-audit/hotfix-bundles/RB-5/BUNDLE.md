@@ -23,6 +23,29 @@ Status: **READY**
 | Second reviewer | **Codex** — separate fresh review that challenges Review 1 and independently re-derives bounded source cases |
 | Rush ship | **Eligible, not planned.** Only an explicit owner invocation activates the exception; it cannot waive the full gate, combined acceptance run, source recounts, or two-review merge gate |
 
+## Post-readiness `main` advance — 2026-08-10
+
+The readiness source above is no longer the tip of `main`. Two independent
+releases landed afterward: `v0.34.0` (`63a56a0`) and `v0.35.0` (`800bea2`).
+`v0.35.0` deliberately changed Highway Sequence **vs-TSN** so `HG`, `City`, and
+`Distance To Next Point` are asserted rather than context-only, and updated that
+comparator's Notes and focused checks. It did not implement HF-06 or HF-09 and
+did not start `RB5-A1`.
+
+Stage 4 therefore must:
+
+1. branch from and record the latest clean pushed `main` (at least `800bea2`),
+   never the older readiness source;
+2. treat the `v0.35.0` Highway Sequence vs-TSN semantics as an owner-directed
+   pre-existing baseline and neither revert nor reclassify them under RB-5;
+3. interpret every "Highway Sequence vs-TSN counts unchanged" criterion as an
+   exact comparison between the recorded Stage-4 base and the RB-5 acceptance
+   head; and
+4. bind the required pre-fix signatures and witnesses to that recorded base.
+
+The readiness source remains useful provenance for the frozen scope. It is not
+an allowed acceptance baseline after `main` advanced.
+
 ## Bundle scope and completeness rule
 
 RB-5 is exactly the union of HF-06 and HF-09 below. Every scope statement,
@@ -176,7 +199,7 @@ relations, three delayed target markers, zero unsupported cases, zero residual).
 the change rides an **opt-in** mechanism scoped to this comparator — never a
 shared-formula or shared-equality edit; it honors the `compare_core` correctness
 lock and
-[the Phase-3 decision gates](../comparison-perfection/comparison-phase3-decision-gates.md)
+[the Phase-3 decision gates](../../../comparison-perfection/comparison-phase3-decision-gates.md)
 (D0's "is this a difference?" criterion); it is proved against an **independent**
 oracle over all 60,254 rows, not the product's own parser; Highway Sequence
 **vs TSN** counts must not move by a single cell; and the anti-suppression test

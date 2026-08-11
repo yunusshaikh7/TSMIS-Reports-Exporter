@@ -322,6 +322,41 @@ def test_nested_menu(page):
           isinstance(raised, ReportUnavailableError))
 
 
+def test_duplicate_district_labels(page):
+    print("2026-08 form controls: duplicate District labels use stable IDs:")
+    page.goto(_fixture_url("dropdown_nested.html"))
+    check("fixture exposes both District-labelled controls",
+          page.get_by_label("District").count() == 2)
+
+    err = None
+    try:
+        select_report(page, "Highway Log", data_value="highway_log")
+    except Exception as e:  # noqa: BLE001 -- reported by the assertion below
+        err = e
+    check("select_report ignores the ambiguous label and completes",
+          err is None)
+
+    def selected_text(selector):
+        return page.locator(selector).evaluate(
+            "el => el.options[el.selectedIndex].textContent.trim()")
+
+    check("District/Route District is fanned out to -- ALL --",
+          selected_text("#districtSelect") == "-- ALL --")
+    check("District/Route County is fanned out to -- ALL --",
+          selected_text("#districtCountySelect") == "-- ALL --")
+
+    # Preflight must use the same structural Route/Generate IDs. The captured
+    # page carries multiple Route- and Generate-like controls for its two modes.
+    page.goto(_fixture_url("dropdown_nested.html"))
+    preflight_error = None
+    try:
+        common.preflight(page, "Highway Log", data_value="highway_log")
+    except Exception as e:  # noqa: BLE001 -- reported by the assertion below
+        preflight_error = e
+    check("preflight completes against the two-mode form",
+          preflight_error is None)
+
+
 def test_env_scan_probe(page):
     print("env-scan dropdown probe (_REPORT_OPTIONS_JS) on the nested menu:")
     from gui_worker import _REPORT_OPTIONS_JS
@@ -517,6 +552,7 @@ def main():
             test_is_empty(page)
             test_error_js(page)
             test_cs_disabled(page)
+            test_duplicate_district_labels(page)
             test_exact_match(page)
             test_nested_menu(page)
             test_env_scan_probe(page)

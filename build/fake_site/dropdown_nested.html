@@ -84,6 +84,43 @@ is exactly the contract select_report's submenu-reveal must satisfy.
       </li>
     </ul>
   </div>
+
+  <!-- Synthetic 2026-08 form contract. Postmile mode added another control
+       labelled "District"; it remains in the DOM while District/Route mode is
+       active, so accessible-label lookup is ambiguous even though this row is
+       hidden. The exporter must target the long-stable structural IDs. -->
+  <button id="modeBtnDistrictRoute" type="button" disabled>
+    District / County / Route
+  </button>
+  <div id="controlsGrid">
+    <div id="districtRow" style="display:none">
+      <label for="districtSelect">District</label>
+      <select id="districtSelect">
+        <option value="pick" disabled selected>-- Select District --</option>
+        <option value="">-- ALL --</option>
+        <option value="01">01</option>
+      </select>
+    </div>
+    <div id="districtCountyRow" style="display:none">
+      <label for="districtCountySelect">County</label>
+      <select id="districtCountySelect" disabled>
+        <option value="pick" disabled selected>-- Select County --</option>
+        <option value="">-- ALL --</option>
+      </select>
+    </div>
+    <div id="districtRouteRow" style="display:none">
+      <label for="districtRouteSelect">Route</label>
+      <select id="districtRouteSelect">
+        <option value="001">001</option>
+      </select>
+    </div>
+    <div id="pmDistrictRow" style="display:none">
+      <label for="pm-district">District</label>
+      <select id="pm-district"><option value="ALL">ALL</option></select>
+    </div>
+    <button id="districtRouteBtn" type="button" style="display:none">Generate</button>
+    <button id="translateBtn" type="button" style="display:none">Generate</button>
+  </div>
   <script>
     // Mirror the live widget: a click on an ENABLED option records its full name
     // (data-label, else the visible text) into window.__picked and the cs-value,
@@ -93,6 +130,19 @@ is exactly the contract select_report's submenu-reveal must satisfy.
     const cs = document.getElementById('customReport');
     const csValue = cs.querySelector('.cs-value');
     const hidden = document.getElementById('reportSelect');
+    const mode = document.getElementById('modeBtnDistrictRoute');
+    const district = document.getElementById('districtSelect');
+    const county = document.getElementById('districtCountySelect');
+    mode.addEventListener('click', () => {
+      document.getElementById('districtRow').style.display = 'flex';
+      document.getElementById('districtCountyRow').style.display = 'flex';
+      document.getElementById('districtRouteRow').style.display = 'flex';
+      document.getElementById('pmDistrictRow').style.display = 'none';
+      document.getElementById('districtRouteBtn').style.display = 'inline-block';
+    });
+    district.addEventListener('change', () => {
+      county.disabled = false;
+    });
     cs.querySelector('.cs-trigger').addEventListener('click',
       () => cs.classList.toggle('is-open'));
     cs.querySelectorAll('.cs-option:not(.cs-disabled)').forEach(opt => {
@@ -101,6 +151,7 @@ is exactly the contract select_report's submenu-reveal must satisfy.
         window.__picked = name;
         csValue.textContent = name;
         hidden.value = opt.dataset.value;   // mirror the stable id, as main.js does
+        mode.disabled = false;
         cs.classList.remove('is-open');
       });
     });

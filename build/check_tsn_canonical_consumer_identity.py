@@ -688,8 +688,10 @@ def test_capture_carries_its_source_record():
         abandoned = Path(tempfile.mkdtemp(
             prefix=_CAPTURE_PREFIX))
         shutil.copy2(library, abandoned / library.name)
+        abandoned_sidecar = consolidation_meta.meta_path(abandoned / library.name)
+        abandoned_sidecar.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(consolidation_meta.meta_path(library),
-                     consolidation_meta.meta_path(abandoned / library.name))
+                     abandoned_sidecar)
         fresh = Path(tempfile.mkdtemp(prefix=_CAPTURE_PREFIX))
         shutil.copy2(library, fresh / library.name)
         foreign = Path(tempfile.mkdtemp(prefix=_CAPTURE_PREFIX))

@@ -365,6 +365,7 @@ def main():
         wbp = tmp / "rob" / "wb.xlsx"
         wbp.parent.mkdir(parents=True, exist_ok=True)
         wbp.write_bytes(b"PK")
+        cm.meta_path(wbp).parent.mkdir(parents=True, exist_ok=True)
         cm.meta_path(wbp).write_text("{ not valid json", encoding="utf-8")
         check("corrupt JSON sidecar -> conservative partial (no raise)",
               cm.read_completion(wbp) == oc.PARTIAL)
@@ -579,6 +580,7 @@ def main():
         ur = tmp / "unread" / "wb.xlsx"
         ur.parent.mkdir(parents=True, exist_ok=True)
         ur.write_bytes(b"PK")
+        cm.meta_path(ur).parent.mkdir(parents=True, exist_ok=True)
         cm.meta_path(ur).mkdir()                        # a dir at the sidecar path -> open() OSError
         check("present-but-unreadable sidecar -> conservative partial (not None/legacy)",
               cm.read_completion(ur) == oc.PARTIAL)
@@ -748,16 +750,17 @@ def main():
         cp8.parent.mkdir(parents=True, exist_ok=True)
         cp8.write_text("data")
         _orig_open = _builtins.open
+        cp8_meta = cm.meta_path(cp8)
 
         def _open_fail(file, *a, **k):        # deny writing THIS workbook's sidecar + .tmp
-            if str(file).startswith(str(cp8)):
+            if str(file).startswith(str(cp8_meta)):
                 raise PermissionError("sidecar dir locked")
             return _orig_open(file, *a, **k)
 
         with _patch(_builtins, "open", _open_fail), _patch(cm, "_silent_unlink", lambda _p: False):
             ok = cm.write_outcome(cp8, ConsolidateResult(status="ok", completion=oc.PARTIAL,
                                                         skipped_inputs=1))
-        cp8_tmp = cm.meta_path(cp8).with_name(cm.meta_path(cp8).name + ".tmp")
+        cp8_tmp = cp8_meta.with_name(cp8_meta.name + ".tmp")
         check("write-stage failure -> write_outcome returns False (observable)", ok is False)
         check("...no .tmp sentinel exists (open(tmp) failed)", not cp8_tmp.exists())
         check("...the workbook is QUARANTINED — canonical path now MISSING (resolver rebuilds)",
@@ -785,6 +788,7 @@ def main():
         sta.parent.mkdir(parents=True, exist_ok=True)
         sta.write_text("newer-data")
         sta_tmp = cm.meta_path(sta).with_name(cm.meta_path(sta).name + ".tmp")
+        sta_tmp.parent.mkdir(parents=True, exist_ok=True)
         with open(sta_tmp, "w", encoding="utf-8") as _f:
             _json.dump({"schema_version": cm.SCHEMA_VERSION, "completion": "partial",
                         "skipped_inputs": 1, "failed_inputs": 0,
@@ -795,6 +799,7 @@ def main():
         cur.parent.mkdir(parents=True, exist_ok=True)
         cur.write_text("data")
         cur_tmp = cm.meta_path(cur).with_name(cm.meta_path(cur).name + ".tmp")
+        cur_tmp.parent.mkdir(parents=True, exist_ok=True)
         with open(cur_tmp, "w", encoding="utf-8") as _f:
             _json.dump({"schema_version": cm.SCHEMA_VERSION, "completion": "partial",
                         "skipped_inputs": 1, "failed_inputs": 0,
@@ -815,7 +820,9 @@ def main():
         c9 = matrix.consolidated_store_path(st9, "ramp_summary")
         c9.parent.mkdir(parents=True, exist_ok=True)
         c9.write_text("data")
-        c9_tmp = cm.meta_path(c9).with_name(cm.meta_path(c9).name + ".tmp")
+        c9_meta = cm.meta_path(c9)
+        c9_tmp = c9_meta.with_name(c9_meta.name + ".tmp")
+        c9_tmp.parent.mkdir(parents=True, exist_ok=True)
         with open(c9_tmp, "w", encoding="utf-8") as _f:          # PLANT a valid CURRENT 'complete' tmp
             _json.dump({"schema_version": cm.SCHEMA_VERSION, "completion": "complete",
                         "skipped_inputs": 0, "failed_inputs": 0,
@@ -823,7 +830,7 @@ def main():
         _orig_open9 = _b9.open
 
         def _deny_writes9(file, mode="r", *a, **k):     # deny WRITES to c9's sidecar/tmp; allow READS
-            if str(file).startswith(str(c9)) and any(m in mode for m in ("w", "a", "x", "+")):
+            if str(file).startswith(str(c9_meta)) and any(m in mode for m in ("w", "a", "x", "+")):
                 raise PermissionError("sidecar dir locked")
             return _orig_open9(file, mode, *a, **k)
 
@@ -861,6 +868,7 @@ def main():
         c10.parent.mkdir(parents=True, exist_ok=True)
         c10.write_text("data")
         c10_final = cm.meta_path(c10)
+        c10_final.parent.mkdir(parents=True, exist_ok=True)
         with open(c10_final, "w", encoding="utf-8") as _f:      # PLANT a valid CURRENT 'complete' FINAL
             _json.dump({"schema_version": cm.SCHEMA_VERSION, "completion": "complete",
                         "skipped_inputs": 0, "failed_inputs": 0,

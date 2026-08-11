@@ -37,6 +37,7 @@ from pathlib import Path
 import artifact_store
 import consolidation_meta
 import outcome
+import output_state
 from compare_core import run_compare
 from comparison_contract import comparison_result_boundary
 from events import ConsolidateResult, Events
@@ -691,8 +692,17 @@ def capture_input_provenance(sides):
 
 
 def provenance_path(workbook_path):
-    p = Path(workbook_path)
-    return p.with_name(p.name + PROVENANCE_SUFFIX)
+    return output_state.artifact_state_file(workbook_path, PROVENANCE_SUFFIX)
+
+
+def legacy_provenance_path(workbook_path):
+    return output_state.legacy_artifact_state_file(
+        workbook_path, PROVENANCE_SUFFIX)
+
+
+def _provenance_read_path(workbook_path):
+    return output_state.read_path(
+        provenance_path(workbook_path), legacy_provenance_path(workbook_path))
 
 
 def write_comparison_provenance(result, out_path, *, report, banner, inputs,
@@ -706,6 +716,12 @@ def write_comparison_provenance(result, out_path, *, report, banner, inputs,
     if getattr(result, "status", None) != "ok" or generation is None:
         return False
     target = provenance_path(out_path)
+    state_parent = output_state.ensure_state_dir(Path(out_path).parent, commit_guard)
+    if state_parent is None:
+        log.warning("comparison provenance for %s: organized state directory unavailable",
+                    Path(out_path).name)
+        return False
+
     tmp = target.with_name(target.name + ".tmp")
     if not (consolidation_meta.guard_allows(commit_guard, Path(out_path))
             and consolidation_meta.guard_allows(commit_guard, target)
@@ -740,7 +756,7 @@ def read_comparison_provenance(workbook_path):
     """The provenance record beside a comparison workbook, or None (absent /
     unreadable / wrong shape — an older comparison; never a fabricated one)."""
     try:
-        with open(provenance_path(workbook_path), encoding="utf-8") as f:
+        with open(_provenance_read_path(workbook_path), encoding="utf-8") as f:
             data = json.load(f)
     except OSError:      # silent-ok: absent sidecar is the pre-076 state
         return None

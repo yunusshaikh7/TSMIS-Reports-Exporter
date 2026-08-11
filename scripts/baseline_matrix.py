@@ -31,6 +31,7 @@ import artifact_store   # CMP-AUD-083: the shared accepted-data-file predicate
 import cache_envelope
 import matrix
 import reports
+import output_state
 from paths import (OUTPUT_ROOT, day_source_dir, list_output_days,
                    parse_run_folder)
 
@@ -138,22 +139,27 @@ def out_path(date, source, row_key, baseline_id):
 
 
 def _results_path():
-    return byday_root() / _RESULTS_FILE
+    return output_state.state_file(byday_root(), _RESULTS_FILE)
+
+
+def _results_read_path():
+    return output_state.named_read_file(byday_root(), _RESULTS_FILE)
 
 
 def load_results():
     """{ "<date source>|<row>|<baseline-id>": {verdict, diff_cells, one_sided,
     built_at_mtime, completion, input_fingerprint} }. Tolerant: missing/corrupt
     -> {} (never raises)."""
+    p = _results_read_path()
     try:
-        with open(_results_path(), encoding="utf-8") as f:
+        with open(p, encoding="utf-8") as f:
             data = json.load(f)
         return cache_envelope.unwrap(data, output_identity="baseline-by-day")
     except OSError:  # silent-ok: not written yet (first run) — the expected empty-cache state
         return {}
     except ValueError as e:                  # corrupt JSON: surface it, then degrade
         log.warning("baseline_matrix: corrupt results cache %s (%s: %s); "
-                    "treating as empty", _results_path(), type(e).__name__, e)
+                    "treating as empty", p, type(e).__name__, e)
         return {}
 
 
@@ -179,6 +185,9 @@ def record_result(date, source, row_key, baseline_id, verdict, diff_cells,
         "producer_versions": producer_versions,
     }
     p = _results_path()
+    if output_state.ensure_state_dir(byday_root()) != p.parent:
+        raise ValueError("The organized baseline Matrix state directory is unavailable.")
+
     try:
         p.parent.mkdir(parents=True, exist_ok=True)
         tmp = p.with_name(p.name + ".tmp")

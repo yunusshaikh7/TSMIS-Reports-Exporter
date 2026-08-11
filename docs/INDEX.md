@@ -10,6 +10,19 @@ project snapshot and the non-negotiable conventions, and points into this librar
 Read the conventions there first, then come here for the deep dive on whatever you're
 touching.
 
+## Current status and work
+
+- **Active bounded workflow:**
+  [planning/post-comparison-perfection-output-audit/START-HERE.md](planning/post-comparison-perfection-output-audit/START-HERE.md)
+  is the operational entry point for the post-comparison output program. Read it
+  before starting one of that program's RB bundles; it names the current queue
+  position, exact-base rule, and controlling prompt.
+- **General backlog:** [roadmap.md](roadmap.md) is the current home for deferred,
+  blocked, and owner-ranked work outside that bounded workflow.
+- **Historical handoff:** [agent-handoffs/STATUS.md](agent-handoffs/STATUS.md) records
+  the closed `sol-001` mission. It is retained as evidence, not as current project
+  authority or a live worklist.
+
 ## The docs
 
 | Doc | Read this when… |
@@ -19,7 +32,7 @@ touching.
 | [auth-and-signin.md](auth-and-signin.md) | Anything about signing into TSMIS — the token-in-hash session model, the `CONFIG` lexical-global trap, device sign-in / Edge recapture / portability, LNA pre-grant, signed-in detection, the two login chips. |
 | [gui.md](gui.md) | You're in the desktop GUI — pywebview/WebView2, the threading + queue model, Python↔JS layering, the **five pywebview traps**, the `#mock` preview and its gotchas. |
 | [reports.md](reports.md) | You need the report catalog, a single report's `ReportSpec`/save/empty behavior, the `cs-disabled` rule, or the "add a report / consolidator / comparison" recipes. |
-| [comparison-engine.md](comparison-engine.md) | You're in `compare_core` — the regression lock + harness, the two flavors, key-field / roadbed key / duplicate-pairing, ditto non-asserting, the verdict / incompleteness contract, write-path safety, the three comparison families, the **visual-evidence decoration** (§13 — `visual_evidence` + the `evidence_*` adapters: Highway Detail, Intersection Detail, Highway Log, Highway Sequence). |
+| [comparison-engine.md](comparison-engine.md) | You're in `compare_core` — the regression lock + harness, the two flavors, key-field / roadbed key / duplicate-pairing, ditto non-asserting, the verdict / incompleteness contract, write-path safety, the three comparison families, and the **visual-evidence decoration** (§13 — current print-crop adapters: Highway Log, Highway Sequence, Intersection Detail, and Ramp Detail; Highway Detail remains pre-release). |
 | [planning/comparison-perfection/README.md](planning/comparison-perfection/README.md) | You want to know **why a comparison behaves the way it does**. The comparison-perfection project's record — **COMPLETE, shipped as v0.28.0** (237/242 closed; the 5 open are all ⛔ HD pre-release). Audit ledgers, source bindings, canary bindings and advisory reviews in one folder. It is a record, not a worklist. |
 | [planning/comparison-perfection/comparison-phase4-tsn-source-rebaseline.md](planning/comparison-perfection/comparison-phase4-tsn-source-rebaseline.md) | You're auditing or changing a vs-TSN source, normalizer, comparator, or evidence adapter — exact 29-member comparison-truth and 14-member evidence manifests, source roles, member hashes, raw identity facts, known admission defects, and the Phase-4 source-first gates. |
 | [highway_log/columns.md](highway_log/columns.md) | You need the corrected 31-column Highway Log labels (the vendor mislabeled most) — `highway_log_columns.py`, tooltips, the Legend sheet. |
@@ -30,7 +43,7 @@ touching.
 | [it-and-security.md](it-and-security.md) | You need the IT/DLP/security view — what the app talks to, files it touches, browser flags, the **work-PC capability model**, the read-only audit's findings + the "good designs," and code-signing. |
 | [website.md](website.md) | You're touching the **`gh-pages` landing page** — the single-screen layout, the live-resolving Download button, the System/Light/Dark toggle, screenshot/OG regeneration (`tools/screenshots.py`), favicon, and SEO (sitemap/Search Console). |
 | [verification-and-testing.md](verification-and-testing.md) | You need to verify a change — the golden `check_*.py` catalog, the COM-recalc compare loop, the `#mock` preview, the owed live-export, where the real test data + website source live (local only), and the diagnostics. |
-| [work-pc-validation.md](work-pc-validation.md) | You're running the **work-PC operational sign-off** (still owed; cuts as **v0.18.5**) — the credential-safe `--collect-evidence` kit, the manual fallback, the §K2 work-PC acceptance checklist, and the sign-off process. (Two-tier model: v0.18.0 = offline candidate; v0.18.1 closed out the overhaul; the field sign-off was deferred and now targets v0.18.5.) |
+| [work-pc-validation.md](work-pc-validation.md) | You're running the **work-PC operational sign-off** (still owed) — the credential-safe `--collect-evidence` kit, the manual fallback, the §K2 work-PC acceptance checklist, and the sign-off process. The current acceptance target and additions are maintained in `CLAUDE.md` and [planning/v0.30-owner-backlog-plan.md](planning/v0.30-owner-backlog-plan.md) §4; do not use this document's historical v0.18.x narrative as a release target. |
 | [lessons.md](lessons.md) | You want the project's hard-won judgment — the three field failures, "refactor to one core," regression-lock discipline, "consolidate from raw," "verify agent claims," audit methodology. Distilled; links to the owners. |
 | [history.md](history.md) | You want the narrative — how a one-day console script became a self-updating desktop app, the dead ends and reverts, the field failures that rewrote the design (through v0.18.1). |
 | [roadmap.md](roadmap.md) | You're picking future work — the deferred/dormant/blocked backlog (A3, C1, D1, F1, code-signing, and live-export verification). |
@@ -76,7 +89,8 @@ points), every claim anchored to `file:symbol`.
   `build/release_notes_header.md` (via `build/gen_release_notes.py`); history.md is the narrative.
 - **Real test data + the live TSMIS website source are LOCAL ONLY** (under
   `C:\Users\Yunus\Downloads\TSMIS\…` on the dev PC) and are **never** committed, copied
-  into the repo, or pushed — the website source is Caltrans-internal. See
-  verification-and-testing.md for what lives where.
+  into the repo, or pushed — the website source is Caltrans-internal. Read that
+  corpus's `_INDEX.md` before choosing a fixture; see verification-and-testing.md
+  for the repo-side rules.
 - The former `~/.claude` session-memory files were harvested into this library and archived
   under `memory/_archive/` (see `MEMORY.md`); this `docs/` library is now the canonical home.

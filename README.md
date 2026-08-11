@@ -163,6 +163,14 @@ portable and leaves nothing behind on the system.
    manual calculation — press **F9** once.
 5. **Save run report** *(optional)* — export a CSV of every route's outcome.
 
+Generated folders keep the files you use (XLSX, PDF, images, and run reports) at
+the top level. Internal outcome records, provenance, comparison payloads, locks,
+and Matrix caches are grouped under one `_state` subfolder in the artifact
+folder they describe. Keep `_state` with its artifacts if you move or archive
+them. An app-owned destination may also contain `.tsmis-owned.json` at its root;
+that small marker is intentionally separate because Reset uses it to prove the
+folder is safe to delete.
+
 **Fast mode** (experimental): tick **⚡ Fast mode** and choose a worker count to
 run several browsers in parallel. Each worker uses ~0.5 GB RAM — `3` is a safe
 default; higher counts give a bigger speedup on a well-resourced PC.

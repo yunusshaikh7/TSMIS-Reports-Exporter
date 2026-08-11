@@ -16,6 +16,7 @@ import artifact_store
 import cache_envelope
 import consolidation_meta
 import outcome
+import output_state
 import report_catalog
 import report_library
 import reports
@@ -103,7 +104,13 @@ def comparison_path(dest, baseline_key, row_key, cell_key):
 
 
 def _results_path(dest, baseline_key):
-    return comparisons_root(dest, baseline_key) / _RESULTS_FILE
+    return output_state.state_file(
+        comparisons_root(dest, baseline_key), _RESULTS_FILE)
+
+
+def _results_read_path(dest, baseline_key):
+    return output_state.named_read_file(
+        comparisons_root(dest, baseline_key), _RESULTS_FILE)
 
 
 # --------------------------------------------------------------------------- #
@@ -114,7 +121,7 @@ def load_results(dest, baseline_key):
     Tolerant: missing/corrupt/old-version -> {} (never raises). The cache is a
     versioned envelope (cache_envelope); a pre-P1 raw dict reads as empty (a
     one-time rebuild)."""
-    p = _results_path(dest, baseline_key)
+    p = _results_read_path(dest, baseline_key)
     try:
         with open(p, encoding="utf-8") as f:
             data = json.load(f)
@@ -142,6 +149,10 @@ def _require_cache_guard(commit_guard, path, action):
 
 def _save_results(dest, baseline_key, data, commit_guard=None):
     p = _results_path(dest, baseline_key)
+    root = comparisons_root(dest, baseline_key)
+    if output_state.ensure_state_dir(root, commit_guard) != p.parent:
+        raise ValueError("The organized Matrix state directory is unavailable.")
+
     tmp = p.with_name(p.name + ".tmp")
     _require_cache_guard(commit_guard, p.parent, "cache directory write")
     _require_cache_guard(commit_guard, p, "cache write")
@@ -619,13 +630,18 @@ def out_path_for_cell(dest, baseline_key, row_key, cell_key, mode_id, row_defs=N
 
 
 def _tsn_results_path(dest):
-    return tsn_comparisons_root(dest) / _TSN_RESULTS_FILE
+    return output_state.state_file(tsn_comparisons_root(dest), _TSN_RESULTS_FILE)
+
+
+def _tsn_results_read_path(dest):
+    return output_state.named_read_file(
+        tsn_comparisons_root(dest), _TSN_RESULTS_FILE)
 
 
 def load_tsn_results(dest):
     """{ "<row>|<mode>": {cell_key: {verdict, diff_cells, one_sided,
     built_at_mtime}} } — the non-env (TSN/self) comparison counts cache."""
-    p = _tsn_results_path(dest)
+    p = _tsn_results_read_path(dest)
     try:
         with open(p, encoding="utf-8") as f:
             data = json.load(f)
@@ -657,6 +673,10 @@ def record_tsn_result(dest, result_key, cell_key, verdict, diff_cells, one_sided
         "producer_versions": producer_versions,
     }
     p = _tsn_results_path(dest)
+    root = tsn_comparisons_root(dest)
+    if output_state.ensure_state_dir(root, commit_guard) != p.parent:
+        raise ValueError("The organized TSN Matrix state directory is unavailable.")
+
     tmp = p.with_name(p.name + ".tmp")
     _require_cache_guard(commit_guard, p.parent, "TSN cache directory write")
     _require_cache_guard(commit_guard, p, "TSN cache write")
@@ -699,15 +719,19 @@ ATTEMPT_STATES = ("error", "partial", "cancelled")
 
 
 def attempts_path(root):
-    """The attempt overlay beside a comparisons root's result cache(s)."""
-    return Path(root) / _ATTEMPTS_FILE
+    """The organized attempt-overlay path for a comparisons root."""
+    return output_state.state_file(root, _ATTEMPTS_FILE)
+
+
+def _attempts_read_path(root):
+    return output_state.named_read_file(root, _ATTEMPTS_FILE)
 
 
 def load_attempts(root):
     """{"<row>|<mode>": {cell_key: {status, reason, at}}}. Tolerant exactly like
     the result caches: missing / corrupt / foreign / old-version reads as {} and
     never raises — a lost overlay only costs a badge, never truth."""
-    p = attempts_path(root)
+    p = _attempts_read_path(root)
     try:
         with open(p, encoding="utf-8") as f:
             data = json.load(f)
@@ -733,6 +757,11 @@ def record_attempt(root, result_key, cell_key, status, reason=None, at=None,
         return False
     p = attempts_path(root)
     tmp = p.with_name(p.name + ".tmp")
+    state_parent = output_state.ensure_state_dir(root, commit_guard)
+    if state_parent != p.parent:
+        log.warning("matrix: organized attempt state directory is unavailable")
+        return False
+
     for path in (p.parent, p, tmp):
         if not consolidation_meta.guard_allows(commit_guard, path):
             log.warning("matrix: attempt overlay not recorded for %s/%s "

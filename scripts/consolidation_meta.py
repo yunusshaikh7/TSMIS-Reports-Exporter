@@ -49,6 +49,7 @@ from types import MappingProxyType
 from typing import Any, Mapping, Optional
 
 import outcome
+import output_state
 from comparison_contract import ArtifactGeneration, AttemptState, ComparisonOutcome
 
 log = logging.getLogger("tsmis.consolidation_meta")
@@ -213,19 +214,43 @@ _NEW_PAYLOAD_PRIMARY_MAX_NAME = _payload_primary_basename(
 _NEW_PAYLOAD_SLOT_MAX_NAME = _payload_slot_basename(
     "0" * 64, 999999, "0" * 64, _PAYLOAD_FALLBACK_SLOT_COUNT - 1)
 _FIELD_COMPARISON_PARENT_LEN = 97
+_FIELD_COMPARISON_STATE_PARENT_LEN = (
+    _FIELD_COMPARISON_PARENT_LEN + 1
+    + _windows_utf16_units(output_state.STATE_DIRNAME)
+)
 assert max(_windows_utf16_units(_NEW_PAYLOAD_PRIMARY_MAX_NAME),
            _windows_utf16_units(_NEW_PAYLOAD_SLOT_MAX_NAME)) \
        <= _WINDOWS_COMPONENT_MAX_UTF16_UNITS - 64
-assert (_FIELD_COMPARISON_PARENT_LEN + 1
+assert (_FIELD_COMPARISON_STATE_PARENT_LEN + 1
         + max(_windows_utf16_units(_NEW_PAYLOAD_PRIMARY_MAX_NAME),
               _windows_utf16_units(_NEW_PAYLOAD_SLOT_MAX_NAME))) \
        < _WINDOWS_MAX_PATH
 
 
 def meta_path(consolidated):
-    """The sidecar path for a consolidated workbook: ``<workbook>.outcome.json``."""
-    return Path(str(consolidated) + _COMPARISON_META_SUFFIX)
+    """The organized outcome path: ``<folder>/_state/<workbook>.outcome.json``."""
+    return output_state.artifact_state_file(consolidated, _COMPARISON_META_SUFFIX)
 
+
+def legacy_meta_path(consolidated):
+    """The pre-organization sibling outcome path (read/migration compatibility)."""
+    return output_state.legacy_artifact_state_file(
+        consolidated, _COMPARISON_META_SUFFIX)
+
+
+def _read_meta_path(consolidated):
+    return output_state.read_path(meta_path(consolidated), legacy_meta_path(consolidated))
+
+
+
+def _read_meta_pair(consolidated):
+    """Return final/sentinel from one layout, preferring any new state entry."""
+    final = meta_path(consolidated)
+    sentinel = final.with_name(final.name + _COMPARISON_SENTINEL_SUFFIX)
+    if os.path.lexists(final) or os.path.lexists(sentinel):
+        return final, sentinel
+    final = legacy_meta_path(consolidated)
+    return final, final.with_name(final.name + _COMPARISON_SENTINEL_SUFFIX)
 
 def _safe_mtime(p):
     try:
@@ -528,9 +553,26 @@ def write_outcome(consolidated, result, extra=None, commit_guard=None):
                                        # normalization version, D2); readers are
                                        # tolerant, so unknown keys are harmless
 
+    state_parent = output_state.ensure_state_dir(consolidated.parent, commit_guard)
+    if state_parent is None:
+        log.warning("consolidation outcome for %s: organized state directory unavailable",
+                    consolidated.name)
+        if comp == outcome.COMPLETE:
+            return guard_allows(commit_guard, consolidated)
+        if (guard_allows(commit_guard, consolidated)
+                and _silent_unlink(consolidated)):
+            return False
+        if _quarantine(consolidated, commit_guard):
+            return False
+        log.critical("consolidation outcome for %s: could not establish state storage "
+                     "or remove/quarantine the incomplete workbook",
+                     consolidated.name)
+        return False
+
     p = meta_path(consolidated)
     tmp = p.with_name(p.name + ".tmp")
     if (not guard_allows(commit_guard, consolidated)
+            or not guard_allows(commit_guard, state_parent)
             or not guard_allows(commit_guard, p)
             or not guard_allows(commit_guard, tmp)):
         log.warning("consolidation outcome for %s: destination changed; no sidecar write",
@@ -595,7 +637,7 @@ def read_extra(consolidated, key, default=None):
     absent sidecar / unreadable / corrupt / missing key -> `default`. Used for
     producer metadata like the TSN normalization version (D2) — the FAIL-SAFE
     direction is the default (an unstampable read counts as stale)."""
-    p = meta_path(Path(consolidated))
+    p = _read_meta_path(Path(consolidated))
     try:
         with open(p, encoding="utf-8") as f:
             data = json.load(f)
@@ -1769,7 +1811,8 @@ def _prepare_comparison_publication(result):
         "members": tuple(prepared),
         "payload_manifest": payload_manifest,
         "payload_chunks": payload_chunks,
-        "payload_parent": prepared[0][1].parent,
+        "artifact_parent": prepared[0][1].parent,
+        "payload_parent": output_state.state_dir(prepared[0][1].parent),
     }
     # All bounded JSON envelopes are encoded before the first sentinel mutates
     # the destination. A scale/resource rejection therefore leaves existing
@@ -2110,6 +2153,13 @@ def write_comparison_outcomes(result, commit_guard=None):
     if prepared is None:
         return True
 
+    state_parent = output_state.ensure_state_dir(
+        prepared["artifact_parent"], commit_guard)
+    if state_parent != Path(prepared["payload_parent"]):
+        log.error("comparison outcome publication rejected: organized state "
+                  "directory is unavailable or changed")
+        return False
+
     # One context line per attempt, BEFORE anything can fail: the payload chunk
     # basenames are content-addressed and long, so the deepest planned path is
     # what decides whether this install can publish at all. Logging it up front
@@ -2375,6 +2425,7 @@ class _ParsedComparison:
     artifact_generation: ArtifactGeneration
     self_member: Mapping[str, Any]
     payload_manifest: Optional[Mapping[str, Any]]
+    metadata_parent: Path
 
 
 def _trusted_comparison(parsed, typed_outcome):
@@ -2409,7 +2460,7 @@ def _comparison_mtime_state(meta, workbook):
     return "stale" if abs(built_at - current) > _MTIME_TOL_S else "current"
 
 
-def _parse_comparison_payload(meta, workbook, source):
+def _parse_comparison_payload(meta, workbook, source, metadata_parent):
     """Validate one local final/sentinel without recursively reading peers."""
     if not isinstance(meta, Mapping):
         return _comparison_untrusted("comparison sidecar must be a JSON object", source)
@@ -2520,7 +2571,8 @@ def _parse_comparison_payload(meta, workbook, source):
         artifact_generation=typed_generation,
         self_member=MappingProxyType(dict(self_member)),
         payload_manifest=(MappingProxyType(dict(manifest))
-                          if manifest is not None else None))
+                          if manifest is not None else None),
+        metadata_parent=Path(metadata_parent))
 
 
 def _read_comparison_candidate(sidecar, workbook, source):
@@ -2539,7 +2591,7 @@ def _read_comparison_candidate(sidecar, workbook, source):
             return _STALE
         return _comparison_untrusted(
             "sidecar is not a validated comparison-generation record", source)
-    return _parse_comparison_payload(meta, workbook, source)
+    return _parse_comparison_payload(meta, workbook, source, Path(sidecar).parent)
 
 
 def _shared_comparison_payload(payload):
@@ -2566,9 +2618,9 @@ def _validate_comparison_peers(workbook, parsed):
             return _comparison_untrusted(
                 f"generation member {relative!r} is missing or content-mismatched")
 
-        peer_meta = meta_path(peer)
+        peer_meta, peer_sentinel_path = _read_meta_pair(peer)
         peer_sentinel = _read_comparison_candidate(
-            peer_meta.with_name(peer_meta.name + ".tmp"), peer, "sentinel")
+            peer_sentinel_path, peer, "sentinel")
         if peer_sentinel is not _ABSENT and peer_sentinel is not _STALE:
             return _comparison_untrusted(
                 f"generation member {relative!r} still has an incomplete publication sentinel")
@@ -2588,7 +2640,7 @@ def _validate_comparison_peers(workbook, parsed):
     if parsed.comparison_schema_version == 3:
         try:
             typed_outcome = _read_comparison_payload(
-                parsed.payload_manifest, parent)
+                parsed.payload_manifest, parsed.metadata_parent)
         except (TypeError, ValueError, OSError) as e:
             return _comparison_untrusted(
                 f"comparison sidecar typed payload is invalid: {e}")
@@ -2612,12 +2664,12 @@ def read_comparison_outcome(path) -> Optional[ComparisonSidecarOutcome]:
     except ValueError as e:
         return _comparison_untrusted(
             f"comparison member/sidecar path is invalid: {e}")
-    final_path = meta_path(path)
+    final_path, sentinel_path = _read_meta_pair(path)
     # A current/malformed sentinel dominates before a v3 final is decoded. This
     # both preserves fail-closed publication semantics and prevents an incomplete
     # generation from making readers decompress a potentially large payload.
     sentinel = _read_comparison_candidate(
-        final_path.with_name(final_path.name + ".tmp"), path, "sentinel")
+        sentinel_path, path, "sentinel")
     if isinstance(sentinel, ComparisonSidecarOutcome):
         return sentinel
     final = _read_comparison_candidate(final_path, path, "sidecar")
@@ -2694,7 +2746,7 @@ def read_outcome(consolidated) -> Optional[ConsolidationOutcome]:
     must not reconstruct this outcome using separate :func:`read_extra` calls.
     Never raises.
     """
-    p = meta_path(consolidated)
+    p, sentinel_path = _read_meta_pair(consolidated)
     final = _read_sidecar(p, consolidated, source="sidecar")
     if final is _COMPARISON:
         return _comparison_as_consolidation(consolidated)
@@ -2702,7 +2754,7 @@ def read_outcome(consolidated) -> Optional[ConsolidationOutcome]:
             and final.completion == outcome.PARTIAL):
         return final
 
-    tmp = _read_sidecar(p.with_name(p.name + ".tmp"), consolidated, source="sentinel")
+    tmp = _read_sidecar(sentinel_path, consolidated, source="sentinel")
     if tmp is _COMPARISON:
         return _comparison_as_consolidation(consolidated)
     if (isinstance(tmp, ConsolidationOutcome)

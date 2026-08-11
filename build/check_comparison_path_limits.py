@@ -260,10 +260,11 @@ def test_field_depth_budget() -> None:
                                   cm._PAYLOAD_FALLBACK_SLOT_COUNT - 1),
     ]
     worst = max(_units(name) for name in worst_names)
-    deepest = _FIELD_PARENT_LEN + 1 + worst
+    state_parent = _FIELD_PARENT_LEN + 1 + _units("_state")
+    deepest = state_parent + 1 + worst
     check("deepest planned payload path fits classic MAX_PATH at the field depth",
           deepest < cm._WINDOWS_MAX_PATH,
-          f"parent {_FIELD_PARENT_LEN} + sep + basename {worst} = {deepest} "
+          f"state parent {state_parent} + sep + basename {worst} = {deepest} "
           f"(limit {cm._WINDOWS_MAX_PATH}); names: {worst_names!r}")
 
 

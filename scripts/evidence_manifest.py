@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import artifact_store
+import output_state
 
 log = logging.getLogger("tsmis")
 
@@ -56,14 +57,24 @@ class EvidenceManifestError(ValueError):
 
 
 def manifest_path(comparison_path):
-    """The manifest sibling of a comparison workbook.
+    """The organized state path for a comparison's evidence manifest.
 
-    Deliberately the same length as the '(evidence).xlsx' sibling: the field
-    install depth is already at the Windows MAX_PATH budget (CMP-AUD-242), so a
-    third sibling may not cost a single character more than the ones that fit.
+    The basename remains no longer than the user-facing '(evidence).xlsx';
+    '_state' is included in the unconditional Windows field-depth budget.
     """
     p = Path(comparison_path)
+    return output_state.state_file(p.parent, f"{p.stem} (evidence).json")
+
+
+def legacy_manifest_path(comparison_path):
+    """The pre-organization sibling manifest path."""
+    p = Path(comparison_path)
     return p.with_name(f"{p.stem} (evidence).json")
+
+
+def manifest_read_path(comparison_path):
+    return output_state.read_path(
+        manifest_path(comparison_path), legacy_manifest_path(comparison_path))
 
 
 @dataclass(frozen=True)
@@ -242,7 +253,7 @@ def describe(comparison_path, verify_members=True):
     freshness may never be judged by mtime alone.
     """
     comparison_path = Path(comparison_path)
-    man_path = manifest_path(comparison_path)
+    man_path = manifest_read_path(comparison_path)
     try:
         manifest = read(man_path)
     except EvidenceManifestError as e:

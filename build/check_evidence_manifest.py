@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 import _checklib
+import compare_tsn_common as ctc
 import evidence_manifest as em
 import visual_evidence as ve
 from PIL import Image
@@ -85,6 +86,7 @@ _cmp = _r / "hd vs tsn.xlsx"
 _cmp.write_bytes(b"a comparison workbook")
 _wb, _img = ve.sibling_paths(_cmp)
 _man = em.manifest_path(_cmp)
+_man.parent.mkdir(parents=True, exist_ok=True)
 
 check("the manifest sibling costs no more path than the workbook does "
       "(the field install is already at the MAX_PATH budget, CMP-AUD-242)",
@@ -161,6 +163,7 @@ def publish_case(name, lock):
     cmp_path.write_bytes(b"comparison " + name.encode())
     wb, img = ve.sibling_paths(cmp_path)
     man = em.manifest_path(cmp_path)
+    man.parent.mkdir(parents=True, exist_ok=True)
     wb.write_bytes(b"OLD workbook")
     img.mkdir()
     (img / "old.png").write_bytes(b"old image")
@@ -293,7 +296,7 @@ def run_generate(name, rows_a, rows_b, proposals, cancel_at_locate=False,
     _checklib.publish_bound_comparison(cmp_path, idt._SCHEMA, rows_a, rows_b,
                                        (cons, tsn))
     if strip_provenance:
-        cmp_path.with_name(cmp_path.name + ".provenance.json").unlink()
+        ctc.provenance_path(cmp_path).unlink()
     tdir = root / "tsmis_pdf"
     tdir.mkdir()
     (tdir / "intersection_detail_route_001.pdf").write_bytes(b"%PDF tsmis")
@@ -302,6 +305,7 @@ def run_generate(name, rows_a, rows_b, proposals, cancel_at_locate=False,
     (lib / "stub.pdf").write_bytes(b"%PDF tsn")
     wb, img = ve.sibling_paths(cmp_path)
     man = em.manifest_path(cmp_path)
+    man.parent.mkdir(parents=True, exist_ok=True)
     if plant_prior:
         wb.write_bytes(b"PRIOR red evidence workbook")
         img.mkdir()

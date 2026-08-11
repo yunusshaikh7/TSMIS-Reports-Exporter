@@ -7,8 +7,10 @@ RB-3 is MERGED at `61fcac611de255c56759551a95ccd2e552287bfc`; its 158/158
 post-merge gate and frozen application self-test both passed;
 RB-4 is MERGED at `83a24896a5a970a3686df87934210f54cea43778`; its 158/158
 post-merge gate and frozen application self-test both passed;
-RB-5 is READY from `main` at `1e9446bb7f1f9771b7698482d63980840ee5ec28`;
-no RB-5 branch, product change, generation, or acceptance run has begun**
+RB-5's readiness contract was prepared from `main` at
+`1e9446bb7f1f9771b7698482d63980840ee5ec28`; current clean `main` has since
+advanced to `800bea2f0835fa69ab8ded0ed46fd83368173d80` (`v0.35.0`);
+no RB-5 branch, RB-5 product change, generation, or acceptance run has begun**
 
 Last updated: 2026-08-10
 
@@ -23,9 +25,15 @@ first pass.
 Invoke
 [`PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
 in a fresh task with `<BUNDLE_ID> = RB-5` and `<IMPLEMENTER> = Claude`.
-Create `hotfix/rb-5-difference-classification` only after Prompt 04 verifies the
-exact clean pushed `main` base. Keep HF-06/HF-09 combined unless the documented
-split fallback is invoked; do not begin implementation in this review closeout.
+Create `hotfix/rb-5-difference-classification` only after Prompt 04 verifies and
+records the exact clean pushed `main` base. The readiness commit is provenance,
+not the branch point. `v0.35.0` separately made `HG`, `City`, and `Distance To
+Next Point` asserted in Highway Sequence vs-TSN; that owner-directed release is
+the pre-existing baseline, not RB-5 work. RB-5 must preserve it. In every RB-5
+criterion that says Highway Sequence vs-TSN counts are unchanged, "unchanged"
+means between the exact Stage-4 base and RB-5 acceptance head. Keep HF-06/HF-09
+combined unless the documented split fallback is invoked; do not reuse the old
+readiness source as a pre-fix witness.
 
 Codex Review 2 re-review closed `RB4-R2-001`. All missing-print exits now use
 the retirement-aware binding refusal. The committed six assertions passed for

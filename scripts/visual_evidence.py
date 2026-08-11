@@ -85,6 +85,7 @@ import consolidation_meta
 import evidence_ledger
 import evidence_manifest
 import owned_dir
+import output_state
 import paths
 from compare_core import set_safe_literal_cell
 from pdf_table_lib import RouteIdentityError
@@ -2846,9 +2847,12 @@ def _commit_manifest(man_path, manifest, source_paths, captured_sources,
         require_sources_current=True)
     _require_output_guard(commit_guard, man_path.parent,
                           "evidence manifest-folder creation")
-    man_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = None
     try:
+        state_parent = output_state.ensure_state_dir(
+            man_path.parent.parent, commit_guard)
+        if state_parent != man_path.parent:
+            raise OSError("organized evidence state directory is unavailable")
         with tempfile.NamedTemporaryFile(
                 mode="w", encoding="utf-8", newline="",
                 prefix=f".{man_path.stem}.tmp-", suffix=man_path.suffix,

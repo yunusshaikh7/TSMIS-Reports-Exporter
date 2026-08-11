@@ -150,8 +150,9 @@ def main() -> None:
     check("a v1 fingerprint sidecar reads stale (one-time rebuild)",
           not a.consolidated_fresh(legacy, store))
     a.write_consolidated_fingerprint(legacy, store)
+    rebuilt_sidecar = a._fp_sidecar(legacy)
     check("the rebuilt sidecar is v2 and reads fresh",
-          json.loads(sidecar.read_text(encoding="utf-8"))["schema_version"] == 2
+          json.loads(rebuilt_sidecar.read_text(encoding="utf-8"))["schema_version"] == 2
           and a.consolidated_fresh(legacy, store))
     check("a v1 fingerprint string can never equal a v2 one",
           not a.fingerprint(store).startswith("v1:"))

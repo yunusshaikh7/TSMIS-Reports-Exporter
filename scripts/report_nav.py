@@ -147,8 +147,13 @@ def select_report(page, report_label, data_value=None):
     # On the nested menu a leaf is hidden until its parent flyout is hovered.
     _reveal_submenu_if_leaf(page, option)
     option.click()
-    page.get_by_role("button", name="District / County / Route").click()
-    page.get_by_label("District").select_option(label="-- ALL --")
+    # These IDs are the site's structural contract across the flat and grouped
+    # report menus. Do not use the accessible label here: the 2026-08 site added
+    # a second (postmile-mode) control also labelled "District", so
+    # get_by_label("District") became a strict-mode ambiguity even while that
+    # second control was hidden.
+    page.locator("#modeBtnDistrictRoute").click()
+    page.locator("#districtSelect").select_option(label="-- ALL --")
     page.wait_for_function(
         "() => !document.querySelector('#districtCountySelect').disabled",
         timeout=county_enable_timeout_ms(),
@@ -272,9 +277,9 @@ def preflight(page, report_label, data_value=None):
     try:
         select_report(page, report_label, data_value)
         step = "finding the Route control"
-        page.get_by_label("Route", exact=True).wait_for(state="attached", timeout=15000)
+        page.locator("#districtRouteSelect").wait_for(state="attached", timeout=15000)
         step = "finding the Generate button"
-        page.get_by_role("button", name="Generate").wait_for(state="attached", timeout=15000)
+        page.locator("#districtRouteBtn").wait_for(state="attached", timeout=15000)
         log.info("preflight ok: %s", report_label)
     except ReportUnavailableError:
         # A greyed-out report is a clear, specific condition (select_report

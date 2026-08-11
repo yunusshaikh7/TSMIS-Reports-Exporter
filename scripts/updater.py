@@ -691,18 +691,33 @@ def _wait_for_helper_ready(proc, ready_file, token, helper_log, log_cursor, pid)
     protocol_seen = False
     confirmed = False
     legacy_log_readable = True
+    marker_access_error_seen = False
+    marker_read_error = None
     try:
         while True:
             try:
                 observed = ready_file.read_text(encoding="ascii")
             except FileNotFoundError:  # silent-ok: marker absence is the expected startup state
                 observed = ""
-            except OSError as e:
-                log.warning("swap readiness marker could not be read: %s: %s",
-                            type(e).__name__, str(e).partition("\n")[0])
-                raise UpdateError("the update process could not confirm it was ready "
-                                  "— install the new version manually from the "
-                                  "releases page") from e
+                if marker_read_error is not None:
+                    log.info("swap readiness marker access recovered after transient %s",
+                             type(marker_read_error).__name__)
+                marker_read_error = None
+            except OSError as e:  # silent-ok: bounded retry logs recovery or final timeout
+                # Endpoint scanners can hold the atomically-replaced marker for
+                # a fraction of a second. Retry inside the existing bounded
+                # readiness window instead of making one transient denial abort
+                # an otherwise healthy update. Once access was denied, never
+                # accept the weaker legacy-log signal: the unreadable marker may
+                # belong to a nonce-capable helper, which must prove its nonce.
+                observed = ""
+                marker_access_error_seen = True
+                marker_read_error = e
+            else:
+                if marker_read_error is not None:
+                    log.info("swap readiness marker access recovered after transient %s",
+                             type(marker_read_error).__name__)
+                marker_read_error = None
 
             if secrets.compare_digest(observed, f"starting:{token}"):
                 protocol_seen = True
@@ -730,7 +745,8 @@ def _wait_for_helper_ready(proc, ready_file, token, helper_log, log_cursor, pid)
             # append this exact first line immediately before `_wait_pid_exit`.
             # A nonce-capable helper writes `starting:` BEFORE that line, so it
             # can never silently fall back to the weaker legacy contract.
-            if not protocol_seen and legacy_log_readable:
+            if (not protocol_seen and not marker_access_error_seen
+                    and legacy_log_readable):
                 try:
                     legacy_waiting = _legacy_helper_is_waiting(
                         helper_log, log_cursor, pid)
@@ -744,6 +760,16 @@ def _wait_for_helper_ready(proc, ready_file, token, helper_log, log_cursor, pid)
                         log.info("legacy swap helper reached its PID wait")
                         return
             if time.monotonic() >= deadline:
+                if marker_read_error is not None:
+                    log.warning(
+                        "swap readiness marker remained unreadable for %.1fs: %s: %s",
+                        _HELPER_READY_TIMEOUT_S,
+                        type(marker_read_error).__name__,
+                        str(marker_read_error).partition("\n")[0])
+                    raise UpdateError(
+                        "the update process could not confirm it was ready — install "
+                        "the new version manually from the releases page"
+                    ) from marker_read_error
                 log.warning("swap process did not report readiness within %.1fs",
                             _HELPER_READY_TIMEOUT_S)
                 raise UpdateError("the update process did not become ready — install "
@@ -885,18 +911,14 @@ def _wait_pid_exit(pid, timeout_s, on_waiting=None):
     """True once `pid` has exited (or never existed); False on timeout.
     ctypes only — no psutil in the bundle.
 
-    PID-recycle safety: apply_update_and_restart launches this swap process
-    while the app (pid) is STILL RUNNING (it stays alive ~1.5 s+ after the
-    launch), and OpenProcess below is the swap's very first action — so the
-    handle is taken against the live ORIGINAL process. A held process handle
-    keeps the kernel process object (and therefore the PID) reserved until the
-    handle is closed, so the PID can't be recycled out from under the wait. If
-    OpenProcess instead FAILS, the original has already exited (its PID is gone,
-    or was reused by a process we can't open) — either way our app is down, so
-    returning True to proceed is correct. The only residual case (the swap exe
-    so slow to start that the app exits AND the PID is reused by a live process
-    first) merely lets the wait time out, so the swap reports 'not applied' and
-    the old version is left intact and logged — fail-safe, never a half-swap."""
+    PID-recycle safety: apply_update_and_restart keeps the original app alive
+    until this helper proves it acquired the OpenProcess handle below. A held
+    process handle keeps the kernel process object (and therefore the PID)
+    reserved until the handle is closed, so the PID cannot be recycled out from
+    under the wait. In handshake mode an OpenProcess failure raises instead of
+    certifying readiness; the old app stays open and the update fails closed.
+    The no-callback return-True behavior remains only for legacy helpers whose
+    caller cannot participate in the readiness handshake."""
     import ctypes
     SYNCHRONIZE = 0x00100000
     kernel32 = ctypes.windll.kernel32

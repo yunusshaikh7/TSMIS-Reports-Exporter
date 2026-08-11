@@ -176,7 +176,13 @@ Flow:
    ```
    `helper_log = LOG_DIR/update_helper.log`. `new_exe` is the **staged** exe (a complete copy of the new app) — it applies itself.
 4. `subprocess.Popen(..., creationflags=CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP, close_fds=True, cwd=staged, stdin/out/err=DEVNULL)`. Detached, no console window. `OSError` (a policy blocks running it) → `UpdateError("the update process could not be started — install manually")`.
-5. **The readiness handshake (sol-001, F-02/F-07 — replaced the old fixed ~2 s death poll,** which could only catch a crash inside an arbitrary window). `apply_update_and_restart` generates a one-use nonce (`secrets.token_hex(24)`) + a `ready_file`, passes both as the extra argv above, and calls `_wait_for_helper_ready(...)` (up to `_HELPER_READY_TIMEOUT_S = 15 s`, polling every 50 ms). The staged helper must publish `ready:<nonce>` — which it does **only after it has opened a handle to the still-running original PID** (the proof it truly entered the wait: `_wait_pid_exit`'s new `on_waiting` callback) — before the old app is allowed to close. If the helper dies before readiness, publishes a bad marker, or times out → `UpdateError("… install manually")` and the unready helper is terminated. **Backward-compatible both directions:** a Revert that stages a PRE-handshake helper is accepted via its legacy `swap started: waiting…` log line (read only in the freshly-appended region, and only when no nonce marker appeared — so a nonce-capable helper can never silently downgrade to the weaker signal); an OLD app launching a NEW helper omits the argv tail and the helper falls back to the plain wait. **This closes the old silent-failure mode for good:** a blocked/broken/slow exe can no longer strand the user with no running app *and* no swap.
+5. **The readiness handshake (sol-001, F-02/F-07 — replaced the old fixed ~2 s death poll).** `apply_update_and_restart` generates a one-use nonce (`secrets.token_hex(24)`) + `ready_file`, passes both as the extra argv above, and calls `_wait_for_helper_ready(...)` for up to `_HELPER_READY_TIMEOUT_S = 15 s` (50 ms polling). The staged helper must publish `ready:<nonce>` **only after it has opened a handle to the still-running original PID** via `_wait_pid_exit`'s `on_waiting` callback. Until then, the original app stays open. Helper death, a bad marker, or a timeout raises `UpdateError("… install manually")` and terminates the unready helper.
+
+   **Marker-read reliability (2026-08-10 field failure).** The first two v0.35.0 restart attempts reached the atomically replaced ready marker but the old app received transient `PermissionError [Errno 13]` while reading it. Non-absence `OSError` reads now retry inside the same 15 s bound; a later exact nonce completes normally. If the marker remains unreadable at the deadline, the update fails closed and the helper is terminated.
+
+   **No unsafe downgrade:** after any marker-access error, the weaker legacy-log fallback is disabled for that launch, even if access later changes. A PRE-handshake Revert helper may still prove it entered the PID wait through its freshly appended `swap started: waiting…` line, but only when no nonce protocol and no marker-access error were observed. An OLD app launching a NEW helper omits the argv tail and the helper retains its plain-wait compatibility path. A current helper can therefore never use its ordinary log line to bypass nonce proof.
+
+   This closes the old silent-failure mode: a blocked, broken, slow, or persistently unreadable helper cannot strand the user with no running app and no swap.
 
 After this returns, `GuiApi.update_apply` spawns `_close_for_update` (`gui_api.py:979`): `sleep(1.2)` to flush the goodbye log line, then `self._window.destroy()` (returns from `webview.start()`, process exits) — falling back to `os._exit(0)` if destroy throws, so the helper can always proceed.
 
@@ -226,16 +232,20 @@ Top-level sequence:
 
 ### 6.1 `_wait_pid_exit` — PID-recycle safety
 
-`updater.py:528`. ctypes only (no psutil in the bundle):
+`updater.py:910`. ctypes only (no psutil in the bundle):
 
 ```python
 handle = kernel32.OpenProcess(SYNCHRONIZE, False, int(pid))
-if not handle: return True                    # already gone (or recycled)
+if not handle:
+    if on_waiting is not None: raise OSError  # handshake cannot certify readiness
+    return True                               # legacy: already gone (or recycled)
+if on_waiting is not None:
+    on_waiting()                              # publishes ready:<nonce>
 rc = kernel32.WaitForSingleObject(handle, timeout_s*1000)
 return rc != WAIT_TIMEOUT
 ```
 
-The safety argument (docstring L535–543): `apply_update_and_restart` launches the swap process **while the app is still alive** (it stays up ~2.0 s+ after the launch, across the death-check window), and `OpenProcess` here is the swap's *very first* action — so the handle is taken against the *live original* process. **A held process handle keeps the kernel process object (and thus the PID) reserved until the handle is closed**, so the PID can't be recycled out from under the wait. If `OpenProcess` instead *fails*, the original already exited → returning `True` to proceed is correct. The only residual case (swap exe so slow to start that the app exits AND the PID is reused by a live process before `OpenProcess`) merely lets the wait time out → reports "not applied", old version intact, logged — **fail-safe, never a half-swap.**
+The safety argument: `apply_update_and_restart` keeps the original app alive until the helper publishes the nonce, and that publication happens only after `OpenProcess` returns a handle to the live original process. **A held process handle keeps the kernel process object (and thus the PID) reserved until the handle is closed**, so the PID cannot be recycled out from under the wait. In handshake mode an `OpenProcess` failure raises instead of certifying readiness; the helper reports "not applied", exits, and the old app stays open. The return-`True` "already gone" behavior remains only on the legacy no-callback path.
 
 ### 6.2 Phase 1 — COPY to `*.new` (the slow, abortable part)
 
@@ -354,8 +364,9 @@ gui_api.update_start (user clicks "Update to vX")
        -> posts phase:"downloading"(pct…) then phase:"staged"
 gui_api.update_apply (user clicks "Restart to update"; gated on no task)
   -> updater.apply_update_and_restart(staged)
-       -> Popen staged exe --apply-update <install> <pid> <helperlog>
-       -> poll() every 0.25s across a 2.0s window -> UpdateError if dead   (stay on old version)
+       -> Popen staged exe --apply-update <install> <pid> <helperlog> <readyfile> <nonce>
+       -> wait up to 15s for the exact ready nonce; retry transient marker read errors
+       -> UpdateError + terminate helper if readiness is unproven          (stay on old version)
   -> _close_for_update(): window.destroy() -> process exits
 [staged exe, swap mode]
 gui_main.main: SWAP_FLAG in argv -> updater.run_swap_mode(argv)   # BEFORE any init
@@ -376,7 +387,7 @@ gui_main.main: cleanup_leftovers()           # removes *.old/*.new + staged + we
 | `check_for_update` | network/SSL/timeout | `UpdateError` → `phase:"failed"` (logged; quiet unless manual) |
 | `download_and_stage` | SHA mismatch | zip deleted, `UpdateError`, nothing staged |
 | `download_and_stage` | bad zip / disk full / incomplete | `UpdateError`, nothing staged |
-| `apply_update_and_restart` | swap exe blocked/dies in the ~2.0 s window | `UpdateError`; **app stays open on old version** |
+| `apply_update_and_restart` | helper blocked/dies, bad or timed-out handshake, or marker remains unreadable | `UpdateError`; unready helper terminated; **app stays open on old version** |
 | `perform_swap` phase 1 | copy `OSError` | abort, delete `.new`, old version intact, relaunch old |
 | `perform_swap` phase 2 | rename `OSError` | rename-rollback to old version; `last_swap_failure` reports it next launch |
 | `_wait_pid_exit` | old PID never exits in 120 s | "update NOT applied", old version intact |
@@ -421,4 +432,4 @@ The updater's verification only works because of what `.github/workflows/release
 - **Leftovers are cleaned by the *next* app, not the swap.** `perform_swap` cannot delete the `.old` tree (Defender may hold the just-renamed `_internal.old`) or the `staged` tree it runs from. If you add a step expecting them gone immediately, you'll be wrong — they're removed at the relaunched app's `cleanup_leftovers()`.
 - **`asset_size == 0` disables two guards.** When the API omits `size`, the disk-space check (`if info.asset_size:`) and the completeness check (`if info.asset_size and done != info.asset_size`) both no-op. The download still verifies via SHA-256 (when available) and via a valid-zip extract, so it's not unguarded — but don't assume `asset_size` is always present.
 - **`_clear_webview_caches` is frozen-only (P10).** It sits **below** the `is_frozen()` gate in `cleanup_leftovers`, so a dev run (which serves `scripts/ui` live) does NOT clear it. Only `_recover_store_promotions()` runs before the gate, on every launch.
-- **The ~2.0 s windowed death check is a heuristic, not a guarantee.** A swap exe that dies *after* the 2.0 s window (e.g. crashes during phase 1) won't be caught by `apply_update_and_restart`; that failure surfaces only via `update_helper.log` + `last_swap_failure` on the next launch. The window only catches *near-immediate* launch refusals (polled every 0.25 s).
+- **Readiness-marker retries are bounded and fail closed.** A transient marker-access error can recover when the exact nonce becomes readable within 15 s. Any access error permanently disables legacy-log downgrade for that launch; persistent unreadability reaches the deadline, terminates the helper, and leaves the old app running. This prevents a current nonce-capable helper's ordinary log line from masquerading as readiness.

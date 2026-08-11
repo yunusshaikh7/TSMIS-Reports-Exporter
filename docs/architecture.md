@@ -231,6 +231,13 @@ pre-0.7 exports stay consolidatable. Resume/idempotency, the integrity gate, and
 live browser status are runtime behavior — see
 [engine-and-reliability.md](engine-and-reliability.md).
 
+Artifact directories expose deliverables at their top level and group durable
+machine state under one `_state/` child. Outcome/provenance sidecars, compressed
+comparison payloads, publication locks, evidence manifests, fingerprints, and
+Matrix caches all follow that convention. Readers retain legacy sibling-path
+compatibility; startup organizes known legacy state conservatively. See
+[engine-and-reliability.md](engine-and-reliability.md#clean-artifact-folders-_state).
+
 ## Data location (option A): next to the exe, `%LOCALAPPDATA%` fallback
 
 `scripts/paths.py` decides WHERE the app reads/writes, so the rest of the code never

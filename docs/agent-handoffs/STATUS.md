@@ -1,10 +1,17 @@
-# Agent collaboration — overall status (authoritative)
+# Agent collaboration — `sol-001` historical record
 
-**Claude owns this file.** Sol never edits it. It is the single source of truth for who
-owns what, where each agent is, and what happens next. Product/architecture truth lives in
-the `docs/` library and `docs/planning/comparison-perfection/` — this file only links.
+> **CLOSED / HISTORICAL.** `sol-001` was accepted, integrated, and cleared on
+> 2026-07-17. The `Active`, ownership, branch, and `Next` fields below are the
+> point-in-time coordination record; they are not current instructions. For the
+> active bounded workflow use
+> [`../planning/post-comparison-perfection-output-audit/START-HERE.md`](../planning/post-comparison-perfection-output-audit/START-HERE.md),
+> and for general future work use [`../roadmap.md`](../roadmap.md).
 
-_Last updated: 2026-07-17 by Claude._
+Historical ownership rule: Claude owned this file while the mission was active;
+Sol did not edit it. Product/architecture truth remains in the `docs/` library and
+`docs/planning/comparison-perfection/`.
+
+_Mission record last updated: 2026-07-17 by Claude. Archival banner added: 2026-08-10._
 
 ## Shared baseline
 - **Verified integration commit:** `a4ccd23` (branch `comparison-perfection`, CI-green,

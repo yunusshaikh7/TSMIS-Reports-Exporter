@@ -39,6 +39,7 @@ import zipfile
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+import output_state
 from comparison_contract import ArtifactGeneration, AttemptState, ComparisonOutcome
 from events import ConsolidateResult
 
@@ -1456,7 +1457,11 @@ def fingerprint(folder):
 
 
 def _fp_sidecar(consolidated):
-    return Path(str(consolidated) + _FP_SUFFIX)
+    return output_state.artifact_state_file(consolidated, _FP_SUFFIX)
+
+
+def _fp_read_sidecar(consolidated):
+    return output_state.artifact_read_file(consolidated, _FP_SUFFIX)
 
 
 # A fingerprint value that can NEVER equal a real one (`fingerprint()` returns
@@ -1514,6 +1519,11 @@ def write_consolidated_fingerprint(consolidated, store_dir, built_from=None,
     an exception fails closed; a temp is cleaned only while its path is allowed.
     """
     consolidated = Path(consolidated)
+    state_parent = output_state.ensure_state_dir(consolidated.parent, commit_guard)
+    if state_parent is None:
+        log.warning("artifact fingerprint for %s: organized state directory unavailable",
+                    consolidated.name)
+        return False
 
     def _allowed(path, action):
         if commit_guard is None:
@@ -1541,7 +1551,7 @@ def write_consolidated_fingerprint(consolidated, store_dir, built_from=None,
         # sidecar -> overwrite it with a non-matching sentinel -> (P2-A02 dual-failure)
         # quarantine the replaced workbook so the canonical path resolves MISSING -> log
         # critically. The replaced workbook must NEVER stay eligible to read fresh.
-        sc = _fp_sidecar(consolidated)
+        sc = _fp_read_sidecar(consolidated)
         if not _allowed(sc, "stale-sidecar invalidation"):
             log.error("artifact fingerprint for %s could not invalidate stale state because "
                       "the destination ownership changed", consolidated.name)
@@ -1590,7 +1600,7 @@ def _read_fp_sidecar(consolidated):
     """The recorded fingerprint string, or None when the sidecar is absent / unreadable
     / corrupt / a different schema. Never raises."""
     try:
-        with open(_fp_sidecar(consolidated), encoding="utf-8") as f:
+        with open(_fp_read_sidecar(consolidated), encoding="utf-8") as f:
             meta = json.load(f)
     except (OSError, ValueError):
         return None

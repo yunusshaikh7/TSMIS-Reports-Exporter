@@ -2171,3 +2171,13 @@ The RB-4 closeout then prepared RB-5's combined HF-06/HF-09 scope contract from
 `main` at `1e9446bb7f1f9771b7698482d63980840ee5ec28` and marked RB-5
 `READY`. It did not create the RB-5 branch, modify product code, generate
 deliverables, or begin `RB5-A1`.
+
+After that readiness record, `main` advanced through `v0.34.0` to `v0.35.0`
+(`800bea2f0835fa69ab8ded0ed46fd83368173d80`). `v0.35.0` is a separate
+owner-directed Highway Sequence vs-TSN policy change: `HG`, `City`, and
+`Distance To Next Point` are now asserted. It did not implement HF-06 or HF-09.
+RB-5 remains `READY`, but Stage 4 must use the latest clean pushed `main` as its
+recorded base and treat the readiness commit as scope provenance only. Every
+RB-5 promise that Highway Sequence vs-TSN counts remain unchanged is measured
+from that exact Stage-4 base to the RB-5 acceptance head; the `v0.35.0` policy
+must not be reverted or absorbed into RB-5.

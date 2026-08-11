@@ -56,6 +56,7 @@ from pathlib import Path
 
 import credential_safety
 import paths
+import output_state
 import settings
 import version
 
@@ -165,7 +166,8 @@ def _refuse_reason(f, roots):
 def _is_state_sidecar(f):
     """Whether `f` is one of the metadata sidecars the bundle may carry."""
     name = f.name
-    if name in _STATE_NAMES and f.parent.name in _STATE_DIR_NAMES:
+    if (name in _STATE_NAMES
+            and f.parent.name in (_STATE_DIR_NAMES | {output_state.STATE_DIRNAME})):
         return True
     return any(name.endswith(sfx) for sfx in _STATE_SUFFIXES)
 
@@ -206,7 +208,10 @@ def _state_entries():
             if not _is_state_sidecar(f):
                 continue
             try:
-                rel = f.relative_to(root).as_posix()
+                rel_path = f.relative_to(root)
+                if rel_path.parent.name == output_state.STATE_DIRNAME:
+                    rel_path = rel_path.parent.parent / rel_path.name
+                rel = rel_path.as_posix()
             except ValueError:  # silent-ok: a walk result outside its own root is simply skipped
                 continue
             entries.append((f, f"state/{label}/{rel}"))

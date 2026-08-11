@@ -963,6 +963,81 @@ def test_helper_readiness_handshake():
                 delattr(updater, name)
 
 
+def test_helper_readiness_marker_access_retries():
+    print("helper readiness retries transient marker access failures (section J):")
+
+    class FlakyReadyMarker:
+        def __init__(self):
+            self.reads = 0
+            self.removed = False
+
+        def read_text(self, encoding=None):
+            self.reads += 1
+            if self.reads <= 2:
+                raise PermissionError(13, "Permission denied")
+            return "ready:field-token"
+
+        def unlink(self, missing_ok=False):
+            self.removed = True
+
+    flaky = FlakyReadyMarker()
+    updater._wait_for_helper_ready(
+        _FakeProc([None]), flaky, "field-token",
+        Path(tempfile.mkdtemp(prefix="tsmis_ready_retry_")) / "helper.log",
+        0, 41)
+    check("a transient marker denial is retried until the nonce is readable",
+          flaky.reads == 3)
+    check("the recovered readiness marker is consumed", flaky.removed)
+
+    class AlwaysDeniedMarker:
+        def __init__(self):
+            self.reads = 0
+            self.removed = False
+
+        def read_text(self, encoding=None):
+            self.reads += 1
+            raise PermissionError(13, "Permission denied")
+
+        def unlink(self, missing_ok=False):
+            self.removed = True
+
+    class TerminableProc(_FakeProc):
+        def __init__(self):
+            super().__init__([None])
+            self.terminated = False
+
+        def terminate(self):
+            self.terminated = True
+
+    tmp = Path(tempfile.mkdtemp(prefix="tsmis_ready_denied_"))
+    helper_log = tmp / "helper.log"
+    helper_log.write_text(
+        "2000-01-01 00:00:00  swap started: waiting for the app "
+        "(pid 42) to exit\n", encoding="utf-8")
+    denied = AlwaysDeniedMarker()
+    proc = TerminableProc()
+    orig_timeout = updater._HELPER_READY_TIMEOUT_S
+    orig_interval = updater._HELPER_READY_INTERVAL_S
+    updater._HELPER_READY_TIMEOUT_S = 0.01
+    updater._HELPER_READY_INTERVAL_S = 0.001
+    err = None
+    try:
+        updater._wait_for_helper_ready(
+            proc, denied, "current-token", helper_log, 0, 42)
+    except updater.UpdateError as e:
+        err = str(e)
+    finally:
+        updater._HELPER_READY_TIMEOUT_S = orig_timeout
+        updater._HELPER_READY_INTERVAL_S = orig_interval
+
+    check("a persistent marker denial is retried within the bounded window",
+          denied.reads > 1)
+    check("marker denial cannot downgrade to the legacy log handshake",
+          err is not None and "could not confirm it was ready" in err.lower())
+    check("a helper without nonce proof is terminated", proc.terminated)
+    check("the denied marker still gets a best-effort cleanup", denied.removed)
+
+
 def test_swap_helper_signals_readiness(monkeypatch_wait):
     print("the staged helper signals ready only after entering the PID wait (§J):")
     tmp = Path(tempfile.mkdtemp(prefix="tsmis_ready_"))
@@ -1126,6 +1201,7 @@ def main():
         test_staged_bundle_reverify()
         test_staged_record_mandatory()
         test_helper_readiness_handshake()
+        test_helper_readiness_marker_access_retries()
         test_swap_helper_signals_readiness(monkeypatch_wait)
         test_rollback_message_reflects_outcome(monkeypatch_wait)
         test_partial_rollback_never_relaunches(monkeypatch_wait)

@@ -33,6 +33,7 @@ import cache_envelope
 import consolidation_meta
 import matrix
 import report_catalog
+import output_state
 from paths import (comparisons_root, day_source_dir, list_output_days,
                    parse_run_folder, today_str)
 
@@ -93,14 +94,18 @@ def day_out_path(date, source, row_key):
 
 
 def _results_path():
-    return pve_root() / _RESULTS_FILE
+    return output_state.state_file(pve_root(), _RESULTS_FILE)
+
+
+def _results_read_path():
+    return output_state.named_read_file(pve_root(), _RESULTS_FILE)
 
 
 def load_results():
     """{ "<date source>|<row>": {verdict, diff_cells, one_sided, built_at_mtime,
     completion, generation_id, input_fingerprint, source_identities,
     producer_versions} } — the by-day self-check counts cache."""
-    p = _results_path()
+    p = _results_read_path()
     try:
         with open(p, encoding="utf-8") as f:
             data = json.load(f)
@@ -109,7 +114,7 @@ def load_results():
         return {}                            # not written yet (first run) — expected
     except ValueError as e:                  # corrupt JSON: surface it, then degrade
         log.warning("pve_matrix: corrupt results cache %s (%s: %s); treating as empty",
-                    _results_path(), type(e).__name__, e)
+                    p, type(e).__name__, e)
         return {}
 
 
@@ -129,6 +134,10 @@ def record_result(date, source, row_key, verdict, diff_cells, one_sided,
     }
     p = _results_path()
     tmp = p.with_name(p.name + ".tmp")
+
+    if output_state.ensure_state_dir(pve_root(), commit_guard) != p.parent:
+        raise ValueError("The organized PDF-vs-Excel Matrix state directory is unavailable.")
+
 
     def _require_guard(path, action):
         if not consolidation_meta.guard_allows(commit_guard, path):

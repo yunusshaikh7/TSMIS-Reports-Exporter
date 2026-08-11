@@ -224,23 +224,25 @@ Mechanics (`exporter.py:225-243`):
 
 ## 6. `preflight` and `select_report` (`report_nav.py`, re-exported by `common.py`)
 
-### 6.1 `preflight(page, report_label, data_value=None)` (`report_nav.py:226`)
+### 6.1 `preflight(page, report_label, data_value=None)` (`report_nav.py:260`)
 
 Runs after sign-in, before the loop. Four checks, each a fast-fail with a `preflight_fail_*` page dump:
 
-1. `#customReport` dropdown present (`count() == 0` ⇒ `PreflightError` + dump, `:749-756`).
-2. `select_report(page, report_label, data_value)` (`:244`) — arms the form (picking by the spec's stable `data_value` when present); itself raises `ReportUnavailableError` on a `cs-disabled` report.
-3. Route control attaches within 15 s: `page.get_by_label("Route", exact=True).wait_for(state="attached", timeout=15000)` (`:761`).
-4. Generate button attaches within 15 s (`:763`).
+1. `#customReport` dropdown present; absence raises `PreflightError` after the dump.
+2. `select_report(page, report_label, data_value)` arms the form by the spec's stable `data_value` when present and raises `ReportUnavailableError` on a `cs-disabled` report.
+3. District/Route's `#districtRouteSelect` attaches within 15 s.
+4. District/Route's `#districtRouteBtn` attaches within 15 s.
 
-A `step` string is tracked so the log names the failed step (`:757,760,762`). `ReportUnavailableError` is re-raised **as-is** (`:765-769`) — it's a clear, specific condition, not the generic "page looks different". Any other exception ⇒ generic `PreflightError` (`:770-779`). `SiteUnreachableError` and `ReportUnavailableError` both subclass `PreflightError` (`errors.py`), so every driver shows the message verbatim.
+A `step` string makes the log name the failed check. `ReportUnavailableError` and a precise `PreflightError` from report selection are re-raised **as-is**, rather than replaced by the generic "page looks different" message. `SiteUnreachableError` and `ReportUnavailableError` both subclass `PreflightError` (`errors.py`), so every driver shows the message verbatim.
 
 ### 6.2 `select_report(page, report_label, data_value=None)` (`report_nav.py:108`)
 
-1. Click `#customReport`, then `_find_exact_option(page, report_label, data_value)` (`:27`) picks the one option: it reads every `li.cs-option` as `(locator, text, data-value, data-label)` and matches **by the stable `data-value` first** (the value the site writes into its hidden native `<select>` — identical on the old flat menu and the new nested flyout, and proof against a relabelled leaf), falling back to an **exact** match on the visible text OR `data-label`. Zero or multiple matches ⇒ `PreflightError` — the exact-match guard that replaced the old substring `has_text=…`.first read (which could silently pick the wrong report when one label was contained in another, e.g. "Highway Log" inside "Highway Log (PDF)").
-2. **Read the option's classes**; if `cs-disabled` is present ⇒ `ReportUnavailableError` (`:140`). The disabled `<li>` has no `pointer-events:none`, so a Playwright click would silently no-op and stall ~30 s into a generic preflight error — detecting the class here turns that into one clear "currently unavailable" message. The class read is wrapped so the probe itself can never stop a run (the site marks the not-yet-available Highway group this way on the nested menu).
-3. `_reveal_submenu_if_leaf` (`:83`): on the nested menu a `cs-leaf` stays `display:none` until its `cs-parent` row is hovered (a CSS `:hover` rule, no JS), so it hovers the parent to open the flyout before the click; a flat top-level option needs nothing (best-effort — a missing/unhoverable parent just lets the click proceed).
-4. Click the option, then **fan out District/County/Route to `-- ALL --`** (`:150-156`): click "District / County / Route", select District `-- ALL --`, `wait_for_function` that `#districtCountySelect` is no longer disabled (bounded at `county_enable_timeout_ms()`, default 60 s), then select that to `-- ALL --`. The county-enable wait is the only place `COUNTY_ENABLE_TIMEOUT_MS` is used.
+1. Click `#customReport`, then `_find_exact_option(page, report_label, data_value)` (`:27`) picks exactly one option. It reads each `li.cs-option` as `(locator, text, data-value, data-label)`, matches the stable `data-value` first, and falls back to exact visible text or `data-label`. Zero or multiple matches raise `PreflightError`; this replaced the old substring-first lookup that could silently choose a near-match such as "Highway Log (PDF)" for "Highway Log".
+2. Read the option and parent-flyout classes. If either is `cs-disabled`, raise `ReportUnavailableError` before an inert click can stall into a generic timeout.
+3. `_reveal_submenu_if_leaf` hovers a nested leaf's `cs-parent` so the CSS-only flyout is visible before clicking; flat top-level options need nothing.
+4. Click the option, then fan out District/County/Route through the stable form IDs: click `#modeBtnDistrictRoute`, select `#districtSelect` as `-- ALL --`, wait until `#districtCountySelect` is enabled (bounded by `county_enable_timeout_ms()`, default 60 s), and select it as `-- ALL --`.
+
+The IDs are required by the 2026-08 two-mode form. Its postmile `#pm-district` remains in the DOM with the same accessible label, **District**, so `get_by_label("District")` resolves two elements and Playwright strict mode rejects the action. Route generation follows the same contract with `#districtRouteSelect` and `#districtRouteBtn`; similarly named controls in other modes cannot collide. `test_duplicate_district_labels` in `build/check_fake_site.py` locks the full browser path.
 
 ### 6.3 The report-ready / error JS
 

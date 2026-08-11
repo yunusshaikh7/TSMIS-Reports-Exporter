@@ -1083,8 +1083,8 @@ foundation it sits on was audited cell-accurate over the full 6-env batch (2026-
   output identity, workbook mtime, matching generation ID, and current input fingerprint; absent,
   malformed, foreign, partial, or mismatched records are stale/rebuildable. `matrix_snapshot()` is
   offline and read-only, but strict validation deliberately re-hashes workbook members—it is not a
-  pure-stat trust check. Cache files remain `comparisons/<baseline>/_results.json` for env and
-  `comparisons/tsn/_tsn_results.json` for tsn/self.
+  pure-stat trust check. Cache files live at `comparisons/<baseline>/_state/_results.json` for env
+  and `comparisons/tsn/_state/_tsn_results.json` for tsn/self.
 - **Toggles + refresh:** report and **environment-column** show/hide (`matrix_hidden_reports` /
   `matrix_hidden_envs`); refresh per-cell, **per-row**, **per-column**, or all (`cells_to_rebuild(scope,
   row=, env=)`); **cancel** between cells (`MatrixCompareWorker`) + idempotent resume (re-run stale).
@@ -1153,7 +1153,7 @@ row.) Like `matrix.py`, it NEVER edits the manual compare code — it only orche
   by-day matrix shows a PER-ROW TSN picker (named by its report, like the Everything matrix);
   each cell resolves its own report's TSN.
 - **Store:** `output/comparisons/tsn-by-day/<date src-env>/<row>_vs_tsn.xlsx` (stable, dateless per
-  cell); typed truth is read from the strict generation and cached in that tree's `_results.json`
+  cell); typed truth is read from the strict generation and cached in that tree's `_state/_results.json`
   under output identity `tsn-by-day`, generation ID, mtime, and input fingerprint. Snapshot
   (`day_matrix_snapshot`) is offline/read-only rather than pure-stat; missing or mismatched trust
   data is stale. `cells_to_rebuild(scope, row=, date=)` skips greyed rows + missing sides.
@@ -1211,7 +1211,7 @@ PDF baseline.
 - **Store:** `output/comparisons/baseline-by-day/<date src-env>/<row>_vs_<token>.xlsx` — the
   baseline token (`store` / the baseline date) is PART of the name, so each baseline's comparisons
   are distinct artifacts and switching baselines never clobbers the other's. Strict typed truth is
-  cached in that tree's `_results.json` under `"<date src-env>|<row>|<baseline-id>"`, with output
+  cached in that tree's `_state/_results.json` under `"<date src-env>|<row>|<baseline-id>"`, with output
   identity `baseline-by-day`, generation ID, mtime, and the **two-folder input fingerprint**
   (`fp_folders=(day, baseline)`). BOTH sides are multi-file folders, so a route deleted on either
   one reads the cell stale; missing or untrusted generation/cache data is stale too.
@@ -1392,8 +1392,9 @@ columns THAT row's comparison counts (pinned in `check_visual_evidence`).
   every later field index. *Convenience gap:* the per-cell on-demand camera stays TSN-only; a
   self comparison gets evidence when it is built with the toggle on.
 - **The set is ONE published generation** (CMP-AUD-098/106/109). `scripts/evidence_manifest.py`
-  writes `<comparison> (evidence).json` — deliberately the same length as the `.xlsx` sibling,
-  because the field install is already at the MAX_PATH budget. It records the comparison's
+  writes `<comparison folder>/_state/<comparison stem> (evidence).json`. The basename is
+  deliberately the same length as the `.xlsx` sibling, and the `_state` component is included
+  in the field MAX_PATH budget. It records the comparison's
   CONTENT digest + the published ledger digest, the **read set** (path/size/SHA-256), and a
   digest per published member. `describe()` returns
   absent / current / stale / incomplete / unreadable holding no in-memory state.

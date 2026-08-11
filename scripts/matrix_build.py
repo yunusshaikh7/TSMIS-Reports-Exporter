@@ -20,6 +20,7 @@ from pathlib import Path
 
 import consolidation_meta
 import outcome
+import output_state
 import owned_dir
 import reports
 
@@ -249,6 +250,11 @@ _REPARSE_POINT = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
 _STALE_CAPTURE_AGE_S = 6 * 3600
 
 
+def _capture_metadata_name(name):
+    return (str(name).endswith(_META_SUFFIX)
+            or str(name).endswith(_META_SUFFIX + ".tmp"))
+
+
 def _carried_tsn_sidecar(source):
     """The library sidecar keys a private capture must reproduce, or None when
     the source carries none of them (an older normalization — the capture then
@@ -291,15 +297,41 @@ def _sweep_stale_tsn_captures(keep, now=None):
             if now - st.st_mtime < _STALE_CAPTURE_AGE_S:
                 continue                       # possibly a live capture
             leftovers = list(os.scandir(entry))
-            if any(not item.is_file(follow_symlinks=False)
-                   or not (item.name.endswith(".xlsx")
-                           or item.name.endswith(_META_SUFFIX))
-                   for item in leftovers):
+            files = []
+            organized_files = []
+            organized_dir = None
+            recognized = True
+            for item in leftovers:
+                if item.is_file(follow_symlinks=False):
+                    if item.name.endswith(".xlsx") or _capture_metadata_name(item.name):
+                        files.append(Path(item.path))
+                    else:
+                        recognized = False
+                    continue
+                if item.name != output_state.STATE_DIRNAME or organized_dir is not None:
+                    recognized = False
+                    continue
+                state_stat = item.stat(follow_symlinks=False)
+                if (not stat.S_ISDIR(state_stat.st_mode)
+                        or getattr(state_stat, "st_file_attributes", 0) & _REPARSE_POINT):
+                    recognized = False
+                    continue
+                organized_dir = Path(item.path)
+                state_entries = list(os.scandir(organized_dir))
+                if any(not child.is_file(follow_symlinks=False)
+                       or not _capture_metadata_name(child.name)
+                       for child in state_entries):
+                    recognized = False
+                    continue
+                organized_files.extend(Path(child.path) for child in state_entries)
+            if not recognized:
                 log.warning("matrix: left an unrecognized TSN capture directory "
                             "in place: %s", entry)
                 continue
-            for item in leftovers:
-                os.unlink(item.path)
+            for path in files + organized_files:
+                os.unlink(path)
+            if organized_dir is not None:
+                os.rmdir(organized_dir)
             os.rmdir(entry)
             log.info("matrix: removed the stale TSN capture directory %s", entry)
         except OSError as e:
@@ -331,6 +363,7 @@ def captured_tsn_workbook(source_path, expected_identity):
     captured_identity = None
     captured_sidecar = consolidation_meta.meta_path(captured)
     sidecar_identity = None
+    state_dir_identity = None
     try:
         source_outcome_before = consolidation_meta.read_outcome(source)
         carried_before = _carried_tsn_sidecar(source)
@@ -419,6 +452,11 @@ def captured_tsn_workbook(source_path, expected_identity):
             except OSError as e:
                 raise ValueError(
                     "the captured TSN producer outcome could not be verified") from e
+            try:
+                state_dir_identity = _object_identity(captured_sidecar.parent.lstat())
+            except OSError as e:
+                raise ValueError(
+                    "the captured TSN state directory could not be verified") from e
         yield captured
     finally:
         # Never recursively clean an untrusted/replaced directory. Remove only
@@ -435,6 +473,20 @@ def captured_tsn_workbook(source_path, expected_identity):
             except OSError as e:
                 log.warning("matrix: could not clean TSN capture sidecar %s (%s: %s)",
                             captured_sidecar, type(e).__name__, e)
+        if state_dir_identity is not None:
+            state_dir = captured_sidecar.parent
+            try:
+                if _object_identity(state_dir.lstat()) == state_dir_identity:
+                    os.rmdir(state_dir)
+                else:
+                    log.warning("matrix: retained replaced TSN capture state "
+                                "directory %s", state_dir)
+            except FileNotFoundError:  # silent-ok: already gone is the desired end state
+                pass
+            except OSError as e:
+                log.warning("matrix: retained non-empty/uncertain TSN capture "
+                            "state directory %s (%s: %s)",
+                            state_dir, type(e).__name__, e)
         if captured_identity is not None:
             try:
                 if _object_identity(captured.lstat()) == captured_identity:

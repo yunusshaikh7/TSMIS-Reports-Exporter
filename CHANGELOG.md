@@ -3,6 +3,38 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.35.1 — 2026-08-11
+
+Exports work against the newer TSMIS form again, one-click updates tolerate the
+brief Windows file lock seen during the last update, and generated folders keep
+their internal bookkeeping out of the way.
+
+### Fixed
+- **Exports use the site's stable District/County/Route controls.** The newer
+  form keeps two different controls labelled `District`, which made Playwright's
+  label lookup ambiguous and stopped exports before generation. Report setup,
+  preflight and route generation now use the form's structural IDs, while the
+  existing flat and grouped report menus remain supported.
+- **One-click updates recover from transient readiness-marker locks.** The first
+  two v0.35.0 restart attempts reached the new helper but Windows briefly denied
+  access to its readiness marker. Marker reads now retry within the existing
+  15-second bound and still fail closed—terminating an unproven helper and
+  leaving the old app open—if the exact nonce never becomes readable.
+
+### Changed
+- **Generated folders now separate internal state under `_state`.** Outcomes,
+  provenance, comparison payloads and locks, fingerprints, evidence manifests,
+  and Matrix caches no longer sit beside the workbooks, PDFs and images people
+  use. Startup migrates only recognized legacy state, verifies each copy by
+  SHA-256 before removing the old file, and retains conflicts instead of
+  overwriting them. `.tsmis-owned.json` deliberately stays at an owned root as
+  the deletion-safety marker.
+
+### Internal
+- Added browser coverage for the duplicate-label form, updater coverage for
+  transient and persistent marker denial, and a dedicated output-state migration
+  gate. The full offline suite now contains 159 checks.
+
 ## v0.35.0 — 2026-08-10
 
 ### Changed

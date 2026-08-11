@@ -541,6 +541,7 @@ try:
     _cmp6c.write_bytes(b"comparison")
     _wb6c, _img6c = ve.sibling_paths(_cmp6c)
     _man6c = ve.evidence_manifest.manifest_path(_cmp6c)
+    _man6c.parent.mkdir(parents=True, exist_ok=True)
     _wb6c.write_bytes(b"PRE-AMENDMENT evidence workbook")
     _img6c.mkdir()
     (_img6c / "panel.png").write_bytes(b"a workbook-panel image")
@@ -696,6 +697,7 @@ def _print_refusal_case(tsmis_prints, tsn_prints):
             cmp7, idt7._SCHEMA, [list(row7)], [list(row7)], (cons7, tsn7))
         wb7, img7 = ve.sibling_paths(cmp7)
         man7 = em7.manifest_path(cmp7)
+        man7.parent.mkdir(parents=True, exist_ok=True)
 
         tdir7 = root / "tsmis_pdf"; tdir7.mkdir()
         if tsmis_prints:

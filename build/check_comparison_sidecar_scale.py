@@ -144,7 +144,7 @@ def main():
         vraw = json.loads(cm.meta_path(values).read_text(encoding="utf-8"))
         manifest = fraw["comparison_payload"]
         compressed_total = sum(item["size"] for item in manifest["chunks"])
-        chunk_paths = tuple(root / item["relative_path"]
+        chunk_paths = tuple(cm.meta_path(formulas).parent / item["relative_path"]
                             for item in manifest["chunks"])
         check("measured 41,000-trace shape remains the 16.8 MiB five-chunk boundary",
               manifest["decoded_size"] == 16_795_872

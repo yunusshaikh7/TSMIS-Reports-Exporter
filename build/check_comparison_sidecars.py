@@ -120,14 +120,14 @@ def _write_raw_sidecar(path, value):
 def _payload_chunk_paths(path):
     raw = _raw_sidecar(path)
     manifest = raw["comparison_payload"]
-    return tuple(Path(path).parent / item["relative_path"]
+    return tuple(cm.meta_path(path).parent / item["relative_path"]
                  for item in manifest["chunks"])
 
 
 def _payload_value(path):
     raw = _raw_sidecar(path)
     return cm._read_comparison_payload(
-        raw["comparison_payload"], Path(path).parent).to_dict()
+        raw["comparison_payload"], cm.meta_path(path).parent).to_dict()
 
 
 def _install_payload(paths, value):
@@ -138,7 +138,7 @@ def _install_payload(paths, value):
         skipped_inputs=first_raw["skipped_inputs"],
         failed_inputs=first_raw["failed_inputs"],
         artifact_generation=first_raw["artifact_generation"])
-    parent = Path(paths[0]).parent
+    parent = cm.meta_path(paths[0]).parent
     for relative, compressed in chunks:
         (parent / relative).write_bytes(compressed)
     for path in paths:
@@ -166,7 +166,7 @@ def _mutated_chunk_manifest(path, compressed, index=0):
     descriptor["sha256"] = digest
     descriptor["relative_path"] = cm._payload_primary_basename(
         manifest["decoded_sha256"], index, digest)
-    chunk_path = Path(path).parent / descriptor["relative_path"]
+    chunk_path = cm.meta_path(path).parent / descriptor["relative_path"]
     chunk_path.write_bytes(compressed)
     return manifest, chunk_path
 
@@ -230,6 +230,7 @@ def _capped_pairing_trace():
 def main():
     with tempfile.TemporaryDirectory(prefix="tsmis_comparison_sidecars_") as raw:
         root = Path(raw)
+        state_root = cm.meta_path(root / "state-probe.xlsx").parent
 
         print("single-member complete + partial round trips:")
         single = root / "single.xlsx"
@@ -703,7 +704,7 @@ def main():
             pairing_quality="exact")
         blocked_prepared = cm._prepare_comparison_publication(blocked_result)
         blocked_relative, _blocked_bytes = blocked_prepared["payload_chunks"][0]
-        blocked_chunk = root / blocked_relative
+        blocked_chunk = state_root / blocked_relative
         blocked_chunk.write_bytes(b"foreign-preexisting-bytes")
         foreign_bytes = blocked_chunk.read_bytes()
         check("wrong pre-existing primary selects a bounded fallback publication",
@@ -711,7 +712,7 @@ def main():
         fallback_raw = _raw_sidecar(blocked)
         fallback_manifest = fallback_raw["comparison_payload"]
         fallback_relative = fallback_manifest["chunks"][0]["relative_path"]
-        fallback_path = root / fallback_relative
+        fallback_path = state_root / fallback_relative
         fallback_prefix = (
             f".cmpv3-{cm._payload_name_hex(fallback_manifest['decoded_sha256'])}"
             f"-000000-"
@@ -731,7 +732,7 @@ def main():
               and _raw_sidecar(blocked)["comparison_payload"]["chunks"][0]
                   ["relative_path"] == first_fallback
               and fallback_path.stat().st_mtime_ns == first_fallback_stat.st_mtime_ns
-              and len(tuple(root.glob(
+              and len(tuple(state_root.glob(
                   fallback_prefix + "*" + cm._COMPARISON_PAYLOAD_SUFFIX))) == 1)
 
         # Existing schema-v3 records may already name the older binding+nonce
@@ -744,7 +745,7 @@ def main():
         legacy_relative = (
             legacy_fallback_prefix + fallback_manifest["binding_sha256"]
             + "-" + "d" * 16 + cm._COMPARISON_PAYLOAD_SUFFIX)
-        (root / legacy_relative).write_bytes(fallback_path.read_bytes())
+        (state_root / legacy_relative).write_bytes(fallback_path.read_bytes())
         legacy_raw = _raw_sidecar(blocked)
         legacy_raw["comparison_payload"]["chunks"][0]["relative_path"] = legacy_relative
         _write_raw_sidecar(blocked, legacy_raw)
@@ -766,7 +767,7 @@ def main():
         exhausted_prepared = cm._prepare_comparison_publication(exhausted_result)
         exhausted_descriptor = exhausted_prepared["payload_manifest"]["chunks"][0]
         exhausted_relative, _exhausted_bytes = exhausted_prepared["payload_chunks"][0]
-        exhausted_primary = root / exhausted_relative
+        exhausted_primary = state_root / exhausted_relative
         exhausted_primary.write_bytes(b"foreign-primary")
         exhausted_slots = []
         exhausted_base = (
@@ -774,7 +775,7 @@ def main():
             f"{cm._payload_name_hex(exhausted_prepared['payload_manifest']['decoded_sha256'])}"
             f"-000000-{cm._payload_name_hex(exhausted_descriptor['sha256'])}-f-")
         for slot in range(cm._PAYLOAD_FALLBACK_SLOT_COUNT):
-            slot_path = root / (
+            slot_path = state_root / (
                 exhausted_base + f"{slot:02d}" + cm._COMPARISON_PAYLOAD_SUFFIX)
             slot_path.write_bytes(f"foreign-slot-{slot}".encode("ascii"))
             exhausted_slots.append(slot_path)
@@ -805,7 +806,7 @@ def main():
               and exact_chunk.stat().st_mtime_ns == exact_stat.st_mtime_ns)
 
         print("parent-scoped publication lease + exact winning generation:")
-        publication_lock = root / cm._COMPARISON_PUBLICATION_LOCK_NAME
+        publication_lock = state_root / cm._COMPARISON_PUBLICATION_LOCK_NAME
         lock_identity = cm._ordinary_file_stat(publication_lock)
         check("successful publication retains one permanent ordinary lock anchor",
               lock_identity is not None and publication_lock.is_file())
@@ -821,7 +822,7 @@ def main():
             local_values.append(cm.write_comparison_outcomes(local_result))
             local_done.set()
 
-        with cm._comparison_publication_lease(root):
+        with cm._comparison_publication_lease(state_root):
             local_thread = threading.Thread(target=publish_local_overlap, daemon=True)
             local_thread.start()
             time.sleep(0.15)
@@ -838,6 +839,8 @@ def main():
         process_result = _result(
             (("values", process_book),), "values", "g-process-overlap")
         held_marker = process_root / "holder-ready"
+        process_state = cm.meta_path(process_book).parent
+        process_state.mkdir()
         release_marker = process_root / "holder-release"
         child_code = """
 import sys, time
@@ -852,7 +855,7 @@ with cm._comparison_publication_lease(parent):
 """
         child = subprocess.Popen(
             [sys.executable, "-X", "utf8", "-c", child_code,
-             str(ROOT / "scripts"), str(process_root),
+             str(ROOT / "scripts"), str(process_state),
              str(held_marker), str(release_marker)],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         deadline = time.monotonic() + 10
@@ -909,7 +912,7 @@ with cm._comparison_publication_lease(parent):
                 winning_prepared["payload_chunks"]):
             check("winning fixture payload path agrees with its manifest",
                   descriptor["relative_path"] == relative)
-            (root / relative).write_bytes(raw)
+            (state_root / relative).write_bytes(raw)
         winning_member, _winning_path, winning_facts = winning_prepared["members"][0]
         original_safe_unlink = cm._safe_unlink_sidecar
         winner_installed = []
@@ -952,7 +955,7 @@ with cm._comparison_publication_lease(parent):
         crashsafe_prepared = cm._prepare_comparison_publication(crashsafe_result)
         crashsafe_relative, _crashsafe_bytes = (
             crashsafe_prepared["payload_chunks"][0])
-        crashsafe_primary = root / crashsafe_relative
+        crashsafe_primary = state_root / crashsafe_relative
         original_write = cm.os.write
         original_temp_cleanup = cm._unlink_bound_payload_temp
         partial_writes = []
@@ -970,7 +973,7 @@ with cm._comparison_publication_lease(parent):
         finally:
             cm.os.write = original_write
             cm._unlink_bound_payload_temp = original_temp_cleanup
-        partial_temps = tuple(root.glob(".cmpv3-payload.tmp-*"))
+        partial_temps = tuple(state_root.glob(".cmpv3-payload.tmp-*"))
         check("partial temp failure cannot reserve/poison the deterministic final",
               interrupted is False and partial_writes
               and not crashsafe_primary.exists()
@@ -996,7 +999,7 @@ with cm._comparison_publication_lease(parent):
         install_prepared = cm._prepare_comparison_publication(install_result)
         install_descriptor = install_prepared["payload_manifest"]["chunks"][0]
         install_relative, install_bytes = install_prepared["payload_chunks"][0]
-        install_path = root / install_relative
+        install_path = state_root / install_relative
         original_install = cm._install_payload_temp_no_replace
         install_races = []
 
@@ -1014,7 +1017,7 @@ with cm._comparison_publication_lease(parent):
         check("atomic install race reuses only the byte-identical winner",
               race_reused and install_races
               and install_path.read_bytes() == install_bytes
-              and not list(root.glob(".cmpv3-payload.tmp-*")))
+              and not list(state_root.glob(".cmpv3-payload.tmp-*")))
 
         blocked_prepared = cm._prepare_comparison_publication(blocked_result)
         bmember, _bworkbook, bfacts = blocked_prepared["members"][0]
@@ -1209,9 +1212,10 @@ with cm._comparison_publication_lease(parent):
         gcroot.mkdir()
         gc_book = gcroot / "collect-me.xlsx"
         gc_book.write_bytes(b"PK-collect-127")
+        gc_state = cm.meta_path(gc_book).parent
 
         def reserved_chunks():
-            return {entry.name for entry in os.scandir(gcroot)
+            return {entry.name for entry in os.scandir(gc_state)
                     if cm._PAYLOAD_BASENAME_RE.match(entry.name)}
 
         check("127: generation A publishes",
@@ -1220,13 +1224,13 @@ with cm._comparison_publication_lease(parent):
         chunks_a = reserved_chunks()
         check("127: generation A produced payload chunks", bool(chunks_a))
 
-        near_match = gcroot / "near-match.comparison-payload.zlib"
+        near_match = gc_state / "near-match.comparison-payload.zlib"
         near_match.write_bytes(b"NOT-A-RESERVED-NAME")
-        mismatched = gcroot / cm._payload_primary_basename(
+        mismatched = gc_state / cm._payload_primary_basename(
             "ab" * 32, 0, "cd" * 32)
         mismatched.write_bytes(b"WRONG-CONTENT")
         orphan_bytes = b"orphaned-but-content-valid"
-        orphan = gcroot / cm._payload_primary_basename(
+        orphan = gc_state / cm._payload_primary_basename(
             "11" * 32, 0, hashlib.sha256(orphan_bytes).hexdigest())
         orphan.write_bytes(orphan_bytes)
         stale = time.time() - 86_400
@@ -1245,7 +1249,7 @@ with cm._comparison_publication_lease(parent):
             check("127: a publication sentinel suspends ALL collection",
                   chunks_a <= reserved_chunks() and orphan.is_file())
             foreign_sentinel.unlink()
-            malformed = gcroot / "bad.xlsx.outcome.json"
+            malformed = gc_state / "bad.xlsx.outcome.json"
             malformed.write_bytes(b"{not json")
             check("127: generation C publishes beside a malformed record",
                   cm.write_comparison_outcomes(

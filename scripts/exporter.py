@@ -752,8 +752,8 @@ def _generate_route(page, spec, route, prefix, events, timeout_ms):
     ONCE and then saves every selected edition off that one render."""
     events.on_status(events.worker_no, f"{prefix} generating…")
     _ensure_report_armed(page, spec, prefix, events)   # P8c: stale-form re-arm guard
-    page.get_by_label("Route", exact=True).select_option(route)
-    page.get_by_role("button", name="Generate").click()
+    page.locator("#districtRouteSelect").select_option(route)
+    page.locator("#districtRouteBtn").click()
     # Wait for the report to be ready/empty OR for the site to render an error.
     # _build_wait_condition validates the spec's wait_js (a config tripwire) and
     # wraps it with the shared error check.

@@ -35,6 +35,7 @@ import city_codes                       # noqa: E402
 import clean_highway_columns as chc     # noqa: E402
 import clean_road_layers as crl         # noqa: E402
 import compare_clean_highway_tsn as cht  # noqa: E402
+import consolidation_meta               # noqa: E402
 import consolidate_clean_highway as cch  # noqa: E402
 import tsn_load_clean_road as tlc       # noqa: E402
 from events import Events               # noqa: E402
@@ -792,8 +793,7 @@ def test_skipped_span_source_truth():
               == [getattr(chc, "ARC_MARKED_SHEET", "")])
         check("marker: every disclosure cell is legible at its stored width",
               _illegible_marker_cells(out) == [])
-        sidecar = json.loads(
-            (out.parent / (out.name + ".outcome.json")).read_text("utf-8"))
+        sidecar = json.loads(consolidation_meta.meta_path(out).read_text("utf-8"))
         rec = (sidecar.get("clean_road_build") or {}).get(
             "skipped_source_spans") or {}
         check("sidecar: count/marked/reason recorded",

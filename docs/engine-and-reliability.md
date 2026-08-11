@@ -71,6 +71,45 @@ A pre-existing file only counts as "done" if it passes a **magic-byte check** an
 
 ---
 
+### Clean artifact folders (`_state`)
+
+Generated-artifact folders keep user-facing deliverables at the top level. The
+durable support files the app needs are grouped beneath one `_state/` child in
+the same folder:
+
+```text
+comparisons/tsn/
+  highway_log_vs_tsn.xlsx
+  highway_log_vs_tsn (values).xlsx
+  _state/
+    highway_log_vs_tsn.xlsx.outcome.json
+    highway_log_vs_tsn.xlsx.provenance.json
+    .cmpv3-….comparison-payload.zlib
+    .tsmis-comparison-publication.lock
+    _tsn_results.json
+```
+
+This namespace contains outcome/trust records, provenance, fingerprints,
+evidence manifests, compressed typed comparison payloads, permanent publication
+lock anchors, Matrix result/attempt caches, and their transaction temporaries.
+The files are required for safe reuse, freshness, crash recovery, and
+fail-closed validation; they are organized rather than deleted. Move or archive
+`_state` with the artifacts it describes.
+
+`scripts/output_state.py` owns the layout. New writes always target `_state`;
+readers fall back to the former sibling locations for compatibility. GUI startup
+runs an exact-allowlist migration under `output/`: each recognized legacy file
+is copied, SHA-256 verified, installed without replacing an existing entry, and
+removed only if the source is still unchanged. A conflict, unreadable entry,
+link/reparse point, or race is retained and reported. Arbitrary JSON, zlib, and
+lock files are never swept merely by extension.
+
+One exception remains intentionally at an app-owned destination root:
+`.tsmis-owned.json`. It is the purpose- and identity-bound proof Reset checks
+before recursive deletion, so moving it inside `_state` would weaken the safety
+boundary. Tracked `.gitkeep` files are development placeholders, not generated
+runtime state.
+
 ## Completion & artifact outcomes (v0.18.0)
 
 A run's result now carries two ORTHOGONAL, **producer-owned** axes (`scripts/outcome.py`), set from
@@ -252,9 +291,11 @@ Field failure: N concurrent headless Edge instances restoring the same saved ses
 After login, before the loop, `preflight(page, report_label)` confirms the report form looks as expected:
 
 1. `#customReport` (the report dropdown) must be present, else `PreflightError` + a `preflight_fail_*` page dump.
-2. `select_report(page, report_label)` (which itself raises `ReportUnavailableError` on a `cs-disabled` report).
-3. The Route control (`get_by_label("Route", exact=True)`) must attach within 15 s.
-4. The Generate button must attach within 15 s.
+2. `select_report(page, report_label)` (which itself raises `ReportUnavailableError` on a `cs-disabled` report) arms District/County/Route through `#modeBtnDistrictRoute`, `#districtSelect`, and `#districtCountySelect`.
+3. The District/Route Route control (`#districtRouteSelect`) must attach within 15 s.
+4. The District/Route Generate button (`#districtRouteBtn`) must attach within 15 s.
+
+The structural IDs are intentional. The 2026-08 site keeps a postmile `#pm-district` control in the DOM with the same accessible label, **District**, so label-based lookup is ambiguous even when that row is hidden.
 
 Any failure raises `PreflightError` (UI-neutral message naming the failed step in the log) and dumps a `preflight_fail_*` screenshot, so a TSMIS change fails fast with one clear error instead of every route failing cryptically.
 

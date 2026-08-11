@@ -232,6 +232,9 @@ class _NoopChain:
 
 
 class FakeRoutePage:
+    def locator(self, *a, **k):
+        return _NoopChain()
+
     def get_by_label(self, *a, **k):
         return _NoopChain()
 

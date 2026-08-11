@@ -208,6 +208,22 @@ def main():
         logging.getLogger("tsmis.gui").warning(
             "update leftover cleanup failed", exc_info=True)
     try:
+        # Keep generated-report folders human-facing.  Legacy sibling metadata
+        # is copied, hash-verified, and removed only while unchanged; conflicts
+        # remain in place and are reported rather than overwritten.
+        import output_state
+        from paths import OUTPUT_ROOT
+
+        organized = output_state.organize_tree(OUTPUT_ROOT)
+        if any(organized.values()):
+            logging.getLogger("tsmis.gui").info(
+                "organized output state: %s", organized)
+    except Exception:
+        logging.getLogger("tsmis.gui").warning(
+            "output state organization failed; legacy files were retained",
+            exc_info=True)
+
+    try:
         import gui_api
     except ImportError as e:
         # Dev runs hit this when pywebview isn't installed yet; the packaged

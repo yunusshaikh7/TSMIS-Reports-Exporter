@@ -237,7 +237,7 @@ def main():
               noncanonical_manifest["decoded_size"]
                   <= noncanonical_manifest["chunks"][0]["size"]
                     * cm._MAX_COMPARISON_PAYLOAD_EXPANSION_RATIO)
-        (root / relative).write_bytes(compressed)
+        (cm.meta_path(formulas).parent / relative).write_bytes(compressed)
         _install_manifest(paths, noncanonical_manifest)
         canonical_record, canonical_calls = _count_payload_decodes(
             lambda: cm.read_comparison_outcome(formulas))
@@ -248,7 +248,7 @@ def main():
         check("republishing restores the canonical shared payload",
               cm.write_comparison_outcomes(result))
         manifest = _raw_sidecar(formulas)["comparison_payload"]
-        chunk = root / manifest["chunks"][0]["relative_path"]
+        chunk = cm.meta_path(formulas).parent / manifest["chunks"][0]["relative_path"]
         chunk_bytes = chunk.read_bytes()
         chunk_stat = chunk.stat()
         chunk.write_bytes(bytes([chunk_bytes[0] ^ 1]) + chunk_bytes[1:])

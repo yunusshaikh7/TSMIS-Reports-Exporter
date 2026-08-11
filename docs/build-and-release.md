@@ -316,11 +316,14 @@ the system proxy from the registry. **DO NOT switch this to requests/certifi.**
      the **re-hash before swap** (step 3 re-verifies it before launching the swap exe).
 3. **`apply_update_and_restart(staged_dir)`** — launches the **STAGED NEW EXE**
    in swap mode (`SWAP_FLAG = "--apply-update"`, detached, `CREATE_NO_WINDOW`),
-   passing the install dir, this app's PID, and the helper-log path. The caller
-   then closes the app. The swap exe is watched across a **~2.0 s window (polling
-   every 0.25 s)** (P10-hardened from a single ~1.5 s check); if it dies in that window
-   (a policy blocked it), it raises `UpdateError` and the app **stays open on the old
-   version** — the silent-failure mode the old PowerShell helper had.
+   passing the install dir, this app's PID, the helper-log path, and a one-use
+   readiness-marker path + nonce. The current app stays open while
+   `_wait_for_helper_ready` polls for up to 15 s. The helper publishes the exact
+   `ready:<nonce>` only after it has opened a handle to the still-running original
+   process. A transient `OSError` reading the atomically replaced marker is retried
+   inside that bounded window; persistent unreadability, helper death, a bad marker,
+   or a timeout raises `UpdateError`, terminates the unready helper, and leaves the
+   old app open. Any marker-access error disables the weaker legacy-log fallback.
 4. **`cleanup_leftovers()`** (every GUI launch, before the CLR loads) — removes
    `data\update` staging and stale `*.old`/`*.new` bundle pieces. Deliberately
    removes a staged-but-never-applied download so stale versions are re-offered
@@ -436,7 +439,9 @@ It NEVER contains the saved login, the Edge profile, failure dumps, exported rep
 data, the compressed comparison payloads (they carry compared ROWS — their names and
 sizes are in the inventory, their bytes are not), the TSN inputs, or the TSN library
 workbooks. The state sweep walks the same folders those artifacts live in, so it
-matches by **exact sidecar suffix/name** — a data workbook, a source PDF or a payload
+reads both organized `_state/` entries and legacy sibling entries (normalizing both
+to the same `state/…` ZIP paths), and matches by **exact sidecar suffix/name** — a
+data workbook, a source PDF or a payload
 chunk cannot match. Packaged via the `evidence` module in `APP_MODULES`; locked by
 `build/check_evidence_bundle.py`, whose fixtures plant report ROW DATA beside the
 sidecars (not just credentials — the credential scanner would catch those; only the
@@ -459,10 +464,8 @@ field-driven hotfixes, so "enterprise-ready" now cuts as **v0.18.5** (see
 Bump `version.py` first (v0.18.0 sets it; the tag must be `v<__version__>`); nothing is
 published if any gate fails.
 
-> **Version line — owner decision 2026-08-02: stay on `0.33.x`.** v0.33.0 shipped
-> the post-comparison audit's first two fix bundles; every release after it bumps
-> the PATCH — `0.33.1`, `0.33.2`, … — rather than opening a new minor. Do not
-> bump the minor without asking.
+> **Version line:** use a PATCH release for field fixes on the current `0.35.x`
+> line. Do not open a new minor without asking the owner.
 
 ```
 git push origin refs/tags/v0.14.2

@@ -17,6 +17,7 @@ from pathlib import Path
 sys.path[:0] = [os.path.join(os.path.dirname(__file__), "..", "scripts"),
                 os.path.join(os.path.dirname(__file__), "..")]  # scripts + repo root (version.py)
 
+import artifact_store
 import consolidation_meta
 import day_matrix
 import gui_api
@@ -159,12 +160,12 @@ def worker_routing_checks(root):
           captured.get("store") is True)
     check("an unrelated target is rejected", captured.get("external") is False)
     check("the guarded TSN cache was published under comparisons",
-          (comparisons / "tsn" / "_tsn_results.json").is_file())
+          matrix_state._tsn_results_path(dest).is_file())
     check("the guarded consolidated workbook was published under the store",
           consolidated.read_bytes() == b"combined")
     check("outcome and fingerprint sidecars stayed under the store",
           consolidation_meta.meta_path(consolidated).is_file()
-          and Path(str(consolidated) + ".fingerprint.json").is_file())
+          and artifact_store._fp_sidecar(consolidated).is_file())
 
     guard = captured["guard"]
     anchor = comparisons / "tsn" / ".evidence-temp"

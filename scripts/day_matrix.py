@@ -34,6 +34,7 @@ import cache_envelope
 import consolidation_meta
 import matrix
 import reports
+import output_state
 from paths import (OUTPUT_ROOT, day_source_dir, list_output_days,
                    parse_run_folder, today_str)
 
@@ -118,21 +119,26 @@ def day_out_path(date, source, row_key):
 
 
 def _results_path():
-    return byday_root() / _RESULTS_FILE
+    return output_state.state_file(byday_root(), _RESULTS_FILE)
+
+
+def _results_read_path():
+    return output_state.named_read_file(byday_root(), _RESULTS_FILE)
 
 
 def load_results():
     """{ "<date source>|<row>": {verdict, diff_cells, one_sided, built_at_mtime} }.
     Tolerant: missing/corrupt -> {} (never raises)."""
+    p = _results_read_path()
     try:
-        with open(_results_path(), encoding="utf-8") as f:
+        with open(p, encoding="utf-8") as f:
             data = json.load(f)
         return cache_envelope.unwrap(data, output_identity="tsn-by-day")
     except OSError:
         return {}                            # not written yet (first run) — expected
     except ValueError as e:                  # corrupt JSON: surface it, then degrade
         log.warning("day_matrix: corrupt results cache %s (%s: %s); treating as empty",
-                    _results_path(), type(e).__name__, e)
+                    p, type(e).__name__, e)
         return {}
 
 
@@ -156,6 +162,10 @@ def record_result(date, source, row_key, verdict, diff_cells, one_sided,
     }
     p = _results_path()
     tmp = p.with_name(p.name + ".tmp")
+
+    if output_state.ensure_state_dir(byday_root(), commit_guard) != p.parent:
+        raise ValueError("The organized by-day Matrix state directory is unavailable.")
+
 
     def _require_guard(path, action):
         if not consolidation_meta.guard_allows(commit_guard, path):

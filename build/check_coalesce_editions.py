@@ -63,6 +63,13 @@ class _Page:
         self.generate_clicks = 0
         self.route_selected = None
 
+    def locator(self, selector):
+        kind = {
+            "#districtRouteSelect": "route",
+            "#districtRouteBtn": "generate",
+        }.get(selector, "other")
+        return _Loc(self, kind)
+
     def get_by_label(self, _label, exact=False):
         return _Loc(self, "route")
 

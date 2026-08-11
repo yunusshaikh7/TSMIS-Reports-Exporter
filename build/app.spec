@@ -69,6 +69,7 @@ APP_MODULES = [
     "browser_channels", "auth_nav", "report_nav", "edge_device", "session",
     "events", "outcome", "comparison_contract", "cache_envelope", "credential_safety",
     "consolidation_meta", "artifact_store", "contract", "task_coordinator",
+    "output_state",                    # organized non-deliverable generation state
     "safe_delete", "owned_dir",          # P12 fs-safety: junction-safe reset + M03 ownership marker
     "exporter", "exporter_parallel",
     "run_report", "logging_setup", "settings", "cli", "login", "reports",

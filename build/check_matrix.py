@@ -346,7 +346,7 @@ def test_orchestration_and_cache():
         check("baseline switch: new tree, cell not yet built",
               comp2["built"] is False)
         check("old baseline results.json still present",
-              (matrix.comparisons_root(dest, "ssor-prod") / "_results.json").exists())
+              matrix._results_path(dest, "ssor-prod").exists())
         check("new baseline tree separate",
               matrix.comparisons_root(dest, "ars-prod")
               != matrix.comparisons_root(dest, "ssor-prod"))
