@@ -3,6 +3,25 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.35.0 — 2026-08-10
+
+### Changed
+- **Highway Sequence now compares every column.** `HG`, `City` and `Distance To
+  Next Point` were context columns — shown but never counted. They are now
+  compared like the rest, so a difference in them is a difference.
+
+  Expect a lot more differences, for reasons that are structural rather than a
+  disagreement about the highway: TSMIS leaves `HG` blank for entire counties
+  while TSN always fills it (`U`/`D`), TSN assigns a city code far more
+  aggressively than TSMIS, and `Distance To Next Point` is measured to each
+  system's *own* next listed point — TSN lists finer breaks, so its gap is
+  usually smaller. That reasoning is now printed on the workbook's Notes sheet
+  instead of being used to suppress the count, so you can read those three
+  columns for what they are.
+
+  Only the vs-TSN comparison changes. The PDF-vs-Excel self-check already
+  compared all three, because both of its sides are the same TSMIS render.
+
 ## v0.34.0 — 2026-08-10
 
 Evidence images become a real spot check. Both panels are now crops of the

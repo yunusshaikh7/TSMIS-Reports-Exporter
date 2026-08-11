@@ -60,19 +60,20 @@ SHARED_HEADER = ["County", "PM", "City", "HG", "FT",
                  "Distance To Next Point", "Description"]
 KEY_FIELD = SHARED_HEADER.index(KEY)       # 1
 
-# Shown but NEVER counted as a difference (completeness gaps / listing artifacts,
-# not real disagreements about the highway):
+# EVERY column is compared (owner decision 2026-08-10). Three of them used to be
+# context because each is noisy for a STRUCTURAL reason rather than a data
+# disagreement — that reasoning is still true and is now disclosed on the Notes
+# sheet instead of used to suppress the count:
 #   HG       — TSMIS leaves the highway-group blank for whole counties while TSN
-#              always fills it (U/D); counting it would flood blank-vs-U cells.
+#              always fills it (U/D), so expect many blank-vs-U cells.
 #   City     — TSN assigns a city code far more aggressively than TSMIS (TSN tags
 #              the nearest incorporated place; TSMIS only within strict limits).
 #   Distance — "distance to next point" is measured to each system's OWN next
 #              listed point; TSN lists more (finer) breaks, so its gap is usually
-#              smaller (TSMIS 003.572 vs TSN 000.174 at the same postmile). It is
-#              an artifact of listing granularity, not a data disagreement.
-# FT and Description ARE compared (genuine feature-type / wording differences).
+#              smaller (TSMIS 003.572 vs TSN 000.174 at the same postmile) — an
+#              artifact of listing granularity.
 # County is part of the key (always equal within a matched pair); PM is the key.
-CONTEXT_FIELDS = ("HG", "City", "Distance To Next Point")
+CONTEXT_FIELDS = ()
 
 # Consolidated-TSMIS VALUE positions (Route at 0; verified on the 6.19 set).
 _TSMIS = {"route": 0, "county": 1, "city": 2, "prefix": 3, "pm": 4,
@@ -332,13 +333,15 @@ _NOTES_LINES = (
     "(including ones naming a DIFFERENT route) are authoritative source claims, so "
     "TSMIS \"103 SEP 53-145\" vs TSN \"1/103 SEP 53-145\" is a REAL difference. A "
     "leading cross-route token on the TSMIS side is likewise kept.",
-    "CONTEXT columns (shown for reference, never counted as a difference): HG (TSMIS "
-    "leaves the highway-group blank for whole counties while TSN always fills it); City "
-    "(TSN assigns a city code far more aggressively than TSMIS); and Distance To Next "
-    "Point (measured to each system's OWN next listed point — since TSN lists more breaks, "
-    "its gap is usually smaller; TSN also prints pointer markers \"*P*\" and "
-    "\"-------->\" there, conserved verbatim). Counting these would bury the "
-    "substantive differences. FT and Description ARE compared.",
+    "EVERY column is compared, including three that are noisy for a STRUCTURAL "
+    "reason rather than a data disagreement (owner decision 2026-08-10; they were "
+    "context columns before): HG — TSMIS leaves the highway-group blank for whole "
+    "counties while TSN always fills it, so expect many blank-vs-U cells; City — TSN "
+    "assigns a city code far more aggressively than TSMIS; and Distance To Next Point "
+    "— measured to each system's OWN next listed point, and since TSN lists more "
+    "breaks its gap is usually smaller (TSN also prints pointer markers \"*P*\" and "
+    "\"-------->\" there, conserved verbatim). Read differences in those three as "
+    "listing/assignment differences unless the rest of the row agrees.",
 )
 _write_notes_sheet = ctc.make_notes_writer(_NOTES_TITLE, _NOTES_LINES)
 

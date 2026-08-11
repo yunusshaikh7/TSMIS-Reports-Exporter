@@ -92,8 +92,14 @@ def test_schema():
     check("side names TSMIS / TSN", sc.side_a == "TSMIS" and sc.side_b == "TSN")
     check("no scalar key_normalizer (typed PhysicalKey rows own identity)",
           sc.key_normalizer is None)
-    check("context = HG + City + Distance To Next Point",
-          set(sc.context_fields) == {"HG", "City", "Distance To Next Point"})
+    # Owner decision 2026-08-10: HG / City / Distance To Next Point are COMPARED.
+    # They were context because each is noisy for a structural reason (TSMIS
+    # leaves HG blank for whole counties; TSN assigns city codes more
+    # aggressively; distance is measured to each system's own next listed
+    # point). The owner wants them counted anyway — the noise is the answer he
+    # is asking for. Nothing else about HSL comparison changed.
+    check("no context fields — every HSL column is compared",
+          tuple(sc.context_fields) == ())
     check("Notes legend_writer set (the indicator)", sc.legend_writer is not None)
     check("county 'LA.' -> 'LA' (period strip)", hs._norm_county("LA.") == "LA")
     check("county 'MEN' -> 'MEN' (no-op)", hs._norm_county("MEN") == "MEN")
@@ -250,10 +256,12 @@ def test_end_to_end():
           DIFF in by["001 / LA / 004.000"][desc]
           and "1/103 SEP 53-145" in by["001 / LA / 004.000"][desc])
 
-    # context columns NEVER carry a diff marker (HG/City/Distance differ in data)
+    # HG / City / Distance are COMPARED since 2026-08-10 — the fixture's HG and
+    # City genuinely differ, so they must now be MARKED, not silently passed.
     ctx_cols = [header.index(c) for c in ("HG", "City", "Distance To Next Point")]
     ctx_diffs = sum(1 for r in rows for i in ctx_cols if DIFF in r[i])
-    check("zero diff cells in any context column (HG/City/Distance)", ctx_diffs == 0)
+    check("HG/City/Distance now carry diff markers (no longer context)",
+          ctx_diffs > 0)
 
     # one-sided rows: TSMIS 002.000 / TSN 003.000, the pointer row, and the
     # blank-county annotation under its reserved marker (CMP-AUD-156/158)

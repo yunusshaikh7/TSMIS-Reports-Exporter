@@ -1609,19 +1609,21 @@ check("canonical key: 'COUNTY GLUED-POSTMILE', county normalized",
       and ehsl._canon("ORA", "018.530E") == "ORA 018.530E")
 check("district_index is the sentinel single-folder entry (per-print routing)",
       ehsl.district_index(Path("C:/anywhere")) == {"": Path("C:/anywhere")})
-# Context discipline: HG / City / Distance are CONTEXT fields (never counted by
-# the comparison), so enumerate_diffs must never sample them — while FT and
-# Description diffs in the same row still enumerate.
+# Context discipline: HSL has NO context fields since 2026-08-10 (owner: compare
+# HG / City / Distance too), so enumerate_diffs must now sample all five
+# differing columns. That is also the proof it reads the LIVE schema rather than
+# a hardcoded skip list — a stale list would drop exactly those three.
 _hs_a = ["001", "ORA", "R000.129", "LGNB", "D", "H", "000.100", "JCT 5"]
 _hs_b = ["001", "ORA", "R000.129", "",     "U", "I", "000.900", "JCT 5 UC"]
 _hs_diffs = ehsl.enumerate_diffs([_hs_a], [_hs_b], {"routing": "per-print"})
-check("enumerate_diffs skips context fields but keeps FT + Description diffs",
-      set(_hs_diffs) == {"FT", "Description"}
+check("enumerate_diffs samples every differing column, context set now empty",
+      set(_hs_diffs) == {"City", "HG", "FT", "Distance To Next Point",
+                         "Description"}
       and [e["key"] for e in _hs_diffs["FT"]] == ["ORA R000.129"]
       and _hs_diffs["FT"][0]["dist"] == "" and _hs_diffs["FT"][0]["cnty"] == "")
-check("enumerate_diffs judges through the LIVE schema (context fields set)",
-      set(chsl_cmp._SCHEMA.context_fields)
-      == {"HG", "City", "Distance To Next Point"})
+check("enumerate_diffs judges through the LIVE schema, not a hardcoded list",
+      tuple(chsl_cmp._SCHEMA.context_fields) == ()
+      and {"HG", "City", "Distance To Next Point"} <= set(_hs_diffs))
 # LOCKSTEP pins vs the PDF consolidator: the wrap join, the PM-less data test,
 # the trailer heading, and the evidence twin of the word classifier.
 check("join_desc_parts: bare after a hyphen, one space otherwise, empties skipped",

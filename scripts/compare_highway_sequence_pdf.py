@@ -62,13 +62,15 @@ _NOTES_PDF_VS_TSN = (
     "comparing. TSN text is compared VERBATIM: TSN's numeric route prefixes "
     "(including ones naming a DIFFERENT route) are authoritative source claims, so "
     "TSMIS \"103 SEP 53-145\" vs TSN \"1/103 SEP 53-145\" is a REAL difference.",
-    "CONTEXT columns (shown for reference, never counted as a difference): HG (TSMIS "
-    "leaves the highway-group blank for whole counties while TSN always fills it); City "
-    "(TSN assigns a city code far more aggressively than TSMIS); and Distance To Next "
-    "Point (measured to each system's OWN next listed point — since TSN lists more breaks, "
-    "its gap is usually smaller; TSN also prints pointer markers \"*P*\" and "
-    "\"-------->\" there, conserved verbatim). Counting these would bury the "
-    "substantive differences. FT and Description ARE compared.",
+    "EVERY column is compared, including three that are noisy for a STRUCTURAL "
+    "reason rather than a data disagreement (owner decision 2026-08-10; they were "
+    "context columns before): HG — TSMIS leaves the highway-group blank for whole "
+    "counties while TSN always fills it, so expect many blank-vs-U cells; City — TSN "
+    "assigns a city code far more aggressively than TSMIS; and Distance To Next Point "
+    "— measured to each system's OWN next listed point, and since TSN lists more "
+    "breaks its gap is usually smaller (TSN also prints pointer markers \"*P*\" and "
+    "\"-------->\" there, conserved verbatim). Read differences in those three as "
+    "listing/assignment differences unless the rest of the row agrees.",
 )
 
 # The PDF-vs-Excel self-check notes (CMP-AUD-199): the same report rendered two
