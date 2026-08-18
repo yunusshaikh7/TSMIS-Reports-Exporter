@@ -41,6 +41,7 @@ from export_intersection_detail_pdf import SPEC as _INT_DETAIL_PDF_SPEC
 # The "Highway" TSAR group — see the ExportEntry block below.
 from export_highway_detail import SPEC as _HIGHWAY_DETAIL_SPEC
 from export_highway_summary import SPEC as _HIGHWAY_SUMMARY_SPEC
+from export_highway_summary_pdf import SPEC as _HIGHWAY_SUMMARY_PDF_SPEC
 from export_highway_detail_pdf import SPEC as _HIGHWAY_DETAIL_PDF_SPEC
 from export_route_history import SPEC as _ROUTE_HISTORY_SPEC
 # The "Clean Road Files" group (dev site 2026-07-21) — reserved DISABLED specs.
@@ -192,6 +193,17 @@ EXPORT = (
                 _CLEAN_INTERSECTION_SPEC, group="Clean Road", short_label="Intersection"),
     ExportEntry("clean_ramp", "Clean Road: Ramp", "Excel", _CLEAN_RAMP_SPEC,
                 group="Clean Road", short_label="Ramp"),
+    # Highway Summary (PDF), v0.38.0 — the same "Highway Summary" dropdown option
+    # saved via the site's Print layout (hs_printAll), the exact parallel of
+    # Intersection Summary (PDF). Confirmed on the 2026-08-10 site capture.
+    # Appended LAST (stable id 19; batch positions 0–18 frozen). EXPORT-ONLY: the
+    # vendor's 2026-08-17 release delivered the Excel edition only, so there is no
+    # real print to verify a parser against — its consolidator / comparisons land
+    # once statewide PDFs exist (the Highway Detail v0.19.2 -> v0.20.0 sequence).
+    # Coalesces with the Excel edition automatically (shared data_value).
+    ExportEntry("highway_summary_pdf", "Highway Summary (PDF)", "PDF",
+                _HIGHWAY_SUMMARY_PDF_SPEC, group="Highway",
+                short_label="Summary (PDF)"),
 )
 
 # Consolidate tab. The three Highway Log consolidators split by source/format
@@ -548,11 +560,17 @@ TSN = (
     # marker sheet so the DIRECT comparison path can refuse a stale library (HD's
     # direct loader previously had NO freshness gate at all). Marker-only — the
     # rows are byte-identical to v2; the bump forces D2 to rebuild stored
-    # libraries so they gain the marker. Mirrors
+    # libraries so they gain the marker.
+    # v4 (CMP-AUD-133 / CMP-AUD-142): the sidecar WIDENS to conserve the source
+    # facts the projection dropped — the Report View's DCR cell + five-value ADT
+    # block (blank on every library-sourced comparison before this) plus the
+    # source-only surrogate/order/change-flag columns — and the marker sheet now
+    # carries the extract's two printed snapshot dates as provenance. A real shape
+    # change, so stored libraries rebuild. Mirrors
     # compare_highway_detail_tsn.NORMALIZATION_VERSION.
     TsnEntry("highway_detail", "TSN Highway Detail", "*.xlsx", "statewide_xlsx",
              "tsn_highway_detail_normalized.xlsx", "tsn_load_highway_detail:build_into",
-             normalization_version=3, evidence_pdfs=True),
+             normalization_version=4, evidence_pdfs=True),
     # Highway Summary (v0.37.0) — the statewide TSN print, the same shape as the
     # Ramp / Intersection Summary datasets but measuring MILES. Appended LAST.
     TsnEntry("highway_summary", "TSN Highway Summary", "*.pdf", "statewide_pdf",
@@ -617,8 +635,10 @@ _PICKER_ORDER = (
     "intersection_detail", "intersection_detail_pdf",
     # The newest Highway group renders last; the PDF variant sits next to its Excel
     # sibling (like Intersection Detail + its PDF). Detail export enabled v0.19.1,
-    # the PDF v0.19.2; Summary export-enabled but still site-greyed.
+    # the PDF v0.19.2; Summary export-enabled v0.19.1 and released by the vendor
+    # 2026-08-17, its print edition added v0.38.0.
     "highway_detail", "highway_detail_pdf", "highway_summary",
+    "highway_summary_pdf",
     # The Clean Road group, greyed until the site un-greys it. The SITE lists it
     # ABOVE the TSAR groups (right after the flat options); it renders last here
     # so the working reports stay at the top of the picker.

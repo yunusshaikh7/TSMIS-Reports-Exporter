@@ -307,15 +307,40 @@ NORMALIZATION_MARKER_SHEET = "TSN Normalization"
 _NORM_VERSION_LABEL = "Normalization version"
 
 
-def write_normalization_marker(wb, version, *, report_name=None):
+def write_normalization_marker(wb, version, *, report_name=None, provenance=None):
     """Stamp a normalized TSN workbook with its normalization `version`
     (CMP-AUD-037). Uses create_sheet + append so it works on the write-only
     normalized workbook too (`ws['A1'] =` TypeErrors in write-only mode). The
-    marker is a plain trailing sheet; the data sheet is untouched."""
+    marker is a plain trailing sheet; the data sheet is untouched.
+
+    `provenance` is an optional ordered (label, value) sequence of EXTRACT-level
+    source facts — facts that describe the whole dump rather than a row, so a
+    per-row column would store 60,000 identical copies of one claim. Highway
+    Detail uses it for the two printed snapshot dates (CMP-AUD-142)."""
     ws = wb.create_sheet(NORMALIZATION_MARKER_SHEET)
     if report_name:
         ws.append(["Report", report_name])
     ws.append([_NORM_VERSION_LABEL, int(version)])
+    for label, value in (provenance or ()):
+        ws.append([str(label), "" if value is None else str(value)])
+
+
+def normalization_provenance(wb):
+    """The marker sheet's EXTRACT-level source facts from an OPEN workbook, as
+    {label: value} — every row except the version and the report name. Returns
+    {} when the sheet is absent or carries none, so a caller can say "the library
+    does not record this" instead of inventing a value."""
+    if NORMALIZATION_MARKER_SHEET not in wb.sheetnames:
+        return {}
+    out = {}
+    for r in wb[NORMALIZATION_MARKER_SHEET].iter_rows(values_only=True):
+        if not r or r[0] is None:
+            continue
+        label = str(r[0]).strip()
+        if label in (_NORM_VERSION_LABEL, "Report"):
+            continue
+        out[label] = "" if len(r) < 2 or r[1] is None else str(r[1]).strip()
+    return out
 
 
 def normalization_marker_version(wb):

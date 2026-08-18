@@ -38,6 +38,69 @@ def check(name, cond):
         _fail.append(name)
 
 
+# --------------------------------------------------------------------------- #
+# synthetic-page harness — shared by the CMP-AUD-053 / CMP-AUD-186 parse tests.
+# Builds pdfplumber-shaped pages (chars + zebra-band rects) so the real
+# parse_pdf runs end to end without a PDF file on disk.
+# --------------------------------------------------------------------------- #
+L1_EDGES = [40, 90, 130, 165, 195, 225, 265, 305, 345, 385, 520]       # 10 windows
+L2_EDGES = [40, 68, 108, 148, 173, 198, 228, 253, 288, 318, 348, 378, 408, 438,
+            468, 498, 523, 553, 583, 608, 638, 668, 698, 728, 758, 788]  # 25 windows
+# The same 25 windows with a WIDE Description column, the way the print really
+# lays line 2 out (the real win2[0] runs to x=384): long description text has to
+# fit inside window 0 or the test measures its own geometry instead of the parser.
+L2_WIDE = [40, 320] + [320 + 20 * i for i in range(1, 25)]             # 25 windows
+
+
+def synth_chars(top, text, x0, cw=2.5):
+    """One text line's characters, laid out left to right from `x0`."""
+    out, x = [], x0
+    for ch in text:
+        if ch.strip():
+            out.append({"text": ch, "x0": x, "x1": x + cw, "top": top})
+        x += cw
+    return out
+
+
+def synth_band(edges, top, h=6.0):
+    """A zebra-shaded cell band on `edges` — what _page_windows reads."""
+    return [{"x0": edges[i], "x1": edges[i + 1] - 1, "top": top, "bottom": top + h}
+            for i in range(len(edges) - 1)]
+
+
+def synth_x(edges, i=0):
+    """An x inside window `i` of `edges` (chars land in that column)."""
+    return (edges[i] + edges[i + 1]) / 2
+
+
+def synth_page(chars, rects):
+    from types import SimpleNamespace
+    return SimpleNamespace(width=800.0, chars=chars, rects=rects)
+
+
+class SynthPdf:
+    def __init__(self, pages):
+        self.pages = pages
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def synth_parse(pages):
+    """Run the real parse_pdf over synthetic pages."""
+    import events as _E
+    ev = _E.Events(on_log=lambda *a: None, is_cancelled=lambda: False)
+    saved = hdpdf.pdfplumber.open
+    try:
+        hdpdf.pdfplumber.open = lambda p: SynthPdf(pages)
+        return hdpdf.parse_pdf("f.pdf", ev)
+    finally:
+        hdpdf.pdfplumber.open = saved
+
+
 def test_header():
     print("34-column header (one source of truth, == the Excel export):")
     check("34 columns", len(HEADER) == 34)
@@ -342,50 +405,16 @@ def test_053_leading_orphans():
     header wrap and a dashed-district group header stay furniture. Not emitted, so
     the output is byte-identical (proven on the 51,201-row corpus off-CI)."""
     print("CMP-AUD-053: unreconciled leading orphans counted + escalate:")
-    from types import SimpleNamespace
-
     import events as _E
     import outcome
-    ev = _E.Events(on_log=lambda *a: None, is_cancelled=lambda: False)
-    L1 = [40, 90, 130, 165, 195, 225, 265, 305, 345, 385, 520]        # 10 windows
-    L2 = [40, 68, 108, 148, 173, 198, 228, 253, 288, 318, 348, 378, 408, 438,
-          468, 498, 523, 553, 583, 608, 638, 668, 698, 728, 758, 788]  # 25 windows
-
-    def c(top, text, x0, cw=2.5):
-        out, x = [], x0
-        for ch in text:
-            if ch.strip():
-                out.append({"text": ch, "x0": x, "x1": x + cw, "top": top})
-            x += cw
-        return out
-
-    def band(edges, top, h=6.0):
-        return [{"x0": edges[i], "x1": edges[i + 1] - 1, "top": top,
-                 "bottom": top + h} for i in range(len(edges) - 1)]
+    L1, L2 = L1_EDGES, L2_EDGES
+    c, band, page, parse = synth_chars, synth_band, synth_page, synth_parse
 
     def w0(edges):
-        return (edges[0] + edges[1]) / 2
+        return synth_x(edges, 0)
 
-    def page(chars, rects):
-        return SimpleNamespace(width=800.0, chars=chars, rects=rects)
-
-    class FakePdf:
-        def __init__(self, pages):
-            self.pages = pages
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *a):
-            return False
-
-    def parse(pages):
-        saved = hdpdf.pdfplumber.open
-        try:
-            hdpdf.pdfplumber.open = lambda p: FakePdf(pages)
-            return hdpdf.parse_pdf("f.pdf", ev)
-        finally:
-            hdpdf.pdfplumber.open = saved
+    class FakePdf(SynthPdf):
+        pass
 
     bands = band(L1, 90.0) + band(L2, 103.0)
     banner = c(60.0, "RefDate: 2026-07-10 Route 001 Page 1", 40.0)
@@ -395,16 +424,28 @@ def test_053_leading_orphans():
     check("clean record pairs; no leading orphan",
           rows is not None and len(rows) == 1 and st["leading_orphans"] == 0)
 
-    orphan = c(130.0, "44THSTREET", w0(L1) - 12) + c(130.0, "64-01-01", 200.0)
-    rows, st = parse([page(banner + rec + orphan, bands)])
+    # A data-shaped group printed before ANY line 1 has nothing to reconcile to.
+    orphan = c(78.0, "44THSTREET", w0(L1) - 12) + c(78.0, "64-01-01", 200.0)
+    rows, st = parse([page(banner + orphan + rec, bands)])
     check("a dated data line with no line-1 is a COUNTED orphan (not emitted)",
           len(rows) == 1 and st["leading_orphans"] == 1
           and st["orphan_samples"] and st["orphan_samples"][0][0] == 1)
 
+    # The other half of the 053 hazard, after CMP-AUD-186 made an open record
+    # absorb following groups: a FOREIGN line 2 landing on an already-complete
+    # record. It is merged (never dropped) but its cells COLLIDE with values the
+    # record already had, which is counted and escalates — so a line 1 the parser
+    # failed to recognize can still never pass as a clean merge.
+    foreign = c(130.0, "44THSTREET", w0(L2) - 12) + c(130.0, "64-01-01", 200.0)
+    rows, st = parse([page(banner + rec + foreign, bands)])
+    check("a foreign line-2 merged onto a complete record COLLIDES (counted)",
+          len(rows) == 1 and st["continuation_lines"] == 1
+          and st["continuation_collisions"] >= 1)
+
     furn = c(130.0, "CONT", w0(L1) - 5) + c(140.0, "—MER059", w0(L1) - 8)
     rows, st = parse([page(banner + rec + furn, bands)])
     check("'CONT' wrap + dashed-district header are furniture, not orphans",
-          st["leading_orphans"] == 0)
+          st["leading_orphans"] == 0 and st["continuation_lines"] == 0)
 
     # e2e: the orphan escalates the producer to PARTIAL with a structured
     # parse-anomalies diagnostic, and NOT the file-count fields (CMP-AUD-064).
@@ -417,7 +458,7 @@ def test_053_leading_orphans():
         (in_dir / "highway_detail_route_001.pdf").write_bytes(b"%PDF-1.4\n%stub\n")
         saved = hdpdf.pdfplumber.open
         try:
-            hdpdf.pdfplumber.open = lambda p: FakePdf([page(banner + rec + orphan, bands)])
+            hdpdf.pdfplumber.open = lambda p: FakePdf([page(banner + orphan + rec, bands)])
             result = hdpdf.consolidate(
                 events=_E.Events(on_log=lambda *a: None),
                 confirm_overwrite=lambda _p: True,
@@ -435,6 +476,121 @@ def test_053_leading_orphans():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_186_multibaseline_line2():
+    """CMP-AUD-186: a logical line 2 can print as SEVERAL physical baselines whose
+    tops sit further apart than ROW_GAP (a long Description wraps at the ~11pt print
+    line height, so _row_groups hands the wraps over as separate groups). The record
+    now stays OPEN and every following non-furniture group merges into its cells;
+    it is emitted at the next line 1, a DCR boundary, or the document end.
+
+    Before this, the first baseline was taken as the whole line 2 and the rest were
+    dropped as leading orphans — route 395's `R000.000E` came out with its
+    Description truncated mid-word and all 23 attribute cells blank, while the run
+    still reported complete."""
+    print("CMP-AUD-186: multi-baseline line 2 merges (never truncates):")
+    L1, L2 = L1_EDGES, L2_WIDE
+    bands = synth_band(L1, 90.0) + synth_band(L2, 103.0)
+    banner = synth_chars(60.0, "RefDate: 2026-08-17 Route 395 Page 1", 40.0)
+
+    def line1(top, pm):
+        return synth_chars(top, pm, L1[0] + 4)
+
+    def desc(top, text):
+        return synth_chars(top, text, L2[0] + 4)
+
+    def attr(top, text, col):
+        return synth_chars(top, text, L2[col] + 2, cw=2.0)
+
+    # One record whose line 2 prints as three baselines 12pt apart (> ROW_GAP):
+    # description / description+attributes / description tail.
+    rec = (line1(100.0, "R000.000E")
+           + desc(114.0, "KERN/INYO CO LINE / BEGIN RT")
+           + desc(126.0, "INDEP ALIGN / NEVADA STATE")
+           + attr(126.0, "86-08-07", 2) + attr(126.0, "H", 3)
+           + desc(138.0, "LINE-BEG L"))
+    nxt = line1(160.0, "R003.981") + desc(174.0, "JCT15.")
+    rows, st = synth_parse([synth_page(banner + rec + nxt, bands)])
+
+    check("both records emitted, in document order",
+          rows is not None and len(rows) == 2
+          and (rows[0][0] or "") == "R000.000E" and (rows[1][0] or "") == "R003.981")
+    check("the three description baselines rejoin into ONE Description "
+          f"({(rows[0][9] if rows else None)!r})",
+          bool(rows) and (rows[0][9] or "")
+          == "KERN/INYO CO LINE / BEGIN RT INDEP ALIGN / NEVADA STATE LINE-BEG L")
+    check("...and the attributes printed on a LATER baseline survive "
+          "(they used to be blanked)",
+          bool(rows) and (rows[0][11] or "") == "86-08-07" and (rows[0][12] or "") == "H")
+    check("the continuations are counted, not orphaned",
+          st["continuation_lines"] == 2 and st["leading_orphans"] == 0
+          and st["single_line"] == 0)
+    check("the continuation samples name their page",
+          len(st["continuation_samples"]) == 2
+          and all(s[0] == 1 for s in st["continuation_samples"]))
+
+    # A DCR group row CLOSES the accumulating line 2 — a following data group
+    # belongs to the NEXT record, never to the one before the boundary.
+    dcr = synth_chars(150.0, "08 SBD 395", L1[0] + 4)
+    stray = desc(162.0, "STRAYLINE") + attr(162.0, "64-01-01", 2)
+    rows2, st2 = synth_parse([synth_page(banner + rec + dcr + stray, bands)])
+    check("a DCR group row closes the record; a group after it is NOT merged in",
+          rows2 is not None and len(rows2) == 1
+          and (rows2[0][9] or "")
+          == "KERN/INYO CO LINE / BEGIN RT INDEP ALIGN / NEVADA STATE LINE-BEG L"
+          and st2["leading_orphans"] == 1)
+
+    # A continuation may cross a physical page break: the browser reprints the
+    # table header, which stays furniture, and the open record absorbs the rest.
+    thead = synth_chars(60.0, "POSTMILE LENGTH RECORD", 40.0)
+    p1 = synth_page(banner + line1(100.0, "R000.000E") + desc(114.0, "FIRST HALF"), bands)
+    p2 = synth_page(thead + desc(100.0, "SECOND HALF")
+                    + attr(100.0, "86-08-07", 2), bands)
+    rows3, st3 = synth_parse([p1, p2])
+    check("a continuation crosses a page break (reprinted header stays furniture)",
+          rows3 is not None and len(rows3) == 1
+          and (rows3[0][9] or "") == "FIRST HALF SECOND HALF"
+          and (rows3[0][11] or "") == "86-08-07" and st3["leading_orphans"] == 0)
+
+    # A record that printed NO second line at all is still the single_line case.
+    only1 = synth_page(banner + line1(100.0, "R000.000E") + line1(130.0, "R003.981"), bands)
+    rows4, st4 = synth_parse([only1])
+    check("a record with no line 2 at all is still emitted with a blank tail",
+          rows4 is not None and len(rows4) == 2 and st4["single_line"] == 2
+          and all(v is None for v in rows4[0][9:]))
+
+    # e2e: merged continuations ride a durable diagnostic but stay COMPLETE —
+    # merging IS the correct reading of the print (CMP-AUD-186), unlike an orphan.
+    import shutil
+    import tempfile
+
+    import events as _E
+    import outcome
+    tmp = Path(tempfile.mkdtemp(prefix="cmp186_"))
+    try:
+        in_dir = tmp / "in"
+        in_dir.mkdir()
+        (in_dir / "highway_detail_route_395.pdf").write_bytes(b"%PDF-1.4\n%stub\n")
+        saved = hdpdf.pdfplumber.open
+        try:
+            hdpdf.pdfplumber.open = lambda p: SynthPdf(
+                [synth_page(banner + rec + nxt, bands)])
+            result = hdpdf.consolidate(
+                events=_E.Events(on_log=lambda *a: None),
+                confirm_overwrite=lambda _p: True,
+                input_dir=in_dir, out_path=tmp / "out.xlsx", converted_dir=tmp / "conv")
+        finally:
+            hdpdf.pdfplumber.open = saved
+        pe = (result.producer_extra or {}).get("parse_anomalies", {})
+        check(f"e2e: continuations stay COMPLETE (completion={result.completion!r})",
+              result.completion == outcome.COMPLETE)
+        check(f"e2e: recorded durably in parse_anomalies (pe={pe})",
+              pe.get("continuation_lines") == 2 and "leading_orphan_lines" not in pe)
+        check("e2e: and named in the summary",
+              any("CMP-AUD-186" in ln for ln in (result.summary_lines or [])))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main():
     test_header()
     test_make_row_mapping()
@@ -444,6 +600,7 @@ def main():
     test_adapters_and_matrix()
     test_fallback_recovery()
     test_053_leading_orphans()
+    test_186_multibaseline_line2()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

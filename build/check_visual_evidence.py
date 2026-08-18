@@ -1172,7 +1172,10 @@ try:
     base = {c: "" for c in cols}
     base.update(DIST="06", CNTY="TUL.", RTE="99", PP="R", POSTMILE="004.972",
                 E_IND="E", HG="R", LENGTH="0.123", NON_ADD="A", M_WID="8",
-                M_VA="V", DESCRIPTION="X  Y")
+                M_VA="V", DESCRIPTION="X  Y",
+                # CMP-AUD-142: the normalizer refuses a dump without its two
+                # printed snapshot dates, so the fixture has to carry them.
+                REFERENCE_DATE="2025-09-08", EXTRACT_DATE="2025-09-15")
     ws.append([base[c] for c in cols])
     wb.save(raw)
     wb.close()
@@ -1195,8 +1198,10 @@ try:
     check("normalized header = Route + shared + sidecar",
           res.status == "ok"
           and hdr == ["Route"] + cht.SHARED_HEADER + tlh.SIDECAR_HEADER)
-    check("normalized row carries the sidecar values at the tail",
-          first[-2:] == ["06", "TUL"] and first[0] == "099")
+    n_side = len(tlh.SIDECAR_HEADER)
+    side = first[-n_side:]
+    check(f"normalized row carries the sidecar values at the tail ({side})",
+          side[:3] == ["06", "TUL", "06-TUL-99"] and first[0] == "099")
 
     # load_sides reads the sidecar back; the comparator side stays shared-width
     a_cons = tmp / "cons.xlsx"

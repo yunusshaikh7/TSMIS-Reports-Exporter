@@ -23,6 +23,7 @@ Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- 
 | 7 | Highway Detail | XLSX | `output/<run>/highway_detail/` |
 | 7b | Highway Detail (PDF) | PDF (Letter, landscape) | `output/<run>/highway_detail_pdf/` |
 | 8 | Highway Summary | XLSX | `output/<run>/highway_summary/` |
+| 8b | Highway Summary (PDF) | PDF (Letter, portrait; export-only) | `output/<run>/highway_summary_pdf/` |
 | — | Route History Table | *(none — greyed reserved placeholder, v0.25.1)* | — |
 
 `<run>` is a run folder, `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`) -- see [engine-and-reliability.md](engine-and-reliability.md) for run-folder mechanics.
@@ -53,6 +54,7 @@ table in the same change.
 | 7 | Highway Detail (`highway_detail`) | XLSX | ✓ | ✓ flat, canonical roadbed key | n/a | ✓ | ✓ | ✓ |
 | 7b | Highway Detail (PDF) (`highway_detail_pdf`) | PDF | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | 8 | Highway Summary (`highway_summary`) | XLSX | ✓ (category miles) | ✓ aggregate ³ | n/a | ✓ aggregate | ✓ | — (aggregate ⁵) |
+| 8b | Highway Summary (PDF) (`highway_summary_pdf`) | PDF | — ¹ | — ¹ | — ¹ | — ¹ | — ¹ | — (aggregate ⁵) |
 | — | Route History Table (`route_history`) | — ⁶ | — | — | — | — | — | — |
 | — | Clean Road: Highway (`clean_highway`) | — ⁷ | — | — | — | — | — | — |
 | — | Clean Road: Intersection (`clean_intersection`) | — ⁷ | — | — | — | — | — | — |
@@ -301,7 +303,7 @@ Highway Summary is the app's first **miles-measured** aggregate report. Its per-
 **Censused on the 2026-08-17 statewide prod release** (`ground-truth/HD + HS Release 8.17/`, 252 routes): ONE skeleton across every file — same sheet name (`Highway Summary`), same 129×2 shape, same section order, the same 95 code rows, values numeric with at most three decimals. Statewide total **17,301.098 miles**.
 
 - **`highway_summary_columns.py`** is the layout SoT: the ordered sections/codes, and the ONE strict reader (`values_from_rows`) that the consolidator AND the cross-environment loader both go through — the CMP-AUD-018 rule, so two paths can't read differently and let two equally-broken sides certify a clean match. Miles are carried as exact integer **thousandths** (the export prints three decimals), so statewide rollups sum exactly instead of drifting in binary float.
-- **Why not `summary_layout`:** that module is the shared spec/renderer for the two COUNT summaries (Ramp Summary, Intersection Summary), whose `parse_count` contract requires whole numbers and whose familiar sheet renders a TSMIS-vs-TSN table. Highway Summary is fractional and has no TSN side yet, so forcing a measure concept through correctness-locked count code bought nothing. Generalizing it can be decided against real evidence when a TSN extract lands.
+- **`summary_layout` gained an opt-in MEASURE mode** (v0.37.0, when the TSN print arrived the same day): `value_reader` / `value_format` / `measure_noun` let the shared familiar-sheet renderer carry fractional miles, and `check_compare_highway_summary_tsn` asserts the two COUNT specs are untouched by it. Before the TSN side existed, Highway Summary deliberately did NOT go through it — forcing a measure concept through correctness-locked count code with no consumer would have bought nothing.
 - **The tripwire is the skeleton, and it is exact.** A renamed section, an unknown/dropped/duplicated code, a reordered section, a missing or duplicated total, or an over-precise value fails that route loudly naming the difference. Whitespace and case drift are tolerated (cosmetic, not identity). `build/check_highway_summary_layout.py` proves each refusal fires, hermetically (synthesized sheets, no corpus needed).
 - **Partitions are BOUNDED, not exact.** Nine sections tabulate a subset of the route total; `NON-ADD` is independent (non-add mileage, never the total). A section summing ABOVE the total is refused. Summing BELOW is real and measured — six routes on the release (`HIGHWAY GROUP` on 099/101/125/170/905, `MEDIAN TYPE` on 099/101/170/180, `NUMBER OF LANES` on 101) — so the residual is exposed as a note, never redistributed into a category.
 - **A zero-total route is NOT empty.** Four routes (010S/014U/015S/178S) report `TOTAL MILES SELECTED = 0` while carrying real NON-ADD mileage (0.692–18.785 miles) and 10–102 Highway Detail records each: the total tabulates ADD mileage only. `record_has_data` therefore counts ANY non-zero measure — keying on the total alone dropped four real routes and pinned every run to PARTIAL.
@@ -328,6 +330,32 @@ Highway Summary is the app's first **miles-measured** aggregate report. Its per-
 **`TOTAL MILES SELECTED` is NOT like-for-like** and the familiar sheet says so: the print's own footnotes exclude non-add and unconstructed mileage, and its figures bear that out (Highway Group sums to exactly the total PLUS its unconstructed). The TSMIS export applies no such exclusion. Measured on the bound pair: TSMIS reports **0.000** unconstructed miles statewide, TSN **1,289.296**.
 
 **Bound result** (2026-08-17 TSMIS export vs the 2025-09-15 print — ~11 months apart, so most mileage legitimately moved): **92 categories in both, 0 TSN-only, 4 TSMIS-only, 89 differing / 3 identical**. The familiar `Summary by Category` sheet renders miles to three decimals via `summary_layout`'s opt-in measure mode.
+
+### Highway Summary (PDF) — the print edition, EXPORT-ONLY (v0.38.0)
+
+`export_highway_summary_pdf.py` saves the SAME "Highway Summary" dropdown option through
+the site's own Print layout instead of the Excel Export button — the exact parallel of
+Intersection Summary (PDF). Verified against the 2026-08-10 site capture
+(`highway_summary.js`): the action bar wires `hs_exportToExcel()` + `hs_printAll()`, and
+`hs_printAll()` PREPENDS a cover page (`.rs-cover.hs-cover`, code `OTM22230`) to the
+inline section tables then calls the shared `printWithTitle('highway_summary')`, which is
+a `document.title` swap plus `window.print()`.
+
+- **`save_highway_summary_pdf`** overrides `window.print` to raise FIRST, so no print
+  dialog opens, the `afterprint` restore never fires, and the cover + report stay in the
+  DOM for `page.pdf()`. Narrow two-column code/miles tables → **Portrait**.
+- **The empty backstop is NOT "total = 0".** Unlike Intersection Summary, a zero total is
+  a legitimate Highway Summary: four routes on the 2026-08-17 release (010S / 014U / 015S
+  / 178S) report `TOTAL MILES SELECTED = 0` while carrying real NON-ADD mileage. The
+  marker-independent backstop is instead "the cover built but no `.hs-code` section row
+  rendered".
+- **Shares the Excel edition's `data_value`, `wait_js` and `is_empty`**, so selecting both
+  editions coalesces (one render, two files) and the two can never disagree about whether
+  a route had data.
+- **EXPORT-ONLY, deliberately.** The vendor's 2026-08-17 release delivered the Excel
+  edition only, so there is no real statewide print to verify a parser against. The
+  consolidator + PDF-vs-Excel self-check land once prints exist — the same sequence
+  Highway Sequence (PDF) and Ramp Detail (PDF) followed.
 
 ### The Highway Detail family (v0.20.0)
 

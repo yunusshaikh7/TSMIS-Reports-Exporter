@@ -635,8 +635,11 @@ The accepted identity is **`(Route, County, norm_pm(PM))`**, not Route+PM. The e
 identity; District is a separate asserted field. At `005/SD/72.366`, both TSMIS representations say
 District 12 and both TSN representations say 11, but the current product omits District and calls
 the row identical (CMP-AUD-185). Description normalization also deletes exactly 15 authoritative
-numeric prefixes (CMP-AUD-135), while raw `PM_SFX`, `ADT_EFF_YEAR`, and `EFF_DATE` claims remain
-outside the comparison/evidence projection (CMP-AUD-133).
+numeric prefixes (CMP-AUD-135), while Ramp Detail's raw `ADT_EFF_YEAR` and `EFF_DATE` claims remain
+outside the comparison/evidence projection (the RAMP remainder of CMP-AUD-133; its
+`PM_SFX` identity claim was conserved 2026-07-14, and the **Highway Detail remainder
+closed in v0.38.0** — its normalized library is v4 and now conserves every raw
+column the projection drops).
 
 For the bound 2026-07-09 source pull, independent Excel-vs-TSN truth is **15,212 paired, 4/198
 one-sided, 14,471 identical, 741 differing rows, and 847 differing cells**. Independent
@@ -882,7 +885,7 @@ limit and falls back to "Side A"/"Side B" on collision).
 | `HIGHWAY_DETAIL` | Highway Detail | `highway_detail` / "Highway Detail" | `Post Mile` | **flat** (v0.20.0): per-route XLSX, consolidated shape, route + glued-PM key (both env sides share the TSMIS encoding, so no roadbed canonicalization — that's a vs-TSN tool) |
 | `HIGHWAY_DETAIL_PDF` | Highway Detail (PDF) | `highway_detail_pdf` / "Highway Detail" | `Post Mile` | **flat, PDF-sourced** (v0.20.0): `_load_highway_detail_pdf_side`, the `INTERSECTION_DETAIL_PDF` parallel |
 | `HIGHWAY_SEQUENCE_PDF` | Highway Sequence (PDF) | `highway_sequence_pdf` / "Highway Locations" | `PM` | **flat, PDF-sourced** (v0.25.0): `_load_highway_sequence_pdf_side` parses each side's prints with the HSL-PDF consolidator, then reads them flat exactly like the Excel `HIGHWAY_SEQUENCE` row (no header pin — the converted files carry the export's own header, unnamed columns included) |
-| `HIGHWAY_SUMMARY` | Highway Summary | `highway_summary` / "Highway Summary" | route (first col) | **AGGREGATE per route** (v0.37.0), the `INTERSECTION_SUMMARY` parallel but **MILES-measured**: a `side_loader` (`_load_highway_summary_side`) reads each per-route statistics sheet into ONE `[route, total miles, *95 category miles]` row through the consolidator's own reader (`has_route=False`, `agg_header=HS_HEADER == highway_summary_columns.HEADER`, so compared columns and the consolidated workbook's columns cannot drift). Applies the SAME `record_problem` gate as the consolidator (CMP-AUD-018). **The one report with no vs-TSN comparator** — no TSN Highway Summary extract exists yet |
+| `HIGHWAY_SUMMARY` | Highway Summary | `highway_summary` / "Highway Summary" | route (first col) | **AGGREGATE per route** (v0.37.0), the `INTERSECTION_SUMMARY` parallel but **MILES-measured**: a `side_loader` (`_load_highway_summary_side`) reads each per-route statistics sheet into ONE `[route, total miles, *95 category miles]` row through the consolidator's own reader (`has_route=False`, `agg_header=HS_HEADER == highway_summary_columns.HEADER`, so compared columns and the consolidated workbook's columns cannot drift). Applies the SAME `record_problem` gate as the consolidator (CMP-AUD-018). Its vs-TSN leg landed the SAME day (`compare_highway_summary_tsn`, off the owner's statewide print), so every integrated report now compares both ways |
 
 `EnvCompare` has three shapes: the **flat** path (Ramp Detail / Highway Sequence / Highway Log /
 Intersection Detail / Highway Detail — read the per-route sheet rows in consolidated shape); a

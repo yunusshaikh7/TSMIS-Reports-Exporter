@@ -13,7 +13,8 @@ equivalence; this owns the cross-module wiring):
   * every dual-edition (PDF) family is wired both ways — Excel sibling, self
     comparator, vs-TSN comparator, both editions exported, a shared TSN dataset;
   * day_matrix._day_rows agrees with the MATRIX fmt + support for every row;
-  * the Reset (Delete-all-reports) cleanup lists cover every wired PDF report, so a
+  * the Reset (Delete-all-reports) cleanup lists cover every ENABLED export's output
+    subdir and every wired PDF report's consolidated workbook, so a
     new report's consolidated outputs are actually removable.
 
 Run with the build venv:
@@ -101,16 +102,31 @@ def test_day_matrix_agrees():
                   f"by-day fmt={row[3]!r}")
 
 
-def test_reset_covers_pdf_reports():
-    print("the Reset cleanup lists cover every wired PDF report (its outputs removable):")
+def test_reset_covers_every_export():
+    """Reset (Delete all reports) must be able to remove what every EXPORT writes.
+
+    Originally this only asserted the PDF matrix rows, which is why three real
+    omissions sat unnoticed: `intersection_detail`, `intersection_summary`, and
+    (until v0.37.0) `highway_summary` all wrote export folders Reset never
+    listed. It now derives from the EXPORT registry itself and covers every
+    export whose subdir can actually appear on disk — the app-DISABLED
+    placeholders (`reports.DISABLED_EXPORT_SUBDIRS`: the reserved Route History
+    and Clean Road entries) never run an export, so they have nothing to clean."""
+    print("the Reset cleanup lists cover every ENABLED export's output subdir:")
     legacy_dirs = set(gui_worker_maint._LEGACY_OUTPUT_DIRS)
     legacy_files = {name for name, _lbl in gui_worker_maint._LEGACY_CONSOLIDATED_FILES}
+    disabled = set(reports.DISABLED_EXPORT_SUBDIRS)
+    for e in report_catalog.EXPORT:
+        subdir = e.spec.subdir
+        if subdir in disabled or e.key in disabled:
+            continue
+        check(f"{e.key}: its output subdir {subdir!r} is a Reset legacy-dir target",
+              subdir in legacy_dirs,
+              f"add {subdir!r} to gui_worker_maint._LEGACY_OUTPUT_DIRS")
+    print("...and every wired PDF report's consolidated workbook:")
     for m in report_catalog.matrix_rows_meta():
         if m.fmt != "pdf":
             continue
-        check(f"{m.row_key}: its output subdir is a Reset legacy-dir target",
-              m.row_key in legacy_dirs,
-              f"add {m.row_key!r} to gui_worker_maint._LEGACY_OUTPUT_DIRS")
         wb = f"tsmis_{m.row_key}_consolidated.xlsx"
         check(f"{m.row_key}: its consolidated workbook ({wb}) is a Reset target",
               wb in legacy_files,
@@ -123,7 +139,7 @@ def main():
     test_comparators_dispatchable()
     test_dual_edition_families()
     test_day_matrix_agrees()
-    test_reset_covers_pdf_reports()
+    test_reset_covers_every_export()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

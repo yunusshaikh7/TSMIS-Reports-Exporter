@@ -509,6 +509,59 @@ def save_intersection_summary_pdf(page, out_path, timeout_ms=None):
 _RAMP_DETAIL_PRINT_BUILD_MS = 15_000
 
 
+def save_highway_summary_pdf(page, out_path, timeout_ms=None):
+    """Render the Highway Summary to a Portrait PDF, the way the site's Print
+    button lays it out.
+
+    Structurally the Intersection Summary print edition: the report renders
+    fully INLINE (two-column code/miles tables, no pagination), so the site's
+    `hs_printAll()` simply PREPENDS a cover page to the on-screen report and
+    calls `printWithTitle('highway_summary')` — which is a document.title swap
+    plus `window.print()`. We override `window.print` to raise FIRST, so no
+    print dialog ever opens, the afterprint restore never fires, and the cover +
+    report stay in the DOM for `page.pdf()` (which emulates print media; the
+    site's `@media print` shows only #rampResults). Narrow tables -> Portrait.
+
+    is_empty (the shared no-results marker) ran first, so this is never an empty
+    route; timeout_ms is unused (kept for the uniform save signature). The cover
+    (`.rs-cover`, print-only) proves the Print function ran, and at least one
+    `.hs-code` row proves the sections rendered — the marker-INDEPENDENT
+    backstop. NOTE it is deliberately NOT "total > 0": on the 2026-08-17
+    statewide release four routes (010S / 014U / 015S / 178S) report TOTAL MILES
+    SELECTED = 0 while carrying real NON-ADD mileage, so a zero total is a
+    legitimate report, not an empty one. Fails loudly with ReportError if the
+    site's Print function is gone/renamed."""
+    built = page.evaluate(
+        """() => {
+            if (typeof hs_printAll !== 'function') return {status: 'no-print-fn', rows: 0};
+            window.print = () => { throw new Error('skip-print'); };
+            try { hs_printAll(); } catch (e) { /* the throw skips the afterprint restore */ }
+            const box = document.getElementById('rampResults');
+            if (!box || !box.querySelector('.rs-cover') || !box.querySelector('.hs-report'))
+                return {status: 'no-layout', rows: 0};
+            return {status: 'ok', rows: box.querySelectorAll('.hs-code').length};
+        }""")
+    status = built.get("status") if isinstance(built, dict) else built
+    if status != "ok":
+        raise ReportError(
+            "Couldn't build the Highway Summary print layout for the PDF "
+            f"(the site's Print control changed: {status}).")
+    if not (built.get("rows") if isinstance(built, dict) else 0):
+        # The cover built but no section rows rendered. Marker-INDEPENDENT empty
+        # backstop: record the route `empty` (retried once) instead of saving a
+        # cover-only PDF, even if the empty-text marker drifted.
+        log.info("highway_summary PDF: no section rows for %s; treating as empty",
+                 out_path.name)
+        raise EmptyExport()
+    page.pdf(
+        path=str(out_path),
+        format="Letter",
+        print_background=True,
+        margin={"top": "0.4in", "bottom": "0.4in", "left": "0.4in", "right": "0.4in"},
+    )
+    _verify_saved_file(out_path)
+
+
 def save_ramp_detail_pdf(page, out_path, timeout_ms=None):
     """Render the FULL Ramp Detail to a Landscape PDF, the way the site's Print
     button lays it out.

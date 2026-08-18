@@ -38,6 +38,7 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 | 7 | Highway Detail | XLSX | `output/<run>/highway_detail/` |
 | 7b | Highway Detail (PDF) | PDF (Letter, landscape) | `output/<run>/highway_detail_pdf/` |
 | 8 | Highway Summary | XLSX | `output/<run>/highway_summary/` |
+| 8b | Highway Summary (PDF) | PDF (Letter, portrait) | `output/<run>/highway_summary_pdf/` |
 
 `<run>` is a run folder `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`);
 **since v0.32.0 each per-route file inside it carries that run identity
@@ -74,25 +75,26 @@ the site's July-2026 35-column overhaul (pre-update files are refused with re-ex
 hints), and Intersection Summary's `MASTARM`→`MASTERARM` rename rides a parse-only
 alias + a section-partition tripwire so the next silent reshape fails loudly.
 
-**Highway Detail (7/7b) is RELEASED — the pre-release freeze is LIFTED (vendor
-delivery 2026-08-17, `ground-truth/HD + HS Release 8.17/`).** The released Excel export
-carries the SAME 34 columns the app already read (252 routes / 51,327 statewide rows,
-one header, 0 deviations), so the freeze was about data TRUST, not schema — HD
-consolidation, comparisons, matrix rows and evidence are live against real data again.
-Resolved by the delivery: **CMP-AUD-192** (the 7.7/7.9 stale-payload skew — this is one
-same-build pull) and **045's HD-Excel county question, now ANSWERED: the released Excel
-export has NO county column** (the 34 labels are fixed and none is a county), so
-HD-Excel identity can never be repaired from the Excel export itself — an owner
-decision, not a vendor wait. Also fixed here: **CMP-AUD-243** — HD (PDF) silently lost
-the record on every single-record page (13 pages / 12 routes; 51,314 rows vs Excel's
-51,327), now recovered from the page's own header rule. **Still open and NOT fixed
-here:** CMP-AUD-186 and CMP-AUD-053, both still firing on the released PDFs. With 243
-fixed, 186's blast radius is now EXACT: the statewide PDF-vs-Excel self-check pairs
-**51,327 locations, 0 one-sided, 51,326 fully identical — one differing row**, route
-395 `R000.000E` (24 cells = Description + all 23 attributes blanked). It is the only
-thing between HD's two editions and a clean self-check, and the ledger scopes it as its
-own session (parser rewrite). CMP-AUD-133/142 (normalized-library facts) remain as
-written.
+**Highway Detail (7/7b) is RELEASED and its correctness backlog is CLOSED (v0.38.0).**
+The vendor delivery (2026-08-17, `ground-truth/HD + HS Release 8.17/`) lifted the
+pre-release freeze; the released Excel export carries the SAME 34 columns the app
+already read (252 routes / 51,327 statewide rows, one header, 0 deviations), so the
+freeze was about data TRUST, not schema. **The statewide PDF-vs-Excel self-check is now
+51,327 locations, 0 one-sided, 51,327 fully identical, 0 differing cells**, and HD-PDF
+consolidation returns COMPLETE. All five formerly-open HD findings are resolved:
+**192** (one same-build pull), **243** (v0.37.0 — HD-PDF lost the record on every
+single-record page, recovered from the page's own header rule), **186 + 053** (v0.38.0
+— a logical line 2 now stays OPEN and merges every following baseline until the next
+line 1 / DCR boundary / document end; census-first, blast radius exactly the one route-
+395 record, 251 of 252 routes byte-identical), **133 + 142** (v0.38.0 — the normalized
+TSN library is v4: a 15-column sidecar conserves the Report View's DCR + five-value ADT
+block, which every library-sourced comparison used to blank, plus the source-only
+surrogate/order/change-flag columns, and the extract's two printed snapshot dates ride
+the marker sheet as validated provenance), and **045's HD-Excel county — an OWNER
+DECISION (2026-08-18): the Excel and PDF editions stay SEPARATE sources**, so HD-Excel
+pairs county-blind by decision with the exposure measured and disclosed in the Notes
+(524 of 59,457 keys carry >1 row; 438 of those span counties = 976 rows, 1.6%).
+**Never infer a county.**
 
 **The ArcGIS tab (v0.29.0) builds the HIGHWAY clean-road file WITHOUT the site**: our
 own 74-column CA HIGHWAYS table from the owner's per-layer ArcGIS exports in
@@ -142,10 +144,12 @@ per-field projections against the raw PDFs — the separately-tracked direct-sou
 acceptance. Details + acceptance oracles: §13 and the
 [finding ledger](docs/planning/comparison-perfection/comparison-audit-findings.md).
 
-**The comparison-perfection project is COMPLETE (2026-07-22, v0.28.0).** 237 of 242
-findings closed; `main` is the completion state. The 5 still open are ALL the ⛔
-Highway Detail pre-release block (133 · 142 · 186 · 192 + 045-HD) and reopen only when
-the vendor delivers official HD exports. The
+**The comparison-perfection project is COMPLETE (2026-07-22, v0.28.0), and as of
+v0.38.0 EVERY finding in the ledger is closed — 243 of 243.** `main` is the completion
+state. The last five were the ⛔ Highway Detail pre-release block (133 · 142 · 186 ·
+192 + 045-HD); the vendor's 2026-08-17 delivery unblocked them and v0.37.0 / v0.38.0
+closed them (see the Highway Detail paragraph above; 243 was found and fixed on the
+released data). The
 [COMPLETION-PLAN](docs/planning/comparison-perfection/COMPLETION-PLAN.md) + finding
 ledger are the PROJECT RECORD of why each comparison behaves as it does (start at
 [README.md](docs/planning/comparison-perfection/README.md)).

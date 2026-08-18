@@ -50,6 +50,9 @@ _V017_EXPORT_ORDER = (
     # 2026-07-22 — the reserved-DISABLED Clean Road Files group at 16/17/18
     # (same rule: never insert/reorder).
     "clean_highway", "clean_intersection", "clean_ramp",
+    # v0.38.0 — the Highway Summary print edition at 19 (same rule: never
+    # insert/reorder).
+    "highway_summary_pdf",
 )
 
 # Poison sentinel for a structurally-invalid saved entry. It is never a real export

@@ -27,9 +27,16 @@ log = logging.getLogger("tsmis.gui")
 _LEGACY_OUTPUT_DIRS = ("ramp_summary", "ramp_summary_excel",
                        "ramp_detail", "ramp_detail_pdf",
                        "highway_sequence", "highway_sequence_pdf",
-                       "highway_log", "highway_log_pdf", "intersection_detail_pdf",
-                       "intersection_summary_pdf",
-                       "highway_detail", "highway_detail_pdf", "highway_summary",
+                       "highway_log", "highway_log_pdf",
+                       # The two Intersection EXCEL export folders were missing
+                       # here while both their PDF siblings were listed, so Reset
+                       # left them behind. `check_report_wiring` only asserted
+                       # coverage for PDF rows, which is why it never failed;
+                       # it now asserts every enabled export subdir.
+                       "intersection_detail", "intersection_detail_pdf",
+                       "intersection_summary", "intersection_summary_pdf",
+                       "highway_detail", "highway_detail_pdf",
+                       "highway_summary", "highway_summary_pdf",
                        "consolidated", "tsn_highway_log", "tsmis_highway_log_pdf",
                        "tsmis_intersection_detail_pdf", "tsmis_highway_detail_pdf",
                        "tsmis_highway_sequence_pdf", "tsmis_ramp_detail_pdf",

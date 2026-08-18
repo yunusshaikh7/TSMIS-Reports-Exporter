@@ -329,7 +329,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-042 | P1 | Resolved 2026-07-21 (`06f2d85` — `_normalized_row` consumes the stored PS marker instead of re-deriving it from the already-normalized text) | Normalized Highway Detail erases every PS equation marker |
 | CMP-AUD-043 | P1 | Resolved 2026-07-18 (both familiar secondary surfaces take the finding's accepted "unmistakable values-only snapshot label" path: the Report View was labeled a build-time snapshot in the 2026-07-12 remediation, and the shared Summary-by-Category sheet now carries an unmistakable "do NOT recalculate; regenerate after editing a source" disclosure, gated present in both family checks) | Formula Report View stays stale after live recalculation |
 | CMP-AUD-044 | P1 | Resolved 2026-07-18 (both trim-and-slice loaders — `compare_env._load_xlsx_side` and `compare_highway_log._load_input` — now detect a nonblank cell beyond the declared width and refuse the file instead of slicing it off: compare_env skips loudly into the incompleteness channel, HL raises; census-proven no-op — 1,316 real flat exports carry 0 data beyond the trimmed header, confirmed end-to-end on 252 HD exports) | Data beneath trailing blank headers is silently discarded |
-| CMP-AUD-045 | P1 | Partially remediated (HL integrated 2026-07-17; HD-Excel still red, but **the vendor question is ANSWERED 2026-08-17: the RELEASED HD Excel export has NO county column** — 34 fixed labels, none a county, across 252 statewide routes. No longer a vendor wait; it is now an OWNER DECISION — accept HD-Excel pairing without county as a disclosed weakness, or source county from the HD PDF page banner / TSN sidecars. Still never infer) | Shared typed identity core green; report-family integration remains red |
+| CMP-AUD-045 | P1 | **Resolved 2026-08-18 — OWNER DECIDED.** The released HD Excel export has NO county column, and the owner ruled the Excel and PDF editions stay SEPARATE sources rather than have one borrow the other's county. HD-Excel therefore pairs county-blind BY DECISION, and the exposure is now MEASURED and DISCLOSED in the comparison Notes: 524 of 59,457 Route+canonical-PM keys carry more than one row and 438 of those span counties (976 rows, 1.6%) — only those pair by similarity; everything else pairs on an exact unique key. Every other family stays as integrated. Still never infer a county | Shared typed identity core green; HD-Excel county-blind by owner decision, measured + disclosed |
 | CMP-AUD-046 | P2 | Resolved 2026-07-18 (RD Excel+PDF pin a position-authoritative `force_header`; ID Excel+PDF realign legacy→current via `_id_canonical_header`; census-verified per-position on the 7.9 exports; end-to-end proves a Description change shows under Description not R/U, an INT Type change under INT Type not INT Eff-Date) | Shifted exports report differences under the wrong fields |
 | CMP-AUD-047 | P2 | Remediated: the env XLSX loader takes the report's own value projection (HL passes _hl_normalize; the HL-PDF conversion path too); red->green in check_compare_env_highway_log | Highway Log cross-env skips its whitespace normalization |
 | CMP-AUD-048 | P2 | Remediated: per-side header canonicalization before layout equality (canonical/vendor editions compare with corrected labels; unrecognized same-width layouts refused by name); red->green in check_compare_env_highway_log | Two supported Highway Log header editions cannot compare |
@@ -337,7 +337,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-050 | P1 | Remediated (2026-07-17) | PDF routes can overwrite, double-count, or remain blank |
 | CMP-AUD-051 | P1 | Resolved | Highway Detail PM spill creates phantom PDF records |
 | CMP-AUD-052 | P1 | Resolved | Highway Detail header words swallow real line-two data |
-| CMP-AUD-053 | P1 | Resolved | Highway Detail orphan reconciliation never fires |
+| CMP-AUD-053 | P1 | **Resolved; the residual is CLOSED 2026-08-18** — the 2 route-395 leading orphans that kept HD-PDF consolidation PARTIAL were the SAME defect as CMP-AUD-186 (continuation baselines, not orphans). With 186 fixed the statewide parse reports 0 leading orphans and the producer returns COMPLETE. The orphan tripwire is retained for a genuine no-open-record fragment and reinforced by a new continuation-collision counter that escalates a foreign line 2 | Highway Detail orphan reconciliation never fires |
 | CMP-AUD-054 | P1 | Resolved | Highway Detail fallback grids corrupt real rows as complete |
 | CMP-AUD-055 | P1 | Resolved | Damaged repeated headers silently drop later PDF data pages |
 | CMP-AUD-056 | P1 | Resolved | Intersection wrapped rowB text is truncated as complete |
@@ -417,7 +417,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-130 | P2 | Remediated: Windows deletions go through an identity-verified handle (delete-on-close bound to the checked inode); raced foreign replacements survive, gated in check_comparison_sidecars | Stat-then-unlink cleanup can delete a foreign same-path replacement |
 | CMP-AUD-131 | P2 | Remediated via the sanctioned claims-narrowing option: every crash-safety claim now says process-interruption safety, power loss explicitly unproven, fail-closed reads named as the conservative sentinel | Publication is process-interruption safe but not proven power-loss durable |
 | CMP-AUD-132 | P1 | Resolved | Highway Log intermediates are attempt-scoped and exact-manifest bound |
-| CMP-AUD-133 | P1 | Partially remediated 2026-07-14 (RD PM_SFX conserved, v4 sidecar); the HD remainder is DEFERRED — HD is pre-release (owner 2026-07-21), resumes on the official HD delivery | Normalized Detail libraries discard source-backed identity, print, and Report View facts |
+| CMP-AUD-133 | P1 | **HD remainder RESOLVED 2026-08-18** (RD PM_SFX conserved 2026-07-14). The HD normalized library is now v4: the sidecar widens from 2 to 15 columns and conserves every raw column the projection dropped — the Report View's DCR cell + five-value ADT block (read back by `_tsn_onesided`, which returned None for a library before, so **every library-sourced comparison blanked all six**) plus the source-only surrogate / order / change-flag columns. Proved on the real 60,083-row extract; the compared rows stay byte-identical | Normalized Detail libraries discard source-backed identity, print, and Report View facts |
 | CMP-AUD-134 | P1 | Remediated | The first Stage-6 Ramp oracle could certify without final source revalidation and understated printed-field loss |
 | CMP-AUD-135 | P1 | Resolved 2026-07-14 (TSN Descriptions preserved; the TSMIS strip route-matched; re-blessed) | Ramp normalization deletes all 15 source-backed numeric Description prefixes |
 | CMP-AUD-136 | P1 | Remediated | The independent XLSX reader can parse synchronized A-to-B-to-A bytes between equal live-file hashes |
@@ -426,7 +426,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-139 | P1 | Remediated | The first Intersection Stage-6 oracle has mutable auxiliary scans, split provenance, and permissive numeric admission |
 | CMP-AUD-140 | P1 | Remediated | Intersection numeric-postmile collision censuses still group on display text and can split equivalent identities |
 | CMP-AUD-141 | P1 | Remediated | The first Highway Detail Stage-6 artifact can report acceptance without one coherent immutable source/result transaction |
-| CMP-AUD-142 | P1 | DEFERRED — HD is pre-release (owner 2026-07-21), resumes on the official HD delivery (library change → D2 version bump + re-bless when it does) | Highway Detail drops two PDF-printed snapshot dates and misdescribes them as database-only metadata |
+| CMP-AUD-142 | P1 | **Resolved 2026-08-18.** `REFERENCE_DATE` 2025-09-08 / `EXTRACT_DATE` 2025-09-15 are validated as single-valued real calendar dates at build time (a multi-snapshot, blank or malformed dump is REFUSED) and stamped as extract-level provenance on the v4 library's marker sheet. The Notes sheet no longer calls them database ids: a new section names the snapshot the run compared, explains the reference/report gap as the XLSX-to-PDF skew, and says so plainly when the TSN side does not record them | Highway Detail drops two PDF-printed snapshot dates and misdescribes them as database-only metadata |
 | CMP-AUD-143 | P2 | Remediated | The Highway Detail audit's decisive Length projection inherits mutable ambient Decimal rounding context |
 | CMP-AUD-144 | P1 | Resolved 2026-07-14 (printed J–P claims preserved + derived-S cross-checked; real-data verified) | Intersection Summary normalization irreversibly folds six authoritative printed control categories into one count |
 | CMP-AUD-145 | P1 | Resolved 2026-07-14 (raw F descriptor retained as a declared TSNR-bound correction; drift refuses) | Intersection Summary drops the TSN PDF's erroneous raw CONTROL F label while applying the now-proven RED/MAINLINE canonical mapping |
@@ -470,7 +470,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-183 | P1 | Resolved 2026-07-14 (route universe validated + producer census reconciled; real-data verified) | Intersection Summary aggregation accepts dropped and duplicate routes without validating its route universe |
 | CMP-AUD-184 | P2 | Resolved 2026-07-14 (the shared note states the blank/one-sided truth) | Intersection Summary's familiar view note contradicts its structural-absence cells and cites Ramp categories |
 | CMP-AUD-185 | P1 | Resolved 2026-07-14 (District compared on every RD leg; the 005/SD/72.366 disagreement surfaces; re-blessed) | Ramp Detail omits District and hides a real District disagreement as identical |
-| CMP-AUD-186 | P1 | **OPEN / product-red — un-deferred + RE-CONFIRMED 2026-08-17** on the official release, and now exactly bounded: with 243 fixed, the statewide PDF-vs-Excel self-check pairs **51,327 locations, 0 one-sided, 51,326 identical — this is the ONLY differing row** (route 395 `R000.000E`, 24 cells = Description + all 23 attributes blanked). NOT fixed in v0.37.0: its own session (parser rewrite) | Highway Detail truncates multi-baseline line-two records and erases their attributes as complete |
+| CMP-AUD-186 | P1 | **RESOLVED 2026-08-18** — the parser now keeps a logical line 2 OPEN and merges every following baseline into its cells until the next proved line 1, a DCR boundary, or the document end. Census-first: the statewide continuation histogram is `{0: 51326, 2: 1}`, so the blast radius was exactly this one record. After the fix 251 of 252 routes are byte-identical and route 395 `R000.000E` gains its full Description + all 23 attributes, matching the same-pull Excel row cell-for-cell | Highway Detail truncates multi-baseline line-two records and erases their attributes as complete |
 | CMP-AUD-187 | P2 | Resolved 2026-07-22 | Independent oracle builds statewide key order quadratically |
 | CMP-AUD-188 | P2 | Remediated in accepted audit artifact | Highway Detail product witness loses all returned evidence when its monolithic run exceeds the execution wrapper |
 | CMP-AUD-189 | P2 | Remediated in accepted audit artifact | Highway Detail publication gate compares different duplicate-trace wire schemas byte-for-byte |
@@ -3221,6 +3221,20 @@ reconciled to a line-one record, reconcile the two bands explicitly, and disting
 source-proven single-line rows from broken/truncated pairs. Unexplained or truncated
 payload must make the producer partial or failed and remain visible in structured
 diagnostics.
+
+#### The 2 route-395 leading orphans — CLOSED 2026-08-18
+
+The two "genuinely-unreconcilable leading orphans" this remediation counted (and which
+kept HD-PDF consolidation PARTIAL ever since) were never orphans: they are the second
+and third printed baselines of route 395's `R000.000E` logical line two, which
+CMP-AUD-186 has now taught the parser to merge. With that fix the statewide parse
+reports `leading_orphans = 0` and the producer returns COMPLETE.
+
+The tripwire this finding installed is NOT weakened. It now fires for its true case — a
+data-shaped group with NO open record at all — and is reinforced by CMP-AUD-186's
+continuation-collision counter, which escalates to PARTIAL when a continuation extends
+an attribute the record had already filled (the signature of a foreign line 2 being
+absorbed). Statewide: 0 collisions.
 
 ### CMP-AUD-054 — Highway Detail fallback grids can certify corrupted rows
 
@@ -8175,10 +8189,11 @@ window). Re-blessed: every leg reports exactly the oracle's District 1 — the
 ### CMP-AUD-186 — Highway Detail truncates multi-baseline line-two records as complete
 
 Priority: P1  
-Status: **OPEN / product-red. Un-deferred and RE-CONFIRMED 2026-08-17 on the vendor's
-official release** (`ground-truth/HD + HS Release 8.17/`), which also measured its exact
-blast radius — see "Re-confirmation" below. Previously: verified on the frozen 7.9 pair  
-Primary code: `scripts/consolidate_tsmis_highway_detail_pdf.py::_row_groups/parse_pdf`
+Status: **RESOLVED 2026-08-18** (census-first; a real correctness fix) — see
+"Remediation" below. Previously: OPEN / product-red, re-confirmed 2026-08-17 on the
+vendor's official release (`ground-truth/HD + HS Release 8.17/`), which measured its
+exact blast radius; before that, verified on the frozen 7.9 pair  
+Primary code: `scripts/consolidate_tsmis_highway_detail_pdf.py::_merge_line2/parse_pdf`
 
 The current `highway_detail_route_395.pdf`, physical page 4 / printed page 1, contains
 one visibly four-baseline line-two record at `08 SIE 395 / R000.000E`. Its Description
@@ -8237,6 +8252,58 @@ Bind the exact route-395 current row as a positive canary, plus synthetic wraps 
 line-two cell, simultaneous multi-cell wraps, header-like continuation text, and a
 continuation whose first token resembles a post mile. The corrected product row must
 equal both the visible PDF and the same-pull Excel row cell-for-cell.
+
+#### Remediation — 2026-08-18 (v0.38.0)
+
+**Census first.** Instrumenting the classification loop over all 252 released PDFs
+answered the only question that mattered: how many records actually carry extra
+line-two baselines. The statewide continuations-per-record histogram is
+`{0: 51326, 2: 1}` — ONE record, with exactly two continuation groups, both on
+route 395 page 4. The same census proved two facts the fix depends on:
+
+* a reprinted THEAD **does** appear between a line 1 and its line 2 (31 routes), so a
+  page break must NOT close a record; and
+* a DCR group row is seen mid-document 3,766 times and **always** after a record that
+  already has its line 2 — never between a line 1 and its line 2 — so making it a hard
+  boundary is safe.
+
+**The fix.** `parse_pdf` no longer emits a record the moment it sees one line-two
+group. It keeps `pending_2` open and merges every following non-furniture group into
+it, cell by cell, with the same `_join_wrap` rule the within-group rejoin already used;
+the record is emitted when it CLOSES — at the next proved line 1, a DCR/dashed-district
+boundary, or the document end. Continuations therefore survive a physical page break.
+
+`_merge_line2` also carries the tripwire that the old "everything after line two is an
+orphan" rule used to provide. A continuation may extend a cell only where the print
+really wraps — the Description (window 0), a still-empty cell, or one whose accumulated
+text ends in the hyphen an HTML wrap breaks after. Anything else is the signature of a
+FOREIGN line 2 landing on an open record, so it is still merged (never dropped) but
+COUNTED, and the count escalates the producer to PARTIAL. Statewide: 2 continuations,
+**0 collisions**.
+
+**Measured before/after (252 PDFs, both runs through the shipped parser).** Row count
+unchanged at 51,327; 251 of 252 routes byte-identical. Route 395 keeps its 1,191 rows
+and ONE row changes — `R000.000E`, exactly 24 cells (Description + all 23 attributes),
+which is cell-for-cell what this finding predicted. `leading_orphans` 2 → 0 and
+`single_line` / `unresolved` / `fallback_pages` / `rule_row_pages` are all unchanged.
+The recovered Description is the complete printed sequence
+`KERN/INYO CO LINE / … / END INDEP ALIGN=CO LINE` with LB Eff `86-08-07`, LB
+`H/02/Z/10/10/24/05/05`, Med `76-11-24/K/7/Z/99P`, RB `76-11-24/H/02/Z/05/05/24/10/10`
+— equal to the same-pull Excel row on all 34 cells after the comparison's own
+whitespace collapse.
+
+**Consequences.** The statewide PDF-vs-Excel self-check is now **51,327 locations, 0
+one-sided, 51,327 fully identical, 0 differing rows**. HD-PDF consolidation returns
+**COMPLETE** (it was PARTIAL only because of this defect's two groups — see
+CMP-AUD-053, whose residual this closes). Merged continuations ride a durable
+`parse_anomalies.continuation_lines` diagnostic + a summary note so a future layout
+change that starts producing many of them is visible without being treated as an error.
+
+Red→green in `check_highway_detail_pdf.test_186_multibaseline_line2`: the three-baseline
+merge, attributes printed on a later baseline, the DCR close boundary, a continuation
+crossing a page break, the untouched single-line case, and the e2e "COMPLETE + durable
+diagnostic" contract. `test_053_leading_orphans` gained the collision case.
+
 
 ### CMP-AUD-187 — independent oracle builds statewide key order quadratically
 

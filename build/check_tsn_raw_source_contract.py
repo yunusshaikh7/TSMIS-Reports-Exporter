@@ -729,9 +729,15 @@ def test_detail_success_outcomes():
                                   else "01-DN-001"), ("DIST", "01"), ("CNTY", "DN")):
                 if name in header:
                     source_row[list(header).index(name)] = value
+            # CMP-AUD-142: Highway Detail's normalizer now REFUSES a dump whose
+            # printed snapshot dates are missing/multiple/malformed, so the
+            # success path has to supply them (test_hd_extract_dates covers the
+            # refusals). The real extract always carries both on every row.
             required_values = ({"PR": "R", "PM": 1.0} if label.startswith("Ramp")
                                else {"POST_MILE": 1.0} if label.startswith("Intersection")
-                               else {"RTE": 1, "POSTMILE": 1.0})
+                               else {"RTE": 1, "POSTMILE": 1.0,
+                                     "REFERENCE_DATE": "2025-09-08",
+                                     "EXTRACT_DATE": "2025-09-15"})
             for name, value in required_values.items():
                 source_row[list(header).index(name)] = value
             write_raw(source, header, source_row)
@@ -748,6 +754,69 @@ def test_detail_success_outcomes():
             check(f"{label}: exact normalized header and exactly one emitted row",
                   title == sheet and rows[0] == expected_header and len(rows[1:]) == 1
                   and rows[1][:len(base_row)] == base_row)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_hd_extract_dates():
+    """CMP-AUD-142: the two printed snapshot dates are EXACT source facts, so the
+    Highway Detail normalizer refuses anything ambiguous rather than guessing, and
+    stamps the accepted pair as extract-level provenance on the marker sheet."""
+    print("Highway Detail extract dates: validated exactly once, stamped as provenance:")
+    import compare_tsn_common as ctc
+    header = hdt.TSN_RAW_HEADER
+    root = Path(tempfile.mkdtemp(prefix="tsmis_tsn_hd_dates_"))
+    try:
+        def source_row(ref="2025-09-08", ext="2025-09-15"):
+            row = ["x"] + [None] * (len(header) - 1)
+            for name, value in (("DIST", "01"), ("CNTY", "DN"), ("RTE", 1),
+                                ("POSTMILE", 1.0), ("REFERENCE_DATE", ref),
+                                ("EXTRACT_DATE", ext)):
+                row[list(header).index(name)] = value
+            return row
+
+        def build(rows, tag):
+            raw = root / tag
+            raw.mkdir()
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Sheet 1"
+            ws.append(list(header))
+            for row in rows:
+                ws.append(list(row))
+            wb.save(raw / "truth.xlsx")
+            wb.close()
+            out = root / f"{tag}.xlsx"
+            with patch(hdt, "_tsn_row",
+                       lambda _r, _h: ["001"] + [""] * len(hdt.SHARED_HEADER)):
+                return hd_load.build_into(raw, out), out
+
+        ok_result, ok_path = build([source_row()], "ok")
+        check("a coherent dump builds and is COMPLETE",
+              ok_result.status == "ok" and ok_result.completion == outcome.COMPLETE)
+        wb = load_workbook(ok_path, read_only=True, data_only=True)
+        try:
+            prov = ctc.normalization_provenance(wb)
+        finally:
+            wb.close()
+        check(f"...and stamps BOTH dates as marker provenance ({prov})",
+              prov.get(hdt.PROV_REFERENCE_DATE) == "2025-09-08"
+              and prov.get(hdt.PROV_EXTRACT_DATE) == "2025-09-15")
+        check("...which the comparator reads back for the Notes",
+              hdt.tsn_snapshot_dates(ok_path) == ("2025-09-08", "2025-09-15"))
+
+        for tag, rows, fragment in (
+                ("blank", [source_row(ref="")], "carries no REFERENCE_DATE"),
+                ("two_snapshots", [source_row(), source_row(ref="2025-10-01")],
+                 "2 different REFERENCE_DATE"),
+                ("not_a_date", [source_row(ext="LATEST")], "is not a calendar date"),
+                ("impossible", [source_row(ext="2025-02-30")], "is not a real date")):
+            res, path = build(rows, tag)
+            check(f"a dump with a {tag.replace('_', ' ')} date is REFUSED "
+                  f"({res.message[:60]}...)",
+                  res.status == "error" and fragment in res.message)
+            check(f"...and writes no normalized workbook for the {tag} case",
+                  not path.exists())
     finally:
         shutil.rmtree(root, ignore_errors=True)
 
@@ -816,6 +885,7 @@ def main():
     test_detail_headers()
     test_detail_document_and_row_claims()
     test_detail_success_outcomes()
+    test_hd_extract_dates()
     test_summary_exact_one()
     print()
     if _fail:

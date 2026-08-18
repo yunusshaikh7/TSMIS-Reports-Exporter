@@ -98,14 +98,54 @@ _TSMIS_HEADER = ["Route", "Post Mile", "Length", "Date of Rec", "HG", "AC",
 # highway_detail normalization_version MIRRORS this; tsn_load_highway_detail
 # .build_into stamps it, _load_tsn refuses anything older). HD's direct loader
 # had NO stale-library gate at all — a normalized workbook from any prior
-# normalizer was trusted. v3 is a marker-only bump over the v2 sidecar shape;
-# the rows are byte-identical, and the bump forces D2 to rebuild stored
-# libraries so they gain the marker.
-NORMALIZATION_VERSION = 3
+# normalizer was trusted. v3 was a marker-only bump over the v2 sidecar shape;
+# **v4 widens the sidecar** to conserve the source-backed facts the projection
+# used to drop (CMP-AUD-133) and stamps the two printed snapshot dates as
+# extract-level provenance (CMP-AUD-142). Both are library-shape changes, so the
+# bump forces a D2 rebuild.
+NORMALIZATION_VERSION = 4
 # CMP-AUD-033: the documented sidecar columns that follow ["Route"] +
 # SHARED_HEADER in the normalized workbook (tsn_load_highway_detail.SIDECAR_HEADER
 # mirrors this; check_tsn_normalization_marker gates the mirror).
-_NORMALIZED_SIDECARS = ("TSN District", "TSN County")
+#
+# CMP-AUD-133 (the Highway Detail remainder): the projection to SHARED_HEADER
+# drops 13 raw columns. Two of them (REFERENCE_DATE / EXTRACT_DATE) describe the
+# WHOLE extract and are stamped as marker provenance instead (CMP-AUD-142); the
+# rest are per-ROW facts and are conserved here so nothing silently vanishes:
+#   * REPORT VIEW facts — the DCR line-1 cell and the five-value TSN-only ADT
+#     block. These have a real consumer: before v4 a comparison run off the
+#     canonical library (the normal path) blanked all six, because _tsn_onesided
+#     could only read them from a RAW workbook.
+#   * SOURCE-ONLY facts — the database surrogate (THY_ID), the relational order
+#     field (SEG_ORDER_ID), the four TSN change flags (ACC_SIG / LT_SIG /
+#     MED_SIG / RT_SIG) and BREAK_DESC. Never compared and never shown; carried
+#     so the normalized workbook remains a complete record of its source.
+_SIDECAR_DCR = ("TSN District", "TSN County")
+_SIDECAR_REPORT_VIEW = ("TSN DCR", "TSN ADT", "TSN Profile", "TSN LK-Back ADT",
+                        "TSN Chg/Mile", "TSN DVM")
+_SIDECAR_SOURCE_ONLY = ("TSN THY_ID", "TSN ACC_SIG", "TSN BREAK_DESC",
+                        "TSN LT_SIG", "TSN MED_SIG", "TSN RT_SIG",
+                        "TSN SEG_ORDER_ID")
+_NORMALIZED_SIDECARS = (_SIDECAR_DCR + _SIDECAR_REPORT_VIEW
+                        + _SIDECAR_SOURCE_ONLY)
+# The raw columns each sidecar slot carries, in the SAME order (the DCR pair and
+# "TSN DCR" are derived, so they are absent here and built by the loader).
+SIDECAR_RAW_COLUMNS = {
+    "TSN ADT": "ADT_AMT", "TSN Profile": "PROFILE",
+    "TSN LK-Back ADT": "LK_BACK_ADT", "TSN Chg/Mile": "CHNGMILE",
+    "TSN DVM": "DVM", "TSN THY_ID": "THY_ID", "TSN ACC_SIG": "ACC_SIG",
+    "TSN BREAK_DESC": "BREAK_DESC", "TSN LT_SIG": "LT_SIG",
+    "TSN MED_SIG": "MED_SIG", "TSN RT_SIG": "RT_SIG",
+    "TSN SEG_ORDER_ID": "SEG_ORDER_ID",
+}
+# CMP-AUD-142: the two dates the raw dump prints ONCE for the whole extract —
+# REFERENCE_DATE is the snapshot the rows describe and EXTRACT_DATE is when the
+# dump was taken (the accepted source-format oracle maps them to the TSN print's
+# "REFERENCE DATE" and "REPORT DATE", and their gap explains the XLSX-to-PDF
+# skew). They are extract-level, so they ride the marker sheet's provenance
+# rather than 60,000 identical row cells; the labels below are the contract.
+PROV_REFERENCE_DATE = "TSN reference date"
+PROV_EXTRACT_DATE = "TSN extract date"
 
 KEY = "Post Mile"
 # The shared comparison header: the canonical Post Mile key, the derived PS
@@ -468,7 +508,7 @@ def _load_tsmis(path):
 # "equal after the stated normalization", not raw equality) and comments on the
 # columns that differ wholesale. Nothing is suppressed.
 # --------------------------------------------------------------------------- #
-def _write_notes_sheet(wb):
+def _write_notes_sheet(wb, snapshot=None):
     ws = wb.create_sheet("Notes")
     ws.sheet_properties.tabColor = "ED7D31"
     write_only = getattr(wb, "write_only", False)
@@ -512,6 +552,20 @@ def _write_notes_sheet(wb):
          "where they print it (TSMIS 'C043.925R' and TSN 'C 043.925 E' are the SAME row). "
          "It is compared in the separate 'PS' column, so a marker difference flags there "
          "instead of splitting the row into a false one-sided pair.")
+    # CMP-AUD-045, HD-Excel: owner decision 2026-08-18. The released TSMIS Excel
+    # export has NO county column, and county must never be inferred; the owner
+    # ruled the Excel and PDF editions stay SEPARATE processes rather than have
+    # one borrow the other's county. So this pairing is knowingly county-blind,
+    # and the exposure is disclosed here rather than silently carried.
+    note("• County is NOT part of the key, and cannot be: the TSMIS Highway Detail "
+         "export carries no county column, and the Excel and PDF editions are kept as "
+         "separate sources rather than one borrowing the other's. Route + Post Mile is "
+         "unique for all but a small remainder — on the 2025-09-08 TSN extract, 524 of "
+         "59,457 keys carry more than one row and 438 of those span two or more counties "
+         "(976 rows, 1.6%). ONLY those rows are paired by payload similarity, so on them "
+         "a change could in principle be matched to the same postmile in a different "
+         "county. Everything else pairs on an exact unique key. HOW TO SEE IT: the "
+         "Report View's DCR column shows each TSN row's district-county-route.")
 
     section("NORMALIZATIONS APPLIED  (these can make raw-different values compare EQUAL — "
             "a match means 'equal after the normalization named here', not that the source "
@@ -566,7 +620,28 @@ def _write_notes_sheet(wb):
          "omitted'). Shown in blue on the Report View for reference.")
     note("• TSN's change flags (the '*' / 'Y' prefixes on effective dates in the printed "
          "TSN report; separate *_SIG columns in the extract) and its database ids "
-         "(THY_ID / SEG_ORDER_ID / REFERENCE_DATE / EXTRACT_DATE).")
+         "(THY_ID, the surrogate key, and SEG_ORDER_ID, a relational ordering "
+         "field). All of them are CONSERVED in the normalized library's sidecar "
+         "so nothing the source carried is lost — they are simply not compared.")
+    # CMP-AUD-142: REFERENCE_DATE / EXTRACT_DATE were previously listed above as
+    # database ids. They are not: they are the two dates the print carries as
+    # "REFERENCE DATE" and "REPORT DATE", and the gap between them is exactly the
+    # XLSX-to-PDF snapshot skew. They are extract-level, so they ride the library's
+    # normalization marker rather than a row column, and are named here.
+    section("WHICH SNAPSHOT THIS COMPARED  (the TSN side's own printed dates)")
+    if snapshot:
+        note(f"• TSN reference date {snapshot[0]} — the effective date the TSN rows "
+             "describe (the print's 'REFERENCE DATE').")
+        note(f"• TSN extract date {snapshot[1]} — when that dump was taken (the print's "
+             "'REPORT DATE'). Rows changed between the two dates appear in the extract "
+             "but not in a print made on the reference date; that gap is the known "
+             "XLSX-to-PDF skew, not a comparison error.")
+        note(f"• Read every difference below against {snapshot[0]}: a TSMIS export "
+             "taken months later differs from it by real network change.")
+    else:
+        note("• The TSN side did not record its reference/extract dates (a library built "
+             "before those were conserved, or a raw workbook compared directly). "
+             "Rebuild the TSN library to have this run name its snapshot.")
     note("• TSN carries ~20 unconstructed/unsigned routes TSMIS doesn't export at all — "
          "their rows appear as 'entire route' one-sided (blue), not as differences.")
 
@@ -600,7 +675,7 @@ _SCHEMA = CompareSchema(
                          "TSMIS doesn't export)",
     key_field=KEY_FIELD,
     context_fields=CONTEXT_FIELDS,
-    legend_writer=_write_notes_sheet,
+    legend_writer=_write_notes_sheet,   # replaced per call with the snapshot bound
     source_file_a=("highway_detail", TSMIS_SHEET, "xlsx"),   # Source Files sheet
 )
 
@@ -679,11 +754,68 @@ def _rv_classify(field):
     return "soft" if field in _RV_SOFT else "hard"
 
 
+# The Report View's TSN-only cells, in the order _RV_ONE names them, mapped to
+# the v4 sidecar column that carries each (CMP-AUD-133).
+_RV_ONE_SIDECAR = {"ADT": "TSN ADT", "PROF": "TSN Profile",
+                   "LKBK": "TSN LK-Back ADT", "CHG": "TSN Chg/Mile",
+                   "DVM": "TSN DVM", "DCR": "TSN DCR"}
+
+
+def _onesided_from_normalized(ws):
+    """The Report View's TSN-only cells read back from a v4 normalized library's
+    sidecar, aligned to the rows `_load_tsn` yields (CMP-AUD-133). Returns None
+    when the sheet predates v4 and does not carry them — the replica then shows
+    those cells blank, exactly as before, instead of inventing values."""
+    it = ws.iter_rows(values_only=True)
+    header = [("" if c is None else str(c).strip()) for c in (next(it, None) or ())]
+    idx = {name: i for i, name in enumerate(header)}
+    if not all(col in idx for col in _RV_ONE_SIDECAR.values()):
+        return None
+    out = []
+    for r in it:
+        if not r or not any(c not in (None, "") for c in r):
+            continue
+
+        def gv(col):
+            i = idx[col]
+            return "" if i >= len(r) or r[i] is None else str(r[i]).strip()
+        out.append({k: gv(col) for k, col in _RV_ONE_SIDECAR.items()})
+    return out
+
+
+def tsn_snapshot_dates(path):
+    """(reference_date, extract_date) from a normalized TSN library's marker
+    provenance, or None when the workbook does not record them (CMP-AUD-142).
+
+    These are EXTRACT-level printed facts, not database ids: REFERENCE_DATE is
+    the effective date the rows describe and EXTRACT_DATE is when the dump was
+    taken, and their gap is exactly the XLSX-to-PDF snapshot skew. A comparison
+    that cannot name its snapshot says so in the Notes rather than implying the
+    TSN side is current."""
+    try:
+        wb = load_workbook(path, read_only=True, data_only=True)
+    except Exception as e:
+        log.info("notes: TSN snapshot read failed (%s: %s)",
+                 type(e).__name__, str(e).splitlines()[0] if str(e) else "")
+        return None
+    try:
+        prov = ctc.normalization_provenance(wb)
+    finally:
+        wb.close()
+    ref = prov.get(PROV_REFERENCE_DATE)
+    ext = prov.get(PROV_EXTRACT_DATE)
+    return (ref, ext) if ref and ext else None
+
+
 def _tsn_onesided(path):
-    """Raw TSN one-sided columns (the ADT block + the district-county-route),
-    aligned to the rows `tsn_rows_from_raw` yields. Returns None for a
-    normalized-library workbook (those columns aren't stored there) — the
-    replica then shows the TSN-only cells blank."""
+    """The TSN one-sided Report View columns (the five-value ADT block + the
+    district-county-route), aligned to the rows the matching loader yields.
+
+    Reads them from the v4 normalized library's sidecar when the workbook is one
+    (CMP-AUD-133 — before v4 the canonical library path could not carry these
+    facts at all, so every library-sourced comparison blanked all six), and
+    straight from the raw statewide dump otherwise. Returns None when neither
+    source has them, so the replica shows the cells blank rather than guessing."""
     try:
         wb = load_workbook(path, read_only=True, data_only=True)
     except Exception as e:
@@ -692,7 +824,7 @@ def _tsn_onesided(path):
         return None
     try:
         if NORMALIZED_SHEET in wb.sheetnames:
-            return None
+            return _onesided_from_normalized(wb[NORMALIZED_SHEET])
         sn = TSN_SHEET if TSN_SHEET in wb.sheetnames else wb.sheetnames[0]
         it = wb[sn].iter_rows(values_only=True)
         hdr = next(it, None) or []
@@ -949,8 +1081,10 @@ def add_report_view(schema, tsmis_path, tsn_path):
     `tsmis_path` is accepted for signature parity with the Intersection Detail
     helper; the Highway Detail Report View reads its locations from the compared
     rows, so it isn't needed here."""
+    snapshot = tsn_snapshot_dates(Path(tsn_path))
     return dataclasses.replace(
         schema,
+        legend_writer=lambda wb: _write_notes_sheet(wb, snapshot),
         extra_sheet_writer=lambda wb, ctx: _write_report_view(
             wb, ctx, _tsn_onesided(Path(tsn_path))),
         report_view_diff_check=("Report View", "B", 2))

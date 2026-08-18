@@ -1179,10 +1179,14 @@ def build_normalized(raw_dir, out_path, *, glob, deps_ok, deps_msg, no_raw_what,
     workbook (one `sheet`, the styled `header`, then the projected rows) to
     `out_path` atomically (F9: temp + os.replace, never truncating a prior file).
 
-    `project(raw_path)` returns `(rows, make_result)`:
+    `project(raw_path)` returns `(rows, make_result)` or `(rows, make_result,
+    provenance)`:
       * `rows`                 -- the iterable of data rows appended under `header`;
       * `make_result(out_name)` -- builds the success ConsolidateResult, so each
-        report keeps its own message / summary_lines / producer completion.
+        report keeps its own message / summary_lines / producer completion;
+      * `provenance`           -- OPTIONAL ordered (label, value) EXTRACT-level
+        source facts stamped onto the marker sheet beside the version
+        (CMP-AUD-142); omit the third element when there are none.
     The deps gate (`deps_ok`/`deps_msg`), missing-raw message (`No raw {no_raw_what}
     found ...` + `no_raw_hint`), overwrite-confirm, parse-error wrapping, and the
     PermissionError save guard are identical across the family and live here.
@@ -1259,7 +1263,9 @@ def build_normalized(raw_dir, out_path, *, glob, deps_ok, deps_msg, no_raw_what,
                 prefix=".tsn-statewide-source-", dir=out_path.parent) as snapshot_dir:
             snapshot = Path(snapshot_dir) / Path(relative).name
             snapshot.write_bytes(captured[relative])
-            rows, make_result = project(str(snapshot))
+            projected = project(str(snapshot))
+            rows, make_result = projected[0], projected[1]
+            provenance = projected[2] if len(projected) > 2 else None
     except Exception as e:
         return ConsolidateResult(
             status="error",
@@ -1292,7 +1298,8 @@ def build_normalized(raw_dir, out_path, *, glob, deps_ok, deps_msg, no_raw_what,
             # via the certificate, D2). create_sheet + append works on the
             # write-only workbook.
             import compare_tsn_common as _ctc
-            _ctc.write_normalization_marker(wb, marker_version, report_name=log_label)
+            _ctc.write_normalization_marker(wb, marker_version, report_name=log_label,
+                                            provenance=provenance)
     except ImportError:
         # The `deps_ok` probe is a single `from openpyxl import Workbook`; this is the
         # centralized backstop for a partial/frozen-pruned openpyxl whose WriteOnlyCell /

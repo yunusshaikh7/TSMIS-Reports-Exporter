@@ -4,7 +4,37 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 (what already shipped, per release) is `CHANGELOG.md`; the narrative is
 [history.md](history.md). This file is what's *left*.
 
-> ### ▶ WHERE THINGS STAND (2026-08-17, after v0.37.0)
+> ### ▶ WHERE THINGS STAND (2026-08-18, after v0.38.0)
+>
+> **Every comparison-audit finding is now closed — 243 of 243.** v0.38.0 shut the
+> last four Highway Detail ones and took the owner's decision on the fifth:
+>
+> * **CMP-AUD-186 + CMP-AUD-053** — the HD (PDF) converter now keeps a logical
+>   line 2 OPEN and merges every following baseline into it until the next proved
+>   line 1, a DCR boundary, or the document end. Census-first (the statewide
+>   continuation histogram is `{0: 51326, 2: 1}`), so the blast radius was exactly
+>   one record; 251 of 252 routes came out byte-identical. **The statewide
+>   PDF-vs-Excel self-check is now 51,327 locations, 0 one-sided, 51,327 fully
+>   identical, 0 differing cells**, and HD-PDF consolidation returns COMPLETE.
+> * **CMP-AUD-133 + CMP-AUD-142** — the normalized TSN HD library is v4: a
+>   15-column sidecar conserves the Report View's DCR + five-value ADT block
+>   (which every library-sourced comparison used to blank) plus the source-only
+>   surrogate/order/change-flag columns, and the extract's two printed snapshot
+>   dates ride the marker sheet as validated extract-level provenance. The Notes
+>   sheet names the snapshot instead of calling those dates database ids.
+> * **CMP-AUD-045 (HD-Excel county)** — OWNER DECISION 2026-08-18: the Excel and
+>   PDF editions stay SEPARATE sources, so HD-Excel pairs county-blind by
+>   decision, with the exposure measured and disclosed in the Notes (524 of
+>   59,457 keys carry >1 row; 438 of those span counties = 976 rows, 1.6%).
+>
+> **Also in v0.38.0:** the **Highway Summary (PDF)** export edition (export-only
+> until real statewide prints exist to verify a parser against), and the Reset
+> cleanup now covers every enabled export folder (it had been leaving the two
+> Intersection Excel folders behind).
+>
+> *(The 2026-08-17 / v0.37.0 state below is kept for context.)*
+>
+> ### ▶ WHERE THINGS STOOD (2026-08-17, after v0.37.0)
 >
 > **The vendor RELEASED Highway Detail and Highway Summary on 2026-08-17**
 > (`ground-truth/HD + HS Release 8.17/` — one same-build pull, 756 files).
@@ -15,10 +45,6 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > format. The release also surfaced and fixed **CMP-AUD-243**: HD (PDF) silently
 > lost the record on every single-record page (13 pages / 12 routes).
 >
-> **Still open on HD, deliberately NOT done in v0.37.0:** **CMP-AUD-186**
-> (multi-baseline line-two truncation — the ledger scopes it as its own session,
-> a parser rewrite) and **CMP-AUD-053** (2 orphan lines on route 395).
-> **133 / 142** are un-deferred and now actionable against real data.
 > **Highway Summary is COMPLETE**: the owner supplied the statewide TSN print the
 > same day, so **v0.37.0** added its vs-TSN leg — all 13 integrated reports now
 > compare against TSN. (Caveat: that print is 09/15/2025 against a 2026-08-17
@@ -125,18 +151,16 @@ record. The long themed sections further down keep the detail and rationale — 
 table is the index into them. Re-verify an item against the code before acting on
 it; a stale line here is a bug in this list.
 
-### A. Correctness — the 4 open comparison findings (A1–A4) + 1 owner decision (A5)
+### A. Correctness — **NOTHING OPEN.** All 243 findings are closed (v0.38.0)
 
-| # | Item | Notes |
-|---|---|---|
-| A1 | **CMP-AUD-186** — Highway Detail (PDF) truncates multi-baseline line-two records, blanks all 23 attribute cells, and reports complete | **Its own session — a parser rewrite.** Now bounded EXACTLY: the statewide PDF-vs-Excel self-check pairs 51,327 locations, 0 one-sided, 51,326 identical — **this is the ONLY differing row** (route 395 `R000.000E`, 24 cells). The single thing between HD's two editions and a clean self-check. |
-| A2 | **CMP-AUD-053** — 2 orphan data lines on route 395 reconcile to no record | Same route as A1, separate defect. Keeps the HD-PDF consolidation at PARTIAL. |
-| A3 | **CMP-AUD-133** — normalized Detail libraries discard source-backed identity / print / Report View facts (the HD remainder) | Un-deferred by the release; now actionable against trustworthy data. |
-| A4 | **CMP-AUD-142** — Highway Detail drops two PDF-printed snapshot dates and misdescribes them as database-only | Library change → D2 `normalization_version` bump + re-bless when it lands. |
-| A5 | **CMP-AUD-045 (HD-Excel county)** — *an owner decision, not a task* | **ANSWERED**: the released HD Excel export has NO county column. Either accept HD-Excel pairing without county as a disclosed weakness, or source county from the HD PDF page banner / TSN sidecars. **Never infer it.** |
+A1–A5 as listed here through v0.37.0 (CMP-AUD-186 · 053 · 133 · 142 · 045-HD) were all
+closed on 2026-08-18 — see the status banner above for what each became, and the
+[finding ledger](planning/comparison-perfection/comparison-audit-findings.md) for the
+per-finding remediation records. The project record is
+[COMPLETION-PLAN.md](planning/comparison-perfection/COMPLETION-PLAN.md).
 
-All five live in the [finding ledger](planning/comparison-perfection/comparison-audit-findings.md);
-the project record is [COMPLETION-PLAN.md](planning/comparison-perfection/COMPLETION-PLAN.md).
+The one thing that is *not* closed is not a defect: **both vs-TSN canaries remain
+MIXED VINTAGE** and so are still un-blessable (D5 below).
 
 ### B. Owed by the owner (work PC only — this dev box cannot reach TSMIS)
 
@@ -150,7 +174,7 @@ the project record is [COMPLETION-PLAN.md](planning/comparison-perfection/COMPLE
 |---|---|---|
 | C1 | **Clean Road exports** (`clean_highway` / `clean_intersection` / `clean_ramp`) | All three `cs-disabled` with no report module behind them. A statewide export of each unlocks their real `save` + TSN normalizers. |
 | C2 | **Route History export flow** | Dev-site only, greyed reserved placeholder (stable id 15). |
-| C3 | **A Highway Summary PDF edition** | The site's `highway_summary.js` carries `hs_printAll()`, but the 8.17 delivery was Excel only. Add the export edition only once real prints exist to verify a parser against (the HSL / RD-PDF sequence). |
+| C3 | **Statewide Highway Summary PRINTS** | The export edition SHIPPED in v0.38.0 (`export_highway_summary_pdf`, `hs_printAll`) and is deliberately export-only: there is no real statewide print yet to verify a parser against. One work-PC run producing 252 PDFs unlocks its consolidator + PDF-vs-Excel self-check (the HSL / RD-PDF sequence). |
 | C4 | **A same-date TSN Highway Summary print** | The supplied print is 09/15/2025 against a 2026-08-17 export — 89 of 92 categories differ from ~11 months of real drift. A near-date print would make that comparison a defect check instead. |
 | C5 | **DEF-01 — permanent/main-site parity** | The frozen output-audit archive is a DEV-site export; equivalence is not established and must not be assumed. Needs a review-ready permanent-site export. |
 | C6 | **DEF-03 — baseline Intersection Detail (2 decisions)** | Needs a prior **SSOR-prod** Intersection Detail export for a second day. |
@@ -160,8 +184,8 @@ the project record is [COMPLETION-PLAN.md](planning/comparison-perfection/COMPLE
 | # | Item | Notes |
 |---|---|---|
 | D1 | **Highway Detail (PDF) has no ENV evidence** | v0.37.0 opened HD's **vs-TSN** evidence lane (the registry was explicitly waiting on the freeze). Its adapter carries `locate_tsn` / `tsn_value` / `tsn_box` but no `env_locate` / `env_fields`, so the cross-environment lane still refuses it and stays at four rows. Writing those two hooks would make it five there too. |
-| D2 | **The Reset cleanup misses the two Intersection Excel export folders** | `gui_worker_maint._LEGACY_OUTPUT_DIRS` lists every other report's export dir but not `intersection_detail` / `intersection_summary`. `highway_summary` had the same omission and was fixed in v0.37.0. Confirm whether it is deliberate before changing. |
-| D3 | **`check_report_wiring` only asserts Reset coverage for `fmt == "pdf"` rows** | Which is why D2 (and the Highway Summary omission) never failed the gate. Extending it to every non-site-disabled export key would have caught all three. |
+| D2 | ~~The Reset cleanup misses the two Intersection Excel export folders~~ | **Done (v0.38.0)** — `gui_worker_maint._LEGACY_OUTPUT_DIRS` now lists `intersection_detail`, `intersection_summary` and `highway_summary_pdf`. |
+| D3 | ~~`check_report_wiring` only asserts Reset coverage for `fmt == "pdf"` rows~~ | **Done (v0.38.0)** — `test_reset_covers_every_export` now derives from the EXPORT registry and asserts every enabled export's subdir, skipping only the app-DISABLED placeholders. It fails on all three historical omissions. |
 | D4 | **The Highway Summary vs-TSN cell is PERMANENTLY amber with the current print** | The print masks `MEDIAN BARRIER Z- NO BARRIER` as `**********`, so the normalized workbook is honestly PARTIAL and the comparison propagates that (`⚠ 1 input skipped … coverage is incomplete`). That is the correct contract — 91 of 92 categories have a TSN value — but it cannot clear until a print states that figure. **Owner call:** live with amber, or decide masked-means-uncomparable should read complete-with-note. |
 | D5 | **Both vs-TSN canaries are currently MIXED VINTAGE** | HD's TSN extract is REFERENCE_DATE 2025-09-08 and HS's print 09/15/2025, both against a 2026-08-17 export. The comparisons are structurally sound (verified end to end), but the differing-cell counts are dominated by ~11 months of real network change and are **not blessable as canaries**. A same-period TSN pull for either report converts its smoke test into a re-bless. |
 

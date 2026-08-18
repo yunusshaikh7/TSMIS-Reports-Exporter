@@ -59,6 +59,14 @@ its findings back-to-back, then update this roadmap.
 > **Updated 2026-08-17 (v0.37.0), on the vendor's HD release: 4 open** — 133/142/186 +
 > 045-HD, no longer deferred; ~~192~~ resolved by the same-build delivery and
 > ~~243~~ opened+closed (HD-PDF single-record-page data loss).
+> **Updated 2026-08-18 (v0.38.0): 0 open — 243 of 243 CLOSED.** ~~186~~ + ~~053~~
+> (the logical line 2 stays OPEN and merges every following baseline; statewide
+> PDF-vs-Excel is now 51,327/51,327 identical, 0 differing cells, and HD-PDF
+> consolidation returns COMPLETE), ~~133~~ + ~~142~~ (the v4 HD library's 15-column
+> sidecar conserves the Report View DCR + ADT block and every source-only raw column;
+> the two printed snapshot dates ride the marker sheet as validated provenance), and
+> ~~045~~ (OWNER DECISION: the Excel and PDF editions stay SEPARATE sources, so
+> HD-Excel pairs county-blind by decision with the exposure measured and disclosed).
 > ~~193~~ and ~~242~~ closed in S0; ~~080/085/089/115/187~~ in M-A; ~~108/208/209~~ in M-B;
 > ~~098/106/109/210~~ in M-C.
 
@@ -87,13 +95,20 @@ its findings back-to-back, then update this roadmap.
 >   silently lost the record on every single-record page (13 pages / 12 routes; the
 >   PDF workbook was 51,314 rows against Excel's 51,327).
 >
-> **Still open, and NOT fixed in v0.37.0** — both re-confirmed to fire on the released
-> PDFs: **CMP-AUD-186** (multi-baseline line-two truncation; the ledger scopes it as
-> its own session — a parser rewrite) and **CMP-AUD-053** (2 orphan data lines on
-> route 395). **133 / 142** (normalized-library facts) stand as written and are now
-> actionable against trustworthy data.
+> **All of it is now CLOSED (v0.38.0, 2026-08-18).** **186 + 053** — census-first (the
+> statewide continuation histogram is `{0: 51326, 2: 1}`), the converter keeps a logical
+> line 2 OPEN and merges every following baseline until the next proved line 1, a DCR
+> boundary, or the document end; 251 of 252 routes byte-identical, route 395
+> `R000.000E` gains its full Description + all 23 attributes, the statewide
+> PDF-vs-Excel self-check reads **51,327/51,327 identical, 0 differing cells**, and
+> HD-PDF consolidation returns COMPLETE. **133 + 142** — the HD normalized library is
+> v4: a 15-column sidecar conserves the Report View's DCR + five-value ADT block (which
+> every library-sourced comparison used to blank) plus the source-only
+> surrogate/order/change-flag columns, and the extract's two printed snapshot dates
+> ride the marker sheet as validated extract-level provenance. **045-HD** — OWNER
+> DECISION: the Excel and PDF editions stay SEPARATE sources.
 >
-> **Net effect on NORM: 133 / 142 / 186 are UN-DEFERRED and actionable.**
+> **Net effect on NORM: the bucket is COMPLETE.**
 
 **Vendor-blocked / next-statewide-batch — NOT a marathon.** **045** (HD-Excel county — the
 report-family integration leg still red) and **192** (HD route-005 stale 7.7 Excel beside a newer

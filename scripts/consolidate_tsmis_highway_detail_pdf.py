@@ -209,6 +209,29 @@ def _join_wrap(a, b):
     return a + b if a.endswith("-") else f"{a} {b}"
 
 
+_L2_DESCRIPTION = 0        # line 2's window 0 — the Description, which wraps by design
+
+
+def _merge_line2(base, nxt):
+    """Merge one continuation baseline into an open record's line-2 cells
+    (CMP-AUD-186). Returns (merged, collisions).
+
+    A cell may be EXTENDED only where the print really wraps: the Description
+    (window 0, whose whole job is to wrap), a cell that is still empty, or one
+    whose accumulated text ends in the hyphen an HTML wrap breaks after. Anything
+    else means a FOREIGN line 2 landed on an already-complete record — the
+    CMP-AUD-053 hazard a blanket merge would hide — so it is still merged (never
+    dropped) but COUNTED, and the count escalates the producer to partial. On the
+    2026-08-17 statewide release the only cross-baseline overlap is the
+    Description: 2 continuations, 0 collisions."""
+    out, collisions = [], 0
+    for i, (a, b) in enumerate(zip(base, nxt)):
+        if a and b and i != _L2_DESCRIPTION and not a.endswith("-"):
+            collisions += 1
+        out.append(_join_wrap(a, b))
+    return out, collisions
+
+
 def _group_values(group, windows):
     """The group's cell values on `windows`: each text line is assigned
     separately, then each window's fragments are joined top-to-bottom (see
@@ -420,51 +443,72 @@ def parse_pdf(path, events):
     Returns (rows, stats): `rows` in document order, `stats` a reconciliation
     dict (emitted, pages, orphans — always 0 now, kept for the reconciliation
     contract; `single_line` = records whose print carried NO second line,
-    emitted with a blank attribute tail; `fallback_pages` = data pages parsed
-    on the document-median fallback grid; `no_grid` when no page yielded any
-    geometry; `doc_routes` = the distinct routes the page banners claim for
-    the document itself, CMP-AUD-049 — captured before the geometry gate, so
-    a grid-less document still identifies itself). Returns (None, None) if
-    cancelled.
+    emitted with a blank attribute tail; `continuation_lines` = extra line-2
+    baselines merged into an already-open record, CMP-AUD-186; `fallback_pages`
+    = data pages parsed on the document-median fallback grid; `no_grid` when no
+    page yielded any geometry; `doc_routes` = the distinct routes the page
+    banners claim for the document itself, CMP-AUD-049 — captured before the
+    geometry gate, so a grid-less document still identifies itself). Returns
+    (None, None) if cancelled.
 
     The two window sets are derived PER PAGE from that page's own shaded bands
     (each print page is its own auto-layout table — see _page_windows). The
     page's text lines are re-grouped into PHYSICAL rows first (_row_groups —
     a wrapped cell's fragments rejoin their row, see _group_values); a row
     group whose line-1 shape matches (_is_line1 — the postmile ALONE in window
-    0, or postmile+Length on the fallback grid) is a line 1, and the NEXT
-    non-furniture row group is its line 2, read on the line-2 grid. A print
-    section taller than one physical page splits MID-RECORD (the browser
-    repeats the table header on the continuation page), so a pending line 1
-    carries across the page boundary; the furniture tests (THEAD_RE /
-    DCR_ROW_RE / PAGE_FURNITURE_RE on the raw text) keep the reprinted header
-    from being swallowed as its line 2. The old rule — "a genuine line 2
-    always carries a TASAS date" — is now only the FAST accept: the 7.9/ARS
-    census found real records whose roadbed blocks print codes but no
-    effective dates at all, and pages whose window grid splits a date across
-    columns; both parse now."""
+    0, or postmile+Length on the fallback grid) OPENS a record, and every
+    following non-furniture row group is that record's line 2. A print section
+    taller than one physical page splits MID-RECORD (the browser repeats the
+    table header on the continuation page), so the open record carries across
+    the page boundary; the furniture tests (THEAD_RE / DCR_ROW_RE /
+    PAGE_FURNITURE_RE on the raw text) keep the reprinted header from being
+    swallowed as data. The old rule — "a genuine line 2 always carries a TASAS
+    date" — is now only the FAST accept: the 7.9/ARS census found real records
+    whose roadbed blocks print codes but no effective dates at all, and pages
+    whose window grid splits a date across columns; both parse now.
+
+    CMP-AUD-186: a logical line 2 can print as SEVERAL physical baselines whose
+    tops sit further apart than ROW_GAP (a long Description wraps at the ~11pt
+    print line height while an attribute cell's own wrap fragments sit ~5-6pt
+    apart), so _row_groups hands them over as separate groups. The record stays
+    OPEN and each following group is merged into its cells window-by-window
+    with the same _join_wrap the within-group rejoin uses; it is emitted only
+    when the record CLOSES — at the next proved line 1, a DCR group boundary,
+    or the document end. Before this, the first baseline was taken as the whole
+    line 2 and the rest were dropped as leading orphans (route 395's
+    `R000.000E`: Description truncated mid-word and all 23 attribute cells
+    blanked, while the run still reported complete)."""
     rows = []
     doc_routes = set()                 # the pages' own route claims (049)
     orphans = 0
     single_line = 0
     leading_orphans = 0                # data-shaped groups with no line 1 (053)
     orphan_samples = []                # (page, text) for the durable diagnostic
+    continuation_lines = 0             # extra line-2 baselines merged in (186)
+    continuation_collisions = 0        # continuations that overwrote a filled cell
+    continuation_samples = []          # (page, text) for the durable diagnostic
     fallback_pages = []                # data pages recovered via line-2 geometry
     rule_row_pages = []                # single-record pages recovered via the rule row
     unresolved_pages = []              # data pages with NO recoverable grid (054)
     pending_1 = None                   # carries across pages (mid-record splits)
+    pending_2 = None                   # the open record's accumulating line-2 cells
 
     def _flush_pending():
-        # A line 1 whose record printed NO second line at all (description and
-        # every attribute cell empty — censused on the 7.9/ARS prints): emit it
-        # with a blank attribute line rather than dropping the record. Counted
-        # separately so the summary can say so; the PDF↔Excel check remains the
-        # arbiter of whether the blank tail matches the Excel export.
-        nonlocal pending_1, single_line
-        if pending_1 is not None:
+        # Emit the open record. A line 1 whose record printed NO second line at
+        # all (description and every attribute cell empty — censused on the
+        # 7.9/ARS prints) is emitted with a blank attribute line rather than
+        # dropped, and counted separately so the summary can say so; the
+        # PDF↔Excel check remains the arbiter of whether that blank tail matches
+        # the Excel export.
+        nonlocal pending_1, pending_2, single_line
+        if pending_1 is None:
+            return
+        if pending_2 is None:
             rows.append(_make_row(pending_1, [""] * N_COLS_L2))
             single_line += 1
-            pending_1 = None
+        else:
+            rows.append(_make_row(pending_1, pending_2))
+        pending_1 = pending_2 = None
 
     with pdfplumber.open(path) as pdf:
         n_pages = len(pdf.pages)
@@ -524,8 +568,9 @@ def parse_pdf(path, events):
             for group in groups:
                 vals1 = _group_values(group, win1)
                 if _is_line1(vals1):
-                    _flush_pending()   # the previous record had no line 2
+                    _flush_pending()   # close + emit the previous record
                     pending_1 = vals1
+                    pending_2 = None
                     in_thead = False
                     continue
                 # A record's line 2 is WHATEVER follows its line 1 except the
@@ -543,20 +588,42 @@ def parse_pdf(path, events):
                     in_thead = True
                     continue
                 if not dated and _is_header_residue(raw, in_thead):
+                    # A DCR group row (or its dashed-district variant) starts a new
+                    # district/county block, so it CLOSES an accumulating line 2 —
+                    # no continuation may cross it (CMP-AUD-186). Censused on the
+                    # 2026-08-17 statewide release: every one of the 3,766 DCR rows
+                    # seen mid-document follows a record that already HAS its line
+                    # 2, and none ever separates a line 1 from it — so a line 1
+                    # still awaiting its line 2 deliberately survives, exactly as
+                    # before. The page header/footer is NOT a boundary: a record's
+                    # continuation may cross a physical page break.
+                    if pending_2 is not None and (DCR_ROW_RE.match(raw)
+                                                  or DASHED_DCR_RE.match(raw)):
+                        _flush_pending()
                     continue
                 if pending_1 is not None:
                     in_thead = False
                     vals2 = _group_values(group, win2)
-                    rows.append(_make_row(pending_1, vals2))
-                    pending_1 = None
+                    if pending_2 is None:
+                        pending_2 = vals2
+                    else:
+                        # CMP-AUD-186: another baseline of the SAME logical line 2
+                        # (the Description wrapped past ROW_GAP). Merge cell-by-cell
+                        # with the within-group rejoin rule, and keep the record
+                        # open — it is emitted when it closes.
+                        pending_2, hits = _merge_line2(pending_2, vals2)
+                        continuation_lines += 1
+                        continuation_collisions += hits
+                        if len(continuation_samples) < 20:
+                            continuation_samples.append((page_no, raw[:80]))
                     page_rows += 1
                 elif len(raw) > 2:
                     # CMP-AUD-053: a data-shaped group that reconciles to NO line 1
-                    # (a page-split / equate line-2 whose line 1 was already
-                    # consumed or is absent). Never silently ignored — counted so
-                    # the producer escalates to PARTIAL and the count rides a
-                    # durable diagnostic. NOT emitted: with no line 1 to pair it,
-                    # a speculative row could carry the wrong postmile/identity.
+                    # (a page-split / equate line-2 printed before any line 1 in the
+                    # document). Never silently ignored — counted so the producer
+                    # escalates to PARTIAL and the count rides a durable diagnostic.
+                    # NOT emitted: with no line 1 to pair it, a speculative row could
+                    # carry the wrong postmile/identity.
                     in_thead = False
                     leading_orphans += 1
                     if len(orphan_samples) < 20:
@@ -571,13 +638,19 @@ def parse_pdf(path, events):
         if not any_grid and not rows:
             return [], {"emitted": 0, "pages": n_pages, "orphans": 0,
                         "single_line": 0, "leading_orphans": 0,
-                        "orphan_samples": [], "fallback_pages": [],
+                        "orphan_samples": [], "continuation_lines": 0,
+                        "continuation_samples": [], "continuation_collisions": 0,
+                        "fallback_pages": [],
                         "rule_row_pages": [],
                         "unresolved_pages": unresolved_pages, "no_grid": True,
                         "doc_routes": sorted(doc_routes)}
     return rows, {"emitted": len(rows), "pages": n_pages, "orphans": orphans,
                   "single_line": single_line, "leading_orphans": leading_orphans,
-                  "orphan_samples": orphan_samples, "fallback_pages": fallback_pages,
+                  "orphan_samples": orphan_samples,
+                  "continuation_lines": continuation_lines,
+                  "continuation_samples": continuation_samples,
+                  "continuation_collisions": continuation_collisions,
+                  "fallback_pages": fallback_pages,
                   "rule_row_pages": rule_row_pages,
                   "unresolved_pages": unresolved_pages,
                   "doc_routes": sorted(doc_routes)}
@@ -651,6 +724,21 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
                 ev.on_log(f"  note: {pstats['single_line']} record(s) in {p.name} "
                           "printed no attribute line — kept with blank attribute "
                           "columns.")
+            if pstats.get("continuation_lines"):
+                ctx["continuations"] = (ctx.get("continuations", 0)
+                                        + pstats["continuation_lines"])
+                ctx.setdefault("continuation_samples", []).extend(
+                    pstats.get("continuation_samples", []))
+                ev.on_log(f"  note: {pstats['continuation_lines']} extra attribute "
+                          f"line(s) in {p.name} continue a record's second line "
+                          "(a wrapped Description) — merged into it (CMP-AUD-186).")
+            if pstats.get("continuation_collisions"):
+                ctx["collisions"] = (ctx.get("collisions", 0)
+                                     + pstats["continuation_collisions"])
+                ev.on_log(f"  WARNING: {pstats['continuation_collisions']} continuation "
+                          f"cell(s) in {p.name} extended an already-filled attribute "
+                          "— a foreign line 2 may have merged into the record; "
+                          "marked partial (CMP-AUD-186/053).")
             if pstats.get("fallback_pages"):
                 # A page whose line-1 record was unshaded (no 10-cell band): its
                 # line-1 grid was recovered from the page's OWN line-2 band (source
@@ -699,6 +787,14 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             # is the arbiter of whether that matches the Excel export.
             notes.append(f"{ctx['single_line']} record(s) printed no attribute "
                          "line (kept with blank attribute columns).")
+        if ctx.get("continuations"):
+            # CMP-AUD-186, durable: N extra baseline(s) continued a record's line 2
+            # (a Description that wrapped past ROW_GAP) and were merged into it.
+            # Stays COMPLETE — merging IS the correct reading, and the merged row
+            # equals the same-pull Excel row cell-for-cell — but recorded so a
+            # future layout change that starts producing many of these is visible.
+            notes.append(f"{ctx['continuations']} wrapped attribute line(s) merged "
+                         "into their record's second line (CMP-AUD-186).")
         if ctx.get("fallback"):
             # A DURABLE diagnostic (not just the live log): N page(s) had an
             # unshaded line-1 record recovered from the page's own line-2 geometry.
@@ -719,6 +815,11 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         if leading_orphans:
             notes.append(f"⚠ {leading_orphans} data line(s) reconcile to no record "
                          "(CMP-AUD-053) — verify (see the log).")
+        collisions = ctx.get("collisions", 0)
+        if collisions:
+            notes.append(f"⚠ {collisions} continuation cell(s) extended an "
+                         "already-filled attribute (CMP-AUD-186) — verify "
+                         "(see the log).")
         result.summary_lines = notes + result.summary_lines
         # An unpaired record, a data page with no recoverable grid, or a failed PDF
         # is invisible to / misrepresents the XLSX consolidator, so ESCALATE to a
@@ -734,14 +835,29 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         # (CMP-AUD-064). They are not emitted (no line-1 to pair), so the output is
         # byte-identical — the escalation only makes the previously-silent payload
         # visible for verification.
-        if leading_orphans:
+        if leading_orphans or collisions:
             result.completion = outcome.PARTIAL
+        # CMP-AUD-186's merged continuations ride the same structured diagnostic
+        # but do NOT escalate on their own — merging is the correct reading of
+        # the print. A COLLISION does escalate: a continuation that extends an
+        # already-filled attribute is the signature of a foreign line 2 landing on
+        # an open record, which is exactly the CMP-AUD-053 hazard.
+        anomalies = {}
+        if leading_orphans:
+            anomalies["leading_orphan_lines"] = leading_orphans
+            anomalies["leading_orphan_samples"] = (ctx.get("orphan_samples", []))[:15]
+        if ctx.get("continuations"):
+            anomalies["continuation_lines"] = ctx["continuations"]
+            anomalies["continuation_samples"] = (
+                ctx.get("continuation_samples", []))[:15]
+        if collisions:
+            anomalies["continuation_collisions"] = collisions
+        if anomalies:
             result.producer_extra = {
                 **(result.producer_extra or {}),
                 "parse_anomalies": {
                     **((result.producer_extra or {}).get("parse_anomalies", {})),
-                    "leading_orphan_lines": leading_orphans,
-                    "leading_orphan_samples": (ctx.get("orphan_samples", []))[:15],
+                    **anomalies,
                 },
             }
 

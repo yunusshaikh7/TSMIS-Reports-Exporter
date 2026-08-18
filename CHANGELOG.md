@@ -3,6 +3,71 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.38.0 — 2026-08-18
+
+Highway Detail's two editions now agree **exactly**. The statewide PDF-vs-Excel
+self-check reads 51,327 locations, 0 one-sided, **51,327 fully identical, 0
+differing cells** — the last four open Highway Detail correctness findings are
+closed, the vs-TSN comparison gained the source facts it used to blank, and the
+Highway Summary print edition is ready for the day the site's PDFs arrive.
+
+### Highway Detail (PDF): the last differing row is gone
+
+- **Multi-baseline records are no longer truncated.** A record's second line can
+  print as several baselines — a long Description wraps at the print line height
+  while the attribute cells wrap much tighter — and the converter used to take
+  the FIRST baseline as the whole line and discard the rest. One record statewide
+  hit it (route 395 at PM `R000.000E`): its Description came out cut off
+  mid-word and all 23 attribute columns came out empty, while the run still
+  reported success. The converter now keeps a record open and merges every
+  following baseline into it, closing at the next record, a district/county
+  group header, or the end of the document — so a record's text survives a page
+  break too. That row now carries its full description and every attribute,
+  matching the Excel export cell for cell.
+- **Highway Detail (PDF) consolidation reports COMPLETE again.** The two "data
+  lines that reconcile to no record" that had been marking every run partial
+  were those same two baselines. Nothing was lost — they were being counted
+  instead of merged.
+- The safety net is still there, and is now sharper: a continuation that would
+  overwrite an attribute the record had already filled is counted and marks the
+  run partial, because that is what a genuinely misplaced line looks like.
+  Statewide there are zero of them.
+
+### Highway Detail vs TSN: the Report View stopped showing blanks
+
+- **The DCR column and the whole TSN-only ADT block (LK-AHD / P / LK-BACK /
+  CHG-MILE / DVM) now show real values.** They could only ever be read from a
+  raw TSN workbook, so every comparison run the normal way — off the cached TSN
+  library — showed all six columns empty. The library now carries them.
+- **The comparison says which snapshot it compared.** The TSN extract's printed
+  reference date and report date are captured when the library is built, checked
+  to be one real date each (a dump carrying two snapshots, a blank, or a
+  non-date is refused rather than averaged over), and the Notes sheet now names
+  them, explains the gap between them, and says plainly when they are unknown.
+  They used to be described as database ids, which they are not.
+- **County pairing is now stated outright.** The Highway Detail export carries no
+  county column and the Excel and PDF editions are kept as separate sources, so
+  the Notes now say the pairing is county-blind and give the measured exposure:
+  524 of 59,457 route+postmile keys carry more than one row and 438 of those
+  span counties (976 rows, 1.6%) — only those pair by similarity; everything
+  else pairs on an exact unique key.
+- The TSN Highway Detail library rebuilds itself once on first use after
+  updating (it now stores more of the source than it used to).
+
+### Highway Summary (PDF)
+
+- **New export edition.** The same "Highway Summary" report saved through the
+  site's own Print layout, alongside the Excel edition — and selecting both
+  produces both files from a single render. Export-only for now: the
+  consolidator and comparisons follow once real statewide prints exist to verify
+  a parser against.
+
+### Also
+
+- **Delete all reports** now clears the Intersection Detail and Intersection
+  Summary export folders, which it had been leaving behind. The check that is
+  supposed to catch this only looked at PDF reports; it now covers every export.
+
 ## v0.37.0 — 2026-08-17
 
 The vendor released Highway Detail and Highway Summary, and this release takes

@@ -48,6 +48,7 @@ function makeMockApi() {
     { key: "highway_detail", label: "Highway Detail", fmt: "Excel", group: "Highway", short: "Detail" },
     { key: "highway_detail_pdf", label: "Highway Detail (PDF)", fmt: "PDF", group: "Highway", short: "Detail (PDF)" },
     { key: "highway_summary", label: "Highway Summary", fmt: "Excel", group: "Highway", short: "Summary" },
+    { key: "highway_summary_pdf", label: "Highway Summary (PDF)", fmt: "PDF", group: "Highway", short: "Summary (PDF)" },
     // 2026-07-22: the dev site 7.21 "Clean Road Files" group (ids 16/17/18) —
     // reserved, app-DISABLED (shown greyed) until the site un-greys them.
     { key: "clean_highway", label: "Clean Road: Highway", fmt: "Excel", group: "Clean Road", short: "Highway", disabled: true },

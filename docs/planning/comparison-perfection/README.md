@@ -8,11 +8,14 @@ Last updated: 2026-07-22
 > is the completion state and new work branches from it. Offline gate **152/152**, ruff
 > clean, frozen self-test PASSED on the exact shipped exe, CI green.
 >
-> **The 5 still open are ALL the ⛔ Highway Detail pre-release block** (133 · 142 · 186 ·
-> 192 + 045-HD). The vendor accidentally enabled HD's exports mid-audit and then greyed
-> them out again, so every HD artifact on disk is a snapshot of an unfinished report.
-> **Never infer an HD answer** — these reopen on the owner's official HD delivery, which
-> is also the trigger to re-verify the HD schema.
+> **UPDATE 2026-08-18 (v0.38.0): every finding is now CLOSED — 243 of 243.** The five
+> that were open here (133 · 142 · 186 · 192 + 045-HD) were the ⛔ Highway Detail
+> pre-release block. The vendor RELEASED Highway Detail on 2026-08-17, which retired the
+> freeze; v0.37.0 closed 192 (and found + fixed 243), and v0.38.0 closed 186 · 053 · 133
+> · 142 and took the owner's decision on 045-HD. Highway Detail's two editions now agree
+> statewide: 51,327 locations, 0 one-sided, 51,327 fully identical, 0 differing cells.
+> **Still never infer an HD county answer** — the Excel export does not carry one, and the
+> owner ruled the Excel and PDF editions stay separate sources.
 >
 > **Owed, and only the owner can do it:** the work-PC acceptance run on v0.28.0.
 >
