@@ -162,7 +162,7 @@ the paired-roadbed **ditto** convention as data. TSN prints one roadbed concrete
 other as width-matched `+` runs (a POINTER to the paired row); TSMIS expands them. The
 engine has had `ditto_nonasserting` since the Highway Log work, but Highway Detail's
 schema never switched it on, so 14,490 pointer-vs-value cells were reported as
-differences. Statewide: **178,184 → 163,694** differing cells, asserted cells down by
+differences. Statewide: **174,837 → 160,347** differing cells, asserted cells down by
 exactly the same 14,490, **pairing completely untouched** (48,477 paired / 2,850
 only-TSMIS / 11,606 only-TSN all unchanged), 20 rows became fully identical. Both vs-TSN
 flavors are on; the PDF-vs-Excel self-check is explicitly OFF (both sides expand, so a

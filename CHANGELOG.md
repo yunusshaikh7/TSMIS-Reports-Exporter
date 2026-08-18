@@ -66,14 +66,18 @@ a full backend round trip before showing anything.
 
 **Highway Detail vs TSN: 14,490 differences that were never differences.**
 
+> Corrected after tagging: the first published notes said 178,184 → 163,694. Those
+> came from a shortcut measurement and were both overstated by 3,347; the counts
+> below are what the app itself reports. The 14,490 figure was never affected.
+
 - TSN's Highway Detail prints one roadbed's values and fills the other roadbed's
   columns with `+` marks — a pointer meaning "this roadbed isn't what this row is
   about; its value is on the paired row". TSMIS writes the value out in full. The
   comparison was reading those `+` marks as data and reporting each one as a
   disagreement.
-- **The statewide total goes from 178,184 differing cells to 163,694.** Nothing
+- **The statewide total goes from 174,837 differing cells to 160,347.** Nothing
   about the pairing changed — the same 48,477 locations match, with the same 2,850
-  only-in-TSMIS and 11,606 only-in-TSN. 20 rows are now fully identical.
+  only-in-TSMIS and 11,606 only-in-TSN.
 - Those cells now show their raw `+`, tinted, with the paired roadbed's value on
   hover. About four in five resolve; where no paired row covers that postmile, or
   two disagree, the hover says so instead of guessing.

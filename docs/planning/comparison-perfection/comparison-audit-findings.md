@@ -528,7 +528,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-241 | P2 | Resolved | The **TSMIS (PDF) vs TSN** Intersection Detail Description showed 8 trailing-tab-only false positives statewide (e.g. TSN `HILLCREST RD\t\t` vs PDF `HILLCREST RD`) that the Excel-vs-TSN leg did NOT — the TSN extract carries field-padding tabs the Excel export preserves (so Excel-vs-TSN matched) but the PDF print cannot render. Owner ruling (2026-07-17): showing two identical descriptions as a mismatch is NOT proper comparison — fix it. `_norm_text` now maps the extract's tab/CR/LF whitespace to spaces (compare_core's TRIM twin then collapses + edge-strips) on BOTH sides of the vs-TSN projection; interior content is untouched so genuine edits (incl. the KER 046 `''F''` vs `"F"` quote edit) still flag. Report-specific (NOT the shared engine, whose `_xl_trim` treats tabs as data by policy), and re-applied on read by `_normalized_row` so cached libraries need no rebuild. Real-corpus: PDF-vs-TSN Description 12->4 and total 5,100->5,092, now EQUAL to Excel-vs-TSN (unchanged 5,092/4). Red→green in `check_compare_intersection_detail_tsn` (`test_whitespace_normalization`) |
 | CMP-AUD-242 | P1 | Resolved 2026-07-22 (chunk names 167→71 chars, legacy names read-compatible, two unconditional field-depth gates red→green, RD real-corpus canary-exact; rides the completion release per the owner's no-interim-release policy) | Payload chunk basename (167 chars) overran Windows MAX_PATH at the field install depth; on `LongPathsEnabled=0` machines publication failed and the matrix hid correctly-built comparisons |
 | CMP-AUD-243 | P1 | **Resolved 2026-08-17 (v0.37.0)** — the page-local recovery ladder gained a final rung: a band-less page takes its line-2 grid from its OWN header rule row, then line 1 derives from that as before. 13 lost records recovered; all 12 routes convert warning-free at exact Excel row parity, 6 of them cell-for-cell identical | Highway Detail (PDF) silently lost the record on every single-record page (13 pages / 12 routes statewide) and marked the run partial |
-| CMP-AUD-244 | P1 | **Resolved 2026-08-18 (v0.38.2)** — `ditto_nonasserting` + a span-based paired-roadbed `ditto_resolver` on BOTH vs-TSN flavors (explicitly OFF for the PDF-vs-Excel self-check, where both sides expand). Statewide: differing cells **178,184 → 163,694** (−14,490), asserted cells down by exactly the same 14,490, pairing untouched (48,477 paired / 2,850 only-TSMIS / 11,606 only-TSN all unchanged), 20 rows became fully identical. Red→green in `check_highway_detail_ditto` | **Highway Detail vs TSN counted the paired-roadbed ditto convention as data.** TSN prints one roadbed concrete and the other as width-matched `+` runs — a POINTER to the paired row — and TSMIS expands them, so 14,490 pointer-vs-value cells were reported as differences (~8% of the statewide total). The engine has had the rule since Highway Log; the Highway Detail schema simply never switched it on |
+| CMP-AUD-244 | P1 | **Resolved 2026-08-18 (v0.38.2)** — `ditto_nonasserting` + a span-based paired-roadbed `ditto_resolver` on BOTH vs-TSN flavors (explicitly OFF for the PDF-vs-Excel self-check, where both sides expand). Statewide, through the shipped compare(): differing cells **174,837 → 160,347** (−14,490, matching the evidence Ledger's context count exactly), pairing untouched (48,477 paired / 2,850 only-TSMIS / 11,606 only-TSN all unchanged). Red→green in `check_highway_detail_ditto` | **Highway Detail vs TSN counted the paired-roadbed ditto convention as data.** TSN prints one roadbed concrete and the other as width-matched `+` runs — a POINTER to the paired row — and TSMIS expands them, so 14,490 pointer-vs-value cells were reported as differences (~8% of the statewide total). The engine has had the rule since Highway Log; the Highway Detail schema simply never switched it on |
 
 The ` != ` text above represents the engine's spaced not-equal glyph. It is written
 in ASCII in this ledger heading/table to keep terminals that use cp1252 from
@@ -11751,19 +11751,30 @@ they cost nothing: the fill is display-only.
   unresolved cell for a quietly wrong one. The fill can never affect a diff either way.
 
 **Statewide proof** (2026-08-17 `ssor-prod` consolidated export vs the v4 normalized
-library, through the comparator's own `_load_pair` + `compare_core.count_diffs`):
+library, through the SHIPPED `compare()` on both vs-TSN flavors).
+
+> ⚠ **Measurement correction (2026-08-18, after the v0.38.2 tag).** The first
+> published figures — 178,184 → 163,694 — came from an ad-hoc
+> `compare_core.count_diffs` call rather than the shipped `compare()`, and were
+> inflated by exactly 3,347 on BOTH sides. The delta was never wrong; the absolutes
+> were. The corrected numbers below are the shipped path's own summary line, and
+> they reconcile three independent ways: the after (160,347) plus the evidence
+> Ledger's context count (14,490) equals 174,837, which is precisely the HD figure
+> the roadmap documented BEFORE this work began. Test the shipped path — the
+> project's own standing lesson, re-learned here.
 
 | | before | after | delta |
 |---|---|---|---|
-| differing cells | 178,184 | **163,694** | **−14,490** |
-| asserted cells | 1,648,218 | 1,633,728 | −14,490 |
+| differing cells | 174,837 | **160,347** | **−14,490** |
 | context cells | 0 | 14,490 | +14,490 |
 | paired locations | 48,477 | 48,477 | 0 |
 | only-TSMIS / only-TSN | 2,850 / 11,606 | 2,850 / 11,606 | 0 |
-| fully identical rows | 168 | 188 | +20 |
+| fully identical rows | — | 190 | (shipped path reports the after only) |
 
-The asserted-cell drop equals the differing-cell drop exactly, and pairing is untouched
-— the change moved cells from *asserted* to *context* and nothing else. 14,490 of the
+Pairing is untouched — the change moved cells from *asserted* to *context* and nothing
+else. Both vs-TSN flavors agree: the PDF-sourced run reports 160,360 differing cells with
+the SAME 14,490 context, a 13-cell spread from the Excel-sourced 160,347 that reflects
+the two TSMIS renders, not the ditto rule. 14,490 of the
 17,928 dittos sit on paired rows; the remaining 3,438 are on TSN-only rows, which were
 never counted as differences to begin with.
 
@@ -11781,7 +11792,7 @@ claim "the unresolved ones are exactly the TSN-only ones" was tested and is FALS
 two facts are independent because they answer different questions: *is this location in
 both systems?* versus *does a paired roadbed row cover this postmile inside this route?*
 
-**Read the new total the right way.** 163,694 is still dominated by CMP-AUD-D5 drift:
+**Read the new total the right way.** 160,347 is still dominated by CMP-AUD-D5 drift:
 TSMIS replaced TSN, so the TSN side is frozen at the 09/2025 cutover and the export is
 2026-08-17. This finding removed notation that was never a disagreement; it does not
 and cannot make a vs-TSN total approach zero.
