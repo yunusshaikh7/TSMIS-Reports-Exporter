@@ -218,11 +218,9 @@ v0.30.0–v0.32.0, the last one fixed that day. The evidence, item by item:
 | F2 | ~~sol-002 — export-engine mechanics~~ | **DONE, and the Sol dispatch is moot** (owner, 2026-08-18: "that sol plan was from way before"). Its charter was item 12 + the export side of 9/13, all shipped in v0.32.0: coalescing runs on BOTH paths — `run_export_combined` (standard) and `run_export_parallel_combined` (fast mode) — guarded by `check_coalesce_editions`, with `check_route_file_naming` holding the dated-name contract. |
 | F3 | The [app-consistency backlog](planning/app-consistency-backlog.md) | **DONE — 13 of 13.** 1 (`compare_timings` wired into `gui_worker_matrix` for logging + ETAs) · 2 (`pdf_excel_matrix.py`) · 3 (`check_report_wiring`) · 4 (**was a real bug — fixed v0.38.2**; the day-column drag persisted but never repainted) · 5 (`day_out_path`/`out_path` embed day + source + baseline token) · 6 (`list_output_days_for_report` behind the consolidate picker) · 7 (`manual_comparisons_dir()`) · 8 (`get_compare_folders` filters, folder-kind) · 9/10/11/13 (F1 above) · 12 (F2 above). |
 
-The one living descendant is **item 15** below — a consolidate-style day dropdown for
-FILE-kind manual comparisons (folder-kind already filters). Owner-ranked "very rare
-use"; the wiring is mapped (invert `report_catalog.MATRIX` on `tsn_key` to reach the
-row's consolidator, then `out_path_for(day)`), so it is a small build whenever it is
-wanted.
+Its one living descendant, **item 15** (a consolidate-style day dropdown for FILE-kind
+manual comparisons), **shipped in v0.38.2** — see the Compare-tab entry below. This
+whole family is now closed.
 
 ### G. The next large build
 
@@ -294,10 +292,15 @@ criteria: [work-pc-validation.md](work-pc-validation.md) §3.
 - [ ] **narrow-mode** [S] — (<980 CSS px, e.g. 1366×768 @150% DPI) matrix-tab polish: the card-hide /
   height-fill / config-uncap rules live in `@media (min-width:980px)`, so a small/high-DPI laptop shows stray
   idle cards + a cramped Matrix-options panel on the matrix sub-tabs. *(v0.17.1 follow-up.)*
-- [ ] **Manual Compare: consolidate-style day dropdowns** [M] — the vs-TSN/self manual compare kinds
-  still use raw pick-any-file dialogs; the owner's item 15 asked for present-only day dropdowns like the
-  consolidate tab. Deferred from the v0.30 marathons (owner-ranked the current file-pick "very rare use";
-  the flow overlaps the by-day matrix, which already covers the common case).
+- [x] **Manual Compare: consolidate-style day dropdowns** [M] — **DONE (v0.38.2).** Every FILE-kind
+  recipe now offers an Export-day dropdown that fills BOTH sides: the same day's other edition for a
+  PDF-vs-Excel self-check, the TSN library's current dataset for a vs-TSN one. It lists only days
+  already CONSOLIDATED (it resolves files, never builds one), defaults to the newest so the common
+  case needs no clicks, labels a day whose TSN side is unresolved as "this side only", and drops to
+  a browse sentinel the moment a file is hand-picked. `get_compare_days` resolves the two sides by
+  inverting `report_catalog.MATRIX` on `tsn_key`/`self_key` (`compare_file_sides`), so a new report
+  joins automatically; `check_report_wiring.test_compare_day_picker_resolves` fails if a recipe ever
+  declares a comparison whose consolidator was never registered.
 - [ ] **Console `run_cli_multi` coalescing** [S] — the `.bat` multi-export doesn't coalesce dual-edition
   pairs; share `_coalesce_groups` (move it off `gui_worker_export` to a neutral module) so the CLI groups
   too. (GUI standard path v0.19.2; fast mode + matrix steps v0.32.0.)

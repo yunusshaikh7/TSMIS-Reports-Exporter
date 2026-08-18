@@ -901,6 +901,47 @@ def consolidator_by_subdir():
     return {subdir: module for subdir, module in _AUTO_CONSOLIDATOR}
 
 
+def consolidator_by_export_subdir():
+    """`{export subdir: consolidate module}` for EVERY consolidatable edition —
+    the PDF editions included, unlike ``consolidator_by_subdir()`` which is
+    deliberately the auto-consolidate-on-export-finish subset (the PDF editions
+    need a scratch converted_dir, so they are excluded there on purpose).
+
+    Keyed on each module's own ``SUBDIR``, so it stays derived rather than a
+    second hand-kept list. The dropped-input TSN consolidator has no SUBDIR and
+    is simply absent."""
+    return {module.SUBDIR: module for module in (c.module for c in CONSOLIDATE)
+            if getattr(module, "SUBDIR", None)}
+
+
+def compare_file_sides(compare_key):
+    """`(side_a_subdir, side_b_subdir, tsn_dataset_key)` for a FILE-kind
+    comparison recipe, or None when the recipe isn't one this can resolve.
+
+    Derived by inverting MATRIX — the same table the matrices wire from — so a
+    new report joins automatically once it has a `tsn_key`/`self_key` there:
+
+    * a vs-TSN recipe (`m.tsn_key`) → side A is that row's export subdir and
+      side B comes from the TSN LIBRARY, so `side_b_subdir` is None and
+      `tsn_dataset_key` names the dataset.
+    * a PDF-vs-Excel self recipe (`m.self_key`) → both sides are exports of the
+      SAME day: A is the PDF edition (`m.self_pdf`) and B is the Excel one, in
+      that order because that is the order the self comparator is called in
+      (`pdf_excel_matrix.build_pve_cell` → `compare(side_pdf, side_excel, …)`).
+      `tsn_dataset_key` is None.
+    """
+    for m in MATRIX:
+        if m.tsn_key and m.tsn_key == compare_key:
+            return (m.row_key, None, m.tsn_subdir or m.row_key)
+        if m.self_key and m.self_key == compare_key and m.self_pdf:
+            pair = {m.row_key, m.self_other} - {None}
+            other = sorted(pair - {m.self_pdf})
+            if len(other) != 1:
+                return None          # malformed pair — resolve nothing, don't guess
+            return (m.self_pdf, other[0], None)
+    return None
+
+
 def tsn_entries():
     """The TSN library descriptors, in registration order (for tsn_library)."""
     return TSN

@@ -37,6 +37,17 @@ a full backend round trip before showing anything.
 - Press feedback on the controls that had none: the report picker rows, the
   "set all comparisons to…" chips, the TSN picker buttons, and the matrix header
   buttons.
+- **Manual comparisons get an Export-day dropdown** (the last open item from the
+  owner's app-consistency list). The file-based comparisons made you Browse to two
+  workbooks the app could already locate — the folder-based ones have filtered
+  themselves since v0.30.0. Now every file recipe offers a day picker that fills
+  BOTH sides: the same day's other edition for a PDF-vs-Excel self-check, the TSN
+  library's current file for a vs-TSN one. It offers only days already
+  consolidated, defaults to the newest, says "this side only" when the TSN half
+  isn't resolvable, and steps aside the moment you Browse.
+- Verified the rest of that list against the code: all 13 items are implemented,
+  twelve of them since v0.32.0. The roadmap had been describing finished work as
+  an unstarted project.
 
 ## v0.38.1 — 2026-08-18
 

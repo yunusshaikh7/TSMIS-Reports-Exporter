@@ -104,6 +104,78 @@ function renderCompareFiles() {
   syncCompareButton();
 }
 
+// File-kind day picker (roadmap item 15). The folder-kind recipes have filtered
+// their run-folder dropdowns since v0.30.0; the FILE recipes still made you
+// Browse to two workbooks the app could already locate. Pick a day and both
+// sides fill in — the same day's other edition for a PDF-vs-Excel self-check,
+// the TSN library's current dataset for a vs-TSN one. Browse still wins: using
+// it drops the day back to the sentinel so the row never claims to be driving a
+// path it isn't.
+//
+// Only days already CONSOLIDATED are offered (the endpoint resolves files, it
+// never builds one), so a day with per-route exports but nothing consolidated
+// is honestly absent — consolidating it is the Consolidate tab's job.
+const CMP_BROWSE_OPT = "";              // the "browse instead" sentinel value
+let compareDaysSeq = 0;
+let compareDayOptions = [];             // [{day, file_a, file_b}] for the current recipe
+
+function applyCompareDay(day) {
+  const hit = compareDayOptions.find((o) => o.day === day);
+  if (!hit) return;
+  CMP.tsmis = hit.file_a || null;
+  CMP.tsn = hit.file_b || null;         // null when the TSN side didn't resolve
+  renderCompareFiles();
+}
+
+async function renderCompareDays() {
+  const row = $("cmpDayRow"), sel = $("cmpDay");
+  if (!row || !sel) return;
+  const seq = ++compareDaysSeq;
+  const key = compareChoice();
+  let res = null;
+  try {
+    res = await api.get_compare_days(key);
+  } catch (e) {
+    /* leave the row hidden — Browse still works */
+  }
+  if (seq !== compareDaysSeq || key !== compareChoice()) return;   // superseded
+  const days = (res && res.supported && Array.isArray(res.days)) ? res.days : [];
+  compareDayOptions = days;
+  row.hidden = !days.length;
+  if (!days.length) return;
+
+  sel.textContent = "";
+  days.forEach((o) => {
+    const opt = document.createElement("option");
+    opt.value = o.day;
+    opt.textContent = o.day + (o.file_b ? "" : " — this side only");
+    sel.appendChild(opt);
+  });
+  const browse = document.createElement("option");
+  browse.value = CMP_BROWSE_OPT; browse.textContent = "— browse for files instead —";
+  sel.appendChild(browse);
+
+  // Default to the newest day and APPLY it, so the common case needs no clicks.
+  // Only when nothing is picked yet — never stomp a selection already made.
+  if (!CMP.tsmis && !CMP.tsn) {
+    sel.value = days[0].day;
+    applyCompareDay(days[0].day);
+  } else {
+    const match = days.find((o) => o.file_a === CMP.tsmis);
+    sel.value = match ? match.day : CMP_BROWSE_OPT;
+  }
+  sel.onchange = () => {
+    if (sel.value === CMP_BROWSE_OPT) return;   // the user will Browse; keep paths
+    applyCompareDay(sel.value);
+  };
+  const hint = $("cmpDayHint");
+  if (hint) {
+    hint.textContent = (res && res.tsn_side && !res.tsn_resolved)
+      ? "(newest first — no TSN file in the library yet, so browse for that side)"
+      : "(newest first)";
+  }
+}
+
 // Folder dropdowns: the known run folders (newest first) plus any custom
 // path picked via Browse… (kept as an extra option per side).
 const CMP_DIRS = { a: null, b: null };   // custom absolute paths from Browse…
@@ -121,6 +193,7 @@ function syncCompareInputsToRecipe() {
   compareInputsRecipe = key;
   CMP.tsmis = CMP.tsn = null;
   CMP_DIRS.a = CMP_DIRS.b = null;
+  compareDayOptions = [];        // recipe-bound like the selections above
   return true;
 }
 
@@ -199,9 +272,12 @@ function renderCompareKind() {
   $("cmpFilesSection").classList.toggle("hidden", folders);
   $("cmpFoldersSection").classList.toggle("hidden", !folders);
   if (folders) {
+    const dayRow = $("cmpDayRow");
+    if (dayRow) dayRow.hidden = true;
     renderCompareDirs();
   } else {
     renderCompareFiles();     // reflect the current (possibly cleared) file paths
+    renderCompareDays();      // item 15: offer the day dropdown for this recipe
     // Label the two file pickers from the selected comparison so a
     // PDF-vs-Excel comparison doesn't say "TSN" for a TSMIS Excel file.
     const rep = currentCompareRep();
@@ -255,6 +331,12 @@ async function pickCompareFile(side) {
   const res = await api.pick_compare_file(side.toUpperCase(), compareChoice());
   if (res && res.path) {
     CMP[side] = res.path;
+    // A hand-picked file is no longer "the day's file" — say so rather than
+    // leaving the dropdown pointing at a day it isn't driving any more.
+    const sel = $("cmpDay");
+    if (sel && !compareDayOptions.some((o) => o.file_a === CMP.tsmis && o.file_b === CMP.tsn)) {
+      sel.value = CMP_BROWSE_OPT;
+    }
     renderCompareFiles();
   }
 }

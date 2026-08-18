@@ -133,6 +133,37 @@ def test_reset_covers_every_export():
               f"add {wb!r} to gui_worker_maint._LEGACY_CONSOLIDATED_FILES")
 
 
+def test_compare_day_picker_resolves():
+    """Every FILE-kind comparison recipe must resolve BOTH its sides through
+    report_catalog.compare_file_sides -> a consolidator with out_path_for, or the
+    Compare tab's day dropdown (roadmap item 15) silently falls back to Browse for
+    that recipe. A new report joins by declaring tsn_key/self_key in MATRIX; this
+    fails naming the recipe that declared one without a reachable consolidator."""
+    print("Every file-kind compare recipe resolves its day-picker sides:")
+    mods = report_catalog.consolidator_by_export_subdir()
+    for c in report_catalog.COMPARE:
+        if c.kind != "files":
+            continue
+        sides = report_catalog.compare_file_sides(c.key)
+        check(f"{c.key}: MATRIX resolves its two sides", sides is not None,
+              "declare tsn_key or self_key/self_pdf for it in report_catalog.MATRIX")
+        if sides is None:
+            continue
+        sub_a, sub_b, _tsn = sides
+        check(f"{c.key}: side A ({sub_a}) has a consolidator with out_path_for",
+              hasattr(mods.get(sub_a), "out_path_for"),
+              f"no CONSOLIDATE entry whose module.SUBDIR == {sub_a!r}")
+        if sub_b is None:
+            continue
+        check(f"{c.key}: side B ({sub_b}) has a consolidator with out_path_for",
+              hasattr(mods.get(sub_b), "out_path_for"),
+              f"no CONSOLIDATE entry whose module.SUBDIR == {sub_b!r}")
+        # A self-check that pointed both sides at one file would compare a
+        # workbook with itself and always read as a perfect match.
+        check(f"{c.key}: its two sides are different editions", sub_a != sub_b,
+              "self_pdf must differ from the Excel sibling")
+
+
 def main():
     print("=== report-integration wiring (M2-A) ===")
     test_matrix_parity()
@@ -140,6 +171,7 @@ def main():
     test_dual_edition_families()
     test_day_matrix_agrees()
     test_reset_covers_every_export()
+    test_compare_day_picker_resolves()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

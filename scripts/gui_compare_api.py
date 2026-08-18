@@ -14,6 +14,7 @@ from gui_endpoint import _api_method, pick_path   # + the dialog unwrap
 from gui_worker import ConsolidateWorker
 from paths import (OUTPUT_ROOT, list_output_days, list_output_days_for_report,
                    manual_comparisons_dir)
+from report_catalog import compare_file_sides, consolidator_by_export_subdir
 from reports import (COMPARE_REPORTS, CONSOLIDATE_REPORTS,
                      compare_index_for_key, compare_input_accepts_suffix,
                      compare_input_extensions,
@@ -386,6 +387,76 @@ class GuiCompareMixin:
                 mod.compare(tsmis_path, tsn_path, out_path, events=events,
                             confirm_overwrite=confirm_overwrite, mode=mode),
             source_paths=(tsmis_path, tsn_path))
+
+    @_api_method
+    def get_compare_days(self, report_key):
+        """Export days whose CONSOLIDATED inputs for a FILE-kind recipe already
+        exist, newest first, each with both sides resolved (roadmap item 15).
+
+        The classic file pickers made you Browse to two workbooks by hand even
+        though the app knows exactly where they are; the folder-kind dropdowns
+        have filtered themselves since v0.30.0. This is the file-kind
+        equivalent — pick a day, both paths fill in. Browse stays as the
+        override for anything outside the run folders.
+
+        Deliberately lists only days already CONSOLIDATED: this endpoint
+        resolves existing files and never builds one, so a day with per-route
+        exports but no consolidated workbook is honestly not offered (that is
+        the Consolidate tab's job). Pure filesystem stat, no task lock.
+
+        Side B is the same day's other edition for a PDF-vs-Excel self-check,
+        or the TSN library's current dataset for a vs-TSN recipe; when the TSN
+        side can't be resolved the day is still offered with `file_b` null, so
+        the dropdown fills side A and the user browses for the other."""
+        row = self._pick_report(COMPARE_REPORTS, compare_index_for_key(report_key))
+        if row is None:
+            return {"supported": False, "days": []}
+        _label, _adapter, kind, _group = row[:4]
+        sides = compare_file_sides(report_key) if kind == "files" else None
+        if sides is None:
+            return {"supported": False, "days": []}
+        sub_a, sub_b, tsn_key = sides
+        mods = consolidator_by_export_subdir()
+        mod_a, mod_b = mods.get(sub_a), (mods.get(sub_b) if sub_b else None)
+        if mod_a is None or (sub_b and mod_b is None):
+            return {"supported": False, "days": []}
+
+        # The TSN side is day-independent — resolve the library ONCE, not per day.
+        tsn_path = self._resolved_tsn_path(tsn_key) if tsn_key else None
+        days = []
+        for day in list_output_days_for_report(sub_a):
+            path_a = mod_a.out_path_for(day)
+            if not (path_a and Path(path_a).is_file()):
+                continue                      # not consolidated yet — not offerable
+            path_b = tsn_path
+            if mod_b is not None:
+                candidate = mod_b.out_path_for(day)
+                path_b = (str(candidate) if candidate and Path(candidate).is_file()
+                          else None)
+            days.append({"day": day, "file_a": str(path_a),
+                         "file_b": str(path_b) if path_b else None})
+        return {"supported": True, "days": days,
+                "tsn_side": bool(tsn_key), "tsn_resolved": bool(tsn_path)}
+
+    def _resolved_tsn_path(self, tsn_key):
+        """The TSN library's current consolidated workbook for a dataset, or None.
+        Same resolution the matrices use, so the manual compare and a matrix cell
+        agree on which TSN file is current. Never raises — an unresolvable
+        dataset simply leaves the TSN side for the user to browse."""
+        try:
+            import matrix
+            import settings
+            import tsn_library
+            key = tsn_library.canonical_dataset_key(tsn_key)
+            src = matrix.tsn_source(settings.get_batch_dest(), key, None)
+            if src.get("kind") in ("file", "consolidated"):
+                path = src.get("selected_path") or src.get("path")
+                if path and Path(path).is_file():
+                    return str(path)
+        except Exception as e:   # noqa: BLE001 - advisory resolution; log and fall back
+            ui_log.warning("compare day picker: TSN side unresolved for %s (%s: %s)",
+                           tsn_key, type(e).__name__, e)
+        return None
 
     @_api_method
     def get_compare_folders(self, report_key):

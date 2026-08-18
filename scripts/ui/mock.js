@@ -1979,6 +1979,28 @@ function makeMockApi() {
       return { ok: true };
     },
     get_compare_folders: async () => ({ folders: (st.days || []) }),
+    // Item 15: the file-kind day picker. Mirrors the real endpoint's shape —
+    // only CONSOLIDATED days, both sides resolved, file_b null when the TSN
+    // side can't be resolved. The 'self' recipes fill both sides from one day;
+    // the last mock day deliberately has no TSN file so the "this side only"
+    // path stays exercised in the preview.
+    get_compare_days: async (reportKey) => {
+      const key = String(reportKey || "");
+      if (!/^cmp:/.test(key) || /:env$/.test(key)) return { supported: false, days: [] };
+      const fam = key.split(":")[1] || "report";
+      const self = /pdf_vs_excel$/.test(key);
+      const B = String.fromCharCode(92);         // "\" — see the note above
+      const out = (d, name) => ["C:", "output", d, "consolidated", name].join(B);
+      const lib = (name) => ["C:", "tsn_library", fam, "consolidated", name].join(B);
+      const days = (st.days || []).slice(0, 3).map((d, i) => ({
+        day: d,
+        file_a: out(d, fam + (self ? "_pdf" : "") + " " + d + ".xlsx"),
+        file_b: self
+          ? out(d, fam + " " + d + ".xlsx")
+          : (i === 2 ? null : lib("tsn_" + fam + "_normalized.xlsx")),
+      }));
+      return { supported: true, days, tsn_side: !self, tsn_resolved: !self };
+    },
     pause_or_resume: async () => {
       st.paused = !st.paused;
       push({ t: "log", text: st.paused

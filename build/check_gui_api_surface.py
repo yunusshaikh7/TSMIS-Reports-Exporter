@@ -49,6 +49,14 @@ def _src(mod):
 # The frozen pywebview façade: every PUBLIC method GuiApi exposes to JS (plus `attach`,
 # the one public non-endpoint). Captured at the P7b baseline (8eb9cc8). A mechanical
 # extraction must NOT change this set — adding/removing/renaming an endpoint fails here.
+#
+# A DELIBERATE new endpoint is allowed to move this baseline, but only with a line
+# here saying which one and why, so the diff shows intent rather than drift:
+#   * get_compare_days (v0.38.2) — roadmap item 15, the Compare tab's file-kind day
+#     dropdown. It needs its own endpoint because it answers a question no existing
+#     one does (which export days have BOTH of a recipe's consolidated sides on
+#     disk); folding it into get_compare_folders would have overloaded a
+#     folder-kind endpoint with an unrelated file-kind return shape.
 FROZEN_API = {
     "add_baseline_matrix_day", "baseline_matrix_info", "build_baseline_matrix_cell",
     "open_baseline_cell_comparison", "open_baseline_comparisons_folder",
@@ -62,7 +70,8 @@ FROZEN_API = {
     "confirm_compare_overwrite", "consolidate_info", "consolidate_matrix_tsn",
     "day_matrix_info", "decline_overwrite",
     "delete_chromium", "discard_batch", "download_chromium", "export_day_cell",
-    "export_day_column", "export_day_row", "finish_login", "get_compare_folders",
+    "export_day_column", "export_day_row", "finish_login", "get_compare_days",
+    "get_compare_folders",
     "day_matrix_evidence_cell",
     "get_initial_state", "get_settings", "import_tsn_raw", "log_js_error", "matrix_evidence_cell",
     "matrix_info",

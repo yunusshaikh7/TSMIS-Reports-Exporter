@@ -460,6 +460,17 @@
 
         <div class="card-section" id="cmpFilesSection">
           <div class="section-head"><span class="section-label">Files to compare</span></div>
+          <!-- Item 15: pick an export DAY and both sides fill in from the run
+               folders, the way the Consolidate tab and the folder-kind compare
+               dropdowns already work. Only days already CONSOLIDATED are listed
+               (this resolves files, it never builds one). Browse below stays the
+               override for anything outside the run folders. Hidden entirely for
+               recipes that can't be resolved this way. -->
+          <div class="day-row" id="cmpDayRow" hidden>
+            <span class="file-pick-label">Export day</span>
+            <span class="tb-select select-light"><select id="cmpDay" data-lock-when-busy></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+            <span class="hint" id="cmpDayHint">(newest first)</span>
+          </div>
           <p class="hint" style="margin-bottom:10px" id="cmpFilesHint">
             Pick the two files — either two per-route workbooks (e.g. one route's
             export vs its conversion) or two consolidated workbooks (all routes).
