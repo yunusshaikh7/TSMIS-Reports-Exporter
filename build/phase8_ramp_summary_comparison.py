@@ -40,7 +40,6 @@ import pdfplumber
 from openpyxl import load_workbook
 import openpyxl
 from openpyxl.utils import get_column_letter
-import pypdf
 from pypdf import PdfReader
 
 

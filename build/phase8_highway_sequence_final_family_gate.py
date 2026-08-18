@@ -28,7 +28,6 @@ import json
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import stat
-import sys
 import tempfile
 from typing import Callable, Iterable, Mapping, Sequence
 

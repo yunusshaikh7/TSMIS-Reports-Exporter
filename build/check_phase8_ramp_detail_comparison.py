@@ -9,7 +9,7 @@ import sys
 import tempfile
 import zipfile
 
-from openpyxl import Workbook, load_workbook
+from openpyxl import Workbook
 
 
 BUILD_ROOT = Path(__file__).resolve().parent

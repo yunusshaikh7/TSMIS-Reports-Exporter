@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from copy import deepcopy
 from decimal import Decimal
-import sys
 
 import phase6_intersection_summary_conservation as oracle
 

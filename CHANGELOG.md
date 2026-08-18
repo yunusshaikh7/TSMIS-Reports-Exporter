@@ -49,6 +49,25 @@ a full backend round trip before showing anything.
   twelve of them since v0.32.0. The roadmap had been describing finished work as
   an unstarted project.
 
+**Highway Detail vs TSN: 14,490 differences that were never differences.**
+
+- TSN's Highway Detail prints one roadbed's values and fills the other roadbed's
+  columns with `+` marks — a pointer meaning "this roadbed isn't what this row is
+  about; its value is on the paired row". TSMIS writes the value out in full. The
+  comparison was reading those `+` marks as data and reporting each one as a
+  disagreement.
+- **The statewide total goes from 178,184 differing cells to 163,694.** Nothing
+  about the pairing changed — the same 48,477 locations match, with the same 2,850
+  only-in-TSMIS and 11,606 only-in-TSN. 20 rows are now fully identical.
+- Those cells now show their raw `+`, tinted, with the paired roadbed's value on
+  hover. About four in five resolve; where no paired row covers that postmile, or
+  two disagree, the hover says so instead of guessing.
+- The PDF-vs-Excel self-check deliberately keeps the old behavior: both sides there
+  expand their dittos, so a stray `+` means a parser bug and must still be flagged.
+- **Read the new total the right way.** It is still dominated by the 11-month gap
+  between a frozen September-2025 TSN and a 2026-08-17 export. This removed notation
+  that was never a disagreement; it cannot make a vs-TSN total approach zero.
+
 ## v0.38.1 — 2026-08-18
 
 Hotfix on v0.38.0, caught by walking the report-integration ladder.

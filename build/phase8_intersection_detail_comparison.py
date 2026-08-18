@@ -23,16 +23,14 @@ from decimal import Decimal, InvalidOperation
 import hashlib
 import json
 import logging
-import math
 from pathlib import Path
 import re
 import subprocess
 import sys
-from typing import Iterable, Sequence
+from typing import Sequence
 import zipfile
 import xml.etree.ElementTree as ET
 
-import openpyxl
 from openpyxl import load_workbook
 import pdfplumber
 
@@ -48,7 +46,6 @@ sys.path.insert(0, str(BUILD_ROOT))
 
 from phase3_independent_oracle import (  # noqa: E402
     FieldRule,
-    OracleOutcome,
     OracleRow,
     OracleSchema,
     ValueRule,

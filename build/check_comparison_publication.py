@@ -24,7 +24,6 @@ import artifact_store  # noqa: E402
 import consolidation_meta  # noqa: E402
 from comparison_contract import AttemptState, ComparisonCounts, ComparisonOutcome  # noqa: E402
 from events import ConsolidateResult  # noqa: E402
-from openpyxl import Workbook  # noqa: E402
 
 
 _failures: list[str] = []

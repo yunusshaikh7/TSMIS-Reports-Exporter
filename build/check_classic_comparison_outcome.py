@@ -20,7 +20,6 @@ import gui_api  # noqa: E402
 from comparison_contract import ComparisonCounts, ComparisonOutcome  # noqa: E402
 from compare_core import CompareSchema, run_compare  # noqa: E402
 from events import ConsolidateResult  # noqa: E402
-from openpyxl import Workbook  # noqa: E402
 
 
 failures = []

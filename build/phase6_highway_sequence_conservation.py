@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter, defaultdict
-from copy import deepcopy
 from dataclasses import asdict
 from datetime import date, datetime
 from decimal import Decimal
@@ -22,7 +21,6 @@ import os
 from pathlib import Path
 import platform
 import re
-import stat
 import subprocess
 import sys
 from typing import Iterable, Mapping, Sequence

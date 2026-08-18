@@ -29,7 +29,7 @@ from pathlib import Path
 import re
 import sys
 import tempfile
-from typing import Any, Iterable, Sequence
+from typing import Iterable, Sequence
 from xml.etree import ElementTree
 import zipfile
 

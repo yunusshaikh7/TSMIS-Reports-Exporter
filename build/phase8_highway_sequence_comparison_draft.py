@@ -15,7 +15,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
-from typing import Callable, Iterable, Mapping, Sequence
+from typing import Callable, Mapping, Sequence
 
 from openpyxl.utils.escape import unescape as xlsx_unescape
 

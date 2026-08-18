@@ -26,7 +26,7 @@ import math
 import os
 from pathlib import Path
 import re
-from typing import Iterable, Mapping, Sequence
+from typing import Mapping, Sequence
 
 import pdfplumber
 from openpyxl import load_workbook

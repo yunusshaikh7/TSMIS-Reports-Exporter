@@ -5,7 +5,6 @@ across success/resume/recovery-stop/cancel, the CSV run-report projection, and
 the console multi-export registry view.
 """
 import csv
-from pathlib import Path
 
 from _checklib import Checker, patch, scripts_path, temp_dir
 

@@ -12,7 +12,6 @@ every derived artifact is written under the supplied evidence directory.
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict
 import hashlib
 from itertools import zip_longest
 import json

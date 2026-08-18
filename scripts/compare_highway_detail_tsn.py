@@ -608,8 +608,23 @@ def _write_notes_sheet(wb, snapshot=None):
          "county-boundary marker rows (~700 statewide), which then flag as blank-vs-value.")
     note("• Special Feature (LB/RB S/F) — 'Z' means 'no special feature'; TSMIS renders a "
          "blank where TSN prints the explicit Z on ~5% of rows. Those blank-vs-Z cells are "
-         "counted (a completeness gap, not a geometry conflict). A handful of TSN cells "
-         "carry a '+' continuation mark from the source report; they flag visibly.")
+         "counted (a completeness gap, not a geometry conflict).")
+
+    section("DITTO ('+') CELLS  —  NOT COUNTED, BY DESIGN")
+    note("• A TSN row describes ONE roadbed. It prints that roadbed's block concrete and "
+         "fills the OTHER roadbed's block with '+' marks — a POINTER meaning 'this roadbed "
+         "is not the subject of this row; its value is on the paired roadbed's own row'. "
+         "The mark is width-matched to its column ('++++++++' for a date, '+++' for a "
+         "3-digit width), and TSMIS expands every one of them.")
+    note("• So a '+' is notation, not data, and is NEVER counted as a difference — the real "
+         "value is compared on the row that actually carries it. Statewide this covers "
+         "17,928 cells across 1,992 rows (1,027 dittoed Left blocks, 965 Right); before "
+         "v0.38.2 they were all counted, inflating the difference total by about 10%.")
+    note("• Each such cell keeps its raw '+' in the data sheets, tinted, with the paired "
+         "roadbed's value on hover. About four in five resolve; where no paired row covers "
+         "that postmile, or two cover it with different values, the hover says no paired "
+         "value was found rather than guessing — the fill is informational and never "
+         "affects a difference either way.")
     note("• Median T/C/B — TSMIS renders the three median codes from one packed value and "
          "collapses a missing slot (a missing Type shifts Curb/Barrier left), so a row "
          "missing one median code can misalign the other two against TSN's clean columns.")
@@ -675,6 +690,17 @@ _SCHEMA = CompareSchema(
                          "TSMIS doesn't export)",
     key_field=KEY_FIELD,
     context_fields=CONTEXT_FIELDS,
+    # The paired-roadbed ditto convention (docs/highway_log/comparison-study.md
+    # §3) — TSN's Highway Detail uses it exactly as the Highway Log does, and the
+    # TSMIS export expands it, so without this every dittoed cell compared a
+    # POINTER against the value it points past. Statewide that was 17,928 cells
+    # over 1,992 rows (~10% of the reported differences), none of them real.
+    # The block is the unit and the roadbed is unambiguous: the 60,083-row census
+    # found 1,027 dittoed LEFT blocks (all HG='R') and 965 dittoed RIGHT (all
+    # HG='L'), with zero both-dittoed and zero partial blocks.
+    ditto_nonasserting=True,
+    ditto_resolver=hdc.paired_roadbed_fills,   # display-only; never affects a diff
+
     legend_writer=_write_notes_sheet,   # replaced per call with the snapshot bound
     source_file_a=("highway_detail", TSMIS_SHEET, "xlsx"),   # Source Files sheet
 )

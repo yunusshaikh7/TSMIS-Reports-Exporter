@@ -63,8 +63,16 @@ def _load_tsmis_same_source(path):
         row_transform=_tsmis_row_same_source)
 
 
+# The PDF-vs-Excel SELF-check deliberately turns the ditto rule back OFF. It is
+# inherited from _hd._SCHEMA, but this comparison has two TSMIS renders and BOTH
+# expand their dittos — the statewide self-check reads 0 differing cells across
+# 51,327 locations, which is only true because neither side emits a '+' run. So
+# there is nothing to suppress, and leaving the rule on would mean a stray '+'
+# from a future PDF-parser regression got silently forgiven instead of flagged.
+# (vs-TSN is the opposite case: there the '+' is the SOURCE's own convention.)
 _SS_SCHEMA = replace(
     _hd._SCHEMA, header=SS_HEADER,
+    ditto_nonasserting=False, ditto_resolver=None,
     data_widths=dict(_hd._SCHEMA.data_widths, **{"PM (raw)": 12}),
     cmp_widths=dict(_hd._SCHEMA.cmp_widths, **{"PM (raw)": 12}))
 

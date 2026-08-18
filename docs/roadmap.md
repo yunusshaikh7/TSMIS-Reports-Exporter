@@ -155,7 +155,18 @@ record. The long themed sections further down keep the detail and rationale — 
 table is the index into them. Re-verify an item against the code before acting on
 it; a stale line here is a bug in this list.
 
-### A. Correctness — **NOTHING OPEN.** All 243 findings are closed (v0.38.0)
+### A. Correctness — **NOTHING OPEN.** All 244 findings are closed (v0.38.2)
+
+**CMP-AUD-244 (found + fixed 2026-08-18, v0.38.2)** — Highway Detail vs TSN was counting
+the paired-roadbed **ditto** convention as data. TSN prints one roadbed concrete and the
+other as width-matched `+` runs (a POINTER to the paired row); TSMIS expands them. The
+engine has had `ditto_nonasserting` since the Highway Log work, but Highway Detail's
+schema never switched it on, so 14,490 pointer-vs-value cells were reported as
+differences. Statewide: **178,184 → 163,694** differing cells, asserted cells down by
+exactly the same 14,490, **pairing completely untouched** (48,477 paired / 2,850
+only-TSMIS / 11,606 only-TSN all unchanged), 20 rows became fully identical. Both vs-TSN
+flavors are on; the PDF-vs-Excel self-check is explicitly OFF (both sides expand, so a
+stray `+` there must still flag). Red→green in `check_highway_detail_ditto`.
 
 A1–A5 as listed here through v0.37.0 (CMP-AUD-186 · 053 · 133 · 142 · 045-HD) were all
 closed on 2026-08-18 — see the status banner above for what each became, and the

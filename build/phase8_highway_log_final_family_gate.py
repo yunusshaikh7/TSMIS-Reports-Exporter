@@ -18,7 +18,6 @@ import os
 from pathlib import Path
 import re
 import stat
-import sys
 import zlib
 
 

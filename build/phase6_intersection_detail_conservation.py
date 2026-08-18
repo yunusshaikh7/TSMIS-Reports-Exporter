@@ -32,7 +32,7 @@ import re
 import stat
 import subprocess
 import sys
-from typing import Any, Iterable, Sequence
+from typing import Iterable, Sequence
 from xml.etree import ElementTree
 import zipfile
 

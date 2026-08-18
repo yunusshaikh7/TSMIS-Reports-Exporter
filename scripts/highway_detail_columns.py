@@ -182,3 +182,135 @@ def apply_header_tooltips(ws, first_row=1):
         cm = comment_for(c.value)
         if cm is not None:
             c.comment = cm
+
+
+# ---------------------------------------------------------------------------
+# Ditto ('+'-run) resolution — the paired-roadbed convention, Highway Detail's
+# own flavor. Same domain rule the Highway Log study established
+# (docs/highway_log/comparison-study.md §3): a `+`/`++` cell is a POINTER to the
+# paired roadbed's own row, never a copy of the row above, so it is never a
+# difference in itself. Only the DISPLAY fill lives here — the non-asserting diff
+# is CompareSchema.ditto_nonasserting and needs no value at all.
+#
+# Censused on the 60,083-row statewide TSN extract (2026-08-18):
+#   * 1,992 rows carry a dittoed block: 1,027 dittoed LEFT (all HG='R') and
+#     965 dittoed RIGHT (all HG='L') — exactly the study's model, and 100%
+#     consistent: zero rows ditto BOTH blocks, zero PARTIAL blocks. The block is
+#     always the unit, so the roadbed a row describes is unambiguous.
+#   * The paired row is found by SPAN, not by equal postmile: the two roadbeds
+#     are segmented independently, so only 27.8% of pairs share a postmile while
+#     90.8% are covered by the opposite roadbed's [postmile, postmile+length)
+#     span (raw-extract figures).
+#   * Measured on the comparison's OWN rows this fills 14,490 of 17,928 cells
+#     (80.8%); the rest have no covering span, or two that disagree, and are left
+#     UNFILLED rather than guessed (the cell still marks itself as a ditto and
+#     says no paired value was found). Lower than the raw figure because the
+#     comparison groups by route where the census also split on the PP prefix, so
+#     a cross-county route can offer two disagreeing spans — refused on purpose.
+#
+# Deliberately NOT Highway Log's nearest-row fallback: HD's spans make a
+# principled answer available for 9 in 10 cells, and inventing one for the rest
+# would trade a visibly-unresolved cell for a quietly-wrong one. The fill is
+# informational either way — it can never change a diff result.
+# ---------------------------------------------------------------------------
+import re as _re
+from decimal import Decimal as _Decimal, InvalidOperation as _InvalidOperation
+
+_DITTO_RE = _re.compile(r"^\++$")
+# Post Mile / Length / HG positions within the comparison's SHARED_HEADER, and
+# the two roadbed blocks' column spans. Kept here beside the labels so the
+# comparison module has one place to change if the header ever moves.
+_PM_I, _LEN_I, _HG_I = 0, 2, 4
+_LB_COLS = tuple(range(12, 21))          # LB Eff .. LB IN-TR
+_RB_COLS = tuple(range(26, 35))          # RB Eff .. RB OT-TR
+
+
+def is_ditto(v):
+    """True for a Highway Detail ditto marker — a non-empty run of only '+'."""
+    return bool(v is not None and _DITTO_RE.fullmatch(str(v).strip()))
+
+
+# Mirrors compare_highway_detail_tsn._PM_RE: a postmile is optional PREFIX
+# letters, the mile, then optional trailing letters (roadbed R/L, equation E).
+# Both ends must come off before the mile can be read as a number — stripping
+# only the roadbed suffix leaves 'R081.505', which is not a Decimal.
+_PM_PARTS_RE = _re.compile(r"^([A-Z]*?)(\d{1,3}\.\d{1,3})([A-Z]*)$")
+
+
+def _pm_split(pm):
+    """(mile, roadbed) for a canonical Post Mile — ('081.505', 'R') — or
+    (None, '') when the token isn't a postmile."""
+    m = _PM_PARTS_RE.match(str(pm or "").strip().upper())
+    if not m:
+        return None, ""
+    bed = ""
+    for ch in m.group(3):
+        if ch in ("R", "L"):
+            bed = ch
+    return m.group(2), bed
+
+
+def _roadbed(pm):
+    """The roadbed a canonical Post Mile names — its trailing 'R'/'L', or ''."""
+    return _pm_split(pm)[1]
+
+
+def _dec(v):
+    try:
+        return _Decimal(str(v).strip() or "0")
+    except (_InvalidOperation, AttributeError, ValueError):  # silent-ok: pure numeric predicate — a non-numeric postmile/length simply has no span, which the caller skips
+        return None
+
+
+def _mile(pm):
+    """The numeric mile of a canonical Post Mile, or None."""
+    return _dec(_pm_split(pm)[0]) if _pm_split(pm)[0] is not None else None
+
+
+def paired_roadbed_fills(rows, has_route):
+    """`{row_index: {col_in_row: resolved_or_None}}` for every dittoed roadbed
+    cell — the CompareSchema.ditto_resolver contract.
+
+    A row whose LEFT block is dittoed describes the RIGHT roadbed, so its Left
+    geometry is the one printed on the LEFT-roadbed row covering this postmile
+    (and vice versa). Resolution is per route, by covering span; a cell with no
+    covering span, or with spans that disagree, resolves to None and is reported
+    as "no paired value found" rather than filled with a guess."""
+    off = 1 if has_route else 0
+    groups = {}
+    for gi, r in enumerate(rows):
+        groups.setdefault(r[0] if has_route else "", []).append(gi)
+
+    out = {}
+    for members in groups.values():
+        # Index the route's rows by which roadbed they describe, with their span.
+        spans = {"R": [], "L": []}
+        for gi in members:
+            r = rows[gi]
+            pm = _mile(r[off + _PM_I])
+            ln = _dec(r[off + _LEN_I])
+            if pm is None or ln is None:
+                continue
+            bed = _roadbed(r[off + _PM_I]) or str(r[off + _HG_I] or "").strip().upper()
+            if bed in ("R", "L"):
+                spans[bed].append((pm, pm + ln, gi))
+
+        for gi in members:
+            r = rows[gi]
+            for cols, want in ((_LB_COLS, "L"), (_RB_COLS, "R")):
+                have = [c for c in cols if off + c < len(r)]
+                if not have or not all(is_ditto(r[off + c]) for c in have):
+                    continue          # only a COMPLETE dittoed block resolves
+                pm = _mile(r[off + _PM_I])
+                found = set()
+                for lo, hi, mate in spans[want]:
+                    if mate == gi or pm is None or not (lo <= pm < hi):
+                        continue
+                    vals = tuple(rows[mate][off + c] if off + c < len(rows[mate])
+                                 else None for c in have)
+                    if not all(is_ditto(v) for v in vals):
+                        found.add(vals)
+                one = found.pop() if len(found) == 1 else None
+                for n, c in enumerate(have):
+                    out.setdefault(gi, {})[c] = one[n] if one is not None else None
+    return out

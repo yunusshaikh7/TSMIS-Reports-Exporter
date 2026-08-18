@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import shutil
-import sys
 
 from _checklib import Checker, scripts_path, temp_dir
 

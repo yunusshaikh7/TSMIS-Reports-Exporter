@@ -15,7 +15,7 @@ under audit.
 from __future__ import annotations
 
 import argparse
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass
 from functools import lru_cache
 import hashlib
@@ -25,7 +25,7 @@ from pathlib import Path
 import re
 import stat
 import tempfile
-from typing import Callable, Iterable, Mapping, Sequence
+from typing import Mapping, Sequence
 
 from openpyxl.utils.escape import unescape as xlsx_unescape
 

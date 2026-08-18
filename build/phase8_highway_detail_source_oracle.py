@@ -38,7 +38,7 @@ import logging
 from pathlib import Path
 import re
 import sys
-from typing import Iterable, Sequence
+from typing import Sequence
 
 import pdfplumber
 

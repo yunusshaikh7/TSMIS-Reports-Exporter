@@ -28,7 +28,7 @@ from pathlib import Path
 import re
 import sys
 import tempfile
-from typing import Callable, Iterable, Mapping, Sequence
+from typing import Callable, Mapping, Sequence
 
 import pdfplumber
 from openpyxl import load_workbook

@@ -8,7 +8,6 @@ openpyxl only — no browser/network. Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_pdf_excel_matrix.py
 """
 import contextlib
-import os
 import shutil
 import sys
 import tempfile

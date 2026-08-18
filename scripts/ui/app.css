@@ -174,8 +174,6 @@ button, input, select { font-family: inherit; }
      idle cards step aside so the log keeps the space. */
   body.matrix-wide .col-config { flex-grow: 3.4; }
   body.matrix-wide .col-activity { flex-grow: 1; }
-  body.matrix-wide .preflight-card,
-  body.matrix-wide .completion-card { display: none; }
   /* In matrix mode the Matrix-options corner IS the primary control surface
      (queue, baseline/source, day columns, set-all modes, report toggles, fast
      mode, formulas) — so give it the column's height and demote the activity log
@@ -189,7 +187,6 @@ button, input, select { font-family: inherit; }
      card scrolls (never clips) when the column is genuinely short. */
   body.matrix-wide .col-activity .log-card { flex: 0 1 auto; min-height: 150px; max-height: 32%; }
   body.matrix-wide .matrix-config { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; }
-  body.matrix-wide .mx-queue { max-height: 118px; overflow-y: auto; }
 
   /* Fill the height too — no wasted space, no scrolling at full screen: the
      matrix pane and grid stretch to the column and the data rows share the
@@ -211,41 +208,70 @@ button, input, select { font-family: inherit; }
      the width. min-height:100% fills the column when rows are few and lets the grid
      grow past it (→ wrap scrolls) when many rows hit their min height. */
   body.matrix-wide .mx-pane .matrix-grid { min-height: 100%; width: 100%; min-width: 0; }
-  /* Reclaim vertical chrome on short/wide laptops so the grid isn't squeezed to
-     2 scrolling rows: the page heading is redundant here (the sub-tab + section
-     header already say "Comparison matrix"), and the surrounding margins shrink. */
-  body.matrix-wide .panel-title { display: none; }
-  body.matrix-wide .subtabs { margin-bottom: 6px; }
-  body.matrix-wide .mx-pane .mx-controls { margin: 0 0 4px; }
-  body.matrix-wide .mx-pane .matrix-legend { margin: 0; }
-  body.matrix-wide .mx-pane .mx-gridsection { padding: 8px 12px; }
-  body.matrix-wide .mx-pane .mx-gridsection .section-head { margin-bottom: 4px; }
-  body.matrix-wide .mx-pane .actions-row { padding-top: 6px; padding-bottom: 6px; }
-  /* Tighter cells (padding + number size; actions overlay so they don't reserve a
-     row) and a compact row header (label + smaller mode dropdown) so a ~56px row
-     floor isn't clipped — more reports show before the grid has to scroll. */
-  body.matrix-wide .mx-pane .mx-cell { justify-content: flex-start; padding: 5px 12px; }
-  body.matrix-wide .mx-pane .mx-num { font-size: 13.5px; }
-  body.matrix-wide .mx-pane .mx-sub { line-height: 1.2; }
-  /* Compact row header: tighter padding/gap, smaller label + mode dropdown +
-     header buttons, so the header isn't what drives row height (the floor is). */
-  body.matrix-wide .mx-pane .mx-rowhead { padding: 3px 10px; gap: 1px; }
-  /* Label keeps the whole top line (buttons aside) and ellipses rather than
-     wrapping, so the row header stays one short line + the stacked dropdown. */
-  body.matrix-wide .mx-pane .mxrh-label {
-    font-size: 12px; line-height: 1.15;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal;
-  }
-  body.matrix-wide .mx-pane .mx-fluent-select { align-self: flex-start; }
-  body.matrix-wide .mx-pane .mx-rowmode { height: 18px; font-size: 10.5px; padding: 0 22px 0 7px; }
-  body.matrix-wide .mx-pane .mxch-refresh { width: 20px; height: 20px; }
-  /* Column header lays its label + the two buttons on one row (wide columns), so
-     it costs ~one line instead of two. */
-  body.matrix-wide .mx-pane .mx-colhead {
-    flex-direction: row; flex-wrap: wrap; align-items: center;
-    justify-content: center; gap: 4px 6px; padding: 4px 8px;
-  }
-  body.matrix-wide .mx-pane .mx-rowhead { justify-content: center; }
+}
+
+/* ---- matrix mode at ANY width -------------------------------------------
+   `body.matrix-wide` means "a matrix sub-tab is open", not "the window is wide"
+   — the JS sets it on every matrix sub-tab regardless of size. These rules used
+   to live entirely inside the 980px block, so on a small/high-DPI laptop (a
+   1366x768 work PC at 150% DPI is ~910 CSS px) the class was on and NONE of its
+   layout applied: the export-centric idle cards stayed, the redundant page
+   heading stayed, cells kept their roomy padding, and the matrix ended up buried
+   under ~900px of other cards in a 600px viewport.
+
+   None of the rules below depend on the two-column desktop layout — they hide
+   what matrix mode doesn't use and tighten what it does — so they belong to the
+   MODE, not the breakpoint. The genuinely width-dependent parts (the column
+   flex-grow split, height-filling, internal scrolling) stay in the block above.
+   Wide behavior is unchanged: these applied there before and still do. */
+body.matrix-wide .preflight-card,
+body.matrix-wide .completion-card { display: none; }
+body.matrix-wide .mx-queue { max-height: 118px; overflow-y: auto; }
+/* The page heading is redundant here — the sub-tab and the section header
+   already say "Comparison matrix" — and the surrounding margins shrink. */
+body.matrix-wide .panel-title { display: none; }
+body.matrix-wide .subtabs { margin-bottom: 6px; }
+body.matrix-wide .mx-pane .mx-controls { margin: 0 0 4px; }
+body.matrix-wide .mx-pane .matrix-legend { margin: 0; }
+body.matrix-wide .mx-pane .mx-gridsection { padding: 8px 12px; }
+body.matrix-wide .mx-pane .mx-gridsection .section-head { margin-bottom: 4px; }
+body.matrix-wide .mx-pane .actions-row { padding-top: 6px; padding-bottom: 6px; }
+/* Tighter cells (padding + number size; actions overlay so they don't reserve a
+   row) and a compact row header, so a ~56px row floor isn't clipped — more
+   reports show before the grid has to scroll. Worth MORE on a small screen. */
+body.matrix-wide .mx-pane .mx-cell { justify-content: flex-start; padding: 5px 12px; }
+body.matrix-wide .mx-pane .mx-num { font-size: 13.5px; }
+body.matrix-wide .mx-pane .mx-sub { line-height: 1.2; }
+body.matrix-wide .mx-pane .mx-rowhead { padding: 3px 10px; gap: 1px; }
+/* Label keeps the whole top line (buttons aside) and ellipses rather than
+   wrapping, so the row header stays one short line + the stacked dropdown. */
+body.matrix-wide .mx-pane .mxrh-label {
+  font-size: 12px; line-height: 1.15;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal;
+}
+body.matrix-wide .mx-pane .mx-fluent-select { align-self: flex-start; }
+body.matrix-wide .mx-pane .mx-rowmode { height: 18px; font-size: 10.5px; padding: 0 22px 0 7px; }
+body.matrix-wide .mx-pane .mxch-refresh { width: 20px; height: 20px; }
+/* Column header lays its label + the two buttons on one row, so it costs ~one
+   line instead of two. */
+body.matrix-wide .mx-pane .mx-colhead {
+  flex-direction: row; flex-wrap: wrap; align-items: center;
+  justify-content: center; gap: 4px 6px; padding: 4px 8px;
+}
+body.matrix-wide .mx-pane .mx-rowhead { justify-content: center; }
+
+/* ---- matrix mode on a NARROW window -------------------------------------
+   Below the breakpoint the columns stack, which is right — but stacking put a
+   full-height Matrix-options card (~530px) and the activity log below the grid,
+   so the grid you opened the tab for was a sliver at the top of a very long
+   scroll. The options card is the primary control surface here, so it is capped
+   and scrolls internally rather than hidden; the log is demoted to a strip; and
+   the grid gets a real minimum so it is worth looking at. */
+@media (max-width: 979px) {
+  body.matrix-wide .matrix-config { max-height: 46vh; overflow-y: auto; }
+  body.matrix-wide .col-activity .log-card { min-height: 96px; max-height: 22vh; }
+  body.matrix-wide .mx-pane .matrix-wrap { max-height: 62vh; overflow: auto; }
+  body.matrix-wide .mx-pane .matrix-grid { min-height: 180px; width: 100%; min-width: 0; }
 }
 
 /* ------------------------------ title bar -------------------------------- */
