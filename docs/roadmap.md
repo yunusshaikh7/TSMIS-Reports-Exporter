@@ -145,7 +145,7 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 
 ---
 
-## ▣ OPEN WORK INVENTORY (current as of v0.37.0, 2026-08-17)
+## ▣ OPEN WORK INVENTORY (current as of v0.38.1, 2026-08-18)
 
 **This is the definitive list of what is left.** Everything below is genuinely
 open; anything not here is either shipped (see `CHANGELOG.md`) or a historical
@@ -168,7 +168,7 @@ MIXED VINTAGE** and so are still un-blessable (D5 below).
 
 | # | Item | Notes |
 |---|---|---|
-| B1 | **The work-PC acceptance run — now against v0.37.0** | Comparison + evidence output intentionally differ from v0.26.2/v0.27.x: re-run both sides, never reconcile old against new. TSN libraries rebuild once; PDF-sourced workbooks re-consolidate once. Then the carried v0.30–v0.32 items in [the backlog plan §4](planning/v0.30-owner-backlog-plan.md): Retry Edge sign-in, the PDF vs Excel Matrix, a fast-mode dual-format run, a pre-v0.32 partial resume, one Excel-row evidence run. **New for v0.37.0:** a Highway Summary export → consolidate → vs-TSN run, and one Highway Detail evidence generation (its evidence lane just opened — see D1). |
+| B1 | **The work-PC acceptance run — now against v0.38.1. THE TOP PRIORITY: everything since v0.32.0 is offline-verified only.** | Comparison + evidence output intentionally differ from v0.26.2/v0.27.x: re-run both sides, never reconcile old against new. TSN libraries rebuild once; PDF-sourced workbooks re-consolidate once. Then the carried v0.30–v0.32 items in [the backlog plan §4](planning/v0.30-owner-backlog-plan.md): Retry Edge sign-in, the PDF vs Excel Matrix, a fast-mode dual-format run, a pre-v0.32 partial resume, one Excel-row evidence run. **New for v0.37.0:** a Highway Summary export → consolidate → vs-TSN run, and one Highway Detail evidence generation (its evidence lane just opened — see D1). **New for v0.38.x:** re-consolidate Highway Detail (PDF) and confirm it reports COMPLETE with a clean PDF-vs-Excel cell; let the TSN Highway Detail library rebuild once (v4) and confirm the Report View's DCR + ADT columns are populated; and run a **both-editions Highway Summary** export to confirm one render saves both files in the right order. |
 
 ### C. Waiting on the vendor / the site
 
