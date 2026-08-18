@@ -86,11 +86,13 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > generates once per route, resume a pre-v0.32 partial run (no route may end with
 > two files), and run one Excel-row evidence generation.
 >
-> **What's actually next:** **CMP-AUD-186** (the HD multi-baseline parser rewrite —
-> now unblocked, scoped as its own session, and the ONLY thing between Highway
-> Detail's two editions and a clean statewide self-check), and the CA INTERSECTIONS
-> + CA RAMPS clean-road builds on the v0.29.0 pattern (mappings censused in
-> [planning/cleanroad-highways.md](planning/cleanroad-highways.md)).
+> **What's actually next:** ~~CMP-AUD-186~~ **done in v0.38.0** (the self-check is
+> now clean statewide). The next large build is the **CA INTERSECTIONS + CA RAMPS
+> clean-road builds** on the v0.29.0 pattern (mappings censused in
+> [planning/cleanroad-highways.md](planning/cleanroad-highways.md)). The highest-value
+> thing the OWNER can supply is a **same-period TSN pull** for Highway Detail or
+> Highway Summary — both vs-TSN canaries are mixed-vintage today (D5), which is the
+> only reason either is a smoke test rather than a re-bless.
 
 > **v0.18.1 — field-validated close-out (SHIPPED 2026-06-26).** The work-PC sign-off release on top of
 > the v0.18.0 candidate, bundled in ONE commit (`e2bfade`; tag `v0.18.1` pushed → `release.yml` published
