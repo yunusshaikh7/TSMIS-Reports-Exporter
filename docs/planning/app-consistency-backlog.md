@@ -60,9 +60,9 @@ a concurrent autonomous free-for-all. `paths.py` is the SoT to unify around.
 | # | Note | Lane | Risk | Notes |
 |---|------|------|------|-------|
 | 3 | Prepare a **workflow for new / format-changed reports** so future additions are flawless too (report_catalog SoT + the add-a-report recipe + consolidate/compare/matrix wiring). | ARCH/GUI | Med | The "add a report" story; partly exists (`report_catalog` derivation + `check_report_catalog`). Document + tighten the recipe. |
-| 4 | **Rearrange dates (columns)** on the matrices, not just rows. | GUI | Low-Med | Extends `matrix.apply_order` to the day/column axis + the drag UI. |
-| 6 | **Consolidate dropdown** should only show days where that report is actually present (not all export days). | GUI | Low | Discovery filter in the consolidate day picker. |
-| 8 | **Manual comparison** should use a **dropdown like consolidate**, showing only days with that specific report (manual file-pick kept as a rare fallback). | GUI | Med | Mirrors item 6 for the Compare tab. |
+| 4 | **Rearrange dates (columns)** on the matrices, not just rows. | GUI | Low-Med | Shipped v0.30.0 but **never visibly worked** until v0.38.2: the three by-day matrices persisted the new day order and then didn't repaint (the `else await render…()` every ROW drag had was missing), so the column snapped back and the reorder only appeared on the next tab entry. Only the 11px `⠿` grip started a drag, so grabbing the day's own name did nothing. Both fixed; the header label is a drag handle now. |
+| 6 | ~~**Consolidate dropdown** should only show days where that report is actually present~~ | GUI | Low | **DONE (v0.30.0) — Step-0 verified 2026-08-18.** `consolidate_info` returns `list_output_days_for_report(subdir)` (run folders holding non-empty `<subdir>/` files) and `refreshConsDest` repopulates the picker from it. |
+| 8 | ~~**Manual comparison** should use a dropdown like consolidate~~ (folder-kind) | GUI | Med | **DONE for folder-kind comparisons — Step-0 verified 2026-08-18.** `get_compare_folders` filters run folders to those containing the chosen report (A2) and `renderCompareDirs` fills both side pickers from it. What remains is only the FILE-kind picker (Browse to individual files) — that is roadmap item 15, owner-ranked "very rare use". |
 
 ## Export-engine item (candidate for a future SOL mission)
 

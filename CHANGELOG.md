@@ -3,6 +3,41 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.38.2 — 2026-08-18
+
+The matrices answer the pointer. Reordering day columns actually worked in
+v0.30.0's *settings* but never on *screen*, and every matrix chip sat inert for
+a full backend round trip before showing anything.
+
+- **Dragging a day column now moves it.** The vs-TSN, vs-Baseline and PDF-vs-Excel
+  matrices persisted the new order and then never repainted — the column snapped
+  back while the setting silently changed underneath, so the reorder only
+  appeared the next time you opened the tab. Every row drag already re-rendered;
+  the three day-column drops were the ones missing it.
+- **The column's own name is a drag handle.** Only the 11px `⠿` glyph started a
+  drag before, so the natural "grab the title and pull" gesture did nothing. The
+  grip is bigger and tints on hover; buttons and the TSN picker in the same
+  header stay undraggable so their clicks still work.
+- **Report/environment chips flip the instant you click them**, then reconcile
+  with the backend. A refusal (the "keep at least one on" rule) puts the chip
+  back and says why. Adding a day column can't be answered optimistically, so
+  that button dims and shows a wait cursor immediately instead of going dead.
+- **Toggling a report no longer rebuilds a whole matrix snapshot to check one
+  key.** The three by-day matrices validated against `snapshot()["all_rows"]` —
+  a filesystem walk plus a TSN-library hash — where the Everything matrix always
+  used the registry. Same key set (proved), ~28 ms → ~0.03 ms.
+- **The TSN raw library is no longer re-hashed on every repaint.** `status()`
+  re-derives the raw manifest on each matrix snapshot, and that re-read and
+  SHA-256'd every raw source file each time — 16 MB per repaint on a sparse
+  library, far more on a stocked one, on every tab entry, chip click, day add and
+  drag. The read-only manifest now memoizes per file against the change token
+  CMP-AUD-080 requires (`artifact_store.content_digest`). The byte-capturing path
+  the consolidators use is untouched, both produce identical manifests, and a
+  mutated-while-read member is still refused.
+- Press feedback on the controls that had none: the report picker rows, the
+  "set all comparisons to…" chips, the TSN picker buttons, and the matrix header
+  buttons.
+
 ## v0.38.1 — 2026-08-18
 
 Hotfix on v0.38.0, caught by walking the report-integration ladder.

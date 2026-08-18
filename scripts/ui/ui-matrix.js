@@ -525,27 +525,74 @@ function mxTsnPicker(tm, locked, rerender) {
   return wrap;
 }
 
+// Acknowledge a click that CAN'T be answered optimistically. Adding a day
+// column has to wait for the real render (there is nothing truthful to draw in
+// the meantime), so the button says "working" the instant it is pressed rather
+// than sitting inert for the whole round trip. Re-entry is ignored, not queued.
+//
+// It never touches `disabled`: the matrix renderers own that (a button whose
+// picker just ran out of days must STAY disabled afterwards), so restoring a
+// captured value here would fight them.
+async function mxBusyClick(btn, fn) {
+  if (btn.dataset.busy) return;
+  btn.dataset.busy = "1";
+  btn.classList.add("is-busy");
+  try {
+    await fn();
+  } finally {
+    btn.classList.remove("is-busy");
+    delete btn.dataset.busy;
+  }
+}
+
+// A show/hide chip that flips IMMEDIATELY, then reconciles with the backend.
+// The chip's own pressed state is just the user's click echoed back, so it can
+// lead; the grid follows when the snapshot lands. Awaiting the round trip first
+// made every chip feel dead for its whole duration — a matrix snapshot is a
+// filesystem walk plus a TSN-library hash, which is far from instant on a work
+// PC with a full library. A refusal (the "keep at least one report on" rule, an
+// unknown key) reverts the chip and reports why, so the optimism never lies.
+// `commit(next)` persists; `rerender()` repaints the grid.
+function mxToggleChip(label, isOn, title, locked, commit, rerender) {
+  const b = document.createElement("button");
+  b.className = "mx-toggle" + (isOn ? " on" : "");
+  b.textContent = label; b.disabled = locked; b.title = title;
+  b.setAttribute("aria-pressed", isOn ? "true" : "false");
+  b.onclick = async () => {
+    if (b.dataset.busy) return;         // ignore re-clicks while one is in flight
+    b.dataset.busy = "1";
+    const next = !b.classList.contains("on");
+    b.classList.toggle("on", next);     // optimistic: the chip answers the click now
+    b.setAttribute("aria-pressed", next ? "true" : "false");
+    b.classList.add("mx-toggle-busy");
+    try {
+      const res = await commit(next);
+      if (res && res.error) {           // refused — put the chip back where it was
+        b.classList.toggle("on", !next);
+        b.setAttribute("aria-pressed", !next ? "true" : "false");
+        showMessage("error", "Can't toggle", res.error);
+        return;
+      }
+      await rerender();
+    } finally {
+      b.classList.remove("mx-toggle-busy");
+      delete b.dataset.busy;
+    }
+  };
+  return b;
+}
+
 // Config zone (bottom-right): report + environment show/hide toggles + the global
 // "set all comparisons to…" control.
 function renderMatrixConfig(snap, locked) {
-  const mkToggle = (label, isOn, title, onClick) => {
-    const b = document.createElement("button");
-    b.className = "mx-toggle" + (isOn ? " on" : "");
-    b.textContent = label; b.disabled = locked; b.title = title;
-    b.onclick = onClick;
-    return b;
-  };
   const rtog = $("matrixReportToggles");
   if (rtog) {
     rtog.textContent = "";
     const hidden = new Set(snap.hidden || []);
     (snap.all_rows || []).forEach((r) => {
       const isOn = !hidden.has(r.key);
-      rtog.appendChild(mkToggle(r.label, isOn, (isOn ? "Hide " : "Show ") + r.label, async () => {
-        const res = await api.set_matrix_report(r.key, !isOn);
-        if (res && res.error) { showMessage("error", "Can't toggle", res.error); return; }
-        await renderMatrix();
-      }));
+      rtog.appendChild(mxToggleChip(r.label, isOn, (isOn ? "Hide " : "Show ") + r.label, locked,
+        (next) => api.set_matrix_report(r.key, next), renderMatrix));
     });
   }
   const etog = $("matrixEnvToggles");
@@ -554,11 +601,8 @@ function renderMatrixConfig(snap, locked) {
     const henv = new Set(snap.hidden_envs || []);
     (snap.all_envs || []).forEach((e) => {
       const isOn = !henv.has(e), lbl = snap.env_labels[e] || e;
-      etog.appendChild(mkToggle(lbl, isOn, (isOn ? "Hide " : "Show ") + lbl, async () => {
-        const res = await api.set_matrix_env(e, !isOn);
-        if (res && res.error) { showMessage("error", "Can't toggle", res.error); return; }
-        await renderMatrix();
-      }));
+      etog.appendChild(mxToggleChip(lbl, isOn, (isOn ? "Hide " : "Show ") + lbl, locked,
+        (next) => api.set_matrix_env(e, next), renderMatrix));
     });
   }
   document.querySelectorAll("#matrixConfig .mc-mode").forEach((b) => {
@@ -589,13 +633,23 @@ function dndAttach(targetEl, gripHost, key, group, axis, getOrder, commit) {
   const grip = document.createElement("span");
   grip.className = "dnd-grip"; grip.textContent = "⠿";
   grip.title = "Drag to reorder"; grip.setAttribute("aria-hidden", "true");
-  grip.draggable = true;
-  grip.addEventListener("dragstart", (e) => {
+  const onDragStart = (e) => {
     _dnd = { group, key }; targetEl.classList.add("dnd-dragging");
     try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", key); } catch (_) { /* ignore */ }
-  });
-  grip.addEventListener("dragend", () => {
+  };
+  const onDragEnd = () => {
     targetEl.classList.remove("dnd-dragging"); _clearDndOver(); _dnd = null;
+  };
+  // The grip is the AFFORDANCE, not the only handle: an 11px glyph is a hard
+  // target, and the natural gesture is to grab the header's own name and pull.
+  // So the label text drags too. Only these two — never the whole header — so
+  // the action buttons and the TSN <select> living in it keep plain clicks and
+  // native mouse behavior (a draggable ancestor breaks dragging inside them).
+  [grip, ...gripHost.querySelectorAll(".mxrh-label, .dnd-handle")].forEach((h) => {
+    h.draggable = true;
+    h.addEventListener("dragstart", onDragStart);
+    h.addEventListener("dragend", onDragEnd);
+    if (h !== grip) h.classList.add("dnd-handle");
   });
   const isAfter = (e) => {
     const r = targetEl.getBoundingClientRect();
@@ -724,7 +778,7 @@ async function renderMatrix() {
     h.className = "mx-cell mx-colhead" + (env === snap.baseline ? " mx-baseline-col" : "");
     h.dataset.env = env;                 // env-access flag target (applyMatrixEnvFlags)
     const elabel = snap.env_labels[env] || env;
-    const lab = document.createElement("div");
+    const lab = document.createElement("div"); lab.className = "dnd-handle";
     lab.textContent = elabel + (env === snap.baseline ? " ★" : "");
     h.appendChild(lab);
     h.appendChild(mxHeaderBtns(elabel,
@@ -978,13 +1032,13 @@ async function renderDayMatrix() {
   }
   if (addBtn) {
     addBtn.disabled = locked || !avail.length;
-    addBtn.onclick = async () => {
+    addBtn.onclick = () => mxBusyClick(addBtn, async () => {
       const d = $("dayMatrixAddDay").value;
       if (!d) return;
       const r = await api.add_day_matrix_day(d);
       if (r && r.error) showMessage("error", "Can't add day", r.error);
       await renderDayMatrix();
-    };
+    });
   }
 
   // (TSN dataset pickers are PER-ROW now — in each row header, named by its
@@ -1000,17 +1054,9 @@ async function renderDayMatrix() {
     const hidden = new Set(snap.hidden || []);
     (snap.all_rows || []).forEach((r) => {
       const isOn = !hidden.has(r.key);
-      const b = document.createElement("button");
-      b.className = "mx-toggle" + (isOn ? " on" : "");
-      b.textContent = r.label + (r.supported ? "" : " (soon)");
-      b.disabled = locked;
-      b.title = (isOn ? "Hide " : "Show ") + r.label;
-      b.onclick = async () => {
-        const res = await api.set_day_matrix_report(r.key, !isOn);
-        if (res && res.error) { showMessage("error", "Can't toggle", res.error); return; }
-        await renderDayMatrix();
-      };
-      rtog.appendChild(b);
+      rtog.appendChild(mxToggleChip(r.label + (r.supported ? "" : " (soon)"), isOn,
+        (isOn ? "Hide " : "Show ") + r.label, locked,
+        (next) => api.set_day_matrix_report(r.key, next), renderDayMatrix));
     });
   }
 
@@ -1036,7 +1082,8 @@ async function renderDayMatrix() {
   days.forEach((d) => {
     const h = document.createElement("div");
     h.className = "mx-cell mx-colhead";
-    const lab = document.createElement("div"); lab.textContent = d;
+    const lab = document.createElement("div"); lab.className = "dnd-handle";
+    lab.textContent = d;
     h.appendChild(lab);
     h.appendChild(dmConsolidatedBadge(d, dayCons[d] || { exists: false, fresh: false, actionable: false }));
     const btns = document.createElement("span"); btns.className = "mxch-btns";
@@ -1063,6 +1110,7 @@ async function renderDayMatrix() {
     dndAttach(h, h, d, "dm-day", "x", () => days.slice(), async (order) => {
       const r = await api.set_day_matrix_day_order(order);
       if (r && r.error) showMessage("error", "Can't reorder", r.error);
+      else await renderDayMatrix();
     });
     grid.appendChild(h);
   });
@@ -1380,13 +1428,13 @@ async function renderBaselineMatrix() {
   }
   if (addBtn) {
     addBtn.disabled = locked || !avail.length;
-    addBtn.onclick = async () => {
+    addBtn.onclick = () => mxBusyClick(addBtn, async () => {
       const d = $("baselineMatrixAddDay").value;
       if (!d) return;
       const r = await api.add_baseline_matrix_day(d);
       if (r && r.error) showMessage("error", "Can't add day", r.error);
       await renderBaselineMatrix();
-    };
+    });
   }
 
   const rtog = $("baselineMatrixReportToggles");
@@ -1395,17 +1443,9 @@ async function renderBaselineMatrix() {
     const hidden = new Set(snap.hidden || []);
     (snap.all_rows || []).forEach((r) => {
       const isOn = !hidden.has(r.key);
-      const b = document.createElement("button");
-      b.className = "mx-toggle" + (isOn ? " on" : "");
-      b.textContent = r.label + (r.supported ? "" : " (soon)");
-      b.disabled = locked;
-      b.title = (isOn ? "Hide " : "Show ") + r.label;
-      b.onclick = async () => {
-        const res = await api.set_baseline_matrix_report(r.key, !isOn);
-        if (res && res.error) { showMessage("error", "Can't toggle", res.error); return; }
-        await renderBaselineMatrix();
-      };
-      rtog.appendChild(b);
+      rtog.appendChild(mxToggleChip(r.label + (r.supported ? "" : " (soon)"), isOn,
+        (isOn ? "Hide " : "Show ") + r.label, locked,
+        (next) => api.set_baseline_matrix_report(r.key, next), renderBaselineMatrix));
     });
   }
 
@@ -1431,7 +1471,7 @@ async function renderBaselineMatrix() {
   days.forEach((d) => {
     const h = document.createElement("div");
     h.className = "mx-cell mx-colhead" + (d === bl.date ? " mx-baseline-col" : "");
-    const lab = document.createElement("div");
+    const lab = document.createElement("div"); lab.className = "dnd-handle";
     lab.textContent = d + (d === bl.date ? " (baseline)" : "");
     h.appendChild(lab);
     const btns = document.createElement("span"); btns.className = "mxch-btns";
@@ -1452,6 +1492,7 @@ async function renderBaselineMatrix() {
     dndAttach(h, h, d, "bl-day", "x", () => days.slice(), async (order) => {
       const r = await api.set_baseline_matrix_day_order(order);
       if (r && r.error) showMessage("error", "Can't reorder", r.error);
+      else await renderBaselineMatrix();
     });
     grid.appendChild(h);
   });
@@ -1633,13 +1674,13 @@ async function renderPveMatrix() {
   }
   if (addBtn) {
     addBtn.disabled = locked || !avail.length;
-    addBtn.onclick = async () => {
+    addBtn.onclick = () => mxBusyClick(addBtn, async () => {
       const d = $("pveMatrixAddDay").value;
       if (!d) return;
       const r = await api.add_pve_matrix_day(d);
       if (r && r.error) showMessage("error", "Can't add day", r.error);
       await renderPveMatrix();
-    };
+    });
   }
 
   const rtog = $("pveMatrixReportToggles");
@@ -1648,17 +1689,9 @@ async function renderPveMatrix() {
     const hidden = new Set(snap.hidden || []);
     (snap.all_rows || []).forEach((r) => {
       const isOn = !hidden.has(r.key);
-      const b = document.createElement("button");
-      b.className = "mx-toggle" + (isOn ? " on" : "");
-      b.textContent = r.label;
-      b.disabled = locked;
-      b.title = (isOn ? "Hide " : "Show ") + r.label;
-      b.onclick = async () => {
-        const res = await api.set_pve_matrix_report(r.key, !isOn);
-        if (res && res.error) { showMessage("error", "Can't toggle", res.error); return; }
-        await renderPveMatrix();
-      };
-      rtog.appendChild(b);
+      rtog.appendChild(mxToggleChip(r.label, isOn,
+        (isOn ? "Hide " : "Show ") + r.label, locked,
+        (next) => api.set_pve_matrix_report(r.key, next), renderPveMatrix));
     });
   }
 
@@ -1684,7 +1717,8 @@ async function renderPveMatrix() {
   days.forEach((d) => {
     const h = document.createElement("div");
     h.className = "mx-cell mx-colhead";
-    const lab = document.createElement("div"); lab.textContent = d;
+    const lab = document.createElement("div"); lab.className = "dnd-handle";
+    lab.textContent = d;
     h.appendChild(lab);
     const btns = document.createElement("span"); btns.className = "mxch-btns";
     btns.append(
@@ -1701,6 +1735,7 @@ async function renderPveMatrix() {
     dndAttach(h, h, d, "pve-day", "x", () => days.slice(), async (order) => {
       const r = await api.set_pve_matrix_day_order(order);
       if (r && r.error) showMessage("error", "Can't reorder", r.error);
+      else await renderPveMatrix();
     });
     grid.appendChild(h);
   });

@@ -831,9 +831,10 @@ class GuiMatrixMixin:
     @_api_method
     def set_matrix_row_mode(self, row_key, mode_id):
         """Set one report row's comparison mode (the dropdown under its name).
-        Validated against that row's available, SUPPORTED modes."""
-        snap = self._matrix_snapshot(self._current_baseline())
-        avail = {m["id"]: m for m in snap.get("row_modes", {}).get(row_key, [])}
+        Validated against that row's available, SUPPORTED modes — off the
+        authoritative row catalog (visibility-independent, and no filesystem
+        stat pass), the same source the bulk 'set all' action validates against."""
+        avail = {m["id"]: m for m in matrix.all_row_modes().get(row_key, [])}
         if not avail:
             return {"error": "Unknown report for the matrix."}
         if mode_id not in avail:
@@ -1396,7 +1397,7 @@ class GuiMatrixMixin:
     @_api_method
     def set_day_matrix_report(self, row_key, visible):
         """Show/hide a report ROW on the by-day matrix. At least one stays on."""
-        keys = {r["key"] for r in self._day_matrix_snapshot()["all_rows"]}
+        keys = day_matrix.row_keys()
         if row_key not in keys:
             return {"error": "Unknown report for the matrix."}
         hidden = set(settings.get_day_matrix_hidden())
@@ -1413,7 +1414,7 @@ class GuiMatrixMixin:
     @_api_method
     def set_day_matrix_row_order(self, keys):
         """Persist the drag-to-reorder ROW order for the by-day matrix."""
-        valid = {r["key"] for r in self._day_matrix_snapshot()["all_rows"]}
+        valid = day_matrix.row_keys()
         clean = [k for k in (keys or []) if isinstance(k, str) and k in valid]
         settings.set_day_matrix_row_order(clean)
         self._push_state()
@@ -1677,7 +1678,7 @@ class GuiMatrixMixin:
     @_api_method
     def set_pve_matrix_report(self, row_key, visible):
         """Show/hide a family ROW on the PDF-vs-Excel matrix. At least one stays on."""
-        keys = {r["key"] for r in self._pve_matrix_snapshot()["all_rows"]}
+        keys = pdf_excel_matrix.row_keys()
         if row_key not in keys:
             return {"error": "Unknown report for the matrix."}
         hidden = set(settings.get_pve_matrix_hidden())
@@ -1694,7 +1695,7 @@ class GuiMatrixMixin:
     @_api_method
     def set_pve_matrix_row_order(self, keys):
         """Persist the drag-to-reorder ROW order for the PDF-vs-Excel matrix."""
-        valid = {r["key"] for r in self._pve_matrix_snapshot()["all_rows"]}
+        valid = pdf_excel_matrix.row_keys()
         clean = [k for k in (keys or []) if isinstance(k, str) and k in valid]
         settings.set_pve_matrix_row_order(clean)
         self._push_state()
@@ -1895,7 +1896,7 @@ class GuiMatrixMixin:
     @_api_method
     def set_baseline_matrix_report(self, row_key, visible):
         """Show/hide a report ROW on the vs-Baseline matrix. At least one stays on."""
-        keys = {r["key"] for r in self._baseline_matrix_snapshot()["all_rows"]}
+        keys = baseline_matrix.row_keys()
         if row_key not in keys:
             return {"error": "Unknown report for the matrix."}
         hidden = set(settings.get_baseline_matrix_hidden())
@@ -1912,7 +1913,7 @@ class GuiMatrixMixin:
     @_api_method
     def set_baseline_matrix_row_order(self, keys):
         """Persist the drag-to-reorder ROW order for the vs-Baseline matrix."""
-        valid = {r["key"] for r in self._baseline_matrix_snapshot()["all_rows"]}
+        valid = baseline_matrix.row_keys()
         clean = [k for k in (keys or []) if isinstance(k, str) and k in valid]
         settings.set_baseline_matrix_row_order(clean)
         self._push_state()

@@ -176,9 +176,62 @@ def capture_raw_manifest(paths, root):
     return manifest, captured
 
 
+def _stable_entry(path, root):
+    """One manifest entry for `path` WITHOUT retaining its bytes.
+
+    Same admission rules as ``_stable_bytes`` -- ordinary file, never a link,
+    and refused outright if it is replaced or mutated while it is being read --
+    but the digest comes from ``artifact_store.content_digest``, which memoizes
+    per file against the CHANGE TOKEN the audit approves (CMP-AUD-080: on
+    Windows ``FILE_BASIC_INFO.ChangeTime`` beside size/mtime/file id, never stat
+    alone, and never inside the clock's own racy window). A file with no
+    obtainable token is simply re-hashed.
+
+    This exists because ``status()`` re-derives this manifest on EVERY matrix
+    snapshot -- every tab entry, chip click, day add and drag -- and the whole
+    raw library was being re-read and re-hashed each time. On a stocked library
+    that is hundreds of megabytes per repaint, which is what made the matrices
+    feel slow. Callers that need the member BYTES still use ``_stable_bytes``
+    via ``capture_raw_manifest``; that path is byte-exact and unchanged."""
+    import artifact_store                    # lazy: keeps this module import-light
+    path = Path(path)
+    if path.is_symlink():
+        raise ValueError(f"TSN raw member must be an ordinary file, not a link: {path}")
+    signature = lambda value: (  # noqa: E731 - the exact stat tuple _stable_bytes uses
+        int(value.st_size), int(getattr(value, "st_mtime_ns", value.st_mtime * 1e9)),
+        int(getattr(value, "st_ctime_ns", value.st_ctime * 1e9)),
+        int(getattr(value, "st_dev", 0)), int(getattr(value, "st_ino", 0)),
+        stat.S_IFMT(value.st_mode),
+    )
+    try:
+        before = path.stat()
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError(f"TSN raw member is not an ordinary file: {path}")
+        digest = artifact_store.content_digest(path)
+        after = path.stat()
+    except OSError as exc:
+        raise ValueError(
+            f"TSN raw member could not be read stably: {path} "
+            f"({type(exc).__name__}: {exc})") from exc
+    if signature(before) != signature(after):
+        raise ValueError(f"TSN raw member changed while it was being read: {path}")
+    return {
+        "relative_path": _relative_path(path, root),
+        "byte_length": int(before.st_size),
+        "sha256": digest,
+    }
+
+
 def canonical_raw_manifest(paths, root):
-    """Return the strict canonical content manifest without retaining member bytes."""
-    manifest, _captured = capture_raw_manifest(paths, root)
+    """Return the strict canonical content manifest without retaining member bytes.
+
+    Byte-for-byte the same manifest ``capture_raw_manifest`` produces (proved by
+    check_tsn_district_source_contract) -- it just never holds the members in
+    memory and lets the approved change-token memo skip a re-hash of raw files
+    that provably have not changed."""
+    manifest = _manifest_from_entries(
+        [_stable_entry(path, root) for path in paths])
+    validate_raw_manifest(manifest)
     return manifest
 
 

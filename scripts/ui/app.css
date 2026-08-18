@@ -568,9 +568,15 @@ button, input, select { font-family: inherit; }
 .option-row {
   display: flex; align-items: center; gap: 12px;
   border: 1px solid transparent; border-radius: var(--radius-lg);
-  padding: 9px 12px; cursor: pointer; transition: background-color 0.1s, border-color 0.1s;
+  padding: 9px 12px; cursor: pointer;
+  transition: background-color var(--motion-fast) var(--ease-out),
+              border-color var(--motion-fast) var(--ease-out),
+              transform var(--motion-instant) var(--ease-out);
 }
 .option-row:hover { background: var(--accent); }
+/* Picking a report is the app's most-repeated click; it depresses like every
+   other control instead of being the one surface that stays inert. */
+.option-row:not(.disabled):not(.option-static):active { transform: scale(0.995); }
 .option-row.checked {
   border-color: color-mix(in oklab, var(--primary) 30%, transparent);
   background: color-mix(in oklab, var(--primary) 5%, transparent);
@@ -788,10 +794,12 @@ button, input, select { font-family: inherit; }
 .mx-controls .matrix-legend { margin: 0; }
 .mx-toggles { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .mx-toggle {
-  font-size: 11.5px; padding: 2px 10px; border-radius: 999px;
+  font-size: 11.5px; padding: 3px 11px; border-radius: 999px;
   border: 1px solid var(--border); background: var(--card);
   color: var(--muted-foreground); cursor: pointer;
-  transition: background-color .12s ease, color .12s ease, border-color .12s ease, opacity .12s ease;
+  transition: background-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out),
+              border-color var(--motion-fast) var(--ease-out), opacity var(--motion-fast) var(--ease-out),
+              transform var(--motion-instant) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out);
 }
 .mx-toggle.on {
   background: color-mix(in oklab, var(--primary) 12%, var(--card));
@@ -800,7 +808,19 @@ button, input, select { font-family: inherit; }
 }
 .mx-toggle:hover:not(:disabled) { border-color: var(--primary); color: var(--foreground); }
 .mx-toggle.on:hover:not(:disabled) { color: var(--primary); }
+/* The chip depresses under the pointer — it is the click's own receipt, and it
+   lands before the backend answers (see mxToggleChip). */
+.mx-toggle:active:not(:disabled) { transform: scale(0.94); }
+.mx-toggle:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
 .mx-toggle:disabled { opacity: 0.5; cursor: default; }
+/* In flight: the chip already shows its NEW state, so this only says "still
+   settling" — never a spinner that would out-shout the state it just took. */
+.mx-toggle-busy:not(:disabled) { opacity: .72; }
+
+/* A click that can't be answered optimistically (see mxBusyClick) — the control
+   dims and shows the wait cursor the moment it is pressed, so the press always
+   lands somewhere visible even when the work behind it takes a while. */
+.is-busy { opacity: .6; cursor: progress; pointer-events: none; }
 .matrix-legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 8px; }
 .mx-key { font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); }
 .mx-key.mx-match { background: color-mix(in oklab, var(--success) 16%, var(--card)); }
@@ -835,8 +855,9 @@ button, input, select { font-family: inherit; }
   display: inline-flex; align-items: center; justify-content: center;
   border: 1px solid transparent; border-radius: var(--radius-md);
   background: transparent; color: var(--muted-foreground); cursor: pointer;
-  transition: background-color .12s ease, color .12s ease,
-              border-color .12s ease, box-shadow .12s ease;
+  transition: background-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out),
+              border-color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out),
+              transform var(--motion-instant) var(--ease-out);
 }
 .mxch-refresh .ic { width: 14px; height: 14px; transition: transform .25s ease; }
 .mxch-refresh:hover:not(:disabled) {
@@ -845,7 +866,10 @@ button, input, select { font-family: inherit; }
   color: var(--primary);
 }
 .mxch-refresh:hover:not(:disabled) .ic { transform: rotate(180deg); }
-.mxch-refresh:active:not(:disabled) { background: color-mix(in oklab, var(--primary) 20%, transparent); }
+.mxch-refresh:active:not(:disabled) {
+  background: color-mix(in oklab, var(--primary) 20%, transparent);
+  transform: scale(0.92);
+}
 .mxch-refresh:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
 .mxch-refresh:disabled { opacity: .4; cursor: default; }
 /* Header buttons come in a PAIR now (↻ re-export + ⇄ rebuild). The spin
@@ -928,12 +952,15 @@ button, input, select { font-family: inherit; }
   background: var(--card); color: var(--foreground);
   font-family: var(--font-sans); font-size: 11px; font-weight: 500; line-height: 1;
   text-decoration: none; white-space: nowrap; cursor: pointer;
-  transition: background-color .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease;
+  transition: background-color var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out),
+              color var(--motion-fast) var(--ease-out), box-shadow var(--motion-fast) var(--ease-out),
+              transform var(--motion-instant) var(--ease-out);
 }
 .mx-linkbtn .ic { width: 13px; height: 13px; }
 .mx-linkbtn:hover:not(:disabled) {
   background: color-mix(in oklab, var(--accent) 55%, var(--card)); border-color: var(--border);
 }
+.mx-linkbtn:active:not(:disabled) { transform: translateY(0.5px) scale(0.99); }
 .mx-linkbtn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--ring); }
 .mx-linkbtn:disabled { opacity: .5; cursor: default; text-decoration: none; }
 /* Consolidate = the suggested next step in the pdfs state. A soft primary TINT
@@ -999,9 +1026,11 @@ body.matrix-wide.mw-pve #pveMatrixConfig { display: flex; }
   font-size: 11.5px; padding: 3px 10px; border-radius: 999px;
   border: 1px solid var(--border); background: var(--card);
   color: var(--muted-foreground); cursor: pointer;
-  transition: background-color .12s ease, color .12s ease, border-color .12s ease;
+  transition: background-color var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out),
+              border-color var(--motion-fast) var(--ease-out), transform var(--motion-instant) var(--ease-out);
 }
 .mc-mode:hover:not(:disabled) { border-color: var(--primary); color: var(--foreground); }
+.mc-mode:active:not(:disabled) { transform: scale(0.94); }
 
 /* Fast-mode toggle (matrix re-exports). A compact checkbox row with the bolt. */
 .mc-fast {
@@ -1427,10 +1456,18 @@ body.matrix-wide.mw-pve #pveMatrixConfig { display: flex; }
 .dnd-grip {
   cursor: grab; user-select: none; flex: none;
   opacity: .45; color: var(--muted-foreground);
-  font-size: 11px; line-height: 1; padding: 0 3px; margin-right: 1px;
+  font-size: 13px; line-height: 1; padding: 3px 4px; margin-right: 1px;
+  border-radius: var(--radius-sm);
+  transition: opacity var(--motion-fast) var(--ease-out), background-color var(--motion-fast) var(--ease-out);
 }
-.dnd-grip:hover { opacity: 1; }
+.dnd-grip:hover { opacity: 1; background: var(--accent); }
 .dnd-grip:active { cursor: grabbing; }
+/* The header's own NAME drags too — an 11px glyph was the only handle, so the
+   natural "grab the title and pull" gesture did nothing at all. Buttons and the
+   TSN <select> in the same header stay undraggable so their clicks still work. */
+.dnd-handle { cursor: grab; user-select: none; }
+.dnd-handle:active { cursor: grabbing; }
+.dnd-target:hover > .dnd-grip { opacity: .8; }
 .dnd-dragging { opacity: .45; }
 .dnd-before-y { box-shadow: inset 0 3px 0 0 var(--primary); }
 .dnd-after-y  { box-shadow: inset 0 -3px 0 0 var(--primary); }

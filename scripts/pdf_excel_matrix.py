@@ -73,6 +73,15 @@ def _row_lookup():
     return {r[0]: r for r in _pve_rows()}
 
 
+def row_keys():
+    """The valid row keys, straight off the registry — no filesystem, no TSN
+    library. Validation-only callers (show/hide a report, persist a row order)
+    used to read `pve_matrix_snapshot()["all_rows"]` for exactly this set, which
+    dragged a full stat pass through every chip click; the row catalog never
+    depended on any of it."""
+    return {r[0] for r in _pve_rows()}
+
+
 # --------------------------------------------------------------------------- #
 # paths + the results cache
 # --------------------------------------------------------------------------- #

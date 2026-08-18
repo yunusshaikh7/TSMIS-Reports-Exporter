@@ -68,6 +68,15 @@ def _row_lookup():
     return {r[0]: r for r in _rows()}
 
 
+def row_keys():
+    """The valid row keys, straight off the registry — no filesystem, no TSN
+    library. Validation-only callers (show/hide a report, persist a row order)
+    used to read `baseline_matrix_snapshot()["all_rows"]` for exactly this set, which
+    dragged a full stat pass through every chip click; the row catalog never
+    depended on any of it."""
+    return {r[0] for r in _rows()}
+
+
 def parse_baseline(baseline_id):
     """("day", "<date>") / ("store", None) from a baseline id, or None for an
     unset/unknown id. The date shape is checked here; whether "<date> <source>"
