@@ -6,6 +6,15 @@ and comparison write the **same way, in standardized, self-identifying, date-sta
 locations**, from a single `paths.py` SoT — so any surface (Export tab, Consolidate, manual
 Compare, the matrices) produces files any other feature can consume.
 
+**Status (2026-08-18): RE-VERIFIED COMPLETE — kept as the design record.** Every target
+in §4 was re-proved against the code at the owner's "you can do all the F": one export
+layout through `output_run_dir` (9/10), `paths.py` owning every comparison tree (11),
+front-anchored run identity via `resolve_route_file` + `stamped_consolidated_filename`
+(13a), self-identifying comparison names (5), `manual_comparisons_dir()` (7), filtered
+day pickers (6/8, folder-kind), and single-pass dual-format on BOTH the standard and
+fast paths (12). The §5 Claude/sol-002 split is moot — the owner retired the Sol plan and
+the export-side mechanics had already shipped. Original 2026-07-23 status follows.
+
 **Status (2026-07-23): RESOLVED IN EFFECT — kept as the design record.** The
 [v0.30 owner-backlog plan](v0.30-owner-backlog-plan.md)'s Step-0 verification showed much
 of this spec was already true (exports were already dated/unified), and the rest shipped

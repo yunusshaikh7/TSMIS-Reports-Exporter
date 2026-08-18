@@ -147,7 +147,7 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 
 ---
 
-## ▣ OPEN WORK INVENTORY (current as of v0.38.1, 2026-08-18)
+## ▣ OPEN WORK INVENTORY (current as of v0.38.2, 2026-08-18)
 
 **This is the definitive list of what is left.** Everything below is genuinely
 open; anything not here is either shipped (see `CHANGELOG.md`) or a historical
@@ -172,7 +172,7 @@ counts as migration drift, not defect — see C4 + D5.
 
 | # | Item | Notes |
 |---|---|---|
-| B1 | **The work-PC acceptance run — now against v0.38.1. THE TOP PRIORITY: everything since v0.32.0 is offline-verified only.** | Comparison + evidence output intentionally differ from v0.26.2/v0.27.x: re-run both sides, never reconcile old against new. TSN libraries rebuild once; PDF-sourced workbooks re-consolidate once. Then the carried v0.30–v0.32 items in [the backlog plan §4](planning/v0.30-owner-backlog-plan.md): Retry Edge sign-in, the PDF vs Excel Matrix, a fast-mode dual-format run, a pre-v0.32 partial resume, one Excel-row evidence run. **New for v0.37.0:** a Highway Summary export → consolidate → vs-TSN run, and one Highway Detail evidence generation (its evidence lane just opened — see D1). **New for v0.38.x:** re-consolidate Highway Detail (PDF) and confirm it reports COMPLETE with a clean PDF-vs-Excel cell; let the TSN Highway Detail library rebuild once (v4) and confirm the Report View's DCR + ADT columns are populated; and run a **both-editions Highway Summary** export to confirm one render saves both files in the right order. |
+| B1 | **The work-PC acceptance run — now against v0.38.1. THE TOP PRIORITY: everything since v0.32.0 is offline-verified only.** | Comparison + evidence output intentionally differ from v0.26.2/v0.27.x: re-run both sides, never reconcile old against new. TSN libraries rebuild once; PDF-sourced workbooks re-consolidate once. Then the carried v0.30–v0.32 items in [the backlog plan §4](planning/v0.30-owner-backlog-plan.md): Retry Edge sign-in, the PDF vs Excel Matrix, a fast-mode dual-format run, a pre-v0.32 partial resume, one Excel-row evidence run. **New for v0.37.0:** a Highway Summary export → consolidate → vs-TSN run, and one Highway Detail evidence generation (its evidence lane just opened — see D1). **New for v0.38.x:** re-consolidate Highway Detail (PDF) and confirm it reports COMPLETE with a clean PDF-vs-Excel cell; let the TSN Highway Detail library rebuild once (v4) and confirm the Report View's DCR + ADT columns are populated; and run a **both-editions Highway Summary** export to confirm one render saves both files in the right order. **New for v0.38.2:** drag a day COLUMN on each by-day matrix and confirm it moves on screen (it never did before); toggle a report chip on a matrix and confirm it responds instantly; and — the one worth watching on a STOCKED TSN library — confirm the matrices repaint quickly after the first render, now that the raw manifest memoizes instead of re-hashing every raw source each time. |
 
 ### C. Waiting on the vendor / the site
 
@@ -205,13 +205,24 @@ counts as migration drift, not defect — see C4 + D5.
 | E4 | **Clean-road sliver policy** | The 0.001-mi boundary-calibration class (rows keyed 9.256 vs 9.257) pairs one-sided today; a few hundred statewide. |
 | E5 | The smaller standing items | In the themed sections below: cancel-latency, narrow-mode matrix polish, console `run_cli_multi` coalescing, the shared whitespace-collapse helper, doc/comment line-ref drift. |
 
-### F. Design-first / gated (do not start without the design)
+### F. Design-first / gated — **NOTHING OPEN.** All of F is shipped (verified 2026-08-18)
 
-| # | Item | Notes |
+F was stale: it read as an unstarted architectural project long after the work had
+landed. A Step-0 code verification of all 13 owner observations (2026-08-18, at the
+owner's "you can do all the F") found **every one already implemented** — most in
+v0.30.0–v0.32.0, the last one fixed that day. The evidence, item by item:
+
+| # | Item | Verified state |
 |---|---|---|
-| F1 | **Output-model unification** (app-consistency items 9 / 10 / 11 / 13) | Export / consolidate / compare output locations + naming standardized so every surface consumes the same artifacts. Spec: [output-model-unification.md](planning/output-model-unification.md). **Design FIRST.** |
-| F2 | **sol-002 — export-engine mechanics** | GATED on landing the additive `paths.py` step-1 from F1. Not dispatched. See [agent-handoffs/STATUS.md](agent-handoffs/STATUS.md). |
-| F3 | The remaining [app-consistency backlog](planning/app-consistency-backlog.md) items | 13 owner OBSERVATIONS — **Step 0 of EACH is a code-verification pass**; the owner said he may be wrong and some may already be correct. Never build on an unverified observation. |
+| F1 | **Output-model unification** (items 9 / 10 / 11 / 13) | **DONE.** Its own spec has said "RESOLVED IN EFFECT" since 2026-07-23. Re-proved in code: all three export surfaces (`exporter`, `exporter_parallel`, `gui_worker_export`) default to `output_run_dir(src, env)/subdir` — there is no second export layout; `paths.py` owns every comparison tree (`comparisons_root` / `manual_comparisons_dir` / `arcgis_comparisons_dir`); `resolve_route_file` front-anchors the run identity on per-route files and `stamped_consolidated_filename` on consolidations. |
+| F2 | ~~sol-002 — export-engine mechanics~~ | **DONE, and the Sol dispatch is moot** (owner, 2026-08-18: "that sol plan was from way before"). Its charter was item 12 + the export side of 9/13, all shipped in v0.32.0: coalescing runs on BOTH paths — `run_export_combined` (standard) and `run_export_parallel_combined` (fast mode) — guarded by `check_coalesce_editions`, with `check_route_file_naming` holding the dated-name contract. |
+| F3 | The [app-consistency backlog](planning/app-consistency-backlog.md) | **DONE — 13 of 13.** 1 (`compare_timings` wired into `gui_worker_matrix` for logging + ETAs) · 2 (`pdf_excel_matrix.py`) · 3 (`check_report_wiring`) · 4 (**was a real bug — fixed v0.38.2**; the day-column drag persisted but never repainted) · 5 (`day_out_path`/`out_path` embed day + source + baseline token) · 6 (`list_output_days_for_report` behind the consolidate picker) · 7 (`manual_comparisons_dir()`) · 8 (`get_compare_folders` filters, folder-kind) · 9/10/11/13 (F1 above) · 12 (F2 above). |
+
+The one living descendant is **item 15** below — a consolidate-style day dropdown for
+FILE-kind manual comparisons (folder-kind already filters). Owner-ranked "very rare
+use"; the wiring is mapped (invert `report_catalog.MATRIX` on `tsn_key` to reach the
+row's consolidator, then `out_path_for(day)`), so it is a small build whenever it is
+wanted.
 
 ### G. The next large build
 

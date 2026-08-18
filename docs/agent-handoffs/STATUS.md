@@ -101,10 +101,18 @@ comparison-lane / GUI / cross-cutting **architecture** (Claude), NOT Sol's relia
 The spine (items 9/10/11/13 = output-model unification) is design-first + coupled to
 comparison-perfection. **Design spec DONE:**
 [docs/planning/output-model-unification.md](../planning/output-model-unification.md) —
-**sol-002** (export-side conformance: unified run-folder writes, single-pass dual-format,
-date-stamping) is now scoped, with a **hard dependency**: Claude lands the additive `paths.py`
-SoT functions (migration step 1) BEFORE sol-002 starts. The comparison-side (unique names,
-manual-Compare folder) + GUI dropdowns stay Claude's. sol-001 is unchanged by this.
+**sol-002 is RETIRED, never dispatched (owner, 2026-08-18: "that sol plan was from way
+before").** Everything it was chartered to do had already shipped by v0.32.0 — unified
+run-folder writes (all three export surfaces default to `output_run_dir`), single-pass
+dual-format on BOTH the standard and fast paths (`run_export_combined` /
+`run_export_parallel_combined`, gated by `check_coalesce_editions`), and front-anchored
+date stamping (`resolve_route_file`). Re-verified in code 2026-08-18; see
+[roadmap.md](../roadmap.md) section F. Do not re-propose dispatching it. sol-001 is
+unchanged by this.
+
+*(Original scoping, for the record: sol-002 was export-side conformance with a hard
+dependency on Claude landing the additive `paths.py` SoT functions first; the
+comparison-side and GUI dropdowns stayed Claude's.)*
 
 ## Fleet scaling (decided 2026-07-17)
 Owner can run 3+ Codex agents (unlimited compute); a dedicated **Orchestrator Claude** (local,

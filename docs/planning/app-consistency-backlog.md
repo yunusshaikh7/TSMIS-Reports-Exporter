@@ -4,6 +4,17 @@ Owner-supplied feature/hardening notes for *after* (or alongside) the comparison
 project. Captured verbatim-in-intent + triaged by **lane**, **risk**, and **sequencing**.
 This is the backlog; detail/decisions land in the owning docs as each is picked up.
 
+> **✅ ALL 13 VERIFIED COMPLETE (2026-08-18).** At the owner's "you can do all the F",
+> every item here was Step-0 code-verified a second time. All 13 are implemented. Twelve
+> were already shipped (v0.30.0–v0.32.0); **item 4 was a real bug** — the day-column drag
+> persisted its order but never repainted, so it had never visibly worked — fixed in
+> v0.38.2. Items 6 and 8 were found already done and are annotated below with the code
+> that does them. The roadmap's section F, which had gone stale describing this as an
+> unstarted architectural project, is reconciled to match.
+>
+> The one living descendant is roadmap **item 15** (a day dropdown for FILE-kind manual
+> comparisons; folder-kind already filters) — owner-ranked "very rare use".
+
 > **✅ COMPLETE (2026-07-23): [v0.30-owner-backlog-plan.md](v0.30-owner-backlog-plan.md)** —
 > the owner expanded this list to 20 comments; every item was Step-0 code-verified there
 > (several were already implemented or refuted) and the whole set shipped across
