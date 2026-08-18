@@ -3,6 +3,13 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.38.1 — 2026-08-18
+
+Hotfix on v0.38.0, caught by walking the report-integration ladder.
+
+- **Selecting Highway Summary in BOTH editions saved them in the wrong order.** The new print edition was missing from the list of saves that rebuild the page, so a combined run could capture the PDF first — which replaces the report area and destroys the Export button the Excel edition then needs. Every other print edition was already listed.
+- The check that guards this no longer keeps its own list: it now reads each export's save and requires any save that calls the site's own print function to be ordered last. It fails on the v0.38.0 code.
+
 ## v0.38.0 — 2026-08-18
 
 Highway Detail's two editions now agree **exactly**. The statewide PDF-vs-Excel

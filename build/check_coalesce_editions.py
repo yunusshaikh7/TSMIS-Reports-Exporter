@@ -129,6 +129,28 @@ def test_save_order():
     c.check("Excel sorts before PDF regardless of selection order",
             [specs[i].subdir for i in order] == ["highway_log", "highway_log_pdf"])
 
+    # DERIVED from the saves themselves, not a hand-kept list. A save that invokes
+    # the site's own print function (`*_printAll`) REBUILDS #rampResults, so the
+    # Export button element its Excel sibling needs is re-created — it MUST
+    # therefore be in _PAGE_REBUILDING_SAVES, or a combined run could save it FIRST
+    # and break the sibling. Hand-keeping that set is exactly how the Highway
+    # Summary print edition shipped missing from it. Ramp Summary's save_pdf_letter
+    # captures the already-rendered report WITHOUT a print call, so it correctly
+    # stays out.
+    import inspect
+
+    import report_catalog
+    for e in report_catalog.EXPORT:
+        try:
+            src = inspect.getsource(e.spec.save)
+        except (OSError, TypeError):     # a stub/placeholder spec has no real save
+            continue
+        if "printAll" not in src:
+            continue
+        c.check(f"{e.key}: its save calls a site print fn, so it must rebuild-order",
+                exporter._save_rebuilds_page(e.spec),
+                f"add {e.spec.save.__name__} to exporter._PAGE_REBUILDING_SAVES")
+
 
 def _run_route(base_spec, targets, results, *, err=None):
     """Drive _process_route_combined once with a faked generation + saves."""

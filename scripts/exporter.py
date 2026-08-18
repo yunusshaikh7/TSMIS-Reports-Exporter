@@ -632,10 +632,10 @@ def save_ramp_detail_pdf(page, out_path, timeout_ms=None):
 _PAGE_REBUILDING_SAVES = frozenset({
     save_highway_log_pdf, save_intersection_detail_pdf, save_highway_detail_pdf,
     save_highway_sequence_pdf, save_ramp_detail_pdf,
-    # ints_printAll only PREPENDS a cover, but it reassigns #rampResults's
-    # innerHTML (the Export button element is re-created) — order it after the
-    # DOM-preserving Export-button save all the same.
-    save_intersection_summary_pdf,
+    # ints_printAll / hs_printAll only PREPEND a cover, but they reassign
+    # #rampResults's innerHTML (the Export button element is re-created) — order
+    # them after the DOM-preserving Export-button save all the same.
+    save_intersection_summary_pdf, save_highway_summary_pdf,
 })
 
 
