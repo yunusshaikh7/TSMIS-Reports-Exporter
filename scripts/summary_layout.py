@@ -75,6 +75,15 @@ class SummarySpec:
     footnotes: tuple = field(default_factory=tuple)   # TSMIS-only extras (e.g. no-linework)
     notes: tuple = field(default_factory=tuple)       # extra note lines on the familiar
     #                                                   sheet (e.g. normalizations applied)
+    # MEASURE (opt-in, v0.37.0). The two COUNT summaries (Ramp / Intersection)
+    # leave these None and keep the integer behavior byte-for-byte; Highway
+    # Summary measures MILES, whose values are fractional and would read as blank
+    # through the integer reader. `value_reader` turns a cell into the number the
+    # familiar sheet shows (None -> `_as_int`); `value_format` is the Excel number
+    # format for those cells (None -> the integer "0").
+    value_reader: object = None
+    value_format: str = None
+    measure_noun: str = "Counts"      # the familiar sheet's lead noun ("Miles")
 
     def categories(self):
         """Every COMPARED category in display order (sections then total) as
@@ -581,8 +590,11 @@ def _render(wb, ctx, spec, footnote_values=None, extra_notes=None):
     sc = ctx["sc"]
     side_a, side_b = sc.side_a, sc.side_b          # the side LABELS ("TSMIS"/"TSN")
     file_a, file_b = ctx.get("side_a", ""), ctx.get("side_b", "")   # the source filenames
-    va = {r[0]: _as_int(r[1]) for r in ctx["rows_a"]}
-    vb = {r[0]: _as_int(r[1]) for r in ctx["rows_b"]}
+    # Opt-in measure reader (see SummarySpec); the count specs keep `_as_int`.
+    read = spec.value_reader or _as_int
+    num_fmt = spec.value_format
+    va = {r[0]: read(r[1]) for r in ctx["rows_a"]}
+    vb = {r[0]: read(r[1]) for r in ctx["rows_b"]}
 
     # CMP-AUD-039: the diff STYLING must come from the SAME typed comparison the
     # Comparison sheet uses (compared_cell), never an independently re-derived
@@ -625,8 +637,10 @@ def _render(wb, ctx, spec, footnote_values=None, extra_notes=None):
             return value
         c = WriteOnlyCell(ws, value=value)
         c.font = font
-        if isinstance(value, int) and not isinstance(value, bool):
-            c.number_format = "0"      # never let General render a count as 1E+09
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            # Never let General render a count as 1E+09, or drop a measure's
+            # decimals. `num_fmt` is the spec's opt-in measure format.
+            c.number_format = num_fmt or "0"
         if fill:
             c.fill = fill
         if align:
@@ -652,12 +666,21 @@ def _render(wb, ctx, spec, footnote_values=None, extra_notes=None):
     # General format silently degrades a large one to `1E+09`. Measure the real
     # numbers and give them an explicit integer format so the value shown is the
     # value counted (RB2-R2-002 round 9).
-    counts = [str(v) for v in list(va.values()) + list(vb.values())
+    # Column widths are measured off the REAL rendered numbers. A measure spec's
+    # values are floats, so the isinstance test admits both (bool excluded — it is
+    # an int subclass and never a value here).
+    def _num(v):
+        return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+    def _shown(v):
+        return format(v, ",.3f") if (num_fmt and isinstance(v, float)) else str(v)
+
+    counts = [_shown(v) for v in list(va.values()) + list(vb.values())
               + list((footnote_values or {}).values())
-              if isinstance(v, int)]
-    deltas = [str(b - a) for a, b in ((va.get(k), vb.get(k))
-                                      for k in set(va) | set(vb))
-              if isinstance(a, int) and isinstance(b, int)]
+              if _num(v)]
+    deltas = [_shown(b - a) for a, b in ((va.get(k), vb.get(k))
+                                         for k in set(va) | set(vb))
+              if _num(a) and _num(b)]
     # B and C carry the two SIDE NAMES in their header, bold, and a side name is
     # as long as its environment and date make it ("SSOR-PROD 2026-07-23"); the
     # count beneath is short but the header is not, and its neighbour is
@@ -681,7 +704,7 @@ def _render(wb, ctx, spec, footnote_values=None, extra_notes=None):
     # a structurally one-sided category stays BLANK on the absent side (blank ≠
     # an explicit source 0) — and must not cite another family's categories;
     # the family-specific detail rides spec.notes.
-    ws.append([cell(f"Counts per category. Δ = {side_b} − {side_a}; a flagged row "
+    ws.append([cell(f"{spec.measure_noun} per category. Δ = {side_b} − {side_a}; a flagged row "
                     "is one the Comparison sheet judges different. A category one "
                     "system doesn't classify stays BLANK on that side (no Δ) and "
                     "is listed under 'Only in …' in the Comparison sheet; an "

@@ -4,7 +4,30 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 (what already shipped, per release) is `CHANGELOG.md`; the narrative is
 [history.md](history.md). This file is what's *left*.
 
-> ### ▶ WHERE THINGS STAND (2026-07-23, after v0.32.0)
+> ### ▶ WHERE THINGS STAND (2026-08-17, after v0.37.0)
+>
+> **The vendor RELEASED Highway Detail and Highway Summary on 2026-08-17**
+> (`ground-truth/HD + HS Release 8.17/` — one same-build pull, 756 files).
+> **v0.37.0** integrated Highway Summary (consolidator + cross-environment
+> comparator + matrix row + a hermetic layout-contract check) and LIFTED the
+> Highway Detail pre-release freeze. HD's schema was UNCHANGED — the same 34
+> columns, 51,327 statewide rows — so the freeze was about data trust, not
+> format. The release also surfaced and fixed **CMP-AUD-243**: HD (PDF) silently
+> lost the record on every single-record page (13 pages / 12 routes).
+>
+> **Still open on HD, deliberately NOT done in v0.37.0:** **CMP-AUD-186**
+> (multi-baseline line-two truncation — the ledger scopes it as its own session,
+> a parser rewrite) and **CMP-AUD-053** (2 orphan lines on route 395).
+> **133 / 142** are un-deferred and now actionable against real data.
+> **Highway Summary is COMPLETE**: the owner supplied the statewide TSN print the
+> same day, so **v0.37.0** added its vs-TSN leg — all 13 integrated reports now
+> compare against TSN. (Caveat: that print is 09/15/2025 against a 2026-08-17
+> export, so 89 of its 92 categories differ for real; a near-same-date print would
+> make the comparison a defect check rather than a drift report.)
+>
+> *(The block below is the 2026-07-23 / v0.32.0 state, kept for context.)*
+>
+> ### ▶ WHERE THINGS STOOD (2026-07-23, after v0.32.0)
 >
 > **The owner's 20-comment backlog is COMPLETE.** It ran as two marathons plus a
 > close-out — v0.30.0 (the surfaces/diagnosis run: day filters, day-column drag,
@@ -21,11 +44,11 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > compares — owner-ranked "very rare use"), tracked below.
 >
 > **The comparison-perfection project is DONE — v0.28.0; `main` is the completion
-> state.** 237 of 242 findings closed. The 5 open are ALL the ⛔ Highway Detail
-> pre-release block (133 · 142 · 186 · 192 + 045-HD): the vendor accidentally
-> enabled HD's exports, they are greyed out again, and every HD artifact on disk
-> came from that window. **Never infer an HD answer** — those findings reopen on the
-> owner's official HD delivery, which is also the trigger to re-verify the HD schema.
+> state.** As of v0.37.0: **239 of 243 findings closed, 4 open** — 133 · 142 · 186
+> + 045-HD. The ⛔ HD pre-release block that held them is LIFTED (see the 2026-08-17
+> note above): 192 resolved, 243 opened+fixed, and 045's HD-Excel county question
+> ANSWERED — the released Excel export has **no county column**, making it an owner
+> decision rather than a vendor wait. **Still never infer an HD county answer.**
 >
 > **Owed by the owner, blocking nothing else: the work-PC acceptance run — now
 > targeting v0.32.0** (the dev box cannot reach the TSMIS intranet). Comparison AND
@@ -37,10 +60,11 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > generates once per route, resume a pre-v0.32 partial run (no route may end with
 > two files), and run one Excel-row evidence generation.
 >
-> **What's actually next:** the CA INTERSECTIONS + CA RAMPS clean-road builds on the
-> v0.29.0 pattern (mappings censused in
-> [planning/cleanroad-highways.md](planning/cleanroad-highways.md)), and Highway
-> Summary whenever the site un-greys it.
+> **What's actually next:** **CMP-AUD-186** (the HD multi-baseline parser rewrite —
+> now unblocked, scoped as its own session, and the ONLY thing between Highway
+> Detail's two editions and a clean statewide self-check), and the CA INTERSECTIONS
+> + CA RAMPS clean-road builds on the v0.29.0 pattern (mappings censused in
+> [planning/cleanroad-highways.md](planning/cleanroad-highways.md)).
 
 > **v0.18.1 — field-validated close-out (SHIPPED 2026-06-26).** The work-PC sign-off release on top of
 > the v0.18.0 candidate, bundled in ONE commit (`e2bfade`; tag `v0.18.1` pushed → `release.yml` published
@@ -89,6 +113,83 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > **Owed (now consolidated in *Next version (v0.18.2)* above):** the work-PC live verification, the
 > **gh-pages** landing-page regen, and the two deferred v0.17.1 follow-ups — **cancel-latency** and
 > **narrow-mode** (<980 CSS px) matrix-tab polish.
+
+
+---
+
+## ▣ OPEN WORK INVENTORY (current as of v0.37.0, 2026-08-17)
+
+**This is the definitive list of what is left.** Everything below is genuinely
+open; anything not here is either shipped (see `CHANGELOG.md`) or a historical
+record. The long themed sections further down keep the detail and rationale — this
+table is the index into them. Re-verify an item against the code before acting on
+it; a stale line here is a bug in this list.
+
+### A. Correctness — the 4 open comparison findings (A1–A4) + 1 owner decision (A5)
+
+| # | Item | Notes |
+|---|---|---|
+| A1 | **CMP-AUD-186** — Highway Detail (PDF) truncates multi-baseline line-two records, blanks all 23 attribute cells, and reports complete | **Its own session — a parser rewrite.** Now bounded EXACTLY: the statewide PDF-vs-Excel self-check pairs 51,327 locations, 0 one-sided, 51,326 identical — **this is the ONLY differing row** (route 395 `R000.000E`, 24 cells). The single thing between HD's two editions and a clean self-check. |
+| A2 | **CMP-AUD-053** — 2 orphan data lines on route 395 reconcile to no record | Same route as A1, separate defect. Keeps the HD-PDF consolidation at PARTIAL. |
+| A3 | **CMP-AUD-133** — normalized Detail libraries discard source-backed identity / print / Report View facts (the HD remainder) | Un-deferred by the release; now actionable against trustworthy data. |
+| A4 | **CMP-AUD-142** — Highway Detail drops two PDF-printed snapshot dates and misdescribes them as database-only | Library change → D2 `normalization_version` bump + re-bless when it lands. |
+| A5 | **CMP-AUD-045 (HD-Excel county)** — *an owner decision, not a task* | **ANSWERED**: the released HD Excel export has NO county column. Either accept HD-Excel pairing without county as a disclosed weakness, or source county from the HD PDF page banner / TSN sidecars. **Never infer it.** |
+
+All five live in the [finding ledger](planning/comparison-perfection/comparison-audit-findings.md);
+the project record is [COMPLETION-PLAN.md](planning/comparison-perfection/COMPLETION-PLAN.md).
+
+### B. Owed by the owner (work PC only — this dev box cannot reach TSMIS)
+
+| # | Item | Notes |
+|---|---|---|
+| B1 | **The work-PC acceptance run — now against v0.37.0** | Comparison + evidence output intentionally differ from v0.26.2/v0.27.x: re-run both sides, never reconcile old against new. TSN libraries rebuild once; PDF-sourced workbooks re-consolidate once. Then the carried v0.30–v0.32 items in [the backlog plan §4](planning/v0.30-owner-backlog-plan.md): Retry Edge sign-in, the PDF vs Excel Matrix, a fast-mode dual-format run, a pre-v0.32 partial resume, one Excel-row evidence run. **New for v0.37.0:** a Highway Summary export → consolidate → vs-TSN run, and one Highway Detail evidence generation (its evidence lane just opened — see D1). |
+
+### C. Waiting on the vendor / the site
+
+| # | Item | Unlock |
+|---|---|---|
+| C1 | **Clean Road exports** (`clean_highway` / `clean_intersection` / `clean_ramp`) | All three `cs-disabled` with no report module behind them. A statewide export of each unlocks their real `save` + TSN normalizers. |
+| C2 | **Route History export flow** | Dev-site only, greyed reserved placeholder (stable id 15). |
+| C3 | **A Highway Summary PDF edition** | The site's `highway_summary.js` carries `hs_printAll()`, but the 8.17 delivery was Excel only. Add the export edition only once real prints exist to verify a parser against (the HSL / RD-PDF sequence). |
+| C4 | **A same-date TSN Highway Summary print** | The supplied print is 09/15/2025 against a 2026-08-17 export — 89 of 92 categories differ from ~11 months of real drift. A near-date print would make that comparison a defect check instead. |
+| C5 | **DEF-01 — permanent/main-site parity** | The frozen output-audit archive is a DEV-site export; equivalence is not established and must not be assumed. Needs a review-ready permanent-site export. |
+| C6 | **DEF-03 — baseline Intersection Detail (2 decisions)** | Needs a prior **SSOR-prod** Intersection Detail export for a second day. |
+
+### D. Found during the v0.37.0 work — open
+
+| # | Item | Notes |
+|---|---|---|
+| D1 | **Highway Detail (PDF) has no ENV evidence** | v0.37.0 opened HD's **vs-TSN** evidence lane (the registry was explicitly waiting on the freeze). Its adapter carries `locate_tsn` / `tsn_value` / `tsn_box` but no `env_locate` / `env_fields`, so the cross-environment lane still refuses it and stays at four rows. Writing those two hooks would make it five there too. |
+| D2 | **The Reset cleanup misses the two Intersection Excel export folders** | `gui_worker_maint._LEGACY_OUTPUT_DIRS` lists every other report's export dir but not `intersection_detail` / `intersection_summary`. `highway_summary` had the same omission and was fixed in v0.37.0. Confirm whether it is deliberate before changing. |
+| D3 | **`check_report_wiring` only asserts Reset coverage for `fmt == "pdf"` rows** | Which is why D2 (and the Highway Summary omission) never failed the gate. Extending it to every non-site-disabled export key would have caught all three. |
+| D4 | **The Highway Summary vs-TSN cell is PERMANENTLY amber with the current print** | The print masks `MEDIAN BARRIER Z- NO BARRIER` as `**********`, so the normalized workbook is honestly PARTIAL and the comparison propagates that (`⚠ 1 input skipped … coverage is incomplete`). That is the correct contract — 91 of 92 categories have a TSN value — but it cannot clear until a print states that figure. **Owner call:** live with amber, or decide masked-means-uncomparable should read complete-with-note. |
+| D5 | **Both vs-TSN canaries are currently MIXED VINTAGE** | HD's TSN extract is REFERENCE_DATE 2025-09-08 and HS's print 09/15/2025, both against a 2026-08-17 export. The comparisons are structurally sound (verified end to end), but the differing-cell counts are dominated by ~11 months of real network change and are **not blessable as canaries**. A same-period TSN pull for either report converts its smoke test into a re-bless. |
+
+### E. Hygiene / low priority
+
+| # | Item | Notes |
+|---|---|---|
+| E1 | **5 grandfathered silent-swallow baseline entries no longer match** | `check_silent_swallows` reports them as prunable; the gate is green. |
+| E2 | **33 ruff F401s in `build/check_*.py`** | Pre-existing; CI lints `scripts` only, so non-blocking. `--fix` handles all 33. |
+| E3 | **gh-pages landing-page regen** | Owed since v0.17.0; website only ([website.md](website.md)). |
+| E4 | **Clean-road sliver policy** | The 0.001-mi boundary-calibration class (rows keyed 9.256 vs 9.257) pairs one-sided today; a few hundred statewide. |
+| E5 | The smaller standing items | In the themed sections below: cancel-latency, narrow-mode matrix polish, console `run_cli_multi` coalescing, the shared whitespace-collapse helper, doc/comment line-ref drift. |
+
+### F. Design-first / gated (do not start without the design)
+
+| # | Item | Notes |
+|---|---|---|
+| F1 | **Output-model unification** (app-consistency items 9 / 10 / 11 / 13) | Export / consolidate / compare output locations + naming standardized so every surface consumes the same artifacts. Spec: [output-model-unification.md](planning/output-model-unification.md). **Design FIRST.** |
+| F2 | **sol-002 — export-engine mechanics** | GATED on landing the additive `paths.py` step-1 from F1. Not dispatched. See [agent-handoffs/STATUS.md](agent-handoffs/STATUS.md). |
+| F3 | The remaining [app-consistency backlog](planning/app-consistency-backlog.md) items | 13 owner OBSERVATIONS — **Step 0 of EACH is a code-verification pass**; the owner said he may be wrong and some may already be correct. Never build on an unverified observation. |
+
+### G. The next large build
+
+| # | Item | Notes |
+|---|---|---|
+| G1 | **CA INTERSECTIONS + CA RAMPS clean-road builds** (DEF-05) | On the v0.29.0 CA HIGHWAYS pattern; mappings already censused in [planning/cleanroad-highways.md](planning/cleanroad-highways.md). `tsn_load_clean_road` deliberately has no normalizer for these two slots until their builds land. |
+
+---
 
 ## How to maintain this file
 

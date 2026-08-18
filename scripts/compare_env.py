@@ -52,8 +52,10 @@ def _norm_route_key(token):
 import artifact_store
 import compare_highway_log as _hl
 import compare_tsn_common as ctc
+import consolidate_highway_summary as _hs
 import consolidate_intersection_summary as _is
 import consolidate_ramp_summary as _rs
+import highway_summary_columns as _hsc
 from compare_core import CompareSchema, normalize_value, run_compare
 from compare_tsn_common import row_has_data
 
@@ -437,6 +439,66 @@ def _load_intersection_summary_side(folder, label, events):
     if not rows:
         raise ValueError(
             f"No readable Intersection Summary files were found for the {label} "
+            f"side in:\n{in_dir}")
+    if skipped:
+        events.on_log(f"  [{label}] note: {len(skipped)} file(s) skipped (details above).")
+    return rows, skipped
+
+
+# Highway Summary: the same aggregate-per-route shape as Intersection Summary,
+# but MILES-measured. `agg_header` IS the consolidator's own header
+# (highway_summary_columns.HEADER), so the compared columns and the consolidated
+# workbook's columns cannot drift apart.
+HS_HEADER = list(_hsc.HEADER)
+
+
+def _load_highway_summary_side(folder, label, events):
+    """Parse every per-route Highway Summary XLSX on one side into per-route-shape
+    rows ([route, total miles, *category miles] — the route IS the row key),
+    reusing the consolidator's own reader (consolidate_highway_summary.parse_route
+    -> highway_summary_columns.values_from_rows) so the two sides can't drift from
+    each other or the consolidation. Mileage is compared as the same miles values
+    the consolidated workbook shows. Returns (rows, skipped); raises ValueError
+    when nothing is readable."""
+    in_dir, files = _find_input_dir(folder, "highway_summary", "*.xlsx")
+    files = [p for p in files if not p.name.startswith("~$")]
+    if not files:
+        raise ValueError(
+            f"No Highway Summary files were found for the {label} side:\n{in_dir}"
+            "\n\nExport the Highway Summary report on that environment first.")
+    rows, skipped = [], []
+    for i, p in enumerate(files, 1):
+        if events.is_cancelled():
+            raise ValueError("Cancelled by user.")
+        try:
+            route, values, total = _hs.parse_route(str(p))
+        except Exception as e:
+            events.on_log(f"  [{label}] {p.name}: could not parse "
+                          f"({type(e).__name__}); skipping")
+            log.warning("env compare: %s parse failed", p, exc_info=True)
+            skipped.append(f"{label} {p.name}: could not parse ({type(e).__name__})")
+            continue
+        if not _hs.record_has_data({"total": total, "values": values}):
+            events.on_log(f"  [{label}] {p.name}: no mileage; skipping")
+            skipped.append(f"{label} {p.name}: no mileage")
+            continue
+        # CMP-AUD-018: the consolidator FAILS a record whose sections cannot
+        # reconcile; the cross-env loader must apply the SAME strict validator
+        # (`record_problem`) so two identically malformed sides can't certify a
+        # clean match. A problem is a loud skip (incompleteness), naming the
+        # route, never a silently-compared row.
+        problem = _hs.record_problem(values, total, source=p.name)
+        if problem:
+            events.on_log(f"  [{label}] {p.name}: {problem}; skipping")
+            skipped.append(f"{label} {p.name}: route {route} — {problem}")
+            continue
+        rkey = _norm_route_key(route)
+        rows.append([rkey, _hsc.miles(total)]
+                    + [_hsc.miles(values.get(c.slug, 0)) for c in _hsc.CATS])
+        events.on_log(f"  [{label}] [{i:>3}/{len(files)}] {p.name} (route {rkey})")
+    if not rows:
+        raise ValueError(
+            f"No readable Highway Summary files were found for the {label} "
             f"side in:\n{in_dir}")
     if skipped:
         events.on_log(f"  [{label}] note: {len(skipped)} file(s) skipped (details above).")
@@ -1769,6 +1831,20 @@ RAMP_DETAIL_PDF = EnvCompare(
     # CMP-AUD-046: the same corrected labels as the Excel side + the two
     # print-only columns the PDF carries, which are already correctly positioned.
     force_header=_RD_ENV_HEADER + ["On/Off", "Ramp Type"])
+
+# Highway Summary cross-env (v0.37.0) — the aggregate-per-route path, like
+# INTERSECTION_SUMMARY above but MILES-measured. Appended LAST among the env
+# rows so the existing matrix row order is unchanged. This is Highway Summary's
+# ONLY comparison today: the report has no TSN extract yet, so its vs-TSN matrix
+# cell stays unsupported until one lands (day_matrix derives that from
+# matrix.tsn_supported, no per-report special case).
+HIGHWAY_SUMMARY = EnvCompare(
+    "highway_summary", "Highway Summary", "highway_summary",
+    side_loader=_load_highway_summary_side, agg_header=HS_HEADER,
+    base_schema=CompareSchema(
+        report_name="Highway Summary", header=HS_HEADER,
+        id_noun="route", id_noun_plural="routes",
+        scope_flat="All routes (one row per route)"))
 
 # Default save location for cross-environment comparison workbooks (the GUI
 # aims its save dialog here; "Delete all reports" clears it).

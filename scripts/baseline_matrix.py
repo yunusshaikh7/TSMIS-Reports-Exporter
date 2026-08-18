@@ -54,9 +54,12 @@ def sources():
 
 
 def _rows():
-    """[(row_key, label, subdir, supported)] — every cross-env matrix row (all 12
-    report types; `supported` mirrors the adapter's presence so a future
-    adapter-less row greys instead of crashing)."""
+    """[(row_key, label, subdir, supported)] — every cross-env matrix row (all 13
+    report types as of v0.37.0; `supported` mirrors the CROSS-ENV adapter's
+    presence — NOT vs-TSN support — so a future adapter-less row greys instead of
+    crashing. Highway Summary is supported here despite having no TSN comparator:
+    a baseline comparison diffs two pulls of the SAME report, which needs only the
+    cross-env adapter it has)."""
     return [(row_key, label, subdir, adapter is not None)
             for row_key, label, subdir, _idx, adapter in reports.matrix_rows()]
 

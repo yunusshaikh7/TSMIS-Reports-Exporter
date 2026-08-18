@@ -1121,9 +1121,9 @@ denials above.
 | ID | Item | Reason deferred | Trigger to revisit |
 |---|---|---|---|
 | **DEF-01** | Permanent/main-site parity | The frozen archive is a **development-site** SSOR-prod export. Equivalence is not established and must not be silently assumed | A review-ready permanent-site export is supplied |
-| **DEF-02** | Highway Detail and Highway Detail (PDF) — 14 decisions | Absent from the frozen archive; greyed out on the dev site; owner-declared **pre-release**, and no artifact on disk is ground truth | The vendor delivers official review-ready Highway Detail exports. Same trigger reopens CMP-AUD-133 / 142 / 186 / 192 and 045-HD |
+| **DEF-02** | Highway Detail and Highway Detail (PDF) — 14 decisions | ~~Absent from the frozen archive; greyed out on the dev site; owner-declared **pre-release**~~ | **TRIGGERED 2026-08-17** — the vendor released HD (`ground-truth/HD + HS Release 8.17/`). Schema unchanged (34 cols, 51,327 rows). 192 resolved, 045-HD answered (no county column → owner decision), 243 found+fixed; **133 / 142 / 186 now actionable** (186 still open, its own session). The 14 decisions can be reviewed against real data |
 | **DEF-03** | Baseline Intersection Detail and Intersection Detail (PDF) — 2 decisions | Baseline's same-environment day model cannot select the supplied prior ARS source, and the retained SSOR folder is empty | A prior **SSOR-prod** Intersection Detail export for a second day |
-| **DEF-04** | Highway Summary comparison coverage | Still `cs-disabled` on prod and dev; no schema can be verified | The site un-greys it and a statewide export can be pulled |
+| **DEF-04** | Highway Summary comparison coverage | ~~Still `cs-disabled` on prod and dev; no schema can be verified~~ | **CLOSED — v0.37.0.** The site un-greyed it, the statewide export was pulled and censused (consolidate + cross-env in v0.37.0), and the owner supplied the statewide TSN print the same day, so the vs-TSN leg shipped in v0.37.0. Coverage is complete; the only caveat is the print's 09/15/2025 vintage against a 2026-08-17 export |
 | **DEF-05** | Clean Road Intersection and Clean Road Ramp | `tsn_load_clean_road` has no normalizer; the library rebuild refuses both by design | Their ArcGIS-side build and comparison are integrated on the Highway pattern |
 
 ## Joint approval

@@ -61,15 +61,15 @@ def test_enumeration():
     dest = Path(tempfile.mkdtemp(prefix="tsmis_mx_"))
     try:
         snap = matrix.matrix_snapshot(dest, baseline_key="ssor-prod")
-        check("twelve comparable rows — every report (both HL + both Intersection + "
+        check("thirteen comparable rows — every report (both HL + both Intersection + "
               "both Highway Detail + both Highway Sequence + both Ramp Detail "
-              "formats, v0.26.0)",
+              "formats, v0.26.0; Highway Summary appended LAST, v0.37.0)",
               snap["rows"] == ["ramp_summary", "ramp_detail", "highway_sequence",
                                "highway_log", "intersection_summary",
                                "intersection_detail", "highway_log_pdf",
                                "intersection_detail_pdf", "highway_detail",
                                "highway_detail_pdf", "highway_sequence_pdf",
-                               "ramp_detail_pdf"])
+                               "ramp_detail_pdf", "highway_summary"])
         check("all_rows lists every row with labels + tsn_capable",
               [r["key"] for r in snap["all_rows"]] == snap["rows"]
               and all(r.get("label") for r in snap["all_rows"]))
@@ -78,7 +78,10 @@ def test_enumeration():
               == {"highway_log", "highway_log_pdf", "ramp_detail", "ramp_summary",
                   "highway_sequence", "intersection_summary", "intersection_detail",
                   "intersection_detail_pdf", "highway_detail", "highway_detail_pdf",
-                  "highway_sequence_pdf", "ramp_detail_pdf"})
+                  "highway_sequence_pdf", "ramp_detail_pdf",
+                  # v0.37.0: Highway Summary gained its vs-TSN comparator, so
+                  # EVERY matrix row is tsn_capable again.
+                  "highway_summary"})
         check("six env columns", len(snap["envs"]) == 6
               and snap["envs"][0] == "ssor-prod")
         check("both Intersection reports are now matrix rows (cross-env in v0.17.0)",
@@ -88,7 +91,7 @@ def test_enumeration():
         hidden_snap = matrix.matrix_snapshot(dest, baseline_key="ssor-prod",
                                              hidden=["highway_log"])
         check("hidden row dropped from rows",
-              "highway_log" not in hidden_snap["rows"] and len(hidden_snap["rows"]) == 11)
+              "highway_log" not in hidden_snap["rows"] and len(hidden_snap["rows"]) == 12)
         check("hidden row still in all_rows + hidden list",
               any(r["key"] == "highway_log" for r in hidden_snap["all_rows"])
               and hidden_snap["hidden"] == ["highway_log"])

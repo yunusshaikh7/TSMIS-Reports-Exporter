@@ -92,18 +92,24 @@ check("a print target box is engine-checked against the record's own printed "
 
 # --------------------------------------------------------------------------- #
 print("registry + sources + clamp")
-check("rows: the four PDF-edition rows, nothing else (the 2026-08-05 ruling — "
-      "Excel rows and Highway Detail are out; HD-PDF joins when the owner "
-      "lifts the pre-release freeze)",
-      ve.rows() == ["highway_log_pdf", "highway_sequence_pdf",
+check("rows: the five PDF-edition rows, nothing else (the 2026-08-05 ruling — "
+      "the Excel rows stay out; HD-PDF JOINED in v0.37.0 when the vendor's "
+      "official release lifted the pre-release freeze)",
+      ve.rows() == ["highway_detail_pdf", "highway_log_pdf", "highway_sequence_pdf",
                     "intersection_detail_pdf", "ramp_detail_pdf"])
 check("capable() matches rows(), and refuses every non-_pdf row",
       all(ve.capable(r) for r in ve.rows())
       and not ve.capable("ramp_summary") and not ve.capable("highway_log")
-      and not ve.capable("highway_detail")
-      and not ve.capable("highway_detail_pdf")
+      and not ve.capable("highway_detail")          # the EXCEL row stays out
       and not ve.capable("intersection_detail")
       and not ve.capable("ramp_detail"))
+# HD-PDF is vs-TSN ONLY: its adapter has locate_tsn/tsn_value/tsn_box but no
+# env hooks, so the ENV lane must still refuse it (env_capable checks the hooks).
+check("highway_detail_pdf is vs-TSN capable but NOT env capable",
+      ve.capable("highway_detail_pdf") and not ve.env_capable("highway_detail_pdf"))
+check("the ENV lane stays at the original four rows",
+      sorted(ve._ENV_ADAPTER_MODULES) == ["highway_log_pdf", "highway_sequence_pdf",
+                                          "intersection_detail_pdf", "ramp_detail_pdf"])
 check("the self lane is retired everywhere (self_capable False for every row)",
       not any(ve.self_capable(r) for r in ve.rows()))
 check("TSMIS visuals come from each report's (PDF)-edition export subdir",
@@ -900,15 +906,17 @@ avail = ve.availability()
 check("availability shape (rows/tsn_pdfs/ready/dir/reports/row_reports/deps_ok)",
       set(avail) >= {"rows", "tsn_pdfs", "ready", "dir", "reports", "row_reports",
                      "deps_ok"})
-check("availability reports the four supported evidence families, per-dir + "
-      "source kind (the 2026-08-05 ruling: HD is out until the freeze lifts)",
+check("availability reports the five supported evidence families, per-dir + "
+      "source kind (HD joined in v0.37.0 — its statewide-XLSX TSN library keeps "
+      "the separate optional pdf/ drop, like Intersection/Ramp Detail)",
       [r["key"] for r in avail["reports"]]
-      == ["highway_log", "highway_sequence", "intersection_detail",
-          "ramp_detail"]
+      == ["highway_detail", "highway_log", "highway_sequence",
+          "intersection_detail", "ramp_detail"]
       and all(set(r) >= {"key", "label", "tsn_pdfs", "dir", "source"}
               for r in avail["reports"])
       and {r["key"]: r["source"] for r in avail["reports"]}
-      == {"highway_log": "raw", "highway_sequence": "raw",
+      == {"highway_detail": "pdf", "highway_log": "raw",
+          "highway_sequence": "raw",
           "intersection_detail": "pdf", "ramp_detail": "pdf"})
 check("row_reports maps every capable row to its report (the per-cell action's gate)",
       avail["row_reports"] == ve.TSN_PDF_REPORT

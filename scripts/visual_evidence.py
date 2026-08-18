@@ -98,13 +98,17 @@ DEPS_MSG = "Required components are missing (pdfplumber/Pillow/openpyxl)."
 # evidence collection exists ONLY for the `_pdf`-edition report families — the
 # rows whose compared export genuinely comes from a per-route print set. The
 # Excel rows are absent ON PURPOSE (their vs-TSN cells emit nothing; the
-# engine refuses them through this one registry). Highway Detail (PDF) joins
-# as the fifth family when the owner lifts his 2026-07-21 pre-release freeze.
+# engine refuses them through this one registry). Highway Detail (PDF) JOINED
+# as the fifth family in v0.37.0, when the vendor's official release lifted the
+# 2026-07-21 pre-release freeze this registry was waiting on. It is vs-TSN ONLY:
+# its adapter carries `locate_tsn`/`tsn_value`/`tsn_box` but no `env_locate`/
+# `env_fields`, so `_ENV_ADAPTER_MODULES` below deliberately stays at four.
 _ADAPTER_MODULES = {
     "intersection_detail_pdf": "evidence_intersection_detail",
     "highway_log_pdf": "evidence_highway_log",
     "highway_sequence_pdf": "evidence_highway_sequence",
     "ramp_detail_pdf": "evidence_ramp_detail",
+    "highway_detail_pdf": "evidence_highway_detail",          # v0.37.0
 }
 # Where each row's TSMIS-side PDFs live (the per-route export subdir) and which
 # TSN library report holds the TSN prints (per-district files for Highway Log /
@@ -114,18 +118,21 @@ _ADAPTER_MODULES = {
 TSMIS_PDF_SUBDIR = {"intersection_detail_pdf": "intersection_detail_pdf",
                     "highway_log_pdf": "highway_log_pdf",
                     "highway_sequence_pdf": "highway_sequence_pdf",
-                    "ramp_detail_pdf": "ramp_detail_pdf"}
+                    "ramp_detail_pdf": "ramp_detail_pdf",
+                    "highway_detail_pdf": "highway_detail_pdf"}
 TSN_PDF_REPORT = {"intersection_detail_pdf": "intersection_detail",
                   "highway_log_pdf": "highway_log",
                   "highway_sequence_pdf": "highway_sequence",
-                  "ramp_detail_pdf": "ramp_detail"}
+                  "ramp_detail_pdf": "ramp_detail",
+                  "highway_detail_pdf": "highway_detail"}
 # Report labels for the availability probe (static so the probe never has to
 # import an adapter — a state push must stay cheap; check_visual_evidence pins
 # these maps against report_catalog so they can't drift).
 _TSN_PDF_LABELS = {"intersection_detail": "Intersection Detail",
                    "highway_log": "Highway Log",
                    "highway_sequence": "Highway Sequence",
-                   "ramp_detail": "Ramp Detail"}
+                   "ramp_detail": "Ramp Detail",
+                   "highway_detail": "Highway Detail"}
 # Reports whose TSN prints ARE the library's raw inputs (district-PDF-sourced
 # TSN libraries — Highway Log and Highway Sequence): evidence reads the SAME
 # files from raw/, so a user with a working vs-TSN comparison already has the

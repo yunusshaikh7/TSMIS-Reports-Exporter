@@ -59,7 +59,8 @@ print("which source each row was compared FROM")
 check("every capable row is a '_pdf' edition evidenced from the print "
       "(the 2026-08-05 ruling: nothing else is capable)",
       {rk: ve.tsmis_source_role(rk) for rk in sorted(ve.rows())}
-      == {"highway_log_pdf": "pdf", "highway_sequence_pdf": "pdf",
+      == {"highway_detail_pdf": "pdf", "highway_log_pdf": "pdf",
+          "highway_sequence_pdf": "pdf",
           "intersection_detail_pdf": "pdf", "ramp_detail_pdf": "pdf"})
 check("the role covers exactly the evidence-capable rows",
       set(ve.rows()) == set(ve.TSMIS_PDF_SUBDIR))

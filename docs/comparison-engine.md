@@ -882,6 +882,7 @@ limit and falls back to "Side A"/"Side B" on collision).
 | `HIGHWAY_DETAIL` | Highway Detail | `highway_detail` / "Highway Detail" | `Post Mile` | **flat** (v0.20.0): per-route XLSX, consolidated shape, route + glued-PM key (both env sides share the TSMIS encoding, so no roadbed canonicalization — that's a vs-TSN tool) |
 | `HIGHWAY_DETAIL_PDF` | Highway Detail (PDF) | `highway_detail_pdf` / "Highway Detail" | `Post Mile` | **flat, PDF-sourced** (v0.20.0): `_load_highway_detail_pdf_side`, the `INTERSECTION_DETAIL_PDF` parallel |
 | `HIGHWAY_SEQUENCE_PDF` | Highway Sequence (PDF) | `highway_sequence_pdf` / "Highway Locations" | `PM` | **flat, PDF-sourced** (v0.25.0): `_load_highway_sequence_pdf_side` parses each side's prints with the HSL-PDF consolidator, then reads them flat exactly like the Excel `HIGHWAY_SEQUENCE` row (no header pin — the converted files carry the export's own header, unnamed columns included) |
+| `HIGHWAY_SUMMARY` | Highway Summary | `highway_summary` / "Highway Summary" | route (first col) | **AGGREGATE per route** (v0.37.0), the `INTERSECTION_SUMMARY` parallel but **MILES-measured**: a `side_loader` (`_load_highway_summary_side`) reads each per-route statistics sheet into ONE `[route, total miles, *95 category miles]` row through the consolidator's own reader (`has_route=False`, `agg_header=HS_HEADER == highway_summary_columns.HEADER`, so compared columns and the consolidated workbook's columns cannot drift). Applies the SAME `record_problem` gate as the consolidator (CMP-AUD-018). **The one report with no vs-TSN comparator** — no TSN Highway Summary extract exists yet |
 
 `EnvCompare` has three shapes: the **flat** path (Ramp Detail / Highway Sequence / Highway Log /
 Intersection Detail / Highway Detail — read the per-route sheet rows in consolidated shape); a
@@ -889,7 +890,8 @@ Intersection Detail / Highway Detail — read the per-route sheet rows in consol
 variant (`flat_pdf_loader` — Highway Log (PDF), Intersection Detail (PDF), Highway Detail (PDF)
 **and Highway Sequence (PDF)**, which parse each
 side's PDFs to per-route XLSX first); and the **aggregate-per-route** path (a `side_loader` yielding
-one row per route — Ramp Summary's PDFs, Intersection Summary's category sheets). Ramp Detail /
+one row per route — Ramp Summary's PDFs, Intersection Summary's category sheets, **Highway
+Summary's miles-measured statistics sheets**). Ramp Detail /
 Highway Sequence / Intersection Detail lock their
 layout from the files (both folders must agree, else a clear error); Highway Log (both formats) pins
 `EXPECTED_HEADER` + the Med Wid rule. Verified with
@@ -1059,7 +1061,7 @@ foundation it sits on was audited cell-accurate over the full 6-env batch (2026-
   PDF export). `reports.tsn_matrix_extra_rows()` is empty (every report is a full row).
 - **Per-row comparison MODE** (`matrix._row_modes`, picked via a dropdown under each row's name,
   persisted in `settings.matrix_row_modes`):
-  - `env` — cross-environment (env vs baseline; `compare_env.<adapter>.compare_folders`). **All 12 rows.**
+  - `env` — cross-environment (env vs baseline; `compare_env.<adapter>.compare_folders`). **All 13 rows** (Highway Summary joined in v0.37.0).
   - `tsn` — vs TSN, for **every** report (`matrix.tsn_comparator_for(row_key)`): the FLAT/AGGREGATE
     family-specific comparators for all seven TSN datasets and their PDF siblings. Each PDF row
     **shares its Excel sibling's TSN subdir**, so one TSN dataset serves both editions.
@@ -1132,7 +1134,7 @@ A **second, manual** matrix under the **Compare** tab — a sibling of the Every
 day-keyed instead of env-keyed: **rows = report types, columns = exported days you add, each cell =
 (report, day) vs TSN**. ONE data source for the whole matrix (default `ssor-prod`); **no
 cross-environment, no live re-export** (it compares specific historical exports). **All 12
-comparable report editions are live**; nothing is greyed. (Highway Summary is export-only — no comparator yet, so it isn't a matrix
+comparable report editions are live**; nothing is greyed. (Highway Summary joined the CROSS-ENV matrix in v0.37.0 and gained its vs-TSN comparator in v0.37.0, so its cells are live too. It is not a PDF-vs-Excel matrix
 row.) Like `matrix.py`, it NEVER edits the manual compare code — it only orchestrates.
 
 - **Shared engine:** `day_matrix.build_day_cell` delegates to `matrix.consolidate_and_compare_tsn`
@@ -1204,7 +1206,7 @@ PDF baseline.
   regression-locked by `check_compare_env_sidelabel`) exists because the store's folder shape
   derives a side label confusingly close to the run-folder one.
 - **Baseline identity:** `"day:<date>"` or `"store"` (`parse_baseline`); the picker
-  (`baseline_options`) lists the store + every exported day **with how many of the 12 reports each
+  (`baseline_options`) lists the store + every exported day **with how many of the 13 reports each
   holds** — the "which days have an old copy" answer per option; the grid's per-cell
   `missing_side: "baseline"` state answers it per report. The baseline's own day column renders
   `is_baseline` (skipped by `cells_to_rebuild`; building it is rejected).
@@ -1248,9 +1250,11 @@ PCOA-FINAL-004 workbook-panel remedy):** evidence is an INDEPENDENT spot check
 — a human holds the actual prints against the comparison sheet — so both sides
 of every evidence image are highlighted CROPS of source prints, and evidence
 exists ONLY for the `_pdf`-edition report families (`capable()` names exactly
-`highway_log_pdf` / `highway_sequence_pdf` / `intersection_detail_pdf` /
-`ramp_detail_pdf`; Highway Detail (PDF) joins when its pre-release freeze
-lifts). On a vs-TSN cell the TSMIS side crops the per-route PDF export the
+`highway_detail_pdf` / `highway_log_pdf` / `highway_sequence_pdf` /
+`intersection_detail_pdf` / `ramp_detail_pdf` — **Highway Detail (PDF) JOINED in
+v0.37.0**, when the vendor's official release lifted the pre-release freeze the
+registry was waiting on; it is vs-TSN ONLY, because its adapter carries
+`locate_tsn`/`tsn_value`/`tsn_box` but no `env_locate`/`env_fields`). On a vs-TSN cell the TSMIS side crops the per-route PDF export the
 compared consolidated workbook was built from and the TSN side crops the TSN
 library print; each crop's value is read back through the adapter's LOCKSTEP
 walk, and a print that DISAGREES with the compared value renders WITH a

@@ -63,6 +63,7 @@ import consolidate_tsmis_intersection_detail_pdf as _c_tsmis_int_detail_pdf
 import consolidate_intersection_summary as _c_int_summary
 import consolidate_highway_detail as _c_highway_detail
 import consolidate_tsmis_highway_detail_pdf as _c_tsmis_highway_detail_pdf
+import consolidate_highway_summary as _c_highway_summary
 
 import compare_env as _cmp_env
 import compare_highway_log as _cmp_highway_log
@@ -76,6 +77,7 @@ import compare_intersection_detail_tsn as _cmp_int_detail_tsn
 import compare_highway_sequence_tsn as _cmp_highway_seq_tsn
 import compare_highway_sequence_pdf as _cmp_highway_seq_pdf
 import compare_highway_detail_tsn as _cmp_highway_detail_tsn
+import compare_highway_summary_tsn as _cmp_highway_summary_tsn
 import compare_highway_detail_pdf as _cmp_highway_detail_pdf
 
 # Per-tier descriptors. `key` is the stable export/consolidation/comparison-op key
@@ -233,6 +235,9 @@ CONSOLIDATE = (
     ConsolidateEntry("cons:highway_detail", "Highway Detail", _c_highway_detail),
     ConsolidateEntry("cons:highway_detail_pdf", "TSMIS Highway Detail (PDF)",
                      _c_tsmis_highway_detail_pdf),
+    # Highway Summary (v0.37.0) — the aggregate-per-route summary the vendor
+    # un-greyed on 2026-08-17, completing the Highway group. Appended LAST.
+    ConsolidateEntry("cons:highway_summary", "Highway Summary", _c_highway_summary),
 )
 
 # Compare tab SUB-TABS (the FIRST is the default). "env" = cross-environment
@@ -296,6 +301,12 @@ COMPARE = (
     # Highway Sequence pair above.
     CompareEntry("cmp:ramp_detail_pdf:env", "TSAR: Ramp Detail (PDF) — between environments",
                  _cmp_env.RAMP_DETAIL_PDF, "folders", "env"),
+    # Highway Summary cross-env (v0.37.0), appended after the existing env rows so
+    # the matrix row order is unchanged. Cross-environment is Highway Summary's ONLY
+    # comparison today — no TSN Highway Summary extract exists yet, so its vs-TSN
+    # matrix cell derives as unsupported (matrix.tsn_supported) until one arrives.
+    CompareEntry("cmp:highway_summary:env", "Highway Summary — between environments",
+                 _cmp_env.HIGHWAY_SUMMARY, "folders", "env"),
     # vs TSN (file-based).
     CompareEntry("cmp:highway_log:tsn", "Highway Log — TSMIS vs TSN",
                  _cmp_highway_log, "files", "tsn"),
@@ -348,6 +359,10 @@ COMPARE = (
                  _cmp_ramp_detail_pdf.TSMIS_PDF_VS_TSN, "files", "tsn"),
     CompareEntry("cmp:ramp_detail:pdf_vs_excel", "TSAR: Ramp Detail — TSMIS (PDF) vs TSMIS (Excel)",
                  _cmp_ramp_detail_pdf.TSMIS_PDF_VS_EXCEL, "files", "self"),
+    # Highway Summary vs TSN (v0.37.0) — the AGGREGATE path (statewide category
+    # miles), the Ramp/Intersection Summary parallel. Appended LAST.
+    CompareEntry("cmp:highway_summary:tsn", "Highway Summary — TSMIS vs TSN",
+                 _cmp_highway_summary_tsn, "files", "tsn"),
 )
 
 # ----------------------------------------------------------------------------- #
@@ -414,6 +429,11 @@ MATRIX = (
                 tsn_subdir="ramp_detail", self_id="vs_excel",
                 self_key="cmp:ramp_detail:pdf_vs_excel", self_other="ramp_detail",
                 self_pdf="ramp_detail_pdf"),
+    # Highway Summary (v0.37.0 cross-env; v0.37.0 vs-TSN). The owner supplied the
+    # statewide TSN print on 2026-08-17, so the row's vs-TSN cell flipped on
+    # exactly the way `day_matrix._day_rows` documents — a `cmp:*:tsn` recipe plus
+    # a per-report TSN dataset, no other change.
+    MatrixEntry("highway_summary", tsn_key="cmp:highway_summary:tsn"),
 )
 
 # B2 auto-consolidate: which consolidate module handles each EXPORTABLE report,
@@ -428,6 +448,7 @@ _AUTO_CONSOLIDATOR = (
     ("intersection_summary", _c_int_summary),
     ("intersection_detail", _c_int_detail),
     ("highway_detail", _c_highway_detail),
+    ("highway_summary", _c_highway_summary),
 )
 
 # Canonical TSN library descriptors — each report's TSN source format + the lazy
@@ -532,6 +553,11 @@ TSN = (
     TsnEntry("highway_detail", "TSN Highway Detail", "*.xlsx", "statewide_xlsx",
              "tsn_highway_detail_normalized.xlsx", "tsn_load_highway_detail:build_into",
              normalization_version=3, evidence_pdfs=True),
+    # Highway Summary (v0.37.0) — the statewide TSN print, the same shape as the
+    # Ramp / Intersection Summary datasets but measuring MILES. Appended LAST.
+    TsnEntry("highway_summary", "TSN Highway Summary", "*.pdf", "statewide_pdf",
+             "tsn_highway_summary_normalized.xlsx",
+             "tsn_load_highway_summary:build_into"),
     # Clean Road (2026-07-22) — STAGED library slots for the three TSN clean-road
     # extracts (CA HIGHWAYS / CA INTERSECTIONS / CA RAMPS, the underlying tables
     # rather than the TSAR projections; CA HIGHWAYS carries the SAME 60,083
@@ -742,6 +768,11 @@ _INPUT_PROFILE_BY_KEY = {
     "cmp:highway_log:pdf_vs_excel": "hl",
     "cmp:ramp_summary:tsn": "summary_tsn",
     "cmp:intersection_summary:tsn": "summary_tsn",
+    # v0.37.0: the third AGGREGATE summary comparison — its TSN side is likewise
+    # the raw statewide print OR the normalized library workbook, so the picker
+    # must accept .pdf as well as .xlsx (the default "std" profile is
+    # consolidated-workbook-only and would refuse the print).
+    "cmp:highway_summary:tsn": "summary_tsn",
 }
 
 _COMPARE_BY_KEY = {c.key: c for c in COMPARE}

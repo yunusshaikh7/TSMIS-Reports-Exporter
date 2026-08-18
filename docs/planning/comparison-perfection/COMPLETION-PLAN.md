@@ -23,7 +23,7 @@ Phase:  0 ── 1 ── 2 ── 3 ── 4 ── 5 ── 6 ── 7 ── 
 | **Owner dashboard** | Live completion Artifact: https://claude.ai/code/artifact/5a8dc468-16cb-4231-a8e2-e5102b102ef4 · source **[completion-dashboard.html](completion-dashboard.html)** (committed here so it survives compaction). **Refresh it IN PLACE as part of every finding's wrap-up** (edit that file, re-publish with `url=` the link above — never mint a new one): bump the closed count / % + the segmented bar, flip a bucket's status when it completes, add the finding to "Shipped this session", update the footer HEAD/gate. This is a standing step in the per-finding workflow (see the RESUME block's method line). |
 | **Gate** | **152/152** full-suite checks (Python + JS) + ruff(scripts) + byte-compile green; **identity gate 11 green / 0 known-red** (CMP-AUD-045 fully promoted) |
 | **Audit floor** | Stage 6 (raw→normalized) **7/7**; Stage 8 base (TSMIS-vs-TSN) **7/7** — all seven witnesses hash-verified on disk |
-| **Findings** | **242 total · 237 CLOSED (Resolved/Remediated) · 5 open** (98% closed; verified against every per-entry `Status:` line 2026-07-22; S0 closed 193 + 242, **M-A closed the whole DUR cluster 80 · 85 · 89 · 115 · 187**, **M-B closed the evidence spine 108 · 208 · 209**, **M-C closed the evidence completion batch 98 · 106 · 109 · 210**). The 5 remaining are ALL the ⛔ HD pre-release block: **133 142 186 192 + 045-HD** — deferred to the owner's official HD delivery; never infer. ~~HL-county~~ was never vendor-blocked (resolved 2026-07-16/17). |
+| **Findings** | **243 total · 239 CLOSED (Resolved/Remediated) · 4 open** (98% closed; S0 closed 193 + 242, **M-A closed the whole DUR cluster 80 · 85 · 89 · 115 · 187**, **M-B closed the evidence spine 108 · 208 · 209**, **M-C closed the evidence completion batch 98 · 106 · 109 · 210**). **2026-08-17 (v0.37.0), on the vendor's HD release:** 192 RESOLVED, **243 opened AND resolved** (HD-PDF single-record-page data loss), 045's HD-Excel county question ANSWERED (no county column — now an owner decision, not a vendor wait). **The 4 open: 133 · 142 · 186 · 045-HD** — no longer deferred; actionable against trustworthy data. ~~HL-county~~ was never vendor-blocked (resolved 2026-07-16/17). |
 | **Next action** | **See the ▶ RESUME HERE block below — it is the ONLY live next-action surface.** (The dated per-batch resolution notes that used to live in this cell are recorded where they belong: each finding's ledger entry, the dated resume blocks below, and git history. Keeping a second prose copy here is what caused the stale-directive incidents.) |
 
 ## Marathon roadmap to completion (2026-07-18)
@@ -56,33 +56,44 @@ its findings back-to-back, then update this roadmap.
 > reconciled. When a finding closes, update its entry Status line AND its index-table row AND this
 > roadmap together. Full-parse-verified count 2026-07-22 (post-S0, post-M-A, post-M-B, post-M-C):
 > **5 open** — ALL of them HD-pre-release-deferred: 133/142/186/192 + 045-HD.
+> **Updated 2026-08-17 (v0.37.0), on the vendor's HD release: 4 open** — 133/142/186 +
+> 045-HD, no longer deferred; ~~192~~ resolved by the same-build delivery and
+> ~~243~~ opened+closed (HD-PDF single-record-page data loss).
 > ~~193~~ and ~~242~~ closed in S0; ~~080/085/089/115/187~~ in M-A; ~~108/208/209~~ in M-B;
 > ~~098/106/109/210~~ in M-C.
 
-> ### ⛔ HIGHWAY DETAIL IS PRE-RELEASE — OWNER, 2026-07-21
+> ### ✅ HIGHWAY DETAIL PRE-RELEASE FREEZE — LIFTED 2026-08-17
 >
-> **The vendor ACCIDENTALLY enabled the Highway Detail exports. They are GREYED OUT
-> again now and the report is in ACTIVE DEVELOPMENT.** Every HD artifact on disk —
-> the 7.7 dev bundle, the 7.9 statewide pull, the TSN workbook — came from that
-> accidental window. It is a snapshot of an unfinished report, not a released format.
+> **The vendor RELEASED Highway Detail (and Highway Summary) on 2026-08-17.** The
+> delivery — `ground-truth/HD + HS Release 8.17/`, 252 routes × Excel + PDF + the HS
+> Excel, one same-build pull — is the trigger the freeze named, so the ⛔ block below
+> it is retired. (Kept for context: from 2026-07-21 the report was frozen because the
+> vendor had ACCIDENTALLY enabled its exports and then re-greyed them; every HD
+> artifact from that window was a snapshot of an unfinished report.)
 >
-> Consequences, and they are not optional:
-> - **Do NOT treat any HD export as ground truth**, and do not re-bless HD canaries as
->   if they were stable. The format is expected to change.
-> - **Do NOT "fix" the HD parser/normalizer against this data.** CMP-AUD-133, 142 and
->   186 are all HD; work done against a pre-release layout is likely to be redone, and
->   worse, could bake a pre-release quirk into the product as if it were a rule.
-> - **045's HD-Excel county is not a question anyone can answer yet.** It is not a
->   pending vendor email — the report itself is unfinished. Never infer it.
-> - **The owner will supply NEW Highway Detail exports when it is officially
->   integrated.** That delivery is the trigger to re-verify the HD schema end to end
->   and only then resume 133 / 142 / 186 / 045-HD.
+> **What the release settled:**
+> - **The schema did NOT change.** The released Excel export carries the SAME 34
+>   columns the app already read — one header across all 252 routes, 0 deviations,
+>   51,327 statewide rows. So the freeze was about data TRUST, not format, and the
+>   existing HD parser/normalizer/comparators were built against a correct layout.
+> - **CMP-AUD-192 is RESOLVED** — the cross-build skew it describes cannot arise in a
+>   single same-build pull; route 005 converts 3,472 PDF rows against 3,472 Excel rows.
+> - **045's HD-Excel county question is ANSWERED: the released Excel export has NO
+>   county column.** This is no longer a vendor wait — it is an **owner decision**:
+>   accept HD-Excel pairing without county as a disclosed weakness, or source county
+>   from the HD PDF page banner (`08 INY 127`) or the TSN District/County sidecars.
+>   Still never infer it.
+> - **CMP-AUD-243 (new, found on the released data and FIXED in v0.37.0)** — HD (PDF)
+>   silently lost the record on every single-record page (13 pages / 12 routes; the
+>   PDF workbook was 51,314 rows against Excel's 51,327).
 >
-> This is WHY the owner asked what "HL raw county" meant: the HD county item is not
-> the same kind of blocker as a missing file, and treating it as one was wrong.
+> **Still open, and NOT fixed in v0.37.0** — both re-confirmed to fire on the released
+> PDFs: **CMP-AUD-186** (multi-baseline line-two truncation; the ledger scopes it as
+> its own session — a parser rewrite) and **CMP-AUD-053** (2 orphan data lines on
+> route 395). **133 / 142** (normalized-library facts) stand as written and are now
+> actionable against trustworthy data.
 >
-> **Net effect on NORM: its only currently-actionable finding is 193 (Highway
-> Sequence). 133, 142 and 186 are DEFERRED to the official HD delivery.**
+> **Net effect on NORM: 133 / 142 / 186 are UN-DEFERRED and actionable.**
 
 **Vendor-blocked / next-statewide-batch — NOT a marathon.** **045** (HD-Excel county — the
 report-family integration leg still red) and **192** (HD route-005 stale 7.7 Excel beside a newer

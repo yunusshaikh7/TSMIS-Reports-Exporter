@@ -292,6 +292,40 @@ _L1_FROM_L2_EDGES = (0, 1, 3, 5, 6, 7, 9, 11, 12, 14, 25)
 _PM_PREFIX_RE = re.compile(r"^[A-Z]{0,2}\d{1,3}\.\d{3}")
 
 
+def _rule_row_windows(page):
+    """The page's line-2 (25-cell) windows taken from its own THIN header RULE
+    row, or None.
+
+    Every Highway Detail page — data-bearing or not — draws a hairline 25-cell
+    rule under the column headers (height ~1.5pt, so `_page_bands`' CELL_MIN_H
+    filter correctly excludes it from the SHADED-band search). That rule is laid
+    out by the SAME per-page auto-layout table as the data cells, so it carries
+    this page's own column geometry.
+
+    That matters for the one case the shaded bands cannot cover: a page whose
+    only record is UNSHADED (zebra shading alternates on the global record
+    index), which draws no full-height rect at all and therefore yields neither
+    band. On the 2026-08-17 statewide prod delivery that is 13 pages across 12
+    routes, and each silently lost its single record. Reading the rule row keeps
+    the recovery page-LOCAL — never the unrelated document median that shifted
+    every field (CMP-AUD-054).
+
+    The TOPMOST qualifying row is used: on a data page the rule sits above every
+    data band, and this path is only consulted when no band exists at all."""
+    thin = defaultdict(list)
+    for r in page.rects:
+        w = r["x1"] - r["x0"]
+        h = r["bottom"] - r["top"]
+        if CELL_MIN_W < w < page.width - 10 and 0 < h <= CELL_MIN_H:
+            thin[round(r["top"])].append(r)
+    rows = [sorted(v, key=lambda r: r["x0"]) for v in thin.values()
+            if len(v) == N_COLS_L2]
+    if not rows:
+        return None
+    top_row = min(rows, key=lambda cells: cells[0]["top"])
+    return _windows_from_bands([top_row], N_COLS_L2)
+
+
 def _win1_from_l2_band(win2):
     """Derive a page's 10 line-1 windows from its own 25-cell line-2 windows by
     merging the base edges at _L1_FROM_L2_EDGES. None unless win2 is the full
@@ -416,6 +450,7 @@ def parse_pdf(path, events):
     leading_orphans = 0                # data-shaped groups with no line 1 (053)
     orphan_samples = []                # (page, text) for the durable diagnostic
     fallback_pages = []                # data pages recovered via line-2 geometry
+    rule_row_pages = []                # single-record pages recovered via the rule row
     unresolved_pages = []              # data pages with NO recoverable grid (054)
     pending_1 = None                   # carries across pages (mid-record splits)
 
@@ -451,6 +486,17 @@ def parse_pdf(path, events):
                     doc_routes.add(bm.group(1))
             win1, win2 = _page_windows(page)
             used_fallback = False
+            used_rule_row = False
+            if win1 is None and win2 is None:
+                # Neither shaded band: the page's only record is UNSHADED (the
+                # single-record page — 13 statewide on the 2026-08-17 delivery,
+                # each of which used to lose its record and mark the run
+                # partial). Recover line 2 from the page's OWN header rule row,
+                # which the same per-page auto-layout table lays out; line 1 then
+                # derives from it below. Still page-LOCAL geometry — never the
+                # document median (CMP-AUD-054).
+                win2 = _rule_row_windows(page)
+                used_rule_row = win2 is not None
             if win1 is None and win2 is not None:
                 # A page that prints only the 25-cell line-2 band (a mid-record
                 # continuation — its line-1 record is unshaded, so no 10-cell
@@ -516,17 +562,23 @@ def parse_pdf(path, events):
                     if len(orphan_samples) < 20:
                         orphan_samples.append((page_no, raw[:80]))
             if used_fallback and page_rows:
-                fallback_pages.append(page_no)
+                # Two DIFFERENT page-local recoveries land here; keep them apart in
+                # the log so one upload says which one a page used (their evidence
+                # bases differ: the line-2 band derivation is censused exact on
+                # 3,664 both-band pages, the rule row is the CMP-AUD-243 measurement).
+                (rule_row_pages if used_rule_row else fallback_pages).append(page_no)
         _flush_pending()               # a line 1 dangling at the document end
         if not any_grid and not rows:
             return [], {"emitted": 0, "pages": n_pages, "orphans": 0,
                         "single_line": 0, "leading_orphans": 0,
                         "orphan_samples": [], "fallback_pages": [],
+                        "rule_row_pages": [],
                         "unresolved_pages": unresolved_pages, "no_grid": True,
                         "doc_routes": sorted(doc_routes)}
     return rows, {"emitted": len(rows), "pages": n_pages, "orphans": orphans,
                   "single_line": single_line, "leading_orphans": leading_orphans,
                   "orphan_samples": orphan_samples, "fallback_pages": fallback_pages,
+                  "rule_row_pages": rule_row_pages,
                   "unresolved_pages": unresolved_pages,
                   "doc_routes": sorted(doc_routes)}
 
@@ -579,6 +631,8 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
                                   + pstats.get("single_line", 0))
             ctx["fallback"] = (ctx.get("fallback", 0)
                                + len(pstats.get("fallback_pages") or []))
+            ctx["rule_row"] = (ctx.get("rule_row", 0)
+                               + len(pstats.get("rule_row_pages") or []))
             unresolved = pstats.get("unresolved_pages") or []
             if unresolved:
                 ctx["unresolved"] = ctx.get("unresolved", 0) + len(unresolved)
@@ -604,6 +658,13 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
                 # PDF↔Excel check, but the record is correctly aligned, not shifted.
                 ev.on_log(f"  note: page(s) {pstats['fallback_pages']} of {p.name} "
                           "recovered a line-1 record from the line-2 grid.")
+            if pstats.get("rule_row_pages"):
+                # A page whose ONLY record is unshaded, so it draws neither band:
+                # its grid came from the page's own header rule row (CMP-AUD-243).
+                # Before v0.37.0 these pages were skipped and the record was LOST.
+                ev.on_log(f"  note: page(s) {pstats['rule_row_pages']} of {p.name} "
+                          "hold a single unshaded record — grid recovered from the "
+                          "page's own header rule (CMP-AUD-243).")
             if unresolved:
                 # A data page with NO recoverable grid — not parsed on the unrelated
                 # document median (that shifted every field). Escalated to partial.
@@ -645,6 +706,15 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             # 3,664 both-band pages) — but recorded for the PDF↔Excel check.
             notes.append(f"{ctx['fallback']} page(s) recovered a line-1 record "
                          "from the line-2 grid (CMP-AUD-054).")
+        if ctx.get("rule_row"):
+            # Likewise durable: N page(s) hold a single UNSHADED record, so they
+            # draw neither band and their grid came from the page's own header
+            # rule. Stays COMPLETE — page-local geometry, and the recovered rows
+            # match the same-pull Excel (12 routes proved on the 2026-08-17
+            # release, 6 of them cell-for-cell). Before v0.37.0 these pages were
+            # skipped and their record was LOST.
+            notes.append(f"{ctx['rule_row']} single-record page(s) recovered their "
+                         "grid from the page's own header rule (CMP-AUD-243).")
         leading_orphans = ctx.get("leading_orphans", 0)
         if leading_orphans:
             notes.append(f"⚠ {leading_orphans} data line(s) reconcile to no record "

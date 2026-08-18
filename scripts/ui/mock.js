@@ -73,6 +73,7 @@ function makeMockApi() {
     { key: "cons:tsn_highway_log", label: "TSN Highway Log (PDF)" },
     { key: "cons:highway_detail", label: "Highway Detail" },
     { key: "cons:highway_detail_pdf", label: "TSMIS Highway Detail (PDF)" },
+    { key: "cons:highway_summary", label: "Highway Summary" },
   ];
   // Mock selection travels by KEY too (P3), so the preview exercises the same
   // bridge contract as production. These map a key back to its mock row.
@@ -869,6 +870,7 @@ function makeMockApi() {
         { key: "cons:intersection_detail_pdf", label: "TSMIS Intersection Detail (PDF)", group: "Intersection", short: "Detail (PDF)", fmt: "PDF" },
         { key: "cons:highway_detail", label: "Highway Detail", group: "Highway", short: "Detail", fmt: "Excel" },
         { key: "cons:highway_detail_pdf", label: "TSMIS Highway Detail (PDF)", group: "Highway", short: "Detail (PDF)", fmt: "PDF" },
+        { key: "cons:highway_summary", label: "Highway Summary", group: "Highway", short: "Summary", fmt: "Excel" },
       ],
       compare_groups: [
         { id: "env", label: "Cross-environment" },
@@ -910,6 +912,8 @@ function makeMockApi() {
         { key: "cmp:highway_detail:pdf_vs_tsn", label: "Highway Detail — TSMIS (PDF) vs TSN", kind: "files", group: "tsn", family_group: "Highway", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
         { key: "cmp:highway_detail:pdf_vs_excel", label: "Highway Detail — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "self", family_group: "Highway", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
         { key: "cmp:highway_detail_pdf:env", label: "Highway Detail (PDF) — between environments", kind: "folders", group: "env", family_group: "Highway", subdir: "highway_detail_pdf", file_a_label: "TSMIS", file_b_label: "TSN" },
+        { key: "cmp:highway_summary:env", label: "Highway Summary — between environments", kind: "folders", group: "env", family_group: "Highway", subdir: "highway_summary", file_a_label: "TSMIS", file_b_label: "TSN" },
+        { key: "cmp:highway_summary:tsn", label: "Highway Summary — TSMIS vs TSN", kind: "files", group: "tsn", family_group: "Highway", subdir: null, file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "the raw statewide TSN PDF, or the normalized TSN workbook" },
       ],
       batch_resume: null,
       batch_dest: "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)",

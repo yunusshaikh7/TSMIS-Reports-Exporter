@@ -18,9 +18,13 @@ is complete; Stage 6 conservation and the Stage 8 base audit are complete at 7/7
 Product perfection, companion/historical coverage, and end-to-end evidence remain red
 and are deferred under the current product-code freeze. Live status and the handoff are
 owned by `comparison-perfection-project.md`  
-Finding ledger: continuous and authoritative through `CMP-AUD-242`  
-Authoritative capability baseline: 29 classic comparison recipes, 12 matrix rows,
-30 matrix row-mode placements, 7 canonical TSN datasets
+Finding ledger: continuous and authoritative through `CMP-AUD-243`  
+Capability baseline AS AUDITED (v0.28.0): 29 classic comparison recipes, 12 matrix
+rows, 30 matrix row-mode placements, 7 canonical TSN datasets. **Current product
+(v0.37.0): 30 recipes and 13 matrix rows** — Highway Summary added its cross-env
+recipe + matrix row and no TSN dataset (no TSN source exists), so the TSN dataset
+count is unchanged. The audited figures above are the point-in-time baseline the
+findings were written against; they are deliberately NOT restated as current.
 
 This is the durable source of truth for defects found during the adversarial
 comparison audit. Keep stable finding IDs when correcting issues. A finding moves to
@@ -325,7 +329,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-042 | P1 | Resolved 2026-07-21 (`06f2d85` — `_normalized_row` consumes the stored PS marker instead of re-deriving it from the already-normalized text) | Normalized Highway Detail erases every PS equation marker |
 | CMP-AUD-043 | P1 | Resolved 2026-07-18 (both familiar secondary surfaces take the finding's accepted "unmistakable values-only snapshot label" path: the Report View was labeled a build-time snapshot in the 2026-07-12 remediation, and the shared Summary-by-Category sheet now carries an unmistakable "do NOT recalculate; regenerate after editing a source" disclosure, gated present in both family checks) | Formula Report View stays stale after live recalculation |
 | CMP-AUD-044 | P1 | Resolved 2026-07-18 (both trim-and-slice loaders — `compare_env._load_xlsx_side` and `compare_highway_log._load_input` — now detect a nonblank cell beyond the declared width and refuse the file instead of slicing it off: compare_env skips loudly into the incompleteness channel, HL raises; census-proven no-op — 1,316 real flat exports carry 0 data beyond the trimmed header, confirmed end-to-end on 252 HD exports) | Data beneath trailing blank headers is silently discarded |
-| CMP-AUD-045 | P1 | Partially remediated (HL integrated 2026-07-17; only HD-Excel stays blocked — HD is pre-release (owner 2026-07-21), its county question cannot be answered yet, never infer) | Shared typed identity core green; report-family integration remains red |
+| CMP-AUD-045 | P1 | Partially remediated (HL integrated 2026-07-17; HD-Excel still red, but **the vendor question is ANSWERED 2026-08-17: the RELEASED HD Excel export has NO county column** — 34 fixed labels, none a county, across 252 statewide routes. No longer a vendor wait; it is now an OWNER DECISION — accept HD-Excel pairing without county as a disclosed weakness, or source county from the HD PDF page banner / TSN sidecars. Still never infer) | Shared typed identity core green; report-family integration remains red |
 | CMP-AUD-046 | P2 | Resolved 2026-07-18 (RD Excel+PDF pin a position-authoritative `force_header`; ID Excel+PDF realign legacy→current via `_id_canonical_header`; census-verified per-position on the 7.9 exports; end-to-end proves a Description change shows under Description not R/U, an INT Type change under INT Type not INT Eff-Date) | Shifted exports report differences under the wrong fields |
 | CMP-AUD-047 | P2 | Remediated: the env XLSX loader takes the report's own value projection (HL passes _hl_normalize; the HL-PDF conversion path too); red->green in check_compare_env_highway_log | Highway Log cross-env skips its whitespace normalization |
 | CMP-AUD-048 | P2 | Remediated: per-side header canonicalization before layout equality (canonical/vendor editions compare with corrected labels; unrecognized same-width layouts refused by name); red->green in check_compare_env_highway_log | Two supported Highway Log header editions cannot compare |
@@ -466,13 +470,13 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-183 | P1 | Resolved 2026-07-14 (route universe validated + producer census reconciled; real-data verified) | Intersection Summary aggregation accepts dropped and duplicate routes without validating its route universe |
 | CMP-AUD-184 | P2 | Resolved 2026-07-14 (the shared note states the blank/one-sided truth) | Intersection Summary's familiar view note contradicts its structural-absence cells and cites Ramp categories |
 | CMP-AUD-185 | P1 | Resolved 2026-07-14 (District compared on every RD leg; the 005/SD/72.366 disagreement surfaces; re-blessed) | Ramp Detail omits District and hides a real District disagreement as identical |
-| CMP-AUD-186 | P1 | DEFERRED — HD is pre-release (owner 2026-07-21), resumes on the official HD delivery; parser rewrite, needs its own session | Highway Detail truncates multi-baseline line-two records and erases their attributes as complete |
+| CMP-AUD-186 | P1 | **OPEN / product-red — un-deferred + RE-CONFIRMED 2026-08-17** on the official release, and now exactly bounded: with 243 fixed, the statewide PDF-vs-Excel self-check pairs **51,327 locations, 0 one-sided, 51,326 identical — this is the ONLY differing row** (route 395 `R000.000E`, 24 cells = Description + all 23 attributes blanked). NOT fixed in v0.37.0: its own session (parser rewrite) | Highway Detail truncates multi-baseline line-two records and erases their attributes as complete |
 | CMP-AUD-187 | P2 | Resolved 2026-07-22 | Independent oracle builds statewide key order quadratically |
 | CMP-AUD-188 | P2 | Remediated in accepted audit artifact | Highway Detail product witness loses all returned evidence when its monolithic run exceeds the execution wrapper |
 | CMP-AUD-189 | P2 | Remediated in accepted audit artifact | Highway Detail publication gate compares different duplicate-trace wire schemas byte-for-byte |
 | CMP-AUD-190 | P2 | Remediated in accepted audit artifact | Highway Detail formula/value gate requires source-sheet counts both different and equal |
 | CMP-AUD-191 | P1 | Remediated in accepted Stage-8 oracle | Highway Detail can classify but still leave 298 County-less Excel rows physically unattributed |
-| CMP-AUD-192 | P1 | Verified source-export delta; version-separated in accepted oracle; DEFERRED — the 7.7/7.9 skew is inherent to HD's accidental pre-release window (owner 2026-07-21), resolves with the official HD delivery | Highway Detail route-005 Excel is a stale 7.7 payload beside a later PDF whose DCR owner changed on eight identical rows |
+| CMP-AUD-192 | P1 | **RESOLVED 2026-08-17 by the official HD delivery** — `ground-truth/HD + HS Release 8.17/` is ONE same-build pull (Excel + PDF exported the same morning), so the cross-build skew the finding describes cannot arise in it; route 005 converts to 3,472 PDF rows against 3,472 Excel rows with 0 warnings | Highway Detail route-005 Excel is a stale 7.7 payload beside a later PDF whose DCR owner changed on eight identical rows |
 | CMP-AUD-193 | P1 | Resolved 2026-07-22 (same-run truth bound + HSL-PDF-79 historical binding completed + docs qualified + shipped-path final replay per-column exact on all three legs: 5,589 / 5,001 / 3,721) | Highway Sequence current parity can inherit a stale cross-bundle residual and omit six July-9 Excel updates |
 | CMP-AUD-194 | P2 | Remediated in independent source-oracle draft | Highway Sequence source oracle treats two visually composed legend labels as contiguous PDF text |
 | CMP-AUD-195 | P2 | Remediated in independent source-oracle draft | Highway Sequence source oracle confuses harmless header-label width movement with a changed data grid |
@@ -523,6 +527,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-240 | P2 | Resolved | Cross-env / baseline **Intersection Detail** refused to compare a current (2026-07-17) export against a pre-July-2026 one: the LABEL-ONLY edition change (`P`->`PP`, `S`->`PS`, INT Type/INT Eff-Date labels realigned, `Xing P/S`->`Int PS`) tripped the "different column layouts" guard even though every value stayed in an identical column position (proven cell-for-cell). Added `_id_canonical_header` to `compare_env.INTERSECTION_DETAIL` (the Highway Log CMP-AUD-048 pattern) mapping both editions to one canonical header; any OTHER header is returned UNCHANGED, so strict same-layout equality + genuine-column-move refusal are preserved (no `force_header`). Real-corpus: new-vs-old now aligns 16,459 intersections / 217 routes. Red→green in `check_compare_env_intersection` |
 | CMP-AUD-241 | P2 | Resolved | The **TSMIS (PDF) vs TSN** Intersection Detail Description showed 8 trailing-tab-only false positives statewide (e.g. TSN `HILLCREST RD\t\t` vs PDF `HILLCREST RD`) that the Excel-vs-TSN leg did NOT — the TSN extract carries field-padding tabs the Excel export preserves (so Excel-vs-TSN matched) but the PDF print cannot render. Owner ruling (2026-07-17): showing two identical descriptions as a mismatch is NOT proper comparison — fix it. `_norm_text` now maps the extract's tab/CR/LF whitespace to spaces (compare_core's TRIM twin then collapses + edge-strips) on BOTH sides of the vs-TSN projection; interior content is untouched so genuine edits (incl. the KER 046 `''F''` vs `"F"` quote edit) still flag. Report-specific (NOT the shared engine, whose `_xl_trim` treats tabs as data by policy), and re-applied on read by `_normalized_row` so cached libraries need no rebuild. Real-corpus: PDF-vs-TSN Description 12->4 and total 5,100->5,092, now EQUAL to Excel-vs-TSN (unchanged 5,092/4). Red→green in `check_compare_intersection_detail_tsn` (`test_whitespace_normalization`) |
 | CMP-AUD-242 | P1 | Resolved 2026-07-22 (chunk names 167→71 chars, legacy names read-compatible, two unconditional field-depth gates red→green, RD real-corpus canary-exact; rides the completion release per the owner's no-interim-release policy) | Payload chunk basename (167 chars) overran Windows MAX_PATH at the field install depth; on `LongPathsEnabled=0` machines publication failed and the matrix hid correctly-built comparisons |
+| CMP-AUD-243 | P1 | **Resolved 2026-08-17 (v0.37.0)** — the page-local recovery ladder gained a final rung: a band-less page takes its line-2 grid from its OWN header rule row, then line 1 derives from that as before. 13 lost records recovered; all 12 routes convert warning-free at exact Excel row parity, 6 of them cell-for-cell identical | Highway Detail (PDF) silently lost the record on every single-record page (13 pages / 12 routes statewide) and marked the run partial |
 
 The ` != ` text above represents the engine's spaced not-equal glyph. It is written
 in ASCII in this ledger heading/table to keep terminals that use cp1252 from
@@ -8170,7 +8175,9 @@ window). Re-blessed: every leg reports exactly the oracle's District 1 — the
 ### CMP-AUD-186 — Highway Detail truncates multi-baseline line-two records as complete
 
 Priority: P1  
-Status: Verified on the frozen current 7.9 TSMIS PDF/Excel pair  
+Status: **OPEN / product-red. Un-deferred and RE-CONFIRMED 2026-08-17 on the vendor's
+official release** (`ground-truth/HD + HS Release 8.17/`), which also measured its exact
+blast radius — see "Re-confirmation" below. Previously: verified on the frozen 7.9 pair  
 Primary code: `scripts/consolidate_tsmis_highway_detail_pdf.py::_row_groups/parse_pdf`
 
 The current `highway_detail_route_395.pdf`, physical page 4 / printed page 1, contains
@@ -8200,6 +8207,26 @@ This is the Highway Detail analogue of CMP-AUD-056's Intersection wrap defect, b
 is independently owned because the parser, record layout, and current real-source
 canary differ. It is also distinct from CMP-AUD-053: this row does have a line-one
 partner; the failure is premature completion followed by invisible continuation loss.
+
+#### Re-confirmation + measured blast radius — 2026-08-17 (the official release)
+
+Reproduced UNCHANGED on the vendor's released same-build pair, and now bounded exactly.
+With CMP-AUD-243 fixed, the statewide **PDF-vs-Excel self-check pairs 51,327 locations
+with 0 one-sided rows on either side and 51,326 rows fully identical — leaving EXACTLY
+ONE differing row, this one**: route 395, PM `R000.000E`, **24 differing cells = 1
+Description + all 23 attribute cells**. Read directly from the two consolidated
+workbooks:
+
+* Excel — Description `KERN/INYO CO LINE`; LB Eff `86-08-07`, LB `H/02/Z/10/10/24/05/05`,
+  Med `76-11-24/K/7/Z/99P`, RB `76-11-24/H/02/Z/05/05/24/10/10`.
+* PDF — Description truncated to the run-on `KERN/INYO CO LINE / BE…`, and **every one
+  of the 23 attribute cells EMPTY**.
+
+That is cell-for-cell what this finding predicted, on data that is now trustworthy. So
+the finding's scope is no longer an estimate: it is one record statewide, and it is the
+ONLY thing standing between Highway Detail's two editions and a clean self-check.
+Correction requirements are unchanged; it remains its own session (a parser rewrite),
+and CMP-AUD-053's 2 orphan lines on the same route are still separate.
 
 Correction requirements: retain a logical line-two record until the next proved line
 one, DCR boundary, or document end; merge every continuation baseline into its cell by
@@ -11507,6 +11534,56 @@ do). Call sites that pin the current shape:
 
 **Owner workaround until it ships:** move the app to a short folder path
 (e.g. `C:\TSMIS\TSMIS Exporter\`); this works on an existing install with no rebuild.
+
+### CMP-AUD-243 — Highway Detail (PDF) silently loses the record on a single-record page (RESOLVED v0.37.0)
+
+Priority: P1
+Status: **Resolved 2026-08-17 (v0.37.0)**
+Primary code: `scripts/consolidate_tsmis_highway_detail_pdf.py::_rule_row_windows/parse_pdf`
+
+Found on the vendor's official Highway Detail release
+(`ground-truth/HD + HS Release 8.17/`), the delivery that lifted the pre-release
+freeze — i.e. on the FIRST trustworthy statewide HD source.
+
+The converter derives each page's column grid from that page's own zebra-shaded cell
+bands (per-page, because the print's auto-layout sizes columns to page content — the
+CMP-AUD-054 rule that forbids the document median). Shading alternates on the GLOBAL
+record index, so a page holding exactly ONE record whose index lands on the unshaded
+phase draws no full-height rect at all and yields neither the 10-cell nor the 25-cell
+band. `_page_windows` returned `(None, None)`, `_has_data_rows` correctly saw data, and
+the page went to `unresolved_pages` — the record was DROPPED and the producer escalated
+to PARTIAL.
+
+`_page_windows`' own docstring had named this as "the one theoretical exception… a
+final page holding a single UNSHADED record". It is not theoretical: **13 pages across
+12 routes** on the released statewide export (005 ×2, 014, 079, 095, 127, 162, 190,
+233, 254, 270, 330, 880S — mostly last pages, plus mid-document 005 p179/p228,
+162 p10, 190 p10). Statewide the PDF workbook carried **51,314 rows against the
+same-pull Excel's 51,327**, and each affected route read as differing from its own
+Excel export in the PDF-vs-Excel self-check.
+
+**Measured cause and fix.** Every page — data-bearing or not — draws a hairline
+25-cell rule under the column headers (height ~1.5pt), laid out by the SAME per-page
+auto-layout table as the data cells, and `_page_bands`' `CELL_MIN_H` filter correctly
+excludes it from the SHADED-band search. Measured on route 127: page 6 (banded) rule
+row and data bands agree, first cell width 139.5 in both; page 7 (band-less) carries
+its own rule row at width 115.5 — its OWN geometry, materially different from its
+neighbour's, which is exactly why a neighbour-page or document-median grid would
+reintroduce CMP-AUD-054. `_rule_row_windows` reads the topmost thin 25-cell row, and
+the recovery ladder gained a final rung consulted only when NEITHER band exists:
+line 2 from the rule row, then line 1 from it via the existing `_win1_from_l2_band`.
+The recovery stays page-LOCAL throughout.
+
+**Proof.** All 12 affected routes now convert with **0 warnings** and **exact row
+parity** with their same-pull Excel (4,985 = 4,985 over the 12). Six of them (190,
+233, 254, 270, 330, 880S) match the Excel export **cell-for-cell on every row**,
+recovered record included. On the other six the only deltas are Description INTERNAL
+whitespace, which the comparator normalizes and which reproduces identically on route
+002 — a route this change never touches — so it is pre-existing extraction behavior,
+not a regression.
+
+Not in scope here, and still open on these same PDFs: **CMP-AUD-186** (multi-baseline
+line-two truncation) and **CMP-AUD-053** (2 orphan data lines on route 395).
 
 ### Note — ACL "lease-leak" hypothesis disproved (2026-07-14)
 

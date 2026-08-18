@@ -64,16 +64,27 @@ def test_reserved_groundwork():
           cat.EXPORT[8].spec.data_value == "highway_detail"
           and cat.EXPORT[9].spec.data_value == "highway_summary")
     # v0.20.0: the Highway DETAIL family landed — the recipe this check dry-ran is
-    # now the REAL registration (consolidate + compare + TSN library). Highway
-    # SUMMARY stays export-only until its schema can be verified.
+    # now the REAL registration (consolidate + compare + TSN library).
     check("Highway Detail is REGISTERED in consolidate/compare (the feature landed)",
           any(e.key == "cons:highway_detail" for e in cat.CONSOLIDATE)
           and any(e.key == "cmp:highway_detail:tsn" for e in cat.COMPARE))
     check("...with its TSN library entry (statewide xlsx)",
           any(t.subdir == "highway_detail" and t.raw_kind == "statewide_xlsx"
               for t in cat.TSN))
-    check("Highway Summary stays consolidate/compare-ABSENT (export-only)",
-          not any("highway_summary" in e.key for e in cat.CONSOLIDATE + cat.COMPARE))
+    # v0.37.0: Highway SUMMARY landed off the vendor's 2026-08-17 release —
+    # consolidate + cross-environment compare. v0.37.0 completed it: the owner
+    # supplied the statewide TSN print the same day, so the vs-TSN leg landed too
+    # and the report is now wired end to end like every other family.
+    check("Highway Summary is REGISTERED in consolidate + cross-env compare",
+          any(e.key == "cons:highway_summary" for e in cat.CONSOLIDATE)
+          and any(e.key == "cmp:highway_summary:env" for e in cat.COMPARE))
+    check("...and in vs-TSN, with its TSN library entry (statewide pdf)",
+          any(e.key == "cmp:highway_summary:tsn" for e in cat.COMPARE)
+          and any(t.subdir == "highway_summary" and t.raw_kind == "statewide_pdf"
+                  for t in cat.TSN))
+    check("...and its MATRIX row names that vs-TSN comparator",
+          any(m.tsn_key == "cmp:highway_summary:tsn" for m in cat.MATRIX
+              if m.row_key == "highway_summary"))
 
 
 class _Patch:

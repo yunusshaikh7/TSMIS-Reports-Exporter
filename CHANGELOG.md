@@ -3,6 +3,80 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.37.0 — 2026-08-17
+
+The vendor released Highway Detail and Highway Summary, and this release takes
+both the rest of the way: Highway Summary goes from export-only to fully
+integrated, Highway Detail leaves pre-release, and a real data-loss bug in the
+Highway Detail print converter is fixed.
+
+### Added
+- **Highway Summary consolidates, and compares both ways.** The last TSAR report
+  without a consolidation now has one. Consolidating writes one row per route
+  carrying the route's total mileage and all 95 category mileages (Highway Group,
+  Access Control, Rural-Urban, Non-Add, Median Type/Barrier/Width, Number of
+  Lanes, Terrain, Design Speed), plus a **Combined** sheet with the familiar
+  section-by-section statewide rollup. The Compare tab gains both "Highway Summary
+  — between environments" and "Highway Summary — TSMIS vs TSN", so **every report
+  the app exports and consolidates is now also checked against TSN.**
+- **The Highway Summary comparison says where the two systems differ in KIND,
+  rather than quietly reconciling them.** Four categories show as one-sided
+  instead of compared: `MEDIAN TYPE (UNDIVIDED)` and `(DIVIDED)` are group
+  sub-headers the export writes as zero and the TSN print doesn't measure; the
+  print has no `DESIGN SPEED - NO DATA` row; and `MEDIAN BARRIER Z- NO BARRIER`
+  prints as `**********` because the figure overflows its column — a value the
+  print doesn't state, not a zero. The comparison also warns that **TOTAL MILES
+  SELECTED is not like-for-like**: the TSN print excludes non-add and
+  unconstructed mileage by its own footnotes, and the export doesn't.
+- **Highway Summary refuses a changed layout instead of guessing.** The report's
+  sections and codes are checked against the released layout on every route, so a
+  renamed section, a new or dropped code, or an over-precise value stops that
+  route with a message naming what changed, rather than quietly producing a table
+  that would compare clean against an equally-wrong one. Sections that tabulate
+  less than the route total (the site's own classification — six routes
+  statewide) have the untabulated remainder shown, never redistributed.
+- **The TSN print's identity travels with the comparison** — report id, event,
+  reference date and submitter are captured when the print is read and shown on
+  the comparison, so it's always clear which pull the figures came from.
+- **Highway Detail comparisons can now produce evidence images.** Evidence —
+  the highlighted side-by-side crops of both systems' actual prints — was held
+  back for Highway Detail while the report was pre-release. Now that it is
+  released, its vs-TSN comparison joins the other four: a sampled difference
+  renders the TSMIS print and the TSN district print side by side with the
+  differing value boxed on each, every crop re-read and checked against the
+  compared value. (The cross-environment lane does not carry Highway Detail
+  evidence yet.)
+
+### Fixed
+- **Highway Detail (PDF) no longer loses the record on a single-record page.**
+  A page holding exactly one record draws no shaded band, so the converter could
+  not work out its columns, skipped the page, and marked the run incomplete —
+  losing 13 records across 12 routes on a statewide export and making those
+  routes look different from their own Excel export. The converter now reads the
+  column positions from that page's own header rule, which the page's own layout
+  draws. All 12 routes now convert with no warnings and match their Excel export
+  row for row. Statewide, Highway Detail's PDF and Excel exports now line up on
+  **51,327 locations with none missing from either side and 51,326 rows
+  identical** — a single known record on route 395 still differs, and it is
+  tracked as its own separate fix.
+
+### Changed
+- **Highway Detail is no longer pre-release.** The vendor's accidental enabling in
+  July 2026 froze the report: its exports were not to be trusted as ground truth.
+  The 2026-08-17 release supersedes that. The released export's layout is
+  unchanged from what the app already reads (the same 34 columns), so Highway
+  Detail's consolidation, comparisons and evidence are live against real data.
+  Two known Highway Detail (PDF) parsing limits remain open and are called out in
+  the project notes — they affect a handful of records on one route.
+
+### Note
+- **Compare like dates.** The TSN Highway Summary print supplied with this release
+  is dated **09/15/2025**, and the newest Highway Summary export is 2026-08-17 —
+  about eleven months apart, so most mileage has genuinely moved and 89 of the 92
+  shared categories differ. That is real network change, not a fault in either
+  system. To read the comparison as a correctness check rather than a record of
+  drift, pull a TSN print close to the export's date.
+
 ## v0.35.1 — 2026-08-11
 
 Exports work against the newer TSMIS form again, one-click updates tolerate the

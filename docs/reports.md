@@ -22,7 +22,7 @@ Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- 
 | 6b | Intersection Detail (PDF) | PDF (Letter, landscape) | `output/<run>/intersection_detail_pdf/` |
 | 7 | Highway Detail | XLSX | `output/<run>/highway_detail/` |
 | 7b | Highway Detail (PDF) | PDF (Letter, landscape) | `output/<run>/highway_detail_pdf/` |
-| 8 | Highway Summary | XLSX (export-only) | `output/<run>/highway_summary/` |
+| 8 | Highway Summary | XLSX | `output/<run>/highway_summary/` |
 | — | Route History Table | *(none — greyed reserved placeholder, v0.25.1)* | — |
 
 `<run>` is a run folder, `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`) -- see [engine-and-reliability.md](engine-and-reliability.md) for run-folder mechanics.
@@ -52,7 +52,7 @@ table in the same change.
 | 6b | Intersection Detail (PDF) (`intersection_detail_pdf`) | PDF | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | 7 | Highway Detail (`highway_detail`) | XLSX | ✓ | ✓ flat, canonical roadbed key | n/a | ✓ | ✓ | ✓ |
 | 7b | Highway Detail (PDF) (`highway_detail_pdf`) | PDF | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| 8 | Highway Summary (`highway_summary`) | XLSX ³ | — ³ | — ³ | — | — ³ | — ³ | — ³ |
+| 8 | Highway Summary (`highway_summary`) | XLSX | ✓ (category miles) | ✓ aggregate ³ | n/a | ✓ aggregate | ✓ | — (aggregate ⁵) |
 | — | Route History Table (`route_history`) | — ⁶ | — | — | — | — | — | — |
 | — | Clean Road: Highway (`clean_highway`) | — ⁷ | — | — | — | — | — | — |
 | — | Clean Road: Intersection (`clean_intersection`) | — ⁷ | — | — | — | — | — | — |
@@ -80,15 +80,20 @@ retired the separate `input/` folder).
    in the Excel flavor and the PDF↔Excel self-check). See
    [Ramp Detail (PDF)](#ramp-detail-pdf--the-fully-integrated-print-edition-export-v0240-the-rest-v0260)
    for the censused conventions + canaries.
-3. **Highway Summary is export-wired but site-greyed** (`cs-disabled` on every capture
-   through Dev 7.9) — `select_report` fails fast with "currently unavailable" until
-   the vendor turns it on; consolidate/compare integration then waits for a real
-   statewide export to verify a schema against (the standard Lesson-13 sequence).
+3. **Highway Summary FULLY integrated — v0.37.0.** The vendor un-greyed it
+   (and Highway Detail) on **2026-08-17**; the export delivery
+   (`ground-truth/HD + HS Release 8.17/`) is 252 statewide routes with ONE skeleton
+   across every file, and the owner supplied the statewide TSN print the same day
+   (`ground-truth/Highway Summary TSN print 9.15/`, event 4843734, reference
+   09/15/2025). v0.37.0 ships the consolidator, the cross-environment comparator AND the vs-TSN leg (see
+   [Highway Summary](#highway-summary--the-miles-measured-aggregate-v0360) below).
+   It is the THIRD aggregate summary comparison and the first that measures MILES.
 4. **Where each report lives (site-side, as of 2026-07-10):** EVERY enabled report
    now exports from the **production** site — the late-2026-07-09 prod rollout
    un-greyed Intersection Summary/Detail and Highway Detail (verified on both data
    sources in `ground-truth/All Reports 7.9`), ending the dev-site dependency.
-   Highway Summary is still greyed everywhere; Route History exists on dev only.
+   **Highway Summary and Highway Detail were released on 2026-08-17** and export from
+   prod like the rest; Route History exists on dev only.
 5. **Evidence images require a row-level comparison and a TSMIS PDF edition** — the
    generator renders the exact differing CELL from both systems' prints. The two
    aggregate comparisons (Ramp Summary, Intersection Summary) compare statewide
@@ -278,16 +283,51 @@ The form controls use stable structural IDs too. The 2026-08 site added postmile
 
 The GUI report picker mirrors the site's own grouping: **flat** Highway Log, Highway Log (PDF), Highway Sequence, Highway Sequence (PDF) and the greyed Route History Table at the top (the site's order), then the **Ramp** and **Intersection** families under their own headings. Order + grouping are catalog-driven, not UI-hardcoded: each `ExportEntry` carries an optional `group` + `short_label`, and `report_catalog._PICKER_ORDER` (exposed as `picker_order()`, import-asserted to cover every export key) fixes the display sequence. `reports.PICKER_ORDER` / `EXPORT_DISPLAY` re-export them; `gui_api` sorts the `reports` payload by `PICKER_ORDER` and sets each entry's `idx` = its **display position** (no app code reads `idx` — it's parity-check metadata only), plus `group` and `short` (the short leaf label, e.g. "Detail"). `ui/app.js` emits an `.option-group` header on each group change and shows `short || label` (indented under its group). Both the Export picker and Export-Everything use the one `fillReportList()`.
 
-### Highway Detail / Highway Summary — Detail FULLY INTEGRATED (v0.20.0); Summary export-only
+### Highway Detail / Highway Summary — both INTEGRATED (Detail v0.20.0, Summary v0.37.0)
 
-The site added two more TSAR reports, **Highway Detail** and **Highway Summary**. v0.18.1 scaffolded them as reserved-DISABLED groundwork; **v0.19.1 enabled their EXPORT**; **v0.19.2 added the Highway Detail print-layout PDF edition**; **v0.20.0 integrated Highway Detail end-to-end** (consolidators + vs-TSN / cross-env / PDF↔Excel comparators + TSN library entry + both matrices — see the Highway Detail family section below). Highway Summary stays export-only until the site un-greys it and a schema can be verified:
+The site added two more TSAR reports, **Highway Detail** and **Highway Summary**. v0.18.1 scaffolded them as reserved-DISABLED groundwork; **v0.19.1 enabled their EXPORT**; **v0.19.2 added the Highway Detail print-layout PDF edition**; **v0.20.0 integrated Highway Detail end-to-end** (consolidators + vs-TSN / cross-env / PDF↔Excel comparators + TSN library entry + both matrices — see the Highway Detail family section below); **v0.37.0 integrated Highway Summary** off the vendor's 2026-08-17 release (consolidator + cross-env comparator + matrix row — everything but vs-TSN, which has no source yet):
 
-- **Real modules** `export_highway_detail.py` / `export_highway_summary.py` — each a genuine `ReportSpec` modeled on the Excel siblings (`save = save_via_export_button`). Confirmed against the **7.7 dev capture** (`highway_detail.js` live, action bar wires `hd_exportToExcel()` + `hd_printAll()`): empty = `td.hl-empty` / "No results found in this segment.", matched loosely (`td.hl-empty` OR "No … found"). Highway Detail is un-greyed on 7.7; Highway Summary is still `cs-disabled` there, so its export fail-fasts (`ReportUnavailableError`) until the vendor turns it on.
+- **Real modules** `export_highway_detail.py` / `export_highway_summary.py` — each a genuine `ReportSpec` modeled on the Excel siblings (`save = save_via_export_button`). Confirmed against the **7.7 dev capture** (`highway_detail.js` live, action bar wires `hd_exportToExcel()` + `hd_printAll()`): empty = `td.hl-empty` / "No results found in this segment.", matched loosely (`td.hl-empty` OR "No … found"). Highway Detail was un-greyed on 7.7 and Highway Summary was still `cs-disabled` there (its export fail-fasted with `ReportUnavailableError`); **the vendor released BOTH on 2026-08-17**, so neither greys now.
 - **Highway Detail (PDF)** — `export_highway_detail_pdf.py`, `subdir="highway_detail_pdf"`, `data_value="highway_detail"` (same dropdown option), `save=save_highway_detail_pdf` (in `exporter.py`). The twin of `save_highway_log_pdf`: `hd_printAll()` builds the SAME `.hl-print-section` print layout; `window.print` is overridden to raise so the on-screen restore never runs, then `page.pdf()` captures it (Letter, **landscape**, 27 roadbed-grouped columns). Empty backstop counts `.hd-row1` data rows (HD's grouped columns put colspan on real rows, so Highway Log's non-colspan heuristic doesn't apply). **Appended LAST** — stable id **10** (`batch_manifest._V017_EXPORT_ORDER` stays `== EXPORT_KEYS`); `_PICKER_ORDER` places it next to its Excel sibling.
 - **The export gate holds the reserved placeholders** (`reports.DISABLED_EXPORT_SUBDIRS = {'route_history', 'clean_highway', 'clean_intersection', 'clean_ramp'}`): Route History (stable id 15) and the Clean Road Files group (ids 16/17/18) have no export flow yet, so they're greyed; every OTHER report is pickable in the Export picker and ticked in Export Everything. Where the **live site** still `cs-disabled`s a report, `select_report` fails fast instead of stalling.
-- **Highway Detail** consolidates + compares like every other report as of **v0.20.0** (the env matrix is 12 rows); **Highway Summary** has no consolidator / comparator / TSN entry yet (no real export exists to verify a schema against), so it alone stays absent from the matrices, Consolidate, and Compare. Locked by `check_intersection_gate` (empty gate), `check_report_recipe` (HD registered, HS absent), `check_stable_ids` (append-only 8/9/10), and `check_report_catalog`.
+- **Highway Detail** consolidates + compares like every other report as of **v0.20.0**; **Highway Summary** joined Consolidate, Compare and the env matrix in **v0.37.0** (the env matrix is 13 rows). Locked by `check_intersection_gate` (empty gate), `check_report_recipe`, `check_stable_ids` (append-only 8/9/10), `check_report_catalog`, and `check_report_wiring`.
 
-To integrate Highway Summary later: add its consolidator + comparators + `tsn_library` entry per the same recipe (`build/check_report_recipe.py`), verified against a real statewide export first — exactly how Highway Detail was done (tracked in [roadmap.md](roadmap.md)).
+Highway Summary's vs-TSN leg landed in **v0.37.0** and is the clearest proof the plug-in contract works as documented: adding `compare_highway_summary_tsn` + `tsn_load_highway_summary`, a `cmp:highway_summary:tsn` COMPARE entry, a `report_catalog.TSN` descriptor, and `tsn_key` on the existing `MatrixEntry` was the WHOLE change — `matrix.tsn_supported()` and `day_matrix._day_rows()` flipped the row's cells on by themselves, with no per-report special case anywhere.
+
+### Highway Summary — the miles-measured aggregate (v0.37.0)
+
+Highway Summary is the app's first **miles-measured** aggregate report. Its per-route export is not a row-per-record table but a fixed statistics document: a `TOTAL MILES SELECTED` scalar, then 10 category sections, each a `Code | Miles` block.
+
+**Censused on the 2026-08-17 statewide prod release** (`ground-truth/HD + HS Release 8.17/`, 252 routes): ONE skeleton across every file — same sheet name (`Highway Summary`), same 129×2 shape, same section order, the same 95 code rows, values numeric with at most three decimals. Statewide total **17,301.098 miles**.
+
+- **`highway_summary_columns.py`** is the layout SoT: the ordered sections/codes, and the ONE strict reader (`values_from_rows`) that the consolidator AND the cross-environment loader both go through — the CMP-AUD-018 rule, so two paths can't read differently and let two equally-broken sides certify a clean match. Miles are carried as exact integer **thousandths** (the export prints three decimals), so statewide rollups sum exactly instead of drifting in binary float.
+- **Why not `summary_layout`:** that module is the shared spec/renderer for the two COUNT summaries (Ramp Summary, Intersection Summary), whose `parse_count` contract requires whole numbers and whose familiar sheet renders a TSMIS-vs-TSN table. Highway Summary is fractional and has no TSN side yet, so forcing a measure concept through correctness-locked count code bought nothing. Generalizing it can be decided against real evidence when a TSN extract lands.
+- **The tripwire is the skeleton, and it is exact.** A renamed section, an unknown/dropped/duplicated code, a reordered section, a missing or duplicated total, or an over-precise value fails that route loudly naming the difference. Whitespace and case drift are tolerated (cosmetic, not identity). `build/check_highway_summary_layout.py` proves each refusal fires, hermetically (synthesized sheets, no corpus needed).
+- **Partitions are BOUNDED, not exact.** Nine sections tabulate a subset of the route total; `NON-ADD` is independent (non-add mileage, never the total). A section summing ABOVE the total is refused. Summing BELOW is real and measured — six routes on the release (`HIGHWAY GROUP` on 099/101/125/170/905, `MEDIAN TYPE` on 099/101/170/180, `NUMBER OF LANES` on 101) — so the residual is exposed as a note, never redistributed into a category.
+- **A zero-total route is NOT empty.** Four routes (010S/014U/015S/178S) report `TOTAL MILES SELECTED = 0` while carrying real NON-ADD mileage (0.692–18.785 miles) and 10–102 Highway Detail records each: the total tabulates ADD mileage only. `record_has_data` therefore counts ANY non-zero measure — keying on the total alone dropped four real routes and pinned every run to PARTIAL.
+- **Output:** `highway_summary_consolidated.xlsx` — sheet `Highway Summary` (one row per route: Route, Total Miles, 95 category columns = 97 wide) plus `Combined`, the familiar section-grouped statewide rollup carrying the bounded-residual notes.
+- **Cross-env** rides the `side_loader` + `agg_header` aggregate path (the Intersection Summary pattern), keyed on route, with `agg_header` = the consolidator's own header so compared columns and workbook columns cannot drift.
+
+#### vs TSN (v0.37.0) — the third aggregate summary, the first measuring miles
+
+`compare_highway_summary_tsn` reduces each side to ONE statewide {category: miles} table and compares it with `has_route=False`, exactly like Ramp / Intersection Summary. `tsn_load_highway_summary` normalizes the statewide print into the library's `[Category, Miles]` workbook.
+
+**The print's censused conventions** (`ground-truth/Highway Summary TSN print 9.15/`, OTM22230, event 4843734, reference 09/15/2025):
+
+- **Two columns of independent little tables.** Each section prints `<---NAME--->` then its own `DVM CODE MILES` header. A section's REGION is its header's x-span widened to the midpoints between horizontal neighbours sharing a y-band, running down to the next section sharing its x-band. **Rows are clustered INSIDE a region, never page-wide** — the two columns' baselines interleave, so a page-wide cluster steals a code line into its neighbour's row and orphans its MILES value (this cost `L-LEFT IND ALIGN` its mileage in the first draft).
+- **The MILES header is NOT right-aligned with its data** (header x1 260.9 vs data 276.6), so the column header's edge is useless as an anchor — the region is.
+- **The DVM figure is frequently GLUED to the code text** (`6,311,760.663R-RIGHT IND ALIGN`, and even to a range: `111,826,634.85960 - 99`) and is stripped. TSMIS does not tabulate Daily Vehicle Miles, so DVM is never compared.
+- **MEDIAN TYPE labels carry an old-system mapping in parentheses** (`B-STRIPED (S )`), stripped for matching.
+- **RURAL-URBAN prints its `- O - OUTSIDE CITY` rows without the parent letter**, so each binds to the preceding `R-RURAL` / `U-URBAN` row (the CMP-AUD-023 rule); a parentless `-O` carrying a value RAISES rather than defaulting to Rural.
+- **`**********` means the value overflowed its column width** — an ABSENT source fact, not a zero. It is omitted so the category shows one-sided (CMP-AUD-021), and the normalized workbook reports PARTIAL naming it. On the bound print that is exactly `MEDIAN BARRIER: Z- NO BARRIER`.
+
+**Pairing is on the within-section CODE, not the label**, because the two systems spell everything differently (`R- RIGHT  IND ALIGN` vs `R-RIGHT IND ALIGN`; `0  -  4` vs `0 - 4`). `highway_summary_columns` derives the code for each TSMIS label and asserts uniqueness within every section.
+
+**Structurally one-sided, by design** — 4 of 95, all measured: `MEDIAN TYPE (UNDIVIDED)` / `(DIVIDED)` (group sub-headers the export writes as 0 on all 252 routes and the print does not measure), `DESIGN SPEED - NO DATA` (the print has no such row, though MEDIAN WIDTH does), and the masked `MEDIAN BARRIER Z- NO BARRIER`.
+
+**`TOTAL MILES SELECTED` is NOT like-for-like** and the familiar sheet says so: the print's own footnotes exclude non-add and unconstructed mileage, and its figures bear that out (Highway Group sums to exactly the total PLUS its unconstructed). The TSMIS export applies no such exclusion. Measured on the bound pair: TSMIS reports **0.000** unconstructed miles statewide, TSN **1,289.296**.
+
+**Bound result** (2026-08-17 TSMIS export vs the 2025-09-15 print — ~11 months apart, so most mileage legitimately moved): **92 categories in both, 0 TSN-only, 4 TSMIS-only, 89 differing / 3 identical**. The familiar `Summary by Category` sheet renders miles to three decimals via `summary_layout`'s opt-in measure mode.
 
 ### The Highway Detail family (v0.20.0)
 
@@ -569,7 +609,8 @@ COMPARE_GROUPS = [
 ]
 ```
 - `group="env"` -- every report's **between-environments** comparison (Ramp Summary/Detail, Highway Sequence, Highway Log, **Intersection Summary/Detail**, **Highway Detail**, and the **PDF editions** — Highway Log (PDF) + Intersection Detail (PDF) + Highway Detail (PDF) + Highway Sequence (PDF) + Ramp Detail (PDF)). Folder-to-folder only.
-- `group="tsn"` -- the file-based **TSMIS-vs-TSN** comparisons. 12 of them, COMPLETE for all comparison-integrated editions (Highway Log Excel/PDF, Ramp Detail Excel/PDF, Ramp Summary, Intersection Summary, Intersection Detail Excel/PDF, Highway Sequence Excel/PDF, Highway Detail Excel/PDF — the Highway Detail pair v0.20.0, the Highway Sequence (PDF) v0.25.0, the Ramp Detail (PDF) v0.26.0). (Highway Summary is export-only — no vs-TSN comparator yet, so it isn't here.)
+- `group="tsn"` -- the file-based **TSMIS-vs-TSN** comparisons. 13 of them, COMPLETE for all comparison-integrated editions (Highway Log Excel/PDF, Ramp Detail Excel/PDF, Ramp Summary, Intersection Summary, Intersection Detail Excel/PDF, Highway Sequence Excel/PDF, Highway Detail Excel/PDF — the Highway Detail pair v0.20.0, the Highway Sequence (PDF) v0.25.0, the Ramp Detail (PDF) v0.26.0). (Highway Summary joined this list in **v0.37.0** — the AGGREGATE statewide-miles
+comparator, once the owner supplied the statewide TSN print. That makes it 13.)
 - `group="self"` -- the five **PDF-vs-Excel** consistency self-checks (Highway Log, Intersection Detail, Highway Detail, Highway Sequence, Ramp Detail): a report's PDF render vs its Excel render, one system in one environment — neither cross-environment nor vs-TSN, so its own sub-tab (CMP-AUD-014, formerly mislabeled under `env`).
 - The GUI also appends a **third** sub-tab on its own, the day-keyed **"vs TSN Matrix"** (group id `tsn_by_day`) — not a registry comparison type.
 
@@ -601,6 +642,7 @@ are the PDF-vs-Excel self-checks (CMP-AUD-014, moved out of `env`).
 | Highway Detail (PDF) — between environments | `compare_env.HIGHWAY_DETAIL_PDF` | folders | env |
 | Highway Sequence Listing (PDF) — between environments | `compare_env.HIGHWAY_SEQUENCE_PDF` | folders | env |
 | TSAR: Ramp Detail (PDF) — between environments | `compare_env.RAMP_DETAIL_PDF` | folders | env |
+| Highway Summary — between environments | `compare_env.HIGHWAY_SUMMARY` | folders | env |
 | Highway Log — TSMIS vs TSN | `compare_highway_log` | files | tsn |
 | Highway Log — TSMIS (PDF) vs TSN (PDF) | `compare_highway_log_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
 | Highway Log — TSMIS (PDF) vs TSMIS (Excel) | `compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL` | files | self |
@@ -618,6 +660,7 @@ are the PDF-vs-Excel self-checks (CMP-AUD-014, moved out of `env`).
 | Highway Sequence Listing — TSMIS (PDF) vs TSMIS (Excel) | `compare_highway_sequence_pdf.TSMIS_PDF_VS_EXCEL` | files | self |
 | TSAR: Ramp Detail — TSMIS (PDF) vs TSN | `compare_ramp_detail_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
 | TSAR: Ramp Detail — TSMIS (PDF) vs TSMIS (Excel) | `compare_ramp_detail_pdf.TSMIS_PDF_VS_EXCEL` | files | self |
+| Highway Summary — TSMIS vs TSN | `compare_highway_summary_tsn` | files | tsn |
 
 **Don't hand-roll workbook output**: build a `CompareSchema` and call `compare_core.run_compare` -- that's the approved workbook style for free, and the core's text/formulas are regression-locked. See [comparison-engine.md](comparison-engine.md) (engine + regression-lock harness) and [highway_log/comparison-study.md](highway_log/comparison-study.md) (the PDF-vs-Excel/TSN findings).
 

@@ -67,14 +67,15 @@ def test_paths_and_modes():
           matrix.tsn_capable("highway_sequence"))
 
     defs = matrix._row_defs()
-    check("twelve matrix rows — every report (both HL + both Intersection + both "
+    check("thirteen matrix rows — every report (both HL + both Intersection + both "
           "Highway Detail + both Highway Sequence + both Ramp Detail formats, "
-          "v0.26.0)",
+          "v0.26.0; Highway Summary v0.37.0)",
           set(defs) == {"ramp_summary", "ramp_detail", "highway_sequence",
                         "highway_log", "highway_log_pdf", "intersection_summary",
                         "intersection_detail", "intersection_detail_pdf",
                         "highway_detail", "highway_detail_pdf",
-                        "highway_sequence_pdf", "ramp_detail_pdf"})
+                        "highway_sequence_pdf", "ramp_detail_pdf",
+                        "highway_summary"})
 
     def modes(rk):
         _l, sub, _i, adapter, _hr = defs[rk]
@@ -525,8 +526,13 @@ def test_support_derives_from_registry():
           mode_of(HDP, "highway_detail", "tsn")["supported"])
     check("baseline: ramp_detail_pdf self mode supported",
           mode_of(RDP, "ramp_detail", "self")["supported"])
-    check("baseline: every by-day row supported",
-          all(r[4] for r in day_matrix._day_rows()))
+    # Every by-day row is vs-TSN supported again as of v0.37.0: Highway Summary was
+    # the one deliberate exception while it had no TSN source, and the owner's
+    # statewide print closed that gap.
+    _day = {r[0]: r[4] for r in day_matrix._day_rows()}
+    check("baseline: every by-day row supported", all(_day.values()))
+    check("baseline: highway_summary is by-day supported (its TSN print landed)",
+          _day.get("highway_summary") is True)
 
     # Negative mutation on the TSN registry: the mode + the by-day row must flip,
     # while an unpatched row stays supported.

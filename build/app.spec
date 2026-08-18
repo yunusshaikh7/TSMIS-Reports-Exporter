@@ -94,6 +94,7 @@ APP_MODULES = [
     "export_multi",
     "highway_log_columns", "intersection_detail_columns",   # the corrected/canonical column headers
     "highway_detail_columns",                                # Highway Detail labels + legend (v0.20.0)
+    "highway_summary_columns",                               # Highway Summary layout SoT + reader (v0.37.0)
     "pdf_row_oracle",
     "pdf_table_lib",
     "published_comparison",                                  # the published-cell decoder (CMP-AUD-208)
@@ -122,6 +123,10 @@ APP_MODULES = [
     # the TSN-library loader, and the vs-TSN / PDF-flavor comparators.
     "consolidate_highway_detail", "consolidate_tsmis_highway_detail_pdf",
     "tsn_load_highway_detail",
+    # Highway Summary — the consolidator (v0.37.0) plus its vs-TSN comparator and
+    # TSN-print loader (v0.37.0, once the owner supplied the statewide print).
+    "consolidate_highway_summary",
+    "compare_highway_summary_tsn", "tsn_load_highway_summary",
     "tsn_district_contract", "tsn_library", "tsn_load_ramp_detail", "tsn_load_ramp_summary",
     "tsn_load_intersection_summary", "tsn_load_intersection_detail", "summary_layout",
     "compare_core", "compare_tsn_common", "compare_highway_log", "compare_highway_log_pdf", "compare_env",

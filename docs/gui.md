@@ -148,8 +148,10 @@ snapshot). **7 rows** (every report — Ramp Summary/Detail, Highway Sequence, b
 Highway Log formats, Intersection Summary/Detail — all with cross-env AND vs-TSN as of
 v0.17.0); each **row header** carries the
 report name (evidence-supported rows append a small **camera badge**, v0.24.0 —
-`evidenceRowBadge`: only the four PDF-edition rows carry one since the 2026-08-05
-ruling (their vs-TSN and env lanes render print crops); every other row gets no
+`evidenceRowBadge`: only the PDF-edition rows carry one since the 2026-08-05
+ruling — four at first, FIVE since v0.37.0 when Highway Detail (PDF) joined on the
+pre-release freeze lifting (vs-TSN only; it has no env hooks, so the env lane stays
+at four); every other row gets no
 badge, the toggle's status lines name them), a per-row **comparison-mode select**
 (compact + content-sized in a
 `.mx-fluent-select` chevron wrapper; the "(soon)" greying is now defensive — every
@@ -164,8 +166,9 @@ colour-coded** (`.mx-match`/`.mx-diff-lo`/`.mx-diff-hi`/`.mx-stale`/`.mx-missing
 plus greyed / needs-export / needs-TSN / "consolidate N PDFs" / stale states — with
 compact **icon** actions (`↻ export` / `↻ compare` / `↗ open`, gated on support+built; since
 v0.23.0 a **camera** on built, FRESH cells — the on-demand evidence run for the existing
-comparison, offered ONLY on the tsn/env modes of the four PDF-edition rows since the
-2026-08-05 ruling; a missing TSN print set reports per cell at run time).
+comparison, offered ONLY on the tsn/env modes of the PDF-edition rows since the
+2026-08-05 ruling — five rows on the tsn mode as of v0.37.0 (Highway Detail (PDF)
+joined), four on env; a missing TSN print set reports per cell at run time).
 The **config zone** (`#matrixConfig`, a card under the slim activity log, shown via
 `body.matrix-wide:not(.mw-day)`) holds the report + **environment-column** show/hide toggles,
 the global "set all comparisons to…" (env|tsn), the live-formulas toggle, the **evidence-images
@@ -253,7 +256,7 @@ cameras — `compare_folders` reads the per-route files straight from both folde
 `selectCompareGroup("baseline_by_day")` swaps in `#baselineMatrixSection`, full-width via
 `body.matrix-wide.mw-bl`; `renderBaselineMatrix` is fed by `gui_api.baseline_matrix_info`.
 The **Source + Baseline selects** live in the section head — the baseline picker lists the
-store + every exported day with its report coverage ("2026-06-11 (9/12 reports)"), the
+store + every exported day with its report coverage ("2026-06-11 (9/13 reports)"), the
 per-report half renders as the cells' "baseline not exported" state, and the baseline's own
 day column renders "baseline" cells (highlighted `.mx-baseline-col`, not rebuildable). Its
 config corner (`#baselineMatrixConfig`) holds the shared queue panel, the add-day toolbar,

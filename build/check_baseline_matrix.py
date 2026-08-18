@@ -131,14 +131,14 @@ def main():
         check("options = store + both days, with per-option report coverage",
               [o["id"] for o in opts] == ["store", "day:2026-06-18", "day:2026-06-11"]
               and opts[0]["present"] == 1 and opts[1]["present"] == 2
-              and opts[2]["present"] == 1 and opts[0]["total"] == 12)
+              and opts[2]["present"] == 1 and opts[0]["total"] == 13)
 
         print("snapshot — cell states:")
         days = ["2026-06-18", "2026-06-11"]
         snap0 = baseline_matrix.baseline_matrix_snapshot(
             "ssor-prod", days, None, dest=str(dest))
-        check("12 report rows, all supported",
-              len(snap0["all_rows"]) == 12
+        check("13 report rows, all supported",
+              len(snap0["all_rows"]) == 13
               and all(r["supported"] for r in snap0["all_rows"]))
         check("no baseline picked -> baseline side missing on every cell",
               snap0["baseline"]["id"] is None

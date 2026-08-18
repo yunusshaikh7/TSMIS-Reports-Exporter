@@ -44,9 +44,10 @@ def check(name, cond):
 # printed nothing, so it could not demonstrate the defect it exists to catch.
 print("the print-crop contract this file depends on (owner amendment 2026-08-05)")
 check("the vs-TSN lane locates PRINTS (_locate_tsmis_sources) and evidence "
-      "exists only for the four `_pdf` rows",
+      "exists only for the five `_pdf` rows (HD joined in v0.37.0)",
       hasattr(ve, "_locate_tsmis_sources")
-      and sorted(ve.rows()) == ["highway_log_pdf", "highway_sequence_pdf",
+      and sorted(ve.rows()) == ["highway_detail_pdf", "highway_log_pdf",
+                                "highway_sequence_pdf",
                                 "intersection_detail_pdf", "ramp_detail_pdf"])
 check("a pair that cannot be bound to what the comparison read has its own "
       "refusal type (EvidenceSourceBindingError)",

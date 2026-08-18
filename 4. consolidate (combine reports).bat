@@ -26,13 +26,14 @@ echo     10. TSMIS Highway Log (PDF)   (PDF export from output\...\highway_log_p
 echo     11. TSN Highway Log (PDF)     (district PDFs from tsn_library\highway_log\raw -^> XLSX)
 echo     12. Highway Detail            (XLSX -^> XLSX)
 echo     13. TSMIS Highway Detail (PDF) (PDF export from output\...\highway_detail_pdf -^> XLSX)
+echo     14. Highway Summary           (XLSX -^> XLSX)
 echo.
 echo     Q.  Quit
 echo.
 echo ================================================================
 echo.
 set "choice="
-set /p choice="Enter your choice [1-13, Q]: "
+set /p choice="Enter your choice [1-14, Q]: "
 
 if /i "%choice%"=="1" goto ramp_summary
 if /i "%choice%"=="2" goto ramp_detail
@@ -47,10 +48,11 @@ if /i "%choice%"=="10" goto tsmis_highway_log_pdf
 if /i "%choice%"=="11" goto tsn_highway_log
 if /i "%choice%"=="12" goto highway_detail
 if /i "%choice%"=="13" goto tsmis_highway_detail_pdf
+if /i "%choice%"=="14" goto highway_summary
 if /i "%choice%"=="Q" exit /b 0
 if /i "%choice%"=="quit" exit /b 0
 echo.
-echo Invalid choice "%choice%". Please pick 1-13, or Q.
+echo Invalid choice "%choice%". Please pick 1-14, or Q.
 echo.
 pause
 goto menu
@@ -117,5 +119,10 @@ exit /b 0
 
 :tsmis_highway_detail_pdf
 python scripts\consolidate_tsmis_highway_detail_pdf.py
+pause
+exit /b 0
+
+:highway_summary
+python scripts\consolidate_highway_summary.py
 pause
 exit /b 0

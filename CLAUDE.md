@@ -50,8 +50,11 @@ partial run never leaves one route with two files, and the end-anchored
 (the 2026-07-09 prod rollout; the dev site — Settings ▸ "Use development site" — is
 only needed for Route History testing), and every enabled on-site report exports in
 **BOTH formats** the site offers. **1b/5b are export-only by design** (their siblings
-already consolidate + compare); **8 (Highway Summary) is export-only** until the site
-un-greys it and a schema can be verified. **Selecting both editions of one report
+already consolidate + compare); **8 (Highway Summary) is FULLY INTEGRATED as of v0.37.0** — consolidate +
+cross-environment (v0.37.0) + **vs TSN** (v0.37.0, off the owner's statewide print);
+the vendor un-greyed the report 2026-08-17 and both its schema and the print are
+verified.
+**Selecting both editions of one report
 coalesces** — the route is generated ONCE and both files saved off that render — on
 the standard path (v0.19.2), in fast mode, and for matrix-queued edition steps (both
 v0.32.0). Where the live site greys a report, `select_report` fails fast rather than
@@ -60,9 +63,9 @@ stalling. The dev site's **Route History Table** is a greyed reserved placeholde
 `clean_intersection` / `clean_ramp`, stable ids 16/17/18) is `cs-disabled` on the
 site with refusing placeholder specs (`export_clean_road.py`).
 
-**The 12 fully-integrated export types consolidate AND compare vs TSN** — each has a
+**The 13 fully-integrated export types consolidate AND compare vs TSN** — each has a
 vs-TSN comparator and lives in the Everything, by-day, and (for the 5 dual-edition
-families) PDF-vs-Excel matrices. Per-report schemas + locked canaries:
+families) PDF-vs-Excel matrices. Highway Summary became the 13th in v0.37.0. Per-report schemas + locked canaries:
 [docs/reports.md](docs/reports.md) / [docs/tsn-parsers.md](docs/tsn-parsers.md);
 exact counts and hashes:
 [comparison-canary-bindings.md](docs/planning/comparison-perfection/comparison-canary-bindings.md).
@@ -71,13 +74,25 @@ the site's July-2026 35-column overhaul (pre-update files are refused with re-ex
 hints), and Intersection Summary's `MASTARM`→`MASTERARM` rename rides a parse-only
 alias + a section-partition tripwire so the next silent reshape fails loudly.
 
-**⛔ Highway Detail (7/7b) is PRE-RELEASE (owner, 2026-07-21): the vendor ACCIDENTALLY
-enabled its exports, they are GREYED OUT again, and the report is in ACTIVE
-DEVELOPMENT.** Every HD artifact on disk came from that accidental window — treat none
-of it as ground truth, do not re-bless HD canaries as stable, and do NOT fix the HD
-parser/normalizer against it (CMP-AUD-133/142/186 are deferred). 045's HD-Excel county
-cannot be answered yet — never infer it. The owner will supply NEW HD exports on
-official integration; that delivery is the trigger to re-verify the schema and resume.
+**Highway Detail (7/7b) is RELEASED — the pre-release freeze is LIFTED (vendor
+delivery 2026-08-17, `ground-truth/HD + HS Release 8.17/`).** The released Excel export
+carries the SAME 34 columns the app already read (252 routes / 51,327 statewide rows,
+one header, 0 deviations), so the freeze was about data TRUST, not schema — HD
+consolidation, comparisons, matrix rows and evidence are live against real data again.
+Resolved by the delivery: **CMP-AUD-192** (the 7.7/7.9 stale-payload skew — this is one
+same-build pull) and **045's HD-Excel county question, now ANSWERED: the released Excel
+export has NO county column** (the 34 labels are fixed and none is a county), so
+HD-Excel identity can never be repaired from the Excel export itself — an owner
+decision, not a vendor wait. Also fixed here: **CMP-AUD-243** — HD (PDF) silently lost
+the record on every single-record page (13 pages / 12 routes; 51,314 rows vs Excel's
+51,327), now recovered from the page's own header rule. **Still open and NOT fixed
+here:** CMP-AUD-186 and CMP-AUD-053, both still firing on the released PDFs. With 243
+fixed, 186's blast radius is now EXACT: the statewide PDF-vs-Excel self-check pairs
+**51,327 locations, 0 one-sided, 51,326 fully identical — one differing row**, route
+395 `R000.000E` (24 cells = Description + all 23 attributes blanked). It is the only
+thing between HD's two editions and a clean self-check, and the ledger scopes it as its
+own session (parser rewrite). CMP-AUD-133/142 (normalized-library facts) remain as
+written.
 
 **The ArcGIS tab (v0.29.0) builds the HIGHWAY clean-road file WITHOUT the site**: our
 own 74-column CA HIGHWAYS table from the owner's per-layer ArcGIS exports in
@@ -169,7 +184,7 @@ evidence run).
 | How to verify (no test framework): golden `check_*.py`, COM-recalc, `#mock`, test-data locations | [docs/verification-and-testing.md](docs/verification-and-testing.md) |
 | The durable lessons (field failures, one-core, regression discipline, audit method) | [docs/lessons.md](docs/lessons.md) |
 | The narrative history | [docs/history.md](docs/history.md) |
-| Roadmap / deferred / dormant backlog | [docs/roadmap.md](docs/roadmap.md) |
+| **What's left to do — the definitive OPEN WORK INVENTORY** | [docs/roadmap.md](docs/roadmap.md) (the `▣ OPEN WORK INVENTORY` table at the top) |
 | The reusable read-only code-review prompt | [docs/code-review-prompt.md](docs/code-review-prompt.md) |
 
 Code-level deep-dives (algorithms, data/control flow, extension points) live under
@@ -312,8 +327,10 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
   groundwork, **v0.19.1 enabled their EXPORT** (cleared the Highway pair from
   `DISABLED_EXPORT_SUBDIRS`; real Excel-sibling specs — the gate now holds only the
   reserved Route History placeholder, id 15). Highway Detail now consolidates and participates in the
-  Matrix, cross-environment, vs-TSN, and PDF-vs-Excel comparisons; Highway Summary
-  remains export-only until a real enabled-site schema can be verified. Add a report by editing the catalog;
+  Matrix, cross-environment, vs-TSN, and PDF-vs-Excel comparisons; **Highway Summary
+  consolidates and compares cross-environment (v0.37.0) AND vs TSN (v0.37.0)** — its
+  `MatrixEntry` gained a `tsn_key` the moment a `cmp:*:tsn` recipe + a TSN dataset
+  existed, which is the whole plug-in contract. Add a report by editing the catalog;
   `check_report_catalog` proves the derivation, and **`check_report_wiring` (v0.31.0)
   derives from `report_catalog.MATRIX` what every registered report MUST have —
   dispatchable vs-TSN/self comparators, dual-edition completeness, a by-day row, Reset
@@ -396,6 +413,10 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   tsn_library.py tsn_load_*.py   the canonical TSN library (versioned normalization, D2) + its loaders
   arcgis_layers.py           the manually-stocked ArcGIS layer drop-zone (staging only, no parser)
   highway_log_columns.py intersection_detail_columns.py highway_detail_columns.py   the per-report column labels
+  highway_summary_columns.py the Highway Summary layout SoT: sections/codes + the ONE
+                             strict miles reader the consolidator, the cross-env loader
+                             AND the vs-TSN comparator share (exact thousandths); also
+                             the shared within-section CODES the TSN print pairs on
   gui_main.py gui_api.py     GUI entry / the bridge core (state, pump, gate)
   gui_export_api.py gui_auth_api.py gui_compare_api.py gui_settings_api.py gui_update.py   the endpoint mixins (S1)
   gui_worker.py              re-export SHIM over gui_worker_export/_env/_maint/_matrix.py (S2)
