@@ -575,7 +575,13 @@ TSN = (
     # Ramp / Intersection Summary datasets but measuring MILES. Appended LAST.
     TsnEntry("highway_summary", "TSN Highway Summary", "*.pdf", "statewide_pdf",
              "tsn_highway_summary_normalized.xlsx",
-             "tsn_load_highway_summary:build_into"),
+             "tsn_load_highway_summary:build_into",
+             # v2 (D4, 2026-08-18): the normalized ROWS are unchanged — a masked
+             # category was already omitted — but the producer OUTCOME is not. A
+             # masked value no longer makes the build partial, and the comparison
+             # reads that outcome from the stored sidecar, so an existing library
+             # has to rebuild once to stop reporting incomplete coverage.
+             normalization_version=2),
     # Clean Road (2026-07-22) — STAGED library slots for the three TSN clean-road
     # extracts (CA HIGHWAYS / CA INTERSECTIONS / CA RAMPS, the underlying tables
     # rather than the TSAR projections; CA HIGHWAYS carries the SAME 60,083

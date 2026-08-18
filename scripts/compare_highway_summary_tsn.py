@@ -146,12 +146,19 @@ def _tsn_code(section, text, parent, source):
     return (m.group(1) if m else up), parent
 
 
-def parse_tsn_pdf(path):
+def parse_tsn_pdf(path, masked_out=None):
     """The statewide TSN Highway Summary print -> {slug: miles-thousandths}.
 
     Only categories the print actually carries a NUMBER for are returned: a
     masked (`**********`) value is omitted, never coerced to 0, so the comparator
-    shows it one-sided instead of comparing an invented figure (CMP-AUD-021)."""
+    shows it one-sided instead of comparing an invented figure (CMP-AUD-021).
+
+    `masked_out` is an optional set the parser fills with the slugs whose value the
+    print MASKED — the category is present and states a figure, but it overflowed
+    its column width. That is different from a category the print never mentions:
+    a masked value is permanently unreadable from this frozen source, while an
+    absent one may mean the parse or the taxonomy drifted. The library build uses
+    the distinction to decide what is genuinely incomplete (D4)."""
     index = hsc.code_index("tsn")
     out, total, seen = {}, None, set()
     name = Path(path).name
@@ -195,6 +202,8 @@ def parse_tsn_pdf(path):
                             "twice — refusing to read an ambiguous table")
                     seen.add(cat.slug)
                     if masked:
+                        if masked_out is not None:
+                            masked_out.add(cat.slug)   # unreadable, not absent
                         continue          # absent, not zero
                     out[cat.slug] = hsc.parse_miles(last, source=name,
                                                     category=cat.key)

@@ -36,34 +36,62 @@ def _project(raw_path):
     value that overflows its column width with `**********`, and on the bound
     2025-09-15 print that is exactly `MEDIAN BARRIER: Z- NO BARRIER`. The
     comparison then shows it one-sided instead of comparing an invented figure.
+
+    D4 (owner decision 2026-08-18): a MASKED category no longer makes the build
+    partial. TSMIS replaced TSN, so this print is a FROZEN artifact of the retired
+    database — there will never be a version of it that states the figure, and
+    holding the whole library at PARTIAL for a gap that can never close left the
+    Highway Summary vs-TSN cell permanently amber with nothing to act on. A masked
+    value is disregarded and disclosed instead.
+
+    The distinction is kept and is load-bearing: a category the print MASKS is
+    unreadable-forever, but one it never mentions at all may mean the parse or the
+    shared taxonomy drifted — that still reports PARTIAL, so a future regression
+    that silently dropped categories cannot pass as a complete build.
     """
-    values = hstsn.parse_tsn_pdf(raw_path)
+    masked_slugs = set()
+    values = hstsn.parse_tsn_pdf(raw_path, masked_out=masked_slugs)
     # CMP-AUD-146: capture the print's identity claims (report id/dates/
     # submitter/event/generation time) — an unidentifiable print refuses.
     claims = hstsn.parse_tsn_source_claims(raw_path)
     expected = [(c.key, c.slug) for c in hsc.cats_for("tsn")]
-    missing = [key for key, slug in expected if values.get(slug) is None]
+    missing = [(key, slug) for key, slug in expected if values.get(slug) is None]
+    unreadable = [key for key, slug in missing if slug in masked_slugs]
+    absent = [key for key, slug in missing if slug not in masked_slugs]
     rows = [[key, hsc.miles(values[slug])]
             for key, slug in hstsn._CATEGORIES if values.get(slug) is not None]
+
+    def _listed(keys):
+        return ", ".join(keys[:6]) + ("…" if len(keys) > 6 else "")
 
     def make_result(out_name):
         total = values.get(hsc.TOTAL_SLUG)
         summary = [f"TSN Highway Summary: {len(rows)} categories -> {out_name}",
                    f"{hsc.TOTAL_LABEL}: "
                    + (f"{hsc.miles(total):,.3f}" if total is not None else "not stated")]
-        if missing:
+        if unreadable:
             summary.insert(
-                0, f"⚠ INCOMPLETE — {len(missing)} categor"
-                   f"{'y' if len(missing) == 1 else 'ies'} carried no mileage in the "
-                   "print (a masked '**********' value is omitted, never zeroed): "
-                   + ", ".join(missing[:6]) + ("…" if len(missing) > 6 else ""))
+                0, f"{len(unreadable)} categor"
+                   f"{'y' if len(unreadable) == 1 else 'ies'} masked in the print "
+                   "('**********' — the figure overflowed its column) and DISREGARDED: "
+                   + _listed(unreadable)
+                   + ". The TSN print is a frozen artifact of the retired database, so "
+                     "this can never be filled in; it is shown one-sided, never zeroed.")
+        if absent:
+            summary.insert(
+                0, f"⚠ INCOMPLETE — {len(absent)} categor"
+                   f"{'y' if len(absent) == 1 else 'ies'} the print never mentions: "
+                   + _listed(absent)
+                   + ". Unlike a masked value this may mean the parse or the shared "
+                     "taxonomy drifted — check before trusting the comparison.")
         return ConsolidateResult(
             status="ok",
             message=f"Normalized TSN Highway Summary ({len(rows)} categories).",
             summary_lines=summary,
-            completion=outcome.PARTIAL if missing else outcome.COMPLETE,
-            skipped_inputs=len(missing),
-            producer_extra={"tsn_source_claims": claims})
+            completion=outcome.PARTIAL if absent else outcome.COMPLETE,
+            skipped_inputs=len(absent),
+            producer_extra={"tsn_source_claims": claims,
+                            "tsn_masked_categories": sorted(unreadable)})
 
     return rows, make_result
 

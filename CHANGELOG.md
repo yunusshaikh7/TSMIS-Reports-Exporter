@@ -49,6 +49,21 @@ a full backend round trip before showing anything.
   twelve of them since v0.32.0. The roadmap had been describing finished work as
   an unstarted project.
 
+**The Highway Summary comparison stops reporting incomplete coverage.**
+
+- The statewide TSN print masks one figure that overflowed its column width
+  (`MEDIAN BARRIER: Z- NO BARRIER`). That single gap was making the whole
+  normalized library PARTIAL, which the comparison propagated as "1 input
+  skipped — coverage is incomplete", leaving the cell permanently amber.
+- TSN is a retired database and that print is frozen, so the gap can never close.
+  A masked value is now **disregarded**: the build returns complete. The category
+  is still shown one-sided with its TSMIS value, and recorded in the workbook's
+  metadata — disregarded, never zeroed, never hidden.
+- A category the print never mentions at all is treated differently and still
+  reports incomplete: that would mean the parse or the category list drifted,
+  which is worth knowing about.
+- The TSN Highway Summary library rebuilds itself once to pick this up.
+
 **Highway Detail vs TSN: 14,490 differences that were never differences.**
 
 - TSN's Highway Detail prints one roadbed's values and fills the other roadbed's
