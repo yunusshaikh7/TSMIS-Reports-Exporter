@@ -48,8 +48,9 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > **Highway Summary is COMPLETE**: the owner supplied the statewide TSN print the
 > same day, so **v0.37.0** added its vs-TSN leg — all 13 integrated reports now
 > compare against TSN. (Caveat: that print is 09/15/2025 against a 2026-08-17
-> export, so 89 of its 92 categories differ for real; a near-same-date print would
-> make the comparison a defect check rather than a drift report.)
+> export, so 89 of its 92 categories differ for real. That gap is PERMANENT: TSMIS
+> replaced TSN, so there is no fresher TSN to pull — vs-TSN measures migration
+> drift against a frozen September-2025 baseline, not present-day agreement. See D5.)
 >
 > *(The block below is the 2026-07-23 / v0.32.0 state, kept for context.)*
 >
@@ -90,9 +91,10 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > now clean statewide). The next large build is the **CA INTERSECTIONS + CA RAMPS
 > clean-road builds** on the v0.29.0 pattern (mappings censused in
 > [planning/cleanroad-highways.md](planning/cleanroad-highways.md)). The highest-value
-> thing the OWNER can supply is a **same-period TSN pull** for Highway Detail or
-> Highway Summary — both vs-TSN canaries are mixed-vintage today (D5), which is the
-> only reason either is a smoke test rather than a re-bless.
+> thing the OWNER can supply is the **work-PC acceptance run** (B1) — six releases of
+> change have never run on a real work PC. Note what is NOT available: a fresher TSN
+> pull. TSMIS replaced TSN, so the TSN side is frozen at 09/2025 forever and vs-TSN
+> measures drift from the cutover rather than agreement (D5).
 
 > **v0.18.1 — field-validated close-out (SHIPPED 2026-06-26).** The work-PC sign-off release on top of
 > the v0.18.0 candidate, bundled in ONE commit (`e2bfade`; tag `v0.18.1` pushed → `release.yml` published
@@ -161,8 +163,10 @@ closed on 2026-08-18 — see the status banner above for what each became, and t
 per-finding remediation records. The project record is
 [COMPLETION-PLAN.md](planning/comparison-perfection/COMPLETION-PLAN.md).
 
-The one thing that is *not* closed is not a defect: **both vs-TSN canaries remain
-MIXED VINTAGE** and so are still un-blessable (D5 below).
+The one thing that is *not* closed is not a defect and never will be: **TSMIS
+REPLACED TSN**, so the TSN side of every vs-TSN comparison is frozen at the 09/2025
+cutover and the gap to a live TSMIS export only grows. Read those differing-cell
+counts as migration drift, not defect — see C4 + D5.
 
 ### B. Owed by the owner (work PC only — this dev box cannot reach TSMIS)
 
@@ -177,7 +181,7 @@ MIXED VINTAGE** and so are still un-blessable (D5 below).
 | C1 | **Clean Road exports** (`clean_highway` / `clean_intersection` / `clean_ramp`) | All three `cs-disabled` with no report module behind them. A statewide export of each unlocks their real `save` + TSN normalizers. |
 | C2 | **Route History export flow** | Dev-site only, greyed reserved placeholder (stable id 15). |
 | C3 | **Statewide Highway Summary PRINTS** | The export edition SHIPPED in v0.38.0 (`export_highway_summary_pdf`, `hs_printAll`) and is deliberately export-only: there is no real statewide print yet to verify a parser against. One work-PC run producing 252 PDFs unlocks its consolidator + PDF-vs-Excel self-check (the HSL / RD-PDF sequence). |
-| C4 | **A same-date TSN Highway Summary print** | The supplied print is 09/15/2025 against a 2026-08-17 export — 89 of 92 categories differ from ~11 months of real drift. A near-date print would make that comparison a defect check instead. |
+| C4 | ~~A same-date TSN Highway Summary print~~ **— THERE WILL NEVER BE ONE.** Not a wait; a permanent property | **TSMIS REPLACED TSN.** The site says so on every report cover page ("TASAS — TSMIS has officially replaced the TASAS — TSN database"), and every TSN source we hold is from the one final pull (HD extract REF 2025-09-08; the RD / RS / IS / HS prints all 09/15/2025). The TSN side is a FROZEN historical snapshot and will not be refreshed. See D5 for what that means for the comparisons. |
 | C5 | **DEF-01 — permanent/main-site parity** | The frozen output-audit archive is a DEV-site export; equivalence is not established and must not be assumed. Needs a review-ready permanent-site export. |
 | C6 | **DEF-03 — baseline Intersection Detail (2 decisions)** | Needs a prior **SSOR-prod** Intersection Detail export for a second day. |
 
@@ -189,7 +193,7 @@ MIXED VINTAGE** and so are still un-blessable (D5 below).
 | D2 | ~~The Reset cleanup misses the two Intersection Excel export folders~~ | **Done (v0.38.0)** — `gui_worker_maint._LEGACY_OUTPUT_DIRS` now lists `intersection_detail`, `intersection_summary` and `highway_summary_pdf`. |
 | D3 | ~~`check_report_wiring` only asserts Reset coverage for `fmt == "pdf"` rows~~ | **Done (v0.38.0)** — `test_reset_covers_every_export` now derives from the EXPORT registry and asserts every enabled export's subdir, skipping only the app-DISABLED placeholders. It fails on all three historical omissions. |
 | D4 | **The Highway Summary vs-TSN cell is PERMANENTLY amber with the current print** | The print masks `MEDIAN BARRIER Z- NO BARRIER` as `**********`, so the normalized workbook is honestly PARTIAL and the comparison propagates that (`⚠ 1 input skipped … coverage is incomplete`). That is the correct contract — 91 of 92 categories have a TSN value — but it cannot clear until a print states that figure. **Owner call:** live with amber, or decide masked-means-uncomparable should read complete-with-note. |
-| D5 | **Both vs-TSN canaries are currently MIXED VINTAGE** | HD's TSN extract is REFERENCE_DATE 2025-09-08 and HS's print 09/15/2025, both against a 2026-08-17 export. The comparisons are structurally sound (verified end to end), but the differing-cell counts are dominated by ~11 months of real network change and are **not blessable as canaries**. A same-period TSN pull for either report converts its smoke test into a re-bless. |
+| D5 | **The TSN side is FROZEN at the 09/2025 cutover — so vs-TSN measures DRIFT, not agreement** | TSMIS replaced TSN, so there is no fresher TSN to pull (C4). Every vs-TSN comparison therefore pairs a live TSMIS export against a fixed September-2025 baseline, and the gap grows every month: at the 2026-08-17 export it is ~11 months, which is what dominates HD's 174,837 differing cells and HS's 89-of-92 differing categories. **Read those counts as migration drift, not defect.** The rows that stay diagnostic are the STRUCTURAL ones — HD's 2,850 only-TSMIS / 11,606 only-TSN (21 unconstructed TSN routes TSMIS doesn't export) and HS's 4 only-TSMIS categories. A canary IS still bindable, because the TSN half can no longer move: bind it to (frozen TSN snapshot × a NAMED TSMIS export), and re-running that exact pair detects TSMIS-side parser/consolidator regressions. It can never go to zero, and should not be expected to. |
 
 ### E. Hygiene / low priority
 
