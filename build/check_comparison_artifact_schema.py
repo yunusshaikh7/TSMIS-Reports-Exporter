@@ -38,7 +38,8 @@ def _typed(rows=1, completion="complete"):
         pairing_quality="exact")
 
 
-def _commit(final, writer, mode="values", rows=1, twin=False):
+def _commit(final, writer, mode="values", rows=1, twin=False,
+            fast_validation=False):
     def produce(tmp):
         writer(Path(tmp))
         return ConsolidateResult(
@@ -46,7 +47,8 @@ def _commit(final, writer, mode="values", rows=1, twin=False):
             completion="complete", skipped_inputs=0, failed_inputs=0,
             comparison_outcome=_typed(rows))
     return a.commit_workbook(final, produce, expect_sheet="Comparison",
-                             requested_mode=mode, twin=twin)
+                             requested_mode=mode, twin=twin,
+                             fast_validation=fast_validation)
 
 
 def _sheet(path, header, rows=(), title="Comparison"):
@@ -69,6 +71,16 @@ def main(tmp: Path) -> None:
             res.status == "ok" and good.exists(), repr(res.message))
     c.check("the schema is versioned", isinstance(a.COMPARISON_ARTIFACT_SCHEMA, int)
             and a.COMPARISON_ARTIFACT_SCHEMA >= 1)
+    fast_good = tmp / "good-fast.xlsx"
+    fast_res = _commit(
+        fast_good, lambda p: write_comparison_stub(p, rows=3),
+        fast_validation=True)
+    c.check("the direct OOXML gate accepts the same real artifact",
+            fast_res.status == "ok" and fast_good.exists(), repr(fast_res.message))
+    c.check("the direct and openpyxl readers return identical counts",
+            a.comparison_counts(fast_good, direct_ooxml=True)
+            == a.comparison_counts(fast_good),
+            repr(a.comparison_counts(fast_good, direct_ooxml=True)))
 
     print("the audit's own artifacts are REFUSED, last-good kept:")
     prior = good.read_bytes()
@@ -98,6 +110,13 @@ def main(tmp: Path) -> None:
         c.check(f"REFUSED: {label}",
                 res.status == "error" and good.read_bytes() == prior,
                 f"status={res.status} message={res.message!r}")
+        fast_prior = fast_good.read_bytes()
+        fast_res = _commit(
+            fast_good, writer, rows=5, fast_validation=True)
+        c.check(f"DIRECT REFUSED: {label}",
+                fast_res.status == "error"
+                and fast_good.read_bytes() == fast_prior,
+                f"status={fast_res.status} message={fast_res.message!r}")
     c.check("the refusal names the artifact and keeps the previous file",
             "left unchanged" in (res.message or ""), repr(res.message))
 
@@ -106,6 +125,8 @@ def main(tmp: Path) -> None:
         probe = tmp / "probe.xlsx"
         writer(probe)
         problem = a.comparison_artifact_problem(probe, _typed(rows=5))
+        direct_problem = a.comparison_artifact_problem(
+            probe, _typed(rows=5), direct_ooxml=True)
         counts = matrix_state.read_counts(probe)
         unreadable = counts == (None, None)
         # A refused artifact must already be unreadable to the Matrix — except
@@ -114,6 +135,9 @@ def main(tmp: Path) -> None:
         c.check(f"{label}: refused implies Matrix-unreadable (or a typed contradiction)",
                 problem is None or unreadable or writer is header_only,
                 f"problem={problem!r} counts={counts!r}")
+        c.check(f"{label}: direct and openpyxl gates agree",
+                bool(direct_problem) == bool(problem),
+                f"direct={direct_problem!r} openpyxl={problem!r}")
 
     print("the gate is scoped to a typed comparison's VALUES artifact:")
     formulas = tmp / "formulas.xlsx"
@@ -144,6 +168,14 @@ def main(tmp: Path) -> None:
                             requested_mode="both", twin=True)
     c.check("mode=both gates the VALUES twin, not the formulas primary",
             res.status == "ok", repr(res.message))
+    fast_twin = tmp / "twin-fast.xlsx"
+    fast_res = a.commit_workbook(
+        fast_twin, produce_twin, expect_sheet="Comparison",
+        requested_mode="both", twin=True, fast_validation=True)
+    c.check("mode=both direct-validates values and formulas members",
+            fast_res.status == "ok" and fast_twin.exists()
+            and a._values_twin(fast_twin).exists(), repr(fast_res.message))
+
 
     def produce_twin_bad(t):
         t = Path(t)
@@ -169,6 +201,9 @@ def main(tmp: Path) -> None:
     c.check("read_counts delegates to it unchanged",
             matrix_state.read_counts(counts_path) == (6, 1))
 
+    c.check("the direct reader returns the same nonzero contract",
+            a.comparison_counts(counts_path, direct_ooxml=True) == (6, 1, 3),
+            repr(a.comparison_counts(counts_path, direct_ooxml=True)))
 
 if __name__ == "__main__":
     print("CMP-AUD-115 comparison-artifact schema gate:")

@@ -1172,6 +1172,13 @@ def test_b05_malformed(tmp):                                  # P2-B05
     check("...the valid prior workbook is preserved", final.read_bytes() == prior)
     check("...and it is still openable by openpyxl", a._openable_xlsx(final, "Comparison"))
     check("no temp leak", _no_temp_leak(d))
+    res = a.commit_workbook(
+        final, produce_malformed, expect_sheet="Comparison",
+        fast_validation=True)
+    check("the direct validator also rejects a malformed workbook part",
+          res.status == "error" and final.read_bytes() == prior)
+    check("...and direct rejection leaves no temp", _no_temp_leak(d))
+
 
     # A readable workbook MISSING the expected sheet is rejected too.
     def produce_wrong_sheet(t):
@@ -1180,6 +1187,11 @@ def test_b05_malformed(tmp):                                  # P2-B05
     res = a.commit_workbook(final, produce_wrong_sheet, expect_sheet="Comparison")
     check("a workbook missing the expected sheet -> error", res.status == "error")
     check("...prior preserved", final.read_bytes() == prior)
+    res = a.commit_workbook(
+        final, produce_wrong_sheet, expect_sheet="Comparison",
+        fast_validation=True)
+    check("the direct validator rejects a missing expected sheet",
+          res.status == "error" and final.read_bytes() == prior)
 
 
 def test_r02_no_temp_leak(tmp):                               # P2-R02
@@ -1385,6 +1397,13 @@ def test_r04_malformed_sheet(tmp):                            # P2-R04
     check("a corrupt-worksheet workbook -> error (rejected)", res.status == "error")
     check("...the valid prior workbook is preserved", final.read_bytes() == prior)
     check("...NO temp residue remains (handle released, temp removed)", _no_temp_leak(d))
+    res = a.commit_workbook(
+        final, produce_bad_sheet, expect_sheet="Comparison",
+        fast_validation=True)
+    check("the direct validator rejects the corrupt worksheet too",
+          res.status == "error" and final.read_bytes() == prior)
+    check("...direct rejection also leaves NO temp", _no_temp_leak(d))
+
 
 
 def test_a02_revert_race(tmp):                                # P2-A02 (round 2)

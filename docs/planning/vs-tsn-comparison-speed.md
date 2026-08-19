@@ -40,7 +40,7 @@ Foundation measurements:
 
 ## Improvement 1: direct OOXML post-write validation
 
-Status: **in progress**
+Status: **completed**
 
 Replace Fast mode's two post-write `openpyxl` read-only reloads with a fail-closed
 OOXML package validator. It will resolve sheets through workbook relationships,
@@ -60,9 +60,21 @@ Profile evidence: current Fast Ramp validation reopens the finished workbook
 twice. The existing count path took 10.354 s; a direct XML prototype returned the
 same `(508, 215, 15419)` in 1.329 s (7.79x for that operation).
 
+Completed result:
+
+- Direct package/count read on the real Ramp artifact: 9.795 s to 2.174 s
+  (4.50x).
+- Same-day end-to-end control with identical Fast serialization: 68.780 s with
+  legacy validation to 53.117 s with direct validation (22.77%, 1.295x).
+- Typed outcome and all 20 stable OOXML members were byte-exact; stable package
+  SHA-256: `85a43aa3fa805a9aa5d2b04a6f1257b9b8c90be8ce2c5634a45400f102436d03`.
+- Direct and openpyxl gates agreed on all focused valid/invalid schema cases;
+  malformed package, worksheet, and expected-sheet tests retained last-good
+  artifacts with no temp leak.
+
 ## Improvement 2: cheaper Fast-mode cell construction
 
-Status: **pending**
+Status: **in progress**
 
 Remove deep style-object hashing/equality from the hot cell-writing loop by using
 identity-checked style-cache keys. For guarded literal cells, bind the value once
@@ -138,3 +150,6 @@ Correctness gates:
 - 2026-08-19: Foundation committed and pushed. Profiling identified validation,
   cell construction, repeat TSN normalization, and optional workbook surface area
   as the next four bounded opportunities.
+- 2026-08-19: Improvement 1 completed. Direct OOXML validation removed duplicate
+  post-write workbook loads in Fast mode with a controlled 22.77% Ramp speedup
+  and exact output equivalence. Improvement 2 started.

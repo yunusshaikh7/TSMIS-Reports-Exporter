@@ -1179,7 +1179,8 @@ def run_files_compare(schema, tsmis_path, tsn_path, out_path, *, banner, has_rou
         source_paths=(tsmis_path, tsn_path),
         captured_sources=captured_sources,
         commit_guard=commit_guard,
-        requested_mode=mode)
+        requested_mode=mode,
+        fast_validation=fast_mode)
     # CMP-AUD-076: bind the pre-read input identities to the committed
     # generation, beside the workbook (additive evidence, never a gate).
     write_comparison_provenance(committed, out_path,
