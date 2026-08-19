@@ -1,10 +1,20 @@
 // ArcGIS tab module (v0.29.0, split like the other ui-*.js — same global scope).
-// Owns: the layer-library status card, the CA HIGHWAYS build (as-of date +
-// Build button), and the ArcGIS-vs-TSN comparison launcher (formulas/values
-// checkboxes ride the same start flow as the classic Compare tab, including
-// the derived-values overwrite confirmation).
+// Two sub-tabs (v0.39.0):
+//   CLEAN ROAD    — the layer-library status card, the CA HIGHWAYS build (as-of
+//                   date + Build button), and the ArcGIS-vs-TSN comparison
+//                   launcher (formulas/values checkboxes ride the same start
+//                   flow as the classic Compare tab, including the derived-
+//                   values overwrite confirmation).
+//   REPORTS       — the same layers rendered as a TSMIS report and diffed
+//                   against our own export of it. Because that comparison is
+//                   TSMIS vs TSMIS, the card leads with the VINTAGE question:
+//                   the build's as-of date beside the export day, and a loud
+//                   line when they differ (across a gap the comparison measures
+//                   network change, not correctness).
 
 let AG = null;                 // the last arcgis_status payload
+let AGR = null;                // the last arcgis_report_status payload
+let agSub = "cleanroad";       // which sub-tab is showing
 
 async function renderArcgis() {
   let st;
@@ -84,9 +94,156 @@ function syncArcgisLock() {
     const canCompare = !!(built.exists && hwy.tsn_raw && hwy.layers_ok);
     compare.disabled = locked || !canCompare;
   }
+
+  // Reports sub-tab — same rule, its own readiness (cached, no API call).
+  const rsrc = (AGR && AGR.source) || {}, rbuilt = (AGR && AGR.built) || {};
+  const rdays = (AGR && AGR.days) || [];
+  const rbuild = $("btnAgRepBuild");
+  if (rbuild) rbuild.disabled = locked || !rsrc.exists;
+  const rcmp = $("btnAgRepCompare");
+  if (rcmp) rcmp.disabled = locked || !(rbuilt.exists && rdays.length);
+  const rday = $("agRepDay");
+  if (rday) rday.disabled = locked || !rdays.length;
+  const rcancel = $("btnAgRepCancel");
+  if (rcancel) {
+    rcancel.classList.toggle("hidden", !locked);
+    rcancel.disabled = !locked;
+  }
+}
+
+// The tab's one entry point: refresh the clean-road card (it owns the shared
+// lock sync) and, when the reports sub-tab is the one showing, its card too.
+function renderArcgisTab() {
+  renderArcgis();
+  if (agSub === "reports") renderArcgisReports();
+}
+
+// ---- sub-tabs ------------------------------------------------------------ //
+function setArcgisSub(which) {
+  agSub = which;
+  const on = (id, is) => {
+    const el = $(id);
+    if (!el) return;
+    el.classList.toggle("active", is);
+    el.setAttribute("aria-selected", String(is));
+  };
+  on("subAgCleanRoad", which === "cleanroad");
+  on("subAgReports", which === "reports");
+  const cr = $("agCleanRoad"), rp = $("agReports");
+  if (cr) cr.classList.toggle("hidden", which !== "cleanroad");
+  if (rp) rp.classList.toggle("hidden", which !== "reports");
+  if (which === "reports") renderArcgisReports();
+}
+
+// ---- "Reports vs layers" -------------------------------------------------- //
+async function renderArcgisReports() {
+  let st;
+  try {
+    st = await api.arcgis_report_status();
+  } catch (e) {
+    $("agRepSource").textContent = "Status unavailable: " + e;
+    return;
+  }
+  if (!st || st.error) {
+    $("agRepSource").textContent = (st && st.error) || "Status unavailable.";
+    return;
+  }
+  AGR = st;
+  const src = st.source || {}, built = st.built || {};
+
+  $("agRepSourceMeta").textContent = src.exists
+    ? (src.asof ? "as of " + src.asof : "built") : "not built yet";
+  $("agRepSource").textContent = src.exists
+    ? `The Highway Detail report is projected from this workbook — it is the CA `
+      + `HIGHWAYS table, and the report is that table printed.   ·   ${src.path}`
+    : "No Clean Road Highway workbook yet — build it on the Clean Road sub-tab "
+      + "first. The report is projected from it, not from the layers directly.";
+
+  $("agRepHdMeta").textContent = built.exists
+    ? `${Number(built.rows || 0).toLocaleString()} records`
+      + (built.asof ? " · as of " + built.asof : "")
+    : "not built yet";
+  $("agRepHdBuilt").textContent = built.exists
+    ? `Built: ${built.path}`
+      + (built.merged_away
+         ? `   ·   ${Number(built.merged_away).toLocaleString()} CA HIGHWAYS rows merged `
+           + `(they split only on columns Highway Detail doesn't print)` : "")
+    : "Not built yet — Build renders the layers as Highway Detail's own 34 columns.";
+
+  // Export-day picker: only days whose Highway Detail is CONSOLIDATED.
+  const sel = $("agRepDay");
+  const days = st.days || [];
+  const keep = sel.value;
+  sel.textContent = "";
+  if (!days.length) {
+    const o = document.createElement("option");
+    o.value = ""; o.textContent = "no consolidated Highway Detail export";
+    sel.appendChild(o);
+  } else {
+    days.forEach((d) => {
+      const o = document.createElement("option");
+      o.value = d.day; o.textContent = d.day;
+      sel.appendChild(o);
+    });
+    if (days.some((d) => d.day === keep)) sel.value = keep;
+  }
+
+  // The vintage line — the first thing that makes this comparison honest.
+  const day = sel.value, asof = built.asof || (src.exists ? src.asof : "");
+  const vint = $("agRepVintage");
+  if (!day || !asof) {
+    vint.textContent = "";
+    vint.classList.remove("warn");
+  } else if (asof === day) {
+    vint.textContent = `Same date on both sides (${asof}) — differences are real `
+      + "differences, not network change.";
+    vint.classList.remove("warn");
+  } else {
+    vint.textContent = `⚠ The layers were rebuilt as of ${asof} but this export is `
+      + `from ${day}. Across that gap the comparison measures network CHANGE, not `
+      + `correctness. To compare like for like, rebuild the Clean Road workbook `
+      + `with its as-of date set to ${day}, then build this report again.`;
+    vint.classList.add("warn");
+  }
+
+  const blockers = [];
+  if (!src.exists) blockers.push("build the Clean Road Highway workbook");
+  if (!built.exists) blockers.push("build the Highway Detail report from the layers");
+  if (!days.length) blockers.push("consolidate a Highway Detail export to compare against");
+  $("agRepCompareHint").textContent = blockers.length
+    ? "To compare: " + blockers.join("; ") + "."
+    : "Compares our layer-built Highway Detail against the TSMIS export of the "
+      + "chosen day. Both sides are TSMIS, so they should agree — every column is "
+      + "indexed back to its source in the Notes.";
+  syncArcgisLock();
 }
 
 function bindArcgis() {
+  $("subAgCleanRoad").onclick = () => setArcgisSub("cleanroad");
+  $("subAgReports").onclick = () => setArcgisSub("reports");
+  $("btnAgRepOpenOut").onclick = () => api.open_arcgis_reports_folder();
+  $("btnAgRepCancel").onclick = () => api.cancel_run();
+  $("agRepDay").onchange = () => renderArcgisReports();
+  $("btnAgRepBuild").onclick = async () => {
+    const r = await api.start_arcgis_report_build();
+    if (r && r.error) showMessage("error", "Can't build", r.error);
+  };
+  $("btnAgRepCompare").onclick = async () => {
+    const r = await api.start_arcgis_report_compare(
+      $("agRepDay").value, $("agRepWantFormulas").checked,
+      $("agRepWantValues").checked);
+    if (!r) return;
+    if (r.error) { showMessage("error", "Can't compare", r.error); return; }
+    if (r.confirm_required) {
+      const ok = await showConfirm({
+        title: "Overwrite the values workbook?",
+        message: r.message,
+        confirmLabel: "Overwrite",
+      });
+      const cr = await api.confirm_compare_overwrite(r.confirm_token, !!ok);
+      if (cr && cr.error) showMessage("error", "Can't compare", cr.error);
+    }
+  };
   $("btnAgOpenLayers").onclick = () => api.open_arcgis_layers_folder();
   $("btnAgOpenOut").onclick = () => api.open_arcgis_output_folder();
   $("btnAgCancel").onclick = () => api.cancel_run();

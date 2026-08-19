@@ -714,10 +714,24 @@
         </div><!-- /pveMatrixSection -->
       </div>
 
-      <!-- ArcGIS clean-road pane: the manually-stocked layer library, the
-           CA HIGHWAYS overlay build, and the ArcGIS-vs-TSN comparison.
-           Intersections/Ramps show as staged skeletons until integrated. -->
+      <!-- ArcGIS pane: everything built FROM the layer library, in two sub-tabs.
+           CLEAN ROAD is the CA HIGHWAYS overlay build + the ArcGIS-vs-TSN
+           comparison (Intersections/Ramps are staged skeletons until integrated).
+           REPORTS VS LAYERS renders those same layers as a TSMIS report and
+           diffs it against our own export of it — TSMIS vs TSMIS, so the two
+           sides should agree. -->
       <div class="card pane hidden" id="paneArcgis">
+        <div class="subtabs" role="tablist">
+          <button class="subtab active" id="subAgCleanRoad" role="tab" aria-selected="true">
+            <svg class="ic"><use href="#i-layers"/></svg>Clean Road
+          </button>
+          <button class="subtab" id="subAgReports" role="tab" aria-selected="false">
+            <svg class="ic"><use href="#i-compare"/></svg>Reports vs layers
+          </button>
+        </div>
+
+        <!-- Sub-tab 1: the clean-road files -->
+        <div id="agCleanRoad">
         <div class="card-section">
           <div class="section-head">
             <span class="section-label">ArcGIS layer library</span>
@@ -775,6 +789,64 @@
             builds and comparisons are integrated — Highway went first. Their TSN extracts
             and layers stay staged in the libraries.</p>
         </div>
+        </div><!-- /agCleanRoad -->
+
+        <!-- Sub-tab 2: the same layers, rendered as a TSMIS report -->
+        <div id="agReports" class="hidden">
+        <div class="card-section">
+          <div class="section-head">
+            <span class="section-label">Source — the Clean Road build</span>
+            <span class="section-meta" id="agRepSourceMeta">—</span>
+          </div>
+          <p class="hint" id="agRepSource">—</p>
+        </div>
+
+        <div class="card-section">
+          <div class="section-head">
+            <span class="section-label">Highway Detail — build &amp; compare</span>
+            <span class="section-meta" id="agRepHdMeta">—</span>
+          </div>
+          <p class="hint" id="agRepHdBuilt">—</p>
+          <div class="actions-row">
+            <button class="btn btn-accent" id="btnAgRepBuild" data-lock-when-busy>
+              <svg class="ic"><use href="#i-play"/></svg>Build report from layers
+            </button>
+            <span class="spacer"></span>
+            <button class="btn btn-subtle btn-small" id="btnAgRepOpenOut">
+              <svg class="ic"><use href="#i-folder-open"/></svg>Open output folder
+            </button>
+          </div>
+          <div class="dm-toolbar" style="margin-top:10px">
+            <span class="muted">Compare against the export of</span>
+            <span class="tb-select select-light"><select id="agRepDay" data-lock-when-busy></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+          </div>
+          <p class="hint" id="agRepVintage"></p>
+          <div class="actions-row">
+            <label class="fast-toggle"><input type="checkbox" id="agRepWantFormulas" checked>
+              <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="fast-label">Live formulas</span></label>
+            <label class="fast-toggle"><input type="checkbox" id="agRepWantValues" checked>
+              <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="fast-label">Values</span></label>
+            <button class="btn btn-standard" id="btnAgRepCompare" data-lock-when-busy>
+              <svg class="ic"><use href="#i-compare"/></svg>Compare vs TSMIS…
+            </button>
+            <button class="btn btn-subtle btn-small hidden" id="btnAgRepCancel">
+              <svg class="ic"><use href="#i-x"/></svg>Cancel
+            </button>
+          </div>
+          <p class="hint" id="agRepCompareHint"></p>
+        </div>
+
+        <div class="card-section">
+          <div class="section-head"><span class="section-label">More reports</span></div>
+          <p class="hint">Highway Detail went first because it <b>is</b> the CA HIGHWAYS
+            table printed — 33 of its 34 columns are columns of the Clean Road build, so
+            rendering it is a mapping plus one rule: adjacent stretches that agree on every
+            column the report prints are one record. The other reports follow the same
+            pattern.</p>
+        </div>
+        </div><!-- /agReports -->
       </div>
 
       <!-- Settings pane -->

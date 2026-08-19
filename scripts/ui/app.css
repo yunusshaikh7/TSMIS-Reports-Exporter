@@ -560,6 +560,10 @@ body.matrix-wide .mx-pane .mx-rowhead { justify-content: center; }
 }
 .section-meta { font-size: 12px; color: var(--muted-foreground); }
 .hint { margin: 6px 0 0; font-size: 12px; color: var(--muted-foreground); }
+/* A hint that must be READ, not skimmed: the ArcGIS reports card uses it for
+   the vintage line, where a layer build and an export from different dates
+   make the comparison measure network change instead of correctness. */
+.hint.warn { color: var(--warning); }
 
 /* Evidence-images per-report readiness (under the toggle on both matrix pages) */
 .ev-status-line { margin-top: 2px; line-height: 1.35; }

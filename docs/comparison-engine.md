@@ -949,6 +949,57 @@ each layer's FeatureServer `Data Source` from the library's `00_INDEX.xlsx`.
 Pinned by `build/check_clean_road.py` (synthetic library end-to-end: role gates,
 both flavors, context-never-counts).
 
+### 9k. Highway Detail — ArcGIS build vs TSMIS (`compare_highway_detail_arcgis.py`, v0.39.0)
+
+The first comparison where **both sides are TSMIS**. Side A is OUR Highway Detail,
+rendered from the ArcGIS layer library by `arcgis_report_highway_detail`; side B is the
+app's own consolidated Highway Detail export for a chosen day. It lives on the **ArcGIS
+tab's "Reports vs layers" sub-tab**, not in `COMPARE_REPORTS` or the matrices.
+
+**Side A is a PROJECTION, not a second build.** Highway Detail *is* the CA HIGHWAYS
+table printed — 33 of its 34 columns are THY columns under report labels — so the
+module maps the Clean Road build (§9j) onto the report's own shape rather than
+re-deriving anything from the layers. One measured build (the `CRH-SW-E2` canary) sits
+behind every report rendered this way, and the next report is a mapping table.
+
+Two rules make it a build rather than a column rename, both measured on the 2025-09-08
+build (57,728 THY rows → **51,227** records, against the export's 51,327):
+
+  * **Row boundaries are not THY row boundaries.** THY segments on all 74 of its
+    columns; the report prints 34. A boundary that exists only because of a column the
+    report never shows (most often the ADT/profile block) is not a record boundary, so
+    adjacent spans agreeing across every printed column and touching exactly are merged
+    — and the printed Length is the merged span's own end PM − begin PM. Route 001's
+    first record reads `R000.129 / 000.075` only because of this; the unmerged THY row
+    says `000.041`.
+  * **Description is START-ANCHORED.** Landmarks are point features, so the record
+    beginning at a landmark's postmile prints it and the stretch after carries none.
+    Treating a following blank as a difference split that same route-001 record in two.
+    A following span with a DIFFERENT non-blank description still starts a new record —
+    a landmark is exactly what does.
+
+**Deliberately unforgiving.** Both sides come from the same authority, so the vs-TSN
+reconciliations (the NA `A`→blank fold, numeric/length padding, the WDA glue, the
+whitespace collapse) would hide exactly what this comparison exists to find: values
+compare VERBATIM, keeping only the typed-vs-text date render equivalence. The ditto
+rule stays OFF (neither side emits a `+` run). Pairing is the canonical roadbed-aware
+Post Mile with the raw printed token carried as its own compared cell (CMP-AUD-067), and
+county-blind like every HD-Excel comparison (CMP-AUD-045).
+
+**`RU Eff` is a CONTEXT column.** The report prints the Rural/Urban effective date and
+the THY table carries the population CODE with no date column for it (TSN's own table
+doesn't either), so ours is empty by construction — shown with both sides' values,
+never counted. Counting it would measure a known gap on every row.
+
+**VINTAGE is the first thing to read.** The ArcGIS side is a reconstruction AS OF a
+chosen date; the TSMIS side is a particular day's export. Across a gap the comparison
+measures network change, not correctness — so the Notes sheet leads with both dates and
+the sub-tab shows a warning-coloured line naming the fix (rebuild Clean Road with the
+as-of set to the export's day, re-project, compare again). The three block effective
+dates (LB/Med/RB Eff) are the lowest-agreeing counted columns and are called out in the
+Notes as the composite "candidate rule" the Clean Road build flags in its own
+provenance.
+
 ---
 
 ## 10. Internal mechanics (quick reference)

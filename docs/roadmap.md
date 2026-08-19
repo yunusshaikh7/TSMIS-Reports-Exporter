@@ -206,6 +206,21 @@ counts as migration drift, not defect — see C4 + D5.
 | D4 | ~~The Highway Summary vs-TSN cell is PERMANENTLY amber~~ | **DECIDED + DONE (v0.38.2).** Owner ruling 2026-08-18: *"the TSN summary is locked — that is the file we are working with from the old database and we can't change it. If there is a blank spot we just have to disregard it and deal with it."* A MASKED value (`**********`, the figure overflowed its column) no longer makes the build partial: TSMIS replaced TSN, so the print is a frozen artifact and that gap can never close. The build now returns **complete / 0 skipped**, and the masked category is still shown ONE-SIDED with its TSMIS value (`MEDIAN BARRIER: Z- NO BARRIER`, 12,628.607) and recorded in the sidecar as `tsn_masked_categories` — disregarded, never zeroed, never hidden. **A category the print never MENTIONS still reports PARTIAL**, because that signals a parse or taxonomy drift rather than a locked source. `normalization_version` → 2 so an existing library rebuilds once. Red→green in `check_tsn_highway_summary_masked`. |
 | D5 | **The TSN side is FROZEN at the 09/2025 cutover — so vs-TSN measures DRIFT, not agreement** | TSMIS replaced TSN, so there is no fresher TSN to pull (C4). Every vs-TSN comparison therefore pairs a live TSMIS export against a fixed September-2025 baseline, and the gap grows every month: at the 2026-08-17 export it is ~11 months, which is what dominates HD's 174,837 differing cells and HS's 89-of-92 differing categories. **Read those counts as migration drift, not defect.** The rows that stay diagnostic are the STRUCTURAL ones — HD's 2,850 only-TSMIS / 11,606 only-TSN (21 unconstructed TSN routes TSMIS doesn't export) and HS's 4 only-TSMIS categories. A canary IS still bindable, because the TSN half can no longer move: bind it to (frozen TSN snapshot × a NAMED TSMIS export), and re-running that exact pair detects TSMIS-side parser/consolidator regressions. It can never go to zero, and should not be expected to. |
 
+### D-arc. Found building "Reports vs layers" (v0.39.0) — open
+
+| # | Item | Notes |
+|---|---|---|
+| DA1 | **The three block effective dates are the reconstruction's weakest columns** | `LB Eff` / `Med Eff` / `RB Eff` agree with the TSMIS export on only ~56% of matched rows — by far the lowest of the counted columns (the rest sit 81–100%). The Clean Road build derives each as a composite "newest member layer's item date", which its own provenance calls a **candidate rule**, not a proven one. They also fragment `Length` (85%), because a flickering eff date blocks the record merge. Worth a measured rule the way the ADT anchor was measured. First place to look when a run reports more differences than expected. |
+| DA2 | **`RU Eff` has no source in the CA HIGHWAYS table** | The report prints the Rural/Urban effective date; the THY table carries the population CODE with no date column for it (TSN's own doesn't either). Emitted empty + declared CONTEXT (shown, never counted). Closing it means carrying `SHS Population`'s `InventoryItemStartDate` through the Clean Road build — a new THY-shaped column that TSN has no counterpart for, so it needs an owner decision before it is added. |
+| DA3 | **A same-date pair has never been run** | Every measurement so far pairs the 2025-09-08 build against 2026-08 exports (~11 months). The numbers below are therefore drift-dominated and are NOT a correctness baseline. The first real read needs a Clean Road rebuild with the as-of set to an export day — owner-only, since the layer library is stocked by hand and is not on the dev box. |
+| DA4 | **The other reports** | Highway Detail proved the pattern (project the CA HIGHWAYS build onto the report's shape + a merge rule). Highway Log, Highway Sequence and the Intersection/Ramp reports follow the same recipe once their own mappings are censused — and the Intersection/Ramp ones additionally need the CA INTERSECTIONS / CA RAMPS builds (group G). |
+
+**Measured 2026-08-19** (2025-09-08 build × the 2026-08-17 export, so read as drift, not
+defect): 51,227 projected records vs 50,738 export rows; 44,484 paired on
+(route, postmile) with **100% Post Mile agreement**; 6,242 only-ArcGIS / 6,254
+only-TSMIS. Per-column agreement runs 81–100% apart from the three block eff dates
+(~56%) and the context column.
+
 ### E. Hygiene / low priority
 
 | # | Item | Notes |

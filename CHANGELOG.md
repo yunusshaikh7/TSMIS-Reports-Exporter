@@ -3,6 +3,38 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.39.0 — 2026-08-19
+
+The ArcGIS tab splits in two, and the second half answers a new question: not
+"does our reconstruction match the old TSN extract?" but **"does it match the
+report TSMIS prints today?"**
+
+- **The ArcGIS tab now has two sub-tabs.** *Clean Road* is everything that was
+  there before, unchanged. *Reports vs layers* is new: it renders a TSMIS report
+  from the same layer library and diffs it against your own export of that
+  report. Both sides are TSMIS, so they should agree — which makes a difference
+  worth chasing rather than expected drift.
+- **Highway Detail is the first report.** It isn't rebuilt from the layers a
+  second time: Highway Detail *is* the CA HIGHWAYS table printed — 33 of its 34
+  columns are columns of the Clean Road build — so it projects that build onto
+  the report's own shape. One measured build stays behind everything rendered
+  this way, and the next report is a mapping rather than a new engine.
+- **Two rules make it a build, not a column rename.** CA HIGHWAYS splits a row
+  wherever any of its 74 columns changes; Highway Detail prints 34 of them, so
+  stretches that agree on everything the report shows are one record, and the
+  printed Length is that whole record's extent. And a description is
+  start-anchored — landmarks are points, so the stretch after one continues the
+  record. Statewide that turns 57,728 table rows into 51,227 records, against the
+  export's 51,327.
+- **`RU Eff` is shown but never counted.** The report prints a Rural/Urban
+  effective date; the table we build from carries the population code with no
+  date for it. Rather than invent one, the column is emitted empty and declared
+  context — you still see both sides, it just never counts as a difference.
+- **The vintage question is put in front of you.** The layer build reconstructs
+  the network as of a chosen date, so comparing it against an export from a
+  different day measures network change, not correctness. The card names both
+  dates and, when they differ, says so in warning colour along with the fix.
+
 ## v0.38.3 — 2026-08-19
 
 Evidence images now work on the **vs Baseline Matrix**, and **Highway Detail

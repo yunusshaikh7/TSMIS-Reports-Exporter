@@ -58,6 +58,8 @@ def _src(mod):
 #     disk); folding it into get_compare_folders would have overloaded a
 #     folder-kind endpoint with an unrelated file-kind return shape.
 FROZEN_API = {
+    "arcgis_report_status", "start_arcgis_report_build",
+    "start_arcgis_report_compare", "open_arcgis_reports_folder",
     "add_baseline_matrix_day", "baseline_matrix_evidence_cell",
     "baseline_matrix_info", "build_baseline_matrix_cell",
     "open_baseline_cell_comparison", "open_baseline_cell_evidence",

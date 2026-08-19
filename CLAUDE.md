@@ -96,7 +96,10 @@ pairs county-blind by decision with the exposure measured and disclosed in the N
 (524 of 59,457 keys carry >1 row; 438 of those span counties = 976 rows, 1.6%).
 **Never infer a county.**
 
-**The ArcGIS tab (v0.29.0) builds the HIGHWAY clean-road file WITHOUT the site**: our
+**The ArcGIS tab has TWO sub-tabs (v0.39.0)** — both build from the same
+manually-stocked `arcgis_layers/` library, which never touches the site.
+
+**Clean Road (v0.29.0) builds the HIGHWAY clean-road file**: our
 own 74-column CA HIGHWAYS table from the owner's per-layer ArcGIS exports in
 `arcgis_layers/` (the 40-layer library; county+PM overlay as-of the TSN extract's own
 date; per-column Provenance colour-coded by tier), compared vs the TSN extract in both
@@ -107,6 +110,23 @@ measured build rules + provenance tiers in
 in [docs/comparison-engine.md](docs/comparison-engine.md) §9j. `tsn_load_clean_road`
 normalizes CA HIGHWAYS verbatim (marker v1); the Intersection/Ramp slots stay
 deliberately normalizer-less until their builds land on the same pattern.
+
+**Reports vs layers (v0.39.0) renders a TSMIS REPORT from those same layers and diffs
+it against our own export of it** — TSMIS vs TSMIS, so the two sides SHOULD agree.
+**Highway Detail is the first** (`arcgis_report_highway_detail` +
+`compare_highway_detail_arcgis`). It does NOT re-derive from the layers: Highway Detail
+IS the CA HIGHWAYS table printed (33 of its 34 columns are THY columns), so it PROJECTS
+the Clean Road build — one measured build behind every report rendered this way, and
+the next report is a mapping table, not a second engine. Two rules make it a build
+rather than a rename: THY segments on all 74 columns, so **adjacent spans agreeing
+across every printed column merge into one record** (57,728 → 51,227, vs the export's
+51,327) and the printed Length is the merged span's own extent; and **Description is
+start-anchored** (landmarks are point features), so a following blank continues the
+record. `RU Eff` has **no source** in the THY table and is emitted empty + declared a
+CONTEXT column — shown, never counted. **Read the VINTAGE line first**: the build is a
+reconstruction as-of a chosen date, so the as-of must match the compared export's day
+or the comparison measures network change instead of correctness — the card says so in
+warning colour and the Notes sheet leads with it.
 
 **Consolidate-only sources**: TSN Highway Log district PDFs (dropped into
 `tsn_library/highway_log/raw/` — the one drop location since v0.30.0 retired
@@ -416,6 +436,9 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   matrix_state.py matrix_build.py day_matrix.py summary_layout.py   matrix reads / builds + by-day + summary
   tsn_library.py tsn_load_*.py   the canonical TSN library (versioned normalization, D2) + its loaders
   arcgis_layers.py           the manually-stocked ArcGIS layer drop-zone (staging only, no parser)
+  arcgis_report_highway_detail.py   the CA HIGHWAYS build PROJECTED onto a report's own
+                             shape (Highway Detail first, v0.39.0) — the mapping + the
+                             merge/description rules that make it a build, not a rename
   highway_log_columns.py intersection_detail_columns.py highway_detail_columns.py   the per-report column labels
   highway_summary_columns.py the Highway Summary layout SoT: sections/codes + the ONE
                              strict miles reader the consolidator, the cross-env loader

@@ -280,6 +280,7 @@ function makeMockApi() {
   let timer = null;
   let mockCompareOverwrite = null;
   let mockAgBuilt = false;       // the ArcGIS tab's built-workbook state
+  let mockAgReportBuilt = false; // ...and its projected-report state (needs the above)
   const push = (...evs) => dispatch(evs);
   const pushState = () => push({ t: "state", s: JSON.parse(JSON.stringify(st)) });
 
@@ -1898,6 +1899,65 @@ function makeMockApi() {
         tsn_raw: true, default_asof: "2025-09-08",
       },
     }),
+    // Reports vs layers (v0.39.0). `mockAgReportBuilt` mirrors the real
+    // dependency: the report is PROJECTED from the clean-road build, so it
+    // cannot exist before it. The as-of dates deliberately DIFFER from the
+    // export day so the preview shows the vintage warning, which is the whole
+    // point of that card.
+    arcgis_report_status: async () => ({
+      reports: [{ key: "highway_detail", label: "Highway Detail" }],
+      source: mockAgBuilt
+        ? { exists: true, asof: "2025-09-08", build_version: 1,
+            path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_cleanroad\\clean_highway_built.xlsx" }
+        : { exists: false,
+            path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_cleanroad\\clean_highway_built.xlsx" },
+      built: mockAgReportBuilt
+        ? { exists: true, asof: "2025-09-08", build_version: "1",
+            rows: "51227", merged_away: "6501", routes: "252",
+            path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports\\highway_detail_from_layers.xlsx" }
+        : { exists: false,
+            path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports\\highway_detail_from_layers.xlsx" },
+      days: [{ day: "2026-08-17", path: "C:\\demo\\highway_detail_consolidated 2026-08-17 ssor-prod.xlsx" },
+             { day: "2026-07-23", path: "C:\\demo\\highway_detail_consolidated 2026-07-23 ssor-prod.xlsx" }],
+      out_dir: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports",
+    }),
+    open_arcgis_reports_folder: async () => push({ t: "log", text: "(mock) would open the arcgis_reports output folder" }),
+    start_arcgis_report_build: async () => {
+      if (!mockAgBuilt) return { error: "Build the Clean Road Highway workbook first — the report is projected from it, not from the layers directly." };
+      st.task = "consolidate";
+      st.auth_dot = "busy"; st.auth_text = "Building the report from the layers…";
+      pushState();
+      push({ t: "log", text: "Starting ArcGIS report build: Highway Detail (ArcGIS)" },
+           { t: "run_started", mode: "consolidate", label: "Building Highway Detail from the ArcGIS layers…" });
+      setTimeout(() => push({ t: "log", text: "  projected 57,728 CA HIGHWAYS rows onto the report's 34 columns -> 51,227 records (6,501 merged away)" }), 1200);
+      setTimeout(() => {
+        mockAgReportBuilt = true;
+        push({ t: "log", text: "Built 51,227 Highway Detail records (252 routes) from the ArcGIS layers as of 2025-09-08." },
+             { t: "run_ended" });
+        st.task = null;
+        st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
+        pushState();
+      }, 2000);
+      return { ok: true };
+    },
+    start_arcgis_report_compare: async (day, wantFormulas, wantValues) => {
+      if (!mockAgReportBuilt) return { error: "Build the Highway Detail report from the layers first — the comparison reads it as the ArcGIS side." };
+      if (!day) return { error: "Pick an export day that has a Highway Detail export." };
+      if (!wantFormulas && !wantValues) return { error: "Tick at least one output (values and/or live formulas)." };
+      st.task = "compare";
+      st.auth_dot = "busy"; st.auth_text = "Comparing…";
+      pushState();
+      push({ t: "log", text: `Starting comparison: Highway Detail — ArcGIS vs TSMIS ${day}` },
+           { t: "run_started", mode: "consolidate", label: "Comparing — Highway Detail…" });
+      setTimeout(() => {
+        push({ t: "log", text: "Comparison written: ArcGIS_vs_TSMIS_HighwayDetail.xlsx (values + live formulas)" },
+             { t: "run_ended" });
+        st.task = null;
+        st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
+        pushState();
+      }, 3000);
+      return { ok: true };
+    },
     open_arcgis_layers_folder: async () => push({ t: "log", text: "(mock) would open the ArcGIS layers folder" }),
     open_arcgis_output_folder: async () => push({ t: "log", text: "(mock) would open the arcgis_cleanroad output folder" }),
     start_arcgis_build: async (asof) => {

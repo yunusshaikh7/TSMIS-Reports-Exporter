@@ -1061,7 +1061,7 @@ function dispatch(events) {
           if (S.tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP) renderDayMatrix();
           if (S.tab === "compare" && S.compareGroup === BASELINE_MATRIX_GROUP) renderBaselineMatrix();
           if (S.tab === "compare" && S.compareGroup === PVE_MATRIX_GROUP) renderPveMatrix();
-          if (S.tab === "arcgis") renderArcgis();
+          if (S.tab === "arcgis") renderArcgisTab();
           break;
         case "matrix_refresh":
           if (S.tab === "everything" && S.everySub === "matrix") renderMatrix();
@@ -1106,8 +1106,8 @@ function bindEvents() {
                sub: "Build a discrepancy workbook from two report sources." },
     everything: { btn: "tabEverything", pane: "paneEverything", title: "Export everything",
                   sub: "Export selected report types across selected environments." },
-    arcgis: { btn: "tabArcgis", pane: "paneArcgis", title: "ArcGIS clean road",
-              sub: "Build clean-road files from your ArcGIS layer exports and compare them against TSN." },
+    arcgis: { btn: "tabArcgis", pane: "paneArcgis", title: "ArcGIS layers",
+              sub: "Build clean-road files and TSMIS reports from your ArcGIS layer exports, and compare them." },
     settings: { btn: "tabSettings", pane: "paneSettings", title: "Settings",
                 sub: "Reliability, debugging and storage options." },
   };
@@ -1136,7 +1136,7 @@ function bindEvents() {
     });
     $("panelTitle").textContent = TABS[tab].title;
     $("panelSub").textContent = TABS[tab].sub;
-    if (tab === "arcgis") renderArcgis();
+    if (tab === "arcgis") renderArcgisTab();
     if (tab === "everything") {
       renderBatchLibrary();
       setEverySub(S.everySub || "export");   // re-applies matrix-wide if on the matrix sub-tab
