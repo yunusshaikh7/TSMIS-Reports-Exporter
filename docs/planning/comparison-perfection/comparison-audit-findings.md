@@ -11772,9 +11772,18 @@ library, through the SHIPPED `compare()` on both vs-TSN flavors).
 | fully identical rows | — | 190 | (shipped path reports the after only) |
 
 Pairing is untouched — the change moved cells from *asserted* to *context* and nothing
-else. Both vs-TSN flavors agree: the PDF-sourced run reports 160,360 differing cells with
-the SAME 14,490 context, a 13-cell spread from the Excel-sourced 160,347 that reflects
-the two TSMIS renders, not the ditto rule. 14,490 of the
+else. Both vs-TSN flavors agree at **160,347** with the SAME 14,490 context, once the PDF
+edition is consolidated with v0.38.0-or-later code.
+
+> A 2026-08-18 verification run measured the PDF flavor at 160,360 — a 13-cell spread
+> that was NOT a render difference. The PDF workbook it used had been consolidated
+> 2026-08-17, before the CMP-AUD-186/053 fix, so it still carried the old truncated
+> route-395 record (24 cells at PM `R000.000L`: a Description cut at "…BEGIN RT INDEP"
+> and nine blank LB fields). Diffing the two editions put every differing cell on route
+> 395 and nowhere else — exactly that finding's documented blast radius. v0.38.0's
+> "the two editions agree exactly" holds; it just requires the re-consolidation the
+> work-PC checklist (B1) already calls for. Read a PDF-flavor number older than that
+> re-consolidation as stale input, not as an edition difference. 14,490 of the
 17,928 dittos sit on paired rows; the remaining 3,438 are on TSN-only rows, which were
 never counted as differences to begin with.
 
