@@ -3,6 +3,20 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+
+## Unreleased
+
+- **Fast vs TSN (experimental)** adds a separate default-off comparison toggle.
+  The standard writer remains the fallback; Fast mode caches exact composite
+  workbook styles and reuses one attempt-local TSN-library certification while
+  retaining immutable source capture and a strict final live-source check.
+- On the real Intersection Detail corpus, comparison time fell from 380.8s to
+  241.9s (36.5%); Ramp Detail fell from 109.0s to 98.8s (9.3%). Standard and
+  Fast outputs had identical typed outcomes and byte-identical stable XLSX
+  package members. Canonical TSN preflight fell from 6 status passes to 2
+  (0.298s to 0.075s in the repeatable warm-cache benchmark).
+- Cache identity includes the selected serializer, so toggling modes forces one
+  safe rebuild instead of trusting an artifact produced under the other path.
 ## v0.38.2 — 2026-08-18
 
 The matrices answer the pointer. Reordering day columns actually worked in

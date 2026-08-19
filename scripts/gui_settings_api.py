@@ -270,6 +270,15 @@ class GuiSettingsMixin:
         the worker default are read at run start, so they apply to the next
         run; verbose logging switches immediately; DevTools applies on the
         next launch."""
+        if key == "fast_tsn_comparisons":
+            val = settings.set_fast_tsn_comparisons(bool(value))
+            self._emit_log(
+                "Fast vs TSN (experimental) " + ("on" if val else "off")
+                + (" — style serialization is cached; comparison rules are unchanged."
+                   if val else "."))
+            self._push_state()
+            self._emit({"t": "matrix_refresh"})
+            return {"ok": True, "on": val, "values": settings.all_settings()}
         new = settings.update({key: value})
         if key == "debug_logging":
             set_debug_logging(new["debug_logging"])

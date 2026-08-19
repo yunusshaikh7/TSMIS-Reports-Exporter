@@ -370,7 +370,7 @@ _SCHEMA = CompareSchema(
 
 
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
-            mode="formulas", commit_guard=None):
+            mode="formulas", commit_guard=None, fast_mode=False):
     """Build the Highway Summary TSMIS-vs-TSN AGGREGATE comparison workbook(s)."""
     notes = []
     schema = replace(_SCHEMA, extra_sheet_writer=summary_layout.make_extra_sheet_writer(
@@ -383,4 +383,4 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
         deps_ok=_DEPS_OK,
         deps_msg="Required components are missing (pdfplumber, openpyxl).",
         events=events, confirm_overwrite=confirm_overwrite, mode=mode,
-        commit_guard=commit_guard)
+        commit_guard=commit_guard, fast_mode=fast_mode)

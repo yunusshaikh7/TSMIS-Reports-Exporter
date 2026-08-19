@@ -72,7 +72,7 @@ from compare_tsn_common import (load_consolidated_rows, row_has_data,
                                 suggest_route_name)
 from compare_core import (CompareSchema, compared_cell, normalize_value, keys_for,
                           pair_occurrences_by_similarity, union_keys,
-                          set_safe_literal_cell, _PROGRESS_EVERY)
+                          _styled_cell, _PROGRESS_EVERY)
 
 
 log = logging.getLogger("tsmis.compare")
@@ -945,18 +945,18 @@ def _write_report_view(wb, ctx, tsn_one, tm_loc):
         """A streamed data cell. Every status carries a (normal, ALT) band pair so a whole
         record alternates as one solid zebra band (white record vs grey record); an unknown
         status falls to 'eq' so a blank cell takes its record's band, not a stray shade."""
-        c = set_safe_literal_cell(WriteOnlyCell(ws), val)
-        c.alignment = align or (lft if status == "id" else ctr)
-        c.border = _BD_BOTTOM if bottom else _BD_NORM
-        c.fill = _FILL_CACHE.get((status, bool(alt)),
-                                 _FILL_CACHE[("eq", bool(alt))])
-        c.font = _FONT_CACHE.get(status, _FONT_DEFAULT)
-        return c
+        return _styled_cell(
+            ws, val, font=_FONT_CACHE.get(status, _FONT_DEFAULT),
+            fill=_FILL_CACHE.get((status, bool(alt)),
+                                 _FILL_CACHE[("eq", bool(alt))]),
+            align=align or (lft if status == "id" else ctr),
+            border=_BD_BOTTOM if bottom else _BD_NORM,
+            guard=True)
 
     def hcell(val, fillc, font, align, comment_ref=None):
         """A streamed header cell, optionally carrying the normalization hover-comment."""
-        c = WriteOnlyCell(ws, value=val)
-        c.fill = fillc; c.font = font; c.alignment = align; c.border = bd
+        c = _styled_cell(
+            ws, val, font=font, fill=fillc, align=align, border=bd)
         t = _RV_COMMENTS.get(comment_ref) if comment_ref else None
         if t:
             cm = Comment(t, "TSMIS vs TSN"); cm.width = 250; cm.height = 130
@@ -1135,7 +1135,7 @@ def _load_pair(tsmis_path, tsn_path):
 
 
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
-            mode="formulas", commit_guard=None):
+            mode="formulas", commit_guard=None, fast_mode=False):
     """Build the Intersection Detail TSMIS-vs-TSN comparison workbook(s). `tsmis_path`
     is the consolidated TSMIS Intersection Detail workbook; `tsn_path` the TSN
     statewide (raw or normalized) workbook.
@@ -1157,4 +1157,4 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
         loader=_load_pair, deps_ok=_DEPS_OK,
         deps_msg="Required components are missing (openpyxl).",
         events=events, confirm_overwrite=confirm_overwrite, mode=mode,
-        commit_guard=commit_guard)
+        commit_guard=commit_guard, fast_mode=fast_mode)

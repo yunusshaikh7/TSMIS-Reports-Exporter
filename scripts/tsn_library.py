@@ -1055,7 +1055,7 @@ def build_consolidated(report, events=None, confirm_overwrite=None, force=False)
     return result
 
 
-def ensure_current(report, events=None, source=None):
+def ensure_current(report, events=None, source=None, certified_status=None):
     """Auto-heal hook the compare paths call before READING the library's
     consolidated workbook (D2): a stale library — normalizer version mismatch or
     raw newer than the build — rebuilds itself from the retained raw, announced.
@@ -1064,7 +1064,10 @@ def ensure_current(report, events=None, source=None):
     workbook exists but its raw source is absent, unreadable, ambiguous, or
     otherwise uncertifiable, returns a typed error result so comparison callers
     stop instead of reading stale bytes. The no-consolidated/no-raw state remains
-    None so the existing import-and-build UX is preserved.
+    None so the existing import-and-build UX is preserved. certified_status is
+    an attempt-local snapshot produced by resolve(include_certification=True);
+    it is reused only when report, canonical path, and identity token all match.
+    Any mismatch falls back to the ordinary strict status() boundary.
     """
     if not is_registered(report):
         return None
@@ -1090,7 +1093,16 @@ def ensure_current(report, events=None, source=None):
                          "certificate. Comparison was stopped. Import the authoritative "
                          "raw TSN source into Settings > TSN reports and rebuild it; "
                          "the uncertified workbook was not used."))
-    st = status(report)
+    st = certified_status if isinstance(certified_status, dict) else None
+    if st is not None:
+        canonical = str(consolidated_path(report))
+        source_token = source.get("identity_token") if isinstance(source, dict) else None
+        if (st.get("report") != report
+                or st.get("consolidated_path") != canonical
+                or st.get("identity_token") != source_token):
+            st = None
+    if st is None:
+        st = status(report)
     if st["current"] or not st["consolidated_present"]:
         return None
     if not st.get("raw_admissible"):
@@ -1529,19 +1541,24 @@ def _heal_stale_app_owned(report, p, reason):
             "stale_selection_ignored": {"path": str(p), "reason": reason}}
 
 
-def resolve(report, selected_file=None, legacy_dest=None):
+def resolve(report, selected_file=None, legacy_dest=None, include_certification=False):
     """Resolve the TSN dataset for `report` (the matrices' single entry point) and
     attach the persisted producer `completion` (P1-B05) to any path-bearing source —
     so a PARTIAL generated TSN workbook (categories / district PDFs left out) flags the
     comparison even when reused. `completion` is None for a user-picked file or a
-    workbook with no sidecar (deliberate: a user pick / legacy workbook reads complete)."""
-    r = _resolve_source(report, selected_file, legacy_dest)
+    workbook with no sidecar (deliberate: a user pick / legacy workbook reads complete).
+    include_certification adds the private status snapshot that produced a
+    canonical source's identity token so one build attempt can avoid recomputing it;
+    ordinary callers keep the historical public shape."""
+    r = _resolve_source(report, selected_file, legacy_dest,
+                        include_certification=include_certification)
     if r.get("path"):
         r = {**r, "completion": consolidation_meta.read_completion(r["path"])}
     return r
 
 
-def _resolve_source(report, selected_file=None, legacy_dest=None):
+def _resolve_source(report, selected_file=None, legacy_dest=None,
+                    include_certification=False):
     """Resolve the TSN dataset for `report`, returning the same contract as
     matrix.tsn_source: {kind: file|consolidated|pdfs|raw|none, path?, mtime?,
     pdf_count?, raw_count?}. Resolution order:
@@ -1589,6 +1606,8 @@ def _resolve_source(report, selected_file=None, legacy_dest=None):
         cons = consolidated_path(report)
         if cons.is_file():
             certified = status(report)
+            certification = ({"_certified_status": certified}
+                             if include_certification else {})
             return {"kind": "consolidated", "path": str(cons),
                     "mtime": _safe_mtime(cons),
                     # Existing matrix cache plumbing already persists an optional
@@ -1598,7 +1617,7 @@ def _resolve_source(report, selected_file=None, legacy_dest=None):
                     # CMP-AUD-081: this is None whenever the library is not current
                     # (status: `identity_token if current else None`), so a
                     # would-rebuild library reads dependent Matrix cells stale.
-                    "identity_token": certified.get("identity_token")}
+                    "identity_token": certified.get("identity_token"), **certification}
         raws = _raw_files(report)
         if raws:
             spec = get(report)

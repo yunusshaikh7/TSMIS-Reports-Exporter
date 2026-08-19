@@ -121,6 +121,7 @@ function makeMockApi() {
     matrix_current: null,        // v0.16.0 running job
     matrix_fast: { on: false, workers: 3 },
     matrix_formulas: false,
+    fast_tsn_comparisons: false,
     matrix_baseline: "ssor-prod",
     matrix_hidden: [],
     matrix_hidden_envs: [],
@@ -1112,6 +1113,13 @@ function makeMockApi() {
       return { ok: true, reports: stale.length };
     },
     set_setting: async (key, value) => {
+      if (key === "fast_tsn_comparisons") {
+        st.fast_tsn_comparisons = !!value;
+        push({ t: "log", text: `Fast vs TSN (experimental) ${value ? "on" : "off"}.` });
+        pushState();
+        push({ t: "matrix_refresh" });
+        return { ok: true, on: !!value, values: { ...mockSettings } };
+      }
       const numeric = typeof mockSettings[key] === "number";
       const boolish = typeof mockSettings[key] === "boolean";
       // fast_workers floors at 2 (the matrix's effective minimum), like the engine.

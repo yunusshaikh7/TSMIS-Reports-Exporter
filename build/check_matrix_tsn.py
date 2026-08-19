@@ -324,6 +324,18 @@ def test_canonical_selection_keys():
     check("explicit identity gates cached truth (legacy/different stale; matching fresh)",
           legacy_state["stale"] and changed_state["stale"]
           and not matching_state["stale"])
+    _pv_fast = matrix.producer_identity(True)
+    fast_record = {"built_at_mtime": 10.0, "verdict": "match",
+                   "producer_versions": _pv_fast,
+                   "source_identities": {"tsn": {"sha256": "a" * 64}}}
+    fast_seen_as_standard = matrix._staleness(
+        10.0, sources, fast_record, (), None)
+    fast_seen_as_fast = matrix._staleness(
+        10.0, sources, fast_record, (), None,
+        expected_producer_versions=_pv_fast)
+    check("fast serializer cache is mode-stamped (standard rejects; fast accepts)",
+          _pv_fast != _pv and fast_seen_as_standard["stale"]
+          and not fast_seen_as_fast["stale"])
 
     dest = Path(tempfile.mkdtemp(prefix="tsmis_tsnaliases_"))
     saved_lib = paths.TSN_LIBRARY_ROOT
@@ -364,6 +376,103 @@ def test_canonical_selection_keys():
     finally:
         paths.TSN_LIBRARY_ROOT = saved_lib
         shutil.rmtree(dest, ignore_errors=True)
+
+
+
+def test_certified_status_reuse():
+    print("fast TSN-library certification reuse:")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_tsncert_"))
+    saved_root = paths.TSN_LIBRARY_ROOT
+    saved_status = tsn_library.status
+    paths.TSN_LIBRARY_ROOT = root
+    try:
+        report = "highway_detail"
+        consolidated = tsn_library.consolidated_path(report)
+        token = "tsn-normalized-v1:" + ("a" * 64)
+        source = {
+            "kind": "consolidated",
+            "path": str(consolidated),
+            "identity_token": token,
+        }
+        certified = {
+            "report": report,
+            "consolidated_path": str(consolidated),
+            "identity_token": token,
+            "current": True,
+            "consolidated_present": True,
+        }
+        calls = []
+
+        def _unexpected_status(_report):
+            calls.append(_report)
+            raise AssertionError("status() should not run for a matching certification")
+
+        tsn_library.status = _unexpected_status
+        result = tsn_library.ensure_current(
+            report, source=source, certified_status=certified)
+        check("matching attempt-local certification avoids another status() pass",
+              result is None and not calls)
+
+        tsn_library.status = lambda requested: (
+            calls.append(requested) or certified)
+        calls.clear()
+        mismatched = dict(
+            certified, identity_token="tsn-normalized-v1:" + ("b" * 64))
+        result = tsn_library.ensure_current(
+            report, source=source, certified_status=mismatched)
+        check("mismatched certification falls back to the strict status() boundary",
+              result is None and calls == [report])
+    finally:
+        tsn_library.status = saved_status
+        paths.TSN_LIBRARY_ROOT = saved_root
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_fast_cache_publication_guard():
+    print("fast TSN identity check at atomic cache publication:")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_tsnpublish_"))
+    saved_byday_root = day_matrix.byday_root
+    day_matrix.byday_root = lambda: root / "byday"
+    try:
+        matrix_calls = []
+
+        def _deny_matrix(*_args):
+            matrix_calls.append("matrix")
+            return False
+
+        matrix_denied = False
+        matrix_dest = root / "matrix"
+        try:
+            matrix_state.record_tsn_result(
+                matrix_dest, "ramp_detail|tsn", "ssor-prod", "match", 0, 0,
+                1.0, commit_guard=lambda *_args: True,
+                publication_guard=_deny_matrix)
+        except ValueError:
+            matrix_denied = True
+        check("matrix cache checks the live TSN identity once at publication",
+              matrix_denied and matrix_calls == ["matrix"]
+              and not matrix_state._tsn_results_path(matrix_dest).exists())
+
+        byday_calls = []
+
+        def _deny_byday(*_args):
+            byday_calls.append("byday")
+            return False
+
+        byday_denied = False
+        try:
+            day_matrix.record_result(
+                "2026-08-19", "ssor-prod", "ramp_detail", "match", 0, 0,
+                1.0, commit_guard=lambda *_args: True,
+                publication_guard=_deny_byday)
+        except ValueError:
+            byday_denied = True
+        check("by-day cache checks the live TSN identity once at publication",
+              byday_denied and byday_calls == ["byday"]
+              and not day_matrix._results_path().exists())
+    finally:
+        day_matrix.byday_root = saved_byday_root
+        shutil.rmtree(root, ignore_errors=True)
 
 
 def test_snapshot_modes():
@@ -576,6 +685,8 @@ def main():
     test_source_detection()
     test_stale_app_owned_selection_heals()
     test_canonical_selection_keys()
+    test_certified_status_reuse()
+    test_fast_cache_publication_guard()
     test_snapshot_modes()
     test_missing_side_both()
     test_build_guards()

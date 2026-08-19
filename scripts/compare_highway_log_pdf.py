@@ -91,7 +91,8 @@ class _HighwayLogFileCompare:
         return suggest_route_name(path_a, "Highway_Log", self._name_tag)
 
     def compare(self, path_a, path_b, out_path, events=None,
-                confirm_overwrite=None, mode="formulas", commit_guard=None):
+                confirm_overwrite=None, mode="formulas", commit_guard=None,
+                fast_mode=False):
         """Build the comparison workbook(s). Same contract as the other
         comparison modules (ConsolidateResult returned)."""
         schema = (_hl._schema_with_claims(path_b, schema=self._schema)
@@ -116,7 +117,7 @@ class _HighwayLogFileCompare:
             has_route=None, loader=loader, deps_ok=_hl._DEPS_OK,
             side_a=self.file_a_label, side_b=self.file_b_label,
             events=events, confirm_overwrite=confirm_overwrite, mode=mode,
-            commit_guard=commit_guard)
+            commit_guard=commit_guard, fast_mode=fast_mode)
 
 
 TSMIS_PDF_VS_TSN = _HighwayLogFileCompare(

@@ -298,7 +298,7 @@ class MatrixCompareWorker(threading.Thread):
     ('matrix_done', {...}) at the end."""
 
     def __init__(self, dest, baseline, cells, queue, cancel_event, tsn_files=None,
-                 force_consolidate=False, also_formulas=False, evidence=None):
+                 force_consolidate=False, also_formulas=False, evidence=None, fast_mode=False):
         super().__init__(daemon=True, name="matrix-compare")
         self.dest = dest
         self.baseline = baseline
@@ -310,6 +310,7 @@ class MatrixCompareWorker(threading.Thread):
         self.force_consolidate = force_consolidate
         self.also_formulas = also_formulas
         self.evidence = evidence
+        self.fast_mode = bool(fast_mode)
 
     def run(self):
         tally = _AttemptTally(len(self.cells))
@@ -388,6 +389,7 @@ class MatrixCompareWorker(threading.Thread):
                         events=events, tsn_files=self.tsn_files,
                         force_consolidate=self.force_consolidate,
                         also_formulas=self.also_formulas, evidence=self.evidence,
+                        fast_mode=self.fast_mode,
                         commit_guard=(_target_guard
                                       if comparisons_lease is not None else None))
                     attempt, why = _attempt_state(res)
@@ -438,7 +440,7 @@ class DayMatrixCompareWorker(threading.Thread):
     reusing the Everything matrix's progress events so the bridge handles both."""
 
     def __init__(self, source, cells, dest, queue, cancel_event, tsn_files=None,
-                 force_consolidate=False, also_formulas=False, evidence=None):
+                 force_consolidate=False, also_formulas=False, evidence=None, fast_mode=False):
         super().__init__(daemon=True, name="day-matrix-compare")
         self.source = source
         self.cells = [(c[0], c[1]) for c in cells]   # (date, row_key)
@@ -449,6 +451,7 @@ class DayMatrixCompareWorker(threading.Thread):
         self.force_consolidate = force_consolidate
         self.also_formulas = also_formulas
         self.evidence = evidence
+        self.fast_mode = bool(fast_mode)
 
     def run(self):
         events = Events(is_cancelled=self.cancel.is_set,
@@ -475,7 +478,8 @@ class DayMatrixCompareWorker(threading.Thread):
                         self.source, date, row_key, self.dest, events,
                         tsn_files=self.tsn_files,
                         force_consolidate=self.force_consolidate,
-                        also_formulas=self.also_formulas, evidence=self.evidence)
+                        also_formulas=self.also_formulas, evidence=self.evidence,
+                        fast_mode=self.fast_mode)
                     attempt, why = _attempt_state(res)
                     status = res.status
                     if status != "ok":

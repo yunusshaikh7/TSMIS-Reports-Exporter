@@ -36,6 +36,7 @@ import difflib
 import math
 import re
 import textwrap
+from copy import copy
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
@@ -2357,18 +2358,62 @@ def _ceiling_wrapper(ws):
     return align_for
 
 
-def _styled(ws, value, font, fill=None, align=None, guard=False,
-            exact_source_numeric=False):
+def _styled_cell(ws, value, *, font, fill=None, align=None, border=None,
+                 guard=False, exact_source_numeric=False):
+    """Build one streamed cell, optionally reusing a composite style.
+
+    The ordinary path deliberately remains the historical sequence of public
+    openpyxl assignments.  An experimental comparison sets
+    ``wb._tsmis_fast_styles`` and pays those descriptor/index lookups once per
+    distinct composite style instead.  Each cell receives its own StyleArray
+    copy: later guards (``number_format='@'``) and the Highway Log ditto tint
+    may safely mutate that cell without aliasing the cached prototype or any
+    previously appended cell.
+
+    Reusing the already-registered IDs is presentation-neutral.  It changes
+    neither the component objects nor their order in the workbook style table;
+    the real-corpus benchmark additionally requires the canonical XLSX package
+    digest to remain exact before this path can ship.
+    """
     c = WriteOnlyCell(ws, value=value)
-    c.font = font
-    if fill:
-        c.fill = fill
-    if align:
-        c.alignment = align
+    if getattr(ws.parent, "_tsmis_fast_styles", False):
+        cache = getattr(ws.parent, "_tsmis_fast_style_cache", None)
+        if cache is None:
+            cache = {}
+            ws.parent._tsmis_fast_style_cache = cache
+        key = (font, fill, align, border)
+        style = cache.get(key)
+        if style is None:
+            prototype = WriteOnlyCell(ws)
+            prototype.font = font
+            if fill:
+                prototype.fill = fill
+            if align:
+                prototype.alignment = align
+            if border:
+                prototype.border = border
+            style = copy(prototype._style)
+            cache[key] = style
+        c._style = copy(style)
+    else:
+        c.font = font
+        if fill:
+            c.fill = fill
+        if align:
+            c.alignment = align
+        if border:
+            c.border = border
     if guard:
         set_safe_literal_cell(
             c, value, exact_source_numeric=exact_source_numeric)
     return c
+
+
+def _styled(ws, value, font, fill=None, align=None, guard=False,
+            exact_source_numeric=False):
+    return _styled_cell(
+        ws, value, font=font, fill=fill, align=align, guard=guard,
+        exact_source_numeric=exact_source_numeric)
 
 
 def _header_row(ws, values, comment_fn=None, fill_fn=None):
@@ -4127,7 +4172,8 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
                 confirm_overwrite=None, mode="formulas",
                 name_a="", name_b="", warnings=(), commit_guard=None,
                 input_completion=None, skipped_inputs=None, failed_inputs=0,
-                failures=(), coverage_diagnostics=(), provenance=None):
+                failures=(), coverage_diagnostics=(), provenance=None,
+                fast_mode=False):
     """Build the comparison workbook(s) from two loaded row sets. Returns a
     ConsolidateResult (same contract as the consolidators, so the GUI/console
     drive it identically). The CALLER owns input loading + shape validation;
@@ -4147,7 +4193,11 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
     ``input_completion`` and the explicit issue counters are the additive
     Phase-2 bridge for loaders that already own structured coverage truth.
     Their defaults preserve the legacy ``skipped_inputs == len(warnings)``
-    behavior; exact counts are never derived from display prose."""
+    behavior; exact counts are never derived from display prose.
+
+    ``fast_mode`` is an experimental, opt-in serializer optimization.  It
+    reuses exact composite cell styles within each workbook while leaving the
+    historical writer untouched when false."""
     if sc.unavailable_rule and (
             not isinstance(sc.unavailable_rule, tuple)
             or len(sc.unavailable_rule) != 2
@@ -4550,6 +4600,7 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
         # Streaming workbook (see the note above _styled): sheets are created
         # in display order; Summary first so it's the active sheet on open.
         wb = Workbook(write_only=True)
+        wb._tsmis_fast_styles = bool(fast_mode)
         if has_route and m == "formulas":
             # ~2M live formulas: in automatic mode Excel would recalculate
             # for minutes on open AND after every edit. Ship the workbook in

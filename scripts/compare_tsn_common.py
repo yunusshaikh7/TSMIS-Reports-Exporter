@@ -1061,7 +1061,7 @@ def run_files_compare(schema, tsmis_path, tsn_path, out_path, *, banner, has_rou
                       deps_msg="Required components are missing (openpyxl).",
                       side_a="TSMIS", side_b="TSN",
                       events=None, confirm_overwrite=None, mode="formulas",
-                      commit_guard=None):
+                      commit_guard=None, fast_mode=False):
     """The registry "files"-kind `compare()` skeleton shared by every file
     comparator: a deps gate -> path coercion + existence checks -> the log banner ->
     `loader(path_a, path_b)` (may raise ValueError for a bad input shape) ->
@@ -1173,7 +1173,7 @@ def run_files_compare(schema, tsmis_path, tsn_path, out_path, *, banner, has_rou
             failed_inputs=failed_inputs,
             failures=input_failures,
             provenance=prov_display,
-            commit_guard=commit_guard),
+            commit_guard=commit_guard, fast_mode=fast_mode),
         twin=(mode == "both"), expect_sheet="Comparison",
         confirm_overwrite=confirm_overwrite,
         source_paths=(tsmis_path, tsn_path),

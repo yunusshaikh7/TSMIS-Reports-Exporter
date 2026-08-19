@@ -120,7 +120,16 @@ def _require_source_identity(source_identity_check, action):
             f"current. Refresh the comparison before {action}.")
 
 
-def tsn_identity_check_for(tsn_key, source):
+
+def _reusable_tsn_certification(tsn_key, source, token):
+    status = source.get("_certified_status") if isinstance(source, dict) else None
+    if (isinstance(status, dict) and status.get("report") == tsn_key
+            and status.get("current")
+            and status.get("identity_token") == token):
+        return status
+    return None
+
+def tsn_identity_check_for(tsn_key, source, fast_mode=False):
     """Return ``(token, current_predicate)`` for one resolved TSN source."""
     import tsn_library
     token = source.get("identity_token")
@@ -142,7 +151,8 @@ def tsn_identity_check_for(tsn_key, source):
                             "(%s: %s)", type(e).__name__, e)
                 return False
 
-        _require_source_identity(_explicit_current, "using the selected TSN workbook")
+        if not fast_mode:
+            _require_source_identity(_explicit_current, "using the selected TSN workbook")
         return token, _explicit_current
 
     if source.get("kind") == "consolidated":
@@ -157,7 +167,8 @@ def tsn_identity_check_for(tsn_key, source):
             return bool(status.get("current")
                         and status.get("identity_token") == token)
 
-        _require_source_identity(_canonical_current, "using the TSN workbook")
+        if not fast_mode or _reusable_tsn_certification(tsn_key, source, token) is None:
+            _require_source_identity(_canonical_current, "using the TSN workbook")
         return token, _canonical_current
 
     raise ValueError("no certifiably current TSN workbook available")
@@ -181,7 +192,7 @@ def require_cached_tsn_identity(record, token):
     return generation_id
 
 
-def tsn_expected_workbook_identity(tsn_key, source, token=None):
+def tsn_expected_workbook_identity(tsn_key, source, token=None, fast_mode=False):
     """Return the exact content identity the attempt-local copy must match."""
     import tsn_library
     token = source.get("identity_token") if token is None else token
@@ -200,7 +211,10 @@ def tsn_expected_workbook_identity(tsn_key, source, token=None):
             raise ValueError(
                 "the selected TSN workbook content identity is invalid; re-pick it") from e
     if source.get("kind") == "consolidated":
-        status = tsn_library.status(tsn_key)
+        status = (_reusable_tsn_certification(tsn_key, source, token)
+                  if fast_mode else None)
+        if status is None:
+            status = tsn_library.status(tsn_key)
         if (not status.get("current")
                 or status.get("identity_token") != token):
             raise ValueError(
@@ -1444,7 +1458,7 @@ def evidence_for_cell(dest, row_key, cell_key, baseline_key, events,
 # builds) records the outcome there, and reuse recovers it, so no writer can bypass it.
 def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, subdir,
                                 events, confirm_overwrite=None, force_consolidate=False,
-                                also_formulas=False, evidence_opts=None,
+                                also_formulas=False, evidence_opts=None, fast_mode=False,
                                 explicit_selection=None, commit_guard=None,
                                 source_identity_check=None,
                                 source_workbook_identity=None,
@@ -1468,13 +1482,14 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, su
             raise ValueError(
                 "The TSN workbook has no resolved content identity and cannot be "
                 "safely captured for comparison.")
-        _require_source_identity(source_identity_check, "capturing the TSN workbook")
+        if not fast_mode:
+            _require_source_identity(source_identity_check, "capturing the TSN workbook")
         with captured_tsn_workbook(tsn_path, source_workbook_identity) as captured:
             return consolidate_and_compare_tsn(
                 tsmis_store_dir, captured, out_path, row_key, subdir, events,
                 confirm_overwrite=confirm_overwrite,
                 force_consolidate=force_consolidate,
-                also_formulas=also_formulas, evidence_opts=evidence_opts,
+                also_formulas=also_formulas, evidence_opts=evidence_opts, fast_mode=fast_mode,
                 explicit_selection=explicit_selection, commit_guard=commit_guard,
                 source_identity_check=source_identity_check,
                 source_workbook_identity=source_workbook_identity,
@@ -1513,20 +1528,28 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, su
     # lease reaches its artifact temp and compare_core's exact save boundary.
     source_paths = (consolidated, tsn_path)
     comparison_guard = _compose_source_guard(
-        commit_guard, source_identity_check)
+        commit_guard, None if fast_mode else source_identity_check)
 
     def _compare_checked(target, mode, confirm=None):
-        _require_source_identity(source_identity_check, "running the comparison")
-        if explicit_selection:
+        if not fast_mode:
+            _require_source_identity(source_identity_check, "running the comparison")
+        if explicit_selection and not fast_mode:
             import tsn_library
             tsn_library.require_explicit_selection(explicit_selection)
+        compare_options = {
+            "events": events,
+            "confirm_overwrite": confirm or (lambda _p: True),
+            "mode": mode,
+            "commit_guard": comparison_guard,
+        }
+        if fast_mode:
+            compare_options["fast_mode"] = True
         compared = cmp_mod.compare(
-            consolidated, str(tsn_path), target, events=events,
-            confirm_overwrite=confirm or (lambda _p: True), mode=mode,
-            commit_guard=comparison_guard)
-        if explicit_selection:
+            consolidated, str(tsn_path), target, **compare_options)
+        if explicit_selection and not fast_mode:
             tsn_library.require_explicit_selection(explicit_selection)
-        _require_source_identity(source_identity_check, "publishing the comparison")
+        if not fast_mode:
+            _require_source_identity(source_identity_check, "publishing the comparison")
         return compared
 
     # The direct comparator performs its own source-alias checks and atomic commit.
@@ -1666,7 +1689,7 @@ def _ensure_consolidated(store_dir, subdir, events, force,
 def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
                      tsn_files=None, confirm_overwrite=None, row_defs=None,
                      force_consolidate=False, also_formulas=False, evidence=None,
-                     commit_guard=None):
+                     commit_guard=None, fast_mode=False):
     """(Re)build one cell's comparison for the row's SELECTED mode, write the VALUES
     workbook, and cache its counts. Dispatches to the existing comparison adapters
     (never edits them). Returns the ConsolidateResult. Raises ValueError for an
@@ -1706,7 +1729,12 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
         tsn_files or {})
     if mode["kind"] == "tsn":
         tsn_key = tsn_library.canonical_dataset_key(mode["tsn_subdir"])
-        src = tsn_source(dest, tsn_key, tsn_files.get(tsn_key))
+        def _resolve_tsn_source():
+            if fast_mode:
+                return tsn_source(dest, tsn_key, tsn_files.get(tsn_key),
+                                  include_certification=True)
+            return tsn_source(dest, tsn_key, tsn_files.get(tsn_key))
+        src = _resolve_tsn_source()
         if src.get("kind") == "missing_explicit":
             raise ValueError(tsn_library.explicit_selection_problem(src))
         if src.get("kind") not in ("file", "consolidated"):
@@ -1716,24 +1744,31 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
             # canonical artifact or returns a typed error. In particular, a
             # stale workbook whose raw is gone/unreadable/ambiguous must stop
             # here and can never reach consolidate_and_compare_tsn.
-            healed = tsn_library.ensure_current(tsn_key, events, source=src)
+            healed = (tsn_library.ensure_current(
+                tsn_key, events, source=src,
+                certified_status=src.get("_certified_status"))
+                if fast_mode else tsn_library.ensure_current(tsn_key, events, source=src))
             if healed is not None:
                 if healed.status != "ok":
                     raise ValueError(healed.message
                                      or "the TSN library is not certifiably current; comparison stopped")
-            # Re-resolve even when ensure_current is a no-op: this is the exact
-            # content token that the comparison and its cache must bind.
-            src = tsn_source(dest, tsn_key, tsn_files.get(tsn_key))
+            # Standard mode keeps the historical re-resolve. Fast mode reuses
+            # the attempt-local certificate only for a no-op heal; the private
+            # capture verifies its full expected bytes, and cache publication
+            # still performs one strict live-source check.
+            if healed is not None or not fast_mode:
+                src = _resolve_tsn_source()
             if src.get("kind") != "consolidated":
                 raise ValueError(
                     "the canonical TSN source changed while it was being certified")
-        tsn_token, source_identity_check = tsn_identity_check_for(tsn_key, src)
+        tsn_token, source_identity_check = tsn_identity_check_for(
+            tsn_key, src, fast_mode=fast_mode)
         source_workbook_identity = tsn_expected_workbook_identity(
-            tsn_key, src, tsn_token)
+            tsn_key, src, tsn_token, fast_mode=fast_mode)
         result = _m.consolidate_and_compare_tsn(
             dest / cell_key / mode["env_subdir"], src["path"], out_path,
             row_key, mode["env_subdir"], events, confirm_overwrite=confirm_overwrite,
-            force_consolidate=force_consolidate, also_formulas=also_formulas,
+            force_consolidate=force_consolidate, also_formulas=also_formulas, fast_mode=fast_mode,
             evidence_opts=evidence_opts_for(evidence, row_key,
                                             lambda sub: dest / cell_key / sub),
             explicit_selection=src.get("selection"),
@@ -1784,11 +1819,16 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
         # comparison can't hide that one side was built from incomplete inputs.
 
     if result.status == "ok" and out_path.exists():
+        publication_guard = None
         if mode["kind"] == "tsn":
-            _require_source_identity(source_identity_check,
-                                     "recording the comparison cache")
-            cache_guard = _compose_source_guard(
-                commit_guard, source_identity_check)
+            if fast_mode:
+                cache_guard = commit_guard
+                publication_guard = source_identity_check
+            else:
+                _require_source_identity(source_identity_check,
+                                         "recording the comparison cache")
+                cache_guard = _compose_source_guard(
+                    commit_guard, source_identity_check)
         else:
             cache_guard = commit_guard
         _require_commit_guard(cache_guard, "comparison cache write")
@@ -1816,6 +1856,9 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
                               if mode["kind"] == "tsn"
                               else {}),
                           generation_id=published.artifact_generation.generation_id,
-                          producer_versions=producer_identity(),
-                          commit_guard=cache_guard)
+                          producer_versions=producer_identity(
+                              fast_mode if mode["kind"] == "tsn" else False),
+                          commit_guard=cache_guard,
+                          **({"publication_guard": publication_guard}
+                             if publication_guard is not None else {}))
     return result

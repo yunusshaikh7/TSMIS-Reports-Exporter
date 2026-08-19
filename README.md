@@ -175,6 +175,11 @@ folder is safe to delete.
 run several browsers in parallel. Each worker uses ~0.5 GB RAM — `3` is a safe
 default; higher counts give a bigger speedup on a well-resourced PC.
 
+**Fast vs TSN** (experimental) is a separate option under **Comparison output**.
+It accelerates workbook serialization and reuses the TSN library's attempt-local
+certification; it is off by default, changes no comparison rules, and can be
+disabled independently of parallel export Fast mode.
+
 ---
 
 ## Developer setup

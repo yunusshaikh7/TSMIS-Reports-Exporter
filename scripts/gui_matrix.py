@@ -70,7 +70,8 @@ class GuiMatrixMixin:
             row_modes=settings.get_matrix_row_modes(),
             tsn_files=self._matrix_tsn_selections(),
             row_order=settings.get_matrix_row_order(),
-            env_order=settings.get_matrix_env_order())
+            env_order=settings.get_matrix_env_order(),
+            fast_tsn_comparisons=settings.get_fast_tsn_comparisons())
 
     @_api_method
     def matrix_info(self, baseline=None):
@@ -370,7 +371,8 @@ class GuiMatrixMixin:
                             tsn_files=self._matrix_tsn_selections(),
                             force_consolidate=job.get("force", False),
                             also_formulas=settings.get_matrix_formulas(),
-                            evidence=self._evidence_request()).start()
+                            evidence=self._evidence_request(),
+                            fast_mode=settings.get_fast_tsn_comparisons()).start()
         return True
 
     def _dispatch_day_compare_job(self, job):
@@ -390,7 +392,8 @@ class GuiMatrixMixin:
                                tsn_files=self._matrix_tsn_selections(),
                                force_consolidate=job.get("force", False),
                                also_formulas=settings.get_day_matrix_formulas(),
-                               evidence=self._evidence_request()).start()
+                               evidence=self._evidence_request(),
+                               fast_mode=settings.get_fast_tsn_comparisons()).start()
         return True
 
     def _resolve_pve_cells(self, job):
@@ -1312,7 +1315,8 @@ class GuiMatrixMixin:
             hidden=settings.get_day_matrix_hidden(),
             tsn_files=self._matrix_tsn_selections(),
             dest=settings.get_batch_dest(),
-            row_order=settings.get_day_matrix_row_order())
+            row_order=settings.get_day_matrix_row_order(),
+            fast_tsn_comparisons=settings.get_fast_tsn_comparisons())
 
     def _day_job_label(self, scope, row=None, date=None):
         rl = self._matrix_row_label(row) if row else None

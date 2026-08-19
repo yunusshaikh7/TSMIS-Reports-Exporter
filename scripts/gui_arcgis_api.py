@@ -12,6 +12,7 @@ import logging
 from pathlib import Path
 
 from gui_endpoint import _api_method
+import settings
 from gui_worker import ConsolidateWorker
 
 ui_log = logging.getLogger("tsmis.ui")
@@ -174,7 +175,8 @@ class GuiArcgisMixin:
             if res.status != "ok":
                 return res
             return cht.compare(built, tsn_path, out_path, events=events,
-                               confirm_overwrite=confirm_overwrite, mode=mode)
+                               confirm_overwrite=confirm_overwrite, mode=mode,
+                               fast_mode=settings.get_fast_tsn_comparisons())
 
         sources = tuple(p for p in (built, tsn_path) if p.is_file())
         # M2-E: auto-save to the standardized output/comparisons/arcgis/ (beside the

@@ -1174,6 +1174,13 @@ function bindEvents() {
     }
   });
   // Live-formulas toggles — each matrix has its OWN persisted setting.
+  // Shared, off-by-default serializer optimization for every genuine vs-TSN recipe.
+  ["matrixFastTsn", "dayMatrixFastTsn"].forEach((id) => $(id)?.addEventListener("change", async (e) => {
+    const r = await api.set_setting("fast_tsn_comparisons", e.target.checked);
+    if (r && r.error) showMessage("error", "Can't set Fast vs TSN", r.error);
+    syncFastTsnComparisons();
+  }));
+
   $("matrixFormulas")?.addEventListener("change", async (e) => {
     const r = await api.set_matrix_formulas(e.target.checked);
     if (r && r.error) showMessage("error", "Can't set formulas option", r.error);

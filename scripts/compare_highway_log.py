@@ -283,7 +283,7 @@ def _schema_with_claims(tsn_path, schema=None):
 
 
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
-            mode="formulas", commit_guard=None):
+            mode="formulas", commit_guard=None, fast_mode=False):
     """Build the comparison workbook(s). Returns a ConsolidateResult (same
     contract as the consolidators, so the GUI/console drive it identically).
 
@@ -296,4 +296,4 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
         banner="Highway Log Comparison — TSMIS vs TSN",
         has_route=None, loader=_load_pair_tsn, deps_ok=_DEPS_OK,
         events=events, confirm_overwrite=confirm_overwrite, mode=mode,
-        commit_guard=commit_guard)
+        commit_guard=commit_guard, fast_mode=fast_mode)

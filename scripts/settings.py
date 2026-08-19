@@ -688,6 +688,16 @@ def set_matrix_fast(on):
     return _set_flag("matrix_fast", on)
 
 
+def get_fast_tsn_comparisons():
+    """Whether vs-TSN comparisons use the experimental fast serializer (off)."""
+    return _get_flag("fast_tsn_comparisons")
+
+
+def set_fast_tsn_comparisons(on):
+    """Persist the experimental fast-vs-TSN toggle (cleared when off)."""
+    return _set_flag("fast_tsn_comparisons", on)
+
+
 def get_matrix_formulas():
     """Whether matrix comparisons ALSO write a live-formulas workbook beside the
     values copy (default off; the values copy always wins for the offline counts)."""

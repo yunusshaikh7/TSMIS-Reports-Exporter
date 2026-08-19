@@ -387,6 +387,14 @@ def main():
               settings.get_matrix_fast() is True
               and a._state_snapshot()["matrix_fast"]["on"] is True)
         a.set_matrix_fast(False)
+        check("Fast vs TSN off by default",
+              settings.get_fast_tsn_comparisons() is False)
+        fast_tsn = a.set_setting("fast_tsn_comparisons", True)
+        check("generic setting endpoint persists Fast vs TSN + pushes state",
+              fast_tsn.get("on") is True
+              and settings.get_fast_tsn_comparisons() is True
+              and a._state_snapshot().get("fast_tsn_comparisons") is True)
+        a.set_setting("fast_tsn_comparisons", False)
         check("formulas toggle off by default", settings.get_matrix_formulas() is False)
         a.set_matrix_formulas(True)
         check("formulas toggle persists + snapshot reflects it",

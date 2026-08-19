@@ -38,7 +38,7 @@ the following two row shapes into `run_compare`, together with the reduced input
 
 Entry point: `run_compare(sc, rows_t, rows_n, has_route, out_path, *, events, confirm_overwrite,
 mode, name_a, name_b, warnings, commit_guard, input_completion, skipped_inputs,
-failed_inputs, failures, coverage_diagnostics)` → an additively extended
+failed_inputs, failures, coverage_diagnostics, fast_mode=False)` → an additively extended
 `ConsolidateResult`. Its
 `comparison_outcome`, `artifact_generation`, and `attempt_state` fields are the machine
 contract; legacy `verdict`, completion fields, and `summary_lines` remain display/
@@ -116,6 +116,48 @@ semantic key→row mirror; deliver samples to Downloads as
 delete superseded). Excel is installed — COM automation works for empirical behavior tests (e.g.
 proving whole-row `57:57` link targets don't scroll right while bounded ranges do).
 
+### Experimental Fast vs TSN mode
+
+**Fast vs TSN (experimental)** is a separate, persisted comparison-output toggle. It is
+off by default and applies only to genuine vs-TSN recipes (manual comparisons, the Everything
+matrix, the by-day matrix, and Clean Road ArcGIS vs TSN). Cross-environment, vs-Baseline, and
+PDF-vs-Excel comparisons keep the standard path.
+
+The comparison rules do not change. Parsing, normalization, physical keys, duplicate pairing,
+field equality, counts, formulas, validation, atomic publication, and typed outcomes all run
+through the same code. The opt-in changes two repeated preparation/serialization costs:
+
+- The standard writer keeps its historical public openpyxl font/fill/alignment/border
+  assignments. Fast mode registers each exact composite style once per workbook and copies the
+  resulting StyleArray into each cell. The copy is intentional: formula-injection guards,
+  number formats, and Highway Log ditto tinting can still mutate one cell without aliasing any
+  cached prototype or sibling.
+- A canonical TSN resolve can carry its already-computed status certificate through the same
+  build attempt. Fast mode reuses that certificate while copying the exact certified workbook
+  to an immutable private capture. The capture verifies expected byte length and SHA-256 plus
+  the sidecar before and after copying. Immediately before publishing the Matrix cache, the
+  normal strict live-source status check runs again. If the TSN generation changed, no fresh
+  cache is published and the cell remains stale.
+
+Comparison caches are stamped with either standard-v1 or fast-style-v1. Changing the toggle
+therefore makes an opposite-mode cache stale once instead of treating it as current under a
+different serializer. The setting can be turned off at any time to return to the untouched
+writer.
+
+Real-corpus acceptance on 2026-08-18 (Windows, values workbooks; single runs, so timings remain
+hardware/cache dependent):
+
+| Family / phase | Standard | Fast | Reduction | Correctness gate |
+|---|---:|---:|---:|---|
+| Intersection Detail comparison (217 route exports, about 16K TSN records) | 380.779 s | 241.905 s | 36.47% (1.574x) | Typed outcome and all 24 stable OOXML members exact |
+| Ramp Detail comparison | 108.958 s | 98.791 s | 9.33% (1.103x) | Typed outcome and all 20 stable OOXML members exact |
+| Canonical Highway Detail TSN preflight | 0.2981 s / 6 status passes | 0.0749 s / 2 passes | 74.87% (3.980x) | Same identity token and normalized-workbook SHA-256 |
+
+The repeatable harnesses are **build/benchmark_vs_tsn_speed.py** and
+**build/benchmark_tsn_library_preflight.py**. The blocking
+**build/check_compare_fast_mode.py** fixture runs both values and formulas flavors and requires
+the standard and Fast paths to produce the same typed outcome and byte-identical stable OOXML
+members, including guarded source literals and a post-style cell mutation.
 ---
 
 ## 3. CompareSchema (the parameterization)

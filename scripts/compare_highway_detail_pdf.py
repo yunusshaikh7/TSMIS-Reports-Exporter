@@ -140,7 +140,7 @@ class _HighwayDetailFileCompare:
         return self._schema
 
     def compare(self, path_a, path_b, out_path, events=None, confirm_overwrite=None,
-                mode="formulas", commit_guard=None):
+                mode="formulas", commit_guard=None, fast_mode=False):
         return run_files_compare(
             self._schema_for(path_a, path_b), path_a, path_b, out_path,
             banner=(f"Highway Detail Comparison — {self.file_a_label} vs "
@@ -148,7 +148,7 @@ class _HighwayDetailFileCompare:
             has_route=True, loader=self._load_pair, deps_ok=_hd._DEPS_OK,
             side_a=self.file_a_label, side_b=self.file_b_label,
             events=events, confirm_overwrite=confirm_overwrite, mode=mode,
-            commit_guard=commit_guard)
+            commit_guard=commit_guard, fast_mode=fast_mode)
 
 
 TSMIS_PDF_VS_TSN = _HighwayDetailFileCompare(

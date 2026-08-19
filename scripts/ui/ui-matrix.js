@@ -73,6 +73,7 @@ function updateMatrixProgress() {
   renderMatrixQueue();
   syncMatrixFast();
   syncMatrixFormulas();
+  syncFastTsnComparisons();
   syncMatrixEvidence();
 }
 
@@ -185,6 +186,14 @@ function syncMatrixFormulas() {
 }
 function syncDayMatrixFormulas() {
   syncFormulasToggle("dayMatrixFormulas", "day_matrix_formulas");
+}
+
+// One persisted experimental serializer toggle is shared by manual, Everything,
+// and by-day vs-TSN comparisons. Both visible controls mirror that one value.
+function syncFastTsnComparisons() {
+  ["matrixFastTsn", "dayMatrixFastTsn"].forEach((id) => {
+    const cb = $(id); if (cb) cb.checked = !!(S.st && S.st.fast_tsn_comparisons);
+  });
 }
 
 // Reflect the SHARED evidence-images option (one persisted setting surfaced on
@@ -1339,6 +1348,7 @@ function updateDayMatrixProgress() {
   }
   renderQueuePanel("dayQueueGroup", "dayQueue", "dayQueueCount");
   syncDayMatrixFormulas();
+  syncFastTsnComparisons();
   syncDayMatrixEvidence();
   syncDayMatrixFast();
 }

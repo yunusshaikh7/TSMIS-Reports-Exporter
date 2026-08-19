@@ -655,7 +655,7 @@ def _schema_for(arc_path, facts):
 
 
 def compare(arc_path, tsn_path, out_path, events=None, confirm_overwrite=None,
-            mode="formulas", commit_guard=None):
+            mode="formulas", commit_guard=None, fast_mode=False):
     """Build the Clean Road Highway ArcGIS-vs-TSN comparison workbook(s).
     `arc_path` is the ArcGIS-built workbook; `tsn_path` the TSN extract (raw
     or normalized). Returns a ConsolidateResult."""
@@ -678,4 +678,4 @@ def compare(arc_path, tsn_path, out_path, events=None, confirm_overwrite=None,
         deps_msg="Required components are missing (openpyxl).",
         side_a="ArcGIS", side_b="TSN",
         events=events, confirm_overwrite=confirm_overwrite, mode=mode,
-        commit_guard=commit_guard)
+        commit_guard=commit_guard, fast_mode=fast_mode)

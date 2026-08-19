@@ -36,7 +36,8 @@ _MODULES = ["compare_ramp_detail_tsn", "compare_ramp_summary_tsn",
             "compare_highway_sequence_tsn", "compare_intersection_detail_tsn",
             "compare_intersection_summary_tsn"]
 _GUARDED_FUNCTION_MODULES = ["compare_highway_log", "compare_highway_detail_tsn",
-                             *_MODULES]
+                             "compare_highway_summary_tsn",
+                             "compare_clean_highway_tsn", *_MODULES]
 _GUARDED_INSTANCE_MODULES = ["compare_highway_detail_pdf",
                              "compare_highway_log_pdf",
                              "compare_highway_sequence_pdf",
@@ -188,7 +189,7 @@ def test_driver_happy_path():
         # warnings None from the loader must reach run_compare as the () default.
         ctc.run_files_compare("SCHEMA", a, b, out, banner="Ramp Detail Comparison — TSMIS vs TSN",
                               has_route=True, loader=lambda _t, _n: ([["t"]], [["n"]], None),
-                              mode="values", confirm_overwrite=lambda _p: True, events=ev)
+                              mode="values", confirm_overwrite=lambda _p: True, events=ev, fast_mode=True)
     # CMP-AUD-076: two full-selection lines follow the concise-name pair (the
     # basename alone is ambiguous — A\same.xlsx vs B\same.xlsx).
     check("banner == the 8 canonical log lines (incl. the two full selections)",
@@ -203,6 +204,7 @@ def test_driver_happy_path():
           and Path(seen.get("out_path")).parent == out.parent
           and ".tmp-" in Path(seen.get("out_path")).name
           and seen.get("mode") == "values" and out.is_file()
+          and seen.get("fast_mode") is True
           and seen.get("name_a") == "tsmis.xlsx" and seen.get("name_b") == "tsn.xlsx"
           and callable(seen.get("confirm_overwrite")))
     check("loader rows reach run_compare in order", seen.get("rows_t") == [["t"]] and seen.get("rows_n") == [["n"]])
@@ -302,7 +304,7 @@ def test_compare_core_guard_boundary():
 
 
 def test_all_comparator_guard_facades():
-    print("every file/PDF comparator exposes and forwards optional commit_guard:")
+    print("every file/PDF comparator exposes and forwards commit_guard + fast_mode:")
     for name in _GUARDED_FUNCTION_MODULES:
         mod = __import__(name)
         sig = inspect.signature(mod.compare)
@@ -312,6 +314,11 @@ def test_all_comparator_guard_facades():
               and sig.parameters["commit_guard"].default is None)
         check(f"{name}: forwards the callback to the shared driver",
               "commit_guard=commit_guard" in src)
+        check(f"{name}: compare(fast_mode=False) is public-compatible",
+              "fast_mode" in sig.parameters
+              and sig.parameters["fast_mode"].default is False)
+        check(f"{name}: forwards fast mode to the shared driver",
+              "fast_mode=fast_mode" in src)
     for name in _GUARDED_INSTANCE_MODULES:
         mod = __import__(name)
         sig = inspect.signature(mod.TSMIS_PDF_VS_TSN.compare)
@@ -321,6 +328,11 @@ def test_all_comparator_guard_facades():
               and sig.parameters["commit_guard"].default is None)
         check(f"{name}: forwards the callback to the shared driver",
               "commit_guard=commit_guard" in src)
+        check(f"{name}: adapter.compare(fast_mode=False) is public-compatible",
+              "fast_mode" in sig.parameters
+              and sig.parameters["fast_mode"].default is False)
+        check(f"{name}: forwards fast mode to the shared driver",
+              "fast_mode=fast_mode" in src)
 
 
 def test_driver_output_source_aliases():

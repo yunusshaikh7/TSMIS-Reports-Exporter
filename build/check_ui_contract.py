@@ -20,6 +20,7 @@ node. Run from the repo root:
 """
 import re
 import sys
+from html.parser import HTMLParser
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -35,6 +36,24 @@ def check(name, cond):
     print(f"  [{'OK ' if cond else 'FAIL'}] {name}")
     if not cond:
         _failures.append(name)
+
+
+class _LabelNestingParser(HTMLParser):
+    """Detect invalid nested/unbalanced labels without browser auto-repair."""
+
+    def __init__(self):
+        super().__init__()
+        self.label_depth = 0
+        self.nested_labels = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "label":
+            self.nested_labels += int(self.label_depth > 0)
+            self.label_depth += 1
+
+    def handle_endtag(self, tag):
+        if tag == "label":
+            self.label_depth -= 1
 
 
 def _str_array(text, name):
@@ -90,11 +109,39 @@ def test_baseline_switch_uses_stale_scope():
           bool(m) and m.group(2) == "stale")
 
 
+
+
+def test_fast_tsn_toggle_contract():
+    print("Fast vs TSN toggle: markup, state sync, bridge call, and mock stay paired:")
+    html = (UI / "index.html").read_text(encoding="utf-8")
+    app = (UI / "app.js").read_text(encoding="utf-8")
+    matrix = (UI / "ui-matrix.js").read_text(encoding="utf-8")
+    mock = (UI / "mock.js").read_text(encoding="utf-8")
+    check("Everything and by-day each expose exactly one fast-TSN checkbox",
+          html.count('id="matrixFastTsn"') == 1
+          and html.count('id="dayMatrixFastTsn"') == 1)
+    parser = _LabelNestingParser()
+    parser.feed(html)
+    parser.close()
+    check("Fast controls are sibling labels (no browser-dependent nested repair)",
+          parser.nested_labels == 0 and parser.label_depth == 0)
+    check("both controls call the one persisted bridge endpoint",
+          'api.set_setting("fast_tsn_comparisons"' in app)
+    check("both controls mirror the shared state key",
+          '"matrixFastTsn", "dayMatrixFastTsn"' in matrix
+          and 'fast_tsn_comparisons' in matrix)
+    check("mock exposes the same state + endpoint",
+          'fast_tsn_comparisons: false' in mock
+          and 'key === "fast_tsn_comparisons"' in mock
+          and 'set_fast_tsn_comparisons: async' not in mock)
+
+
 def main():
     test_contract_enum_parity()
     test_mock_carries_contract()
     test_ui_script_references_exist()
     test_baseline_switch_uses_stale_scope()
+    test_fast_tsn_toggle_contract()
     print()
     if _failures:
         print(f"FAILED: {len(_failures)} check(s): {_failures}")

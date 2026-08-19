@@ -154,7 +154,7 @@ def load_results():
 def record_result(date, source, row_key, verdict, diff_cells, one_sided,
                   built_at_mtime, completion=None, input_fingerprint=None,
                   source_identities=None, generation_id=None,
-                  producer_versions=None, commit_guard=None):
+                  producer_versions=None, commit_guard=None, publication_guard=None):
     data = load_results()
     data[f"{day_folder_name(date, source)}|{row_key}"] = {
         "verdict": verdict, "diff_cells": diff_cells,
@@ -193,6 +193,11 @@ def record_result(date, source, row_key, verdict, diff_cells, one_sided,
             json.dump(cache_envelope.wrap(data, output_identity="tsn-by-day"), f)
         _require_guard(p, "cache publication")
         _require_guard(tmp, "cache publication")
+        if not consolidation_meta.guard_allows(publication_guard, p):
+            raise ValueError(
+                "The TSN source generation changed before the by-day cache "
+                "publication. The cache was left untouched; refresh the "
+                "comparison.")
         os.replace(tmp, p)
     except OSError as e:
         log.warning("day_matrix: could not write results cache %s: %s: %s",
@@ -263,7 +268,7 @@ def available_days(source):
 # the snapshot the GUI renders (pure filesystem read)
 # --------------------------------------------------------------------------- #
 def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
-                        now=None, row_order=None, today=None):
+                        now=None, row_order=None, today=None, fast_tsn_comparisons=False):
     """Full render model for the by-day matrix. PURE stat — no workbook opened
     (counts come from the cache). `days` is the ordered list of date columns;
     `hidden` hides report rows; `row_order` is the user's drag-to-reorder row
@@ -354,8 +359,9 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
                          "identity_required": True}]
                 # F5/P2: fingerprint the day's TSMIS store folder so a deleted route reads
                 # the cell stale (the TSN side is a file, captured by mtime).
-                cmp = matrix._cmp_state(day_out_path(date, source, row_key), srcs, rec,
-                                        fp_folders=(tdir,))
+                cmp = matrix._cmp_state(
+                    day_out_path(date, source, row_key), srcs, rec, fp_folders=(tdir,),
+                    producer_versions=matrix.producer_identity(fast_tsn_comparisons))
                 # CMP-AUD-089: the same durable last-attempt overlay the Everything
                 # matrix renders — a failed/stopped/incomplete rebuild marks the cell
                 # here too instead of vanishing behind the previous result.
@@ -491,7 +497,7 @@ def evidence_for_day_cell(source, date, row_key, dest, events, tsn_files=None,
 
 def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
                    confirm_overwrite=None, force_consolidate=False,
-                   also_formulas=False, evidence=None, commit_guard=None):
+                   also_formulas=False, evidence=None, commit_guard=None, fast_mode=False):
     """Build ONE (day, report) vs-TSN comparison: resolve the shared TSN dataset,
     consolidate that day's per-route export (reusing the day folder's persistent
     consolidated unless stale or `force_consolidate`), compare vs TSN, write the
@@ -513,7 +519,12 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
     tsn_files, _selection_map_changed = tsn_library.canonicalize_selections(
         tsn_files or {})
     tsn_key = tsn_library.canonical_dataset_key(tsn_subdir)
-    src_tsn = matrix.tsn_source(dest, tsn_key, tsn_files.get(tsn_key))
+    def _resolve_tsn_source():
+        if fast_mode:
+            return matrix.tsn_source(dest, tsn_key, tsn_files.get(tsn_key),
+                                     include_certification=True)
+        return matrix.tsn_source(dest, tsn_key, tsn_files.get(tsn_key))
+    src_tsn = _resolve_tsn_source()
     if src_tsn.get("kind") == "missing_explicit":
         raise ValueError(tsn_library.explicit_selection_problem(src_tsn))
     if src_tsn.get("kind") not in ("file", "consolidated"):
@@ -521,20 +532,24 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
     if src_tsn.get("kind") == "consolidated":
         # CMP-AUD-035: a typed freshness error is terminal. Never interpret it
         # as the current/no-op None case and never compare stale consolidated bytes.
-        healed = tsn_library.ensure_current(tsn_key, events, source=src_tsn)
+        healed = (tsn_library.ensure_current(
+            tsn_key, events, source=src_tsn,
+            certified_status=src_tsn.get("_certified_status"))
+            if fast_mode else tsn_library.ensure_current(tsn_key, events, source=src_tsn))
         if healed is not None:
             if healed.status != "ok":
                 raise ValueError(
                     healed.message
                     or "the TSN library is not certifiably current; comparison stopped")
-        src_tsn = matrix.tsn_source(dest, tsn_key, tsn_files.get(tsn_key))
+        if healed is not None or not fast_mode:
+            src_tsn = _resolve_tsn_source()
         if src_tsn.get("kind") != "consolidated":
             raise ValueError(
                 "the canonical TSN source changed while it was being certified")
     tsn_token, source_identity_check = matrix.tsn_identity_check_for(
-        tsn_key, src_tsn)
+        tsn_key, src_tsn, fast_mode=fast_mode)
     source_workbook_identity = matrix.tsn_expected_workbook_identity(
-        tsn_key, src_tsn, tsn_token)
+        tsn_key, src_tsn, tsn_token, fast_mode=fast_mode)
 
     out_path = day_out_path(date, source, row_key)
     # CMP-AUD-098: capture the day's TSMIS store-folder identity BEFORE the
@@ -545,6 +560,7 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
         tsmis_dir(date, source, subdir), src_tsn["path"], out_path, row_key, subdir,
         events, confirm_overwrite=confirm_overwrite, force_consolidate=force_consolidate,
         also_formulas=also_formulas,
+        fast_mode=fast_mode,
         evidence_opts=matrix.evidence_opts_for(
             evidence, row_key, lambda sub: tsmis_dir(date, source, sub)),
         explicit_selection=src_tsn.get("selection"),
@@ -554,10 +570,15 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
     # P1-B05: reduce the TSN side too — a partial TSN consolidation (categories /
     # district PDFs left out) flags the by-day cell partial just like a partial TSMIS side.
     if result.status == "ok" and out_path.exists():
-        matrix._require_source_identity(
-            source_identity_check, "recording the by-day comparison cache")
-        cache_guard = matrix._compose_source_guard(
-            commit_guard, source_identity_check)
+        publication_guard = None
+        if fast_mode:
+            cache_guard = commit_guard
+            publication_guard = source_identity_check
+        else:
+            matrix._require_source_identity(
+                source_identity_check, "recording the by-day comparison cache")
+            cache_guard = matrix._compose_source_guard(
+                commit_guard, source_identity_check)
         # F4: detect the layout from the produced workbook — the aggregate reports
         # (Ramp / Intersection Summary) emit a flat sheet that a hardcoded
         # has_route=True would read one column off (0 diffs). The header decides.
@@ -581,6 +602,8 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
                       source_identities=(
                           {"tsn": tsn_token}),
                       generation_id=published.artifact_generation.generation_id,
-                      producer_versions=matrix.producer_identity(),
-                      commit_guard=cache_guard)
+                      producer_versions=matrix.producer_identity(fast_mode),
+                      commit_guard=cache_guard,
+                      **({"publication_guard": publication_guard}
+                         if fast_mode else {}))
     return result

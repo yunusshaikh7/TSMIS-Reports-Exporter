@@ -30,7 +30,7 @@ _RESULTS_FILE = "_results.json"
 _MTIME_TOL_S = consolidation_meta._MTIME_TOL_S   # single home: the sidecar layer owns the tolerance
 
 
-def producer_identity():
+def producer_identity(vs_tsn_fast_mode=False):
     """The semantic PRODUCER version a fresh comparison cache record is stamped
     with — the app's released ``MAJOR.MINOR.PATCH`` (CMP-AUD-084).
 
@@ -46,8 +46,14 @@ def producer_identity():
     Everything / by-day / baseline caches all agree on what "current" means, and
     routed through ``consolidation_meta.producer_app_version`` so the comparison-cache
     and consolidation freshness gates read the SAME value (robust to a scripts-only
-    ``sys.path`` in isolated checks)."""
-    return {"app": consolidation_meta.producer_app_version()}
+    ``sys.path`` in isolated checks). The comparison_serializer member also
+    isolates the opt-in Fast vs-TSN writer from the standard writer: changing
+    modes invalidates the prior cache once instead of trusting an artifact made
+    by the other serializer."""
+    identity = {"app": consolidation_meta.producer_app_version()}
+    identity["comparison_serializer"] = (
+        "fast-style-v1" if vs_tsn_fast_mode else "standard-v1")
+    return identity
 
 
 # --------------------------------------------------------------------------- #
@@ -271,7 +277,7 @@ def _published_comparison_result(path, result):
 
 
 def _staleness(cmp_m, sources, rec, fp_folders, missing_side,
-               comparison_output=None):
+               comparison_output=None, expected_producer_versions=None):
     """The staleness verdict both cell readers share (S4 / ARC-03):
     {supported, built, mtime, stale, reason, missing_side, verdict, diff_cells,
     one_sided, completion}. `sources` is [{name, mtime}, ...] in reason order
@@ -321,8 +327,10 @@ def _staleness(cmp_m, sources, rec, fp_folders, missing_side,
     # with byte-identical inputs and a matching output generation. The recorded
     # producer identity must equal the CURRENT one; a legacy record (no field, or a
     # mismatching map) reads stale and rebuilds ONCE against the running pipeline.
-    producer_stale = bool(rec_trusted
-                          and rec.get("producer_versions") != producer_identity())
+    expected_producer_versions = (producer_identity()
+                                  if expected_producer_versions is None
+                                  else expected_producer_versions)
+    producer_stale = bool(rec_trusted and rec.get("producer_versions") != expected_producer_versions)
     if producer_stale:
         rec_trusted = False
     if rec_trusted and comparison_output is None:
@@ -463,7 +471,7 @@ def tsn_input_dir_for(dest, subdir, src):
     return str(tsn_input_root(dest, subdir))
 
 
-def tsn_source(dest, subdir, selected_file=None):
+def tsn_source(dest, subdir, selected_file=None, include_certification=False):
     """Resolve the TSN dataset for a report `subdir`, returning {kind:
     file|consolidated|pdfs|raw|missing_explicit|none, path?, mtime?, pdf_count?,
     raw_count?, selected_path?}.
@@ -475,7 +483,9 @@ def tsn_source(dest, subdir, selected_file=None):
     (back-compat) — so an existing install keeps resolving until imported."""
     import tsn_library                              # lazy: no import cycle
     subdir = tsn_library.canonical_dataset_key(subdir)
-    return tsn_library.resolve(subdir, selected_file, legacy_dest=dest)
+    return tsn_library.resolve(
+        subdir, selected_file, legacy_dest=dest,
+        include_certification=include_certification)
 
 
 # --- per-row comparison MODE registry -------------------------------------- #
@@ -657,7 +667,7 @@ def load_tsn_results(dest):
 def record_tsn_result(dest, result_key, cell_key, verdict, diff_cells, one_sided,
                       built_at_mtime, completion=None, input_fingerprint=None,
                       source_identities=None, generation_id=None,
-                      producer_versions=None, commit_guard=None):
+                      producer_versions=None, commit_guard=None, publication_guard=None):
     data = load_tsn_results(dest)
     data.setdefault(result_key, {})[cell_key] = {
         "verdict": verdict, "diff_cells": diff_cells,
@@ -689,6 +699,11 @@ def record_tsn_result(dest, result_key, cell_key, verdict, diff_cells, one_sided
             json.dump(cache_envelope.wrap(data, output_identity="tsn"), f)
         _require_cache_guard(commit_guard, p, "TSN cache publication")
         _require_cache_guard(commit_guard, tmp, "TSN cache publication")
+        if not consolidation_meta.guard_allows(publication_guard, p):
+            raise ValueError(
+                "The TSN source generation changed before the matrix cache "
+                "publication. The cache was left untouched; refresh the "
+                "comparison.")
         os.replace(tmp, p)
     except OSError as e:
         log.warning("matrix: could not write TSN results cache %s: %s: %s",
@@ -857,7 +872,7 @@ def cell_unbuildable_reason(cmp):
         cmp.get("missing_side"), "an input for this comparison is missing")
 
 
-def _cmp_state(out_path, sources, rec, fp_folders=()):
+def _cmp_state(out_path, sources, rec, fp_folders=(), producer_versions=None):
     """{supported, built, mtime, stale, reason, missing_side, verdict, diff_cells,
     one_sided} for one comparison cell. `sources` is the input sides
     [{name, present, mtime}]; STALE when the workbook is missing, any present source is
@@ -870,8 +885,9 @@ def _cmp_state(out_path, sources, rec, fp_folders=()):
     # its export nor its reference present must not hide that the reference is also
     # missing (which read as a plain "not exported").
     missing_side = "both" if len(missing) > 1 else (missing[0] if missing else None)
-    return _staleness(_safe_mtime(out_path), sources, rec, fp_folders, missing_side,
-                      comparison_output=out_path)
+    return _staleness(
+        _safe_mtime(out_path), sources, rec, fp_folders, missing_side,
+        comparison_output=out_path, expected_producer_versions=producer_versions)
 
 
 # --------------------------------------------------------------------------- #
@@ -893,8 +909,8 @@ def apply_order(keys, order):
 
 def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
                     env_labels=None, row_defs=None, hidden=None, hidden_envs=None,
-                    row_modes=None, tsn_files=None, now=None,
-                    row_order=None, env_order=None):
+                    row_modes=None, tsn_files=None, now=None, row_order=None,
+                    env_order=None, fast_tsn_comparisons=False):
     """The full render model for the matrix. PURE stat — no workbook opened (counts
     come from the caches). Per row, the SELECTED mode (`row_modes`, default 'env')
     decides each cell's comparison; `hidden`/`hidden_envs` drop rows/columns from
@@ -991,8 +1007,10 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
                             "identity_required": True}]
                 # F5/P2: the TSMIS store folder is the multi-file side where a deleted
                 # route hides from mtime — fingerprint it (the TSN side is a file, mtime).
-                cmp = _cmp_state(mode_out_path(dest, baseline_key, row_key, env, mode),
-                                 sources, rec, fp_folders=(dest / env / env_subdir,))
+                cmp = _cmp_state(
+                    mode_out_path(dest, baseline_key, row_key, env, mode), sources, rec,
+                    fp_folders=(dest / env / env_subdir,),
+                    producer_versions=producer_identity(fast_tsn_comparisons))
             else:                            # self: TSMIS PDF vs Excel
                 other = ages.get(env, {}).get(mode["other_subdir"], _absent)
                 rec = _nested_record(tsn_results, f"{row_key}|{mode['id']}", env)

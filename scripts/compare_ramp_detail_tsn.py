@@ -509,7 +509,7 @@ def _load_pair(tsmis_path, tsn_path):
 
 
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
-            mode="formulas", commit_guard=None):
+            mode="formulas", commit_guard=None, fast_mode=False):
     """Build the Ramp Detail TSMIS-vs-TSN comparison workbook(s). `tsmis_path` is the
     consolidated TSMIS Ramp Detail workbook; `tsn_path` the TSN statewide (raw or
     normalized) workbook. Returns a ConsolidateResult."""
@@ -519,4 +519,4 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
         loader=_load_pair, deps_ok=_DEPS_OK,
         deps_msg="Required components are missing (openpyxl).",
         events=events, confirm_overwrite=confirm_overwrite, mode=mode,
-        commit_guard=commit_guard)
+        commit_guard=commit_guard, fast_mode=fast_mode)

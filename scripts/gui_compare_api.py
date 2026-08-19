@@ -10,6 +10,7 @@ from pathlib import Path
 import webview
 
 import artifact_store
+import settings
 from gui_endpoint import _api_method, pick_path   # + the dialog unwrap
 from gui_worker import ConsolidateWorker
 from paths import (OUTPUT_ROOT, list_output_days, list_output_days_for_report,
@@ -375,6 +376,9 @@ class GuiCompareMixin:
         if mode is None:
             return {"error": "Tick at least one output (values and/or live formulas)."}
         # c14: a manual comparison auto-defaults into output/comparisons/manual/
+        sides = compare_file_sides(report_key)
+        fast_mode = bool(sides and sides[2]
+                         and settings.get_fast_tsn_comparisons())
         # (self-identifying name via suggest_name), so ad-hoc comparisons land in
         # one predictable place instead of beside whatever file was picked. The
         # native dialog still lets the user redirect ("Save elsewhere…").
@@ -385,7 +389,7 @@ class GuiCompareMixin:
             lambda: mod.suggest_name(tsmis_path),
             lambda out_path, events=None, confirm_overwrite=None, day=None:
                 mod.compare(tsmis_path, tsn_path, out_path, events=events,
-                            confirm_overwrite=confirm_overwrite, mode=mode),
+                            confirm_overwrite=confirm_overwrite, mode=mode, fast_mode=fast_mode),
             source_paths=(tsmis_path, tsn_path))
 
     @_api_method
