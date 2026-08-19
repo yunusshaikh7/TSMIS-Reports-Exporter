@@ -1203,6 +1203,8 @@ function bindEvents() {
      () => { syncMatrixEvidence(); if (typeof renderMatrix === "function") renderMatrix(); }],
     ["dayMatrixEvidence", "dayMatrixEvidenceCount", "dayMatrixEvidenceLayout",
      () => { syncDayMatrixEvidence(); if (typeof renderDayMatrix === "function") renderDayMatrix(); }],
+    ["baselineMatrixEvidence", "baselineMatrixEvidenceCount", "baselineMatrixEvidenceLayout",
+     () => { syncBaselineMatrixEvidence(); if (typeof renderBaselineMatrix === "function") renderBaselineMatrix(); }],
   ]) {
     $(cbId)?.addEventListener("change", async (e) => {
       const r = await api.set_evidence_images(e.target.checked);

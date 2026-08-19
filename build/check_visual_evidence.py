@@ -103,13 +103,15 @@ check("capable() matches rows(), and refuses every non-_pdf row",
       and not ve.capable("highway_detail")          # the EXCEL row stays out
       and not ve.capable("intersection_detail")
       and not ve.capable("ramp_detail"))
-# HD-PDF is vs-TSN ONLY: its adapter has locate_tsn/tsn_value/tsn_box but no
-# env hooks, so the ENV lane must still refuse it (env_capable checks the hooks).
-check("highway_detail_pdf is vs-TSN capable but NOT env capable",
-      ve.capable("highway_detail_pdf") and not ve.env_capable("highway_detail_pdf"))
-check("the ENV lane stays at the original four rows",
-      sorted(ve._ENV_ADAPTER_MODULES) == ["highway_log_pdf", "highway_sequence_pdf",
-                                          "intersection_detail_pdf", "ramp_detail_pdf"])
+# HD-PDF gained its env hooks in v0.38.3 (roadmap D1), so every `_pdf` family
+# now carries BOTH lanes; env_capable still proves the hooks, not the registry.
+check("highway_detail_pdf is capable on BOTH lanes (D1 closed in v0.38.3)",
+      ve.capable("highway_detail_pdf") and ve.env_capable("highway_detail_pdf"))
+check("the ENV lane covers all five `_pdf` rows and nothing else",
+      sorted(ve._ENV_ADAPTER_MODULES) == ["highway_detail_pdf", "highway_log_pdf",
+                                          "highway_sequence_pdf",
+                                          "intersection_detail_pdf", "ramp_detail_pdf"]
+      and sorted(ve._ENV_ADAPTER_MODULES) == ve.rows())
 check("the self lane is retired everywhere (self_capable False for every row)",
       not any(ve.self_capable(r) for r in ve.rows()))
 check("TSMIS visuals come from each report's (PDF)-edition export subdir",
@@ -925,10 +927,12 @@ check("row_reports maps every capable row to its report (the per-cell action's g
 # imaging deps alone (a vs-TSN cell missing its TSN prints reports that per
 # cell); env_rows is the LITERAL four `_pdf` placements — Ramp Summary is
 # REMOVED by the third ruling (report-type rule).
-check("ready == deps alone and env_rows is the LITERAL four `_pdf` "
-      "placements (pinned, not self-derived — RB-4 audit; RS removed)",
+check("ready == deps alone and env_rows is the LITERAL five `_pdf` "
+      "placements (pinned, not self-derived — RB-4 audit; RS removed, "
+      "HD-PDF added in v0.38.3)",
       avail["ready"] == avail["deps_ok"]
-      and avail.get("env_rows") == ["highway_log_pdf",
+      and avail.get("env_rows") == ["highway_detail_pdf",
+                                    "highway_log_pdf",
                                     "highway_sequence_pdf",
                                     "intersection_detail_pdf",
                                     "ramp_detail_pdf"])
@@ -2356,6 +2360,21 @@ check("HSL env fields = the per-route layout with '(col C)'/'(col E)' for the "
                              "Distance To Next Point", "Description"])
 check("RS env fields = RS_HEADER minus Route",
       _ers5.env_fields() == list(_ce5.RS_HEADER[1:]))
+import evidence_highway_detail as _ehd5
+import highway_detail_columns as _hdc5
+import compare_highway_detail_tsn as _cht5
+check("HD env fields = the 34-column export SoT minus the Post Mile key "
+      "(cross-module pin — compare_env.HIGHWAY_DETAIL_PDF pins that header on "
+      "BOTH sides and keys on 'Post Mile')",
+      _ehd5.env_fields() == [f for f in _hdc5.HEADER if f != "Post Mile"]
+      and _cht5.KEY == "Post Mile"
+      and _ce5.HIGHWAY_DETAIL_PDF.key_col == "Post Mile")
+check("HD env_locate keys by the print's OWN Post Mile text, not the canonical "
+      "roadbed-aware vs-TSN key (the two lanes publish different keys)",
+      _ehd5._env_key(["R012.243"] + [None] * 33) == "R012.243"
+      and _cht5.pm_canon("R012.243", "") == "R012.243"
+      and _ehd5._env_key(["12.243"] + [None] * 33) == "12.243"
+      and _cht5.pm_canon("12.243", "R") == "012.243R")
 
 # The RS geometry twin: single-line rows parse like the consolidator's own
 # two-column walk, and a count/label pair maps to the count word's box.

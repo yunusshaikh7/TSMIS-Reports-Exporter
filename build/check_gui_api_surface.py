@@ -58,8 +58,10 @@ def _src(mod):
 #     disk); folding it into get_compare_folders would have overloaded a
 #     folder-kind endpoint with an unrelated file-kind return shape.
 FROZEN_API = {
-    "add_baseline_matrix_day", "baseline_matrix_info", "build_baseline_matrix_cell",
-    "open_baseline_cell_comparison", "open_baseline_comparisons_folder",
+    "add_baseline_matrix_day", "baseline_matrix_evidence_cell",
+    "baseline_matrix_info", "build_baseline_matrix_cell",
+    "open_baseline_cell_comparison", "open_baseline_cell_evidence",
+    "open_baseline_comparisons_folder",
     "rebuild_baseline_matrix", "remove_baseline_matrix_day",
     "set_baseline_matrix_baseline", "set_baseline_matrix_formulas",
     "set_baseline_matrix_report", "set_baseline_matrix_row_order",

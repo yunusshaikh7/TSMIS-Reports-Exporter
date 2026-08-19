@@ -1264,6 +1264,21 @@
             <svg class="ic"><use href="#i-file-text"/></svg>
             <span>Also write a live-formulas copy</span>
           </label>
+          <label class="mc-fast" id="baselineMatrixEvidenceRow"
+                 title="Also render highlighted PDF snippets for sampled differences on the PDF-edition rows — both sides are per-route prints, so each panel crops that day's and the baseline's own print. The status lines below say which reports will generate.">
+            <input type="checkbox" id="baselineMatrixEvidence">
+            <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+            <svg class="ic"><use href="#i-camera"/></svg>
+            <span>Evidence images</span>
+          </label>
+          <div class="mc-workers" id="baselineMatrixEvidenceCountRow">
+            <span>sample</span>
+            <input type="number" class="input input-num" id="baselineMatrixEvidenceCount" min="1" max="10"
+                   aria-label="Examples per differing column">
+            <span>per column ·</span>
+            <span class="tb-select select-light"><select id="baselineMatrixEvidenceLayout" aria-label="Evidence image layout"><option value="pair">side-by-side</option><option value="stacked">stacked</option><option value="both">both</option></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+          </div>
+          <p class="hint" id="baselineMatrixEvidenceHint" style="margin:6px 0 0" hidden></p>
         </div>
 
         <div class="mc-group">

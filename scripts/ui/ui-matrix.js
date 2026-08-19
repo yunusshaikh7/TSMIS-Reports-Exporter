@@ -188,13 +188,20 @@ function syncDayMatrixFormulas() {
 }
 
 // Reflect the SHARED evidence-images option (one persisted setting surfaced on
-// both matrix pages) and spell out PER REPORT what the toggle will actually
+// all three matrix pages) and spell out PER REPORT what the toggle will actually
 // generate: a ✓ line for each report whose TSN prints are in place (images WILL
 // render for its vs-TSN cells), a ○ line naming the drop folder for one that
 // isn't, and one line naming the reports with no evidence support at all — so
 // the toggle is never a mystery switch. The toggle greys out only when NO
 // report is ready.
-function syncEvidenceControls(cbId, countRowId, countId, hintId, layoutId) {
+//
+// `lane` picks WHICH status the page needs. "tsn" (default) is the vs-TSN
+// story above. "env" is the vs-Baseline page, where both sides are the report's
+// OWN per-route prints from two folders — no TSN print is read at all, so
+// showing "needs its TSN PDFs" there would say a cell can't generate when it
+// can.
+function syncEvidenceControls(cbId, countRowId, countId, hintId, layoutId,
+                              lane) {
   const ev = (S.st && S.st.evidence) || {};
   const cb = $(cbId);
   if (cb) {
@@ -227,25 +234,41 @@ function syncEvidenceControls(cbId, countRowId, countId, hintId, layoutId) {
     return div;
   };
   const lines = [];
-  for (const r of ev.reports || []) {
-    if (r.tsn_pdfs) {
+  const rowLabel = (rk) => {
+    const rep = (ev.reports || []).find((r) => r.key === (ev.row_reports || {})[rk]);
+    return (rep && rep.label) || rk;
+  };
+  if (lane === "env") {
+    const labels = (ev.env_rows || []).map(rowLabel);
+    if (labels.length) {
       lines.push(line("ok",
-        `${r.label} (PDF) — will generate (${r.tsn_pdfs} TSN print${r.tsn_pdfs === 1 ? "" : "s"})`,
-        `Print crops of the per-route TSMIS export and the TSN print, read from ${r.dir}. ` +
-        `Cells whose run lacks the ${r.label} (PDF) export skip with a note.`));
-    } else {
-      lines.push(line("todo",
-        `${r.label} (PDF) — needs its TSN PDFs in ${r.dir}`,
-        "Evidence is supported for this report's PDF edition, but its TSN " +
-        "prints aren't there yet."));
+        `${labels.join(", ")} (PDF) — will generate`,
+        "Both sides of a cell here are that report's OWN per-route prints " +
+        "(this day's and the baseline's), so no TSN prints are needed. Each " +
+        "panel is a highlighted crop of the exact print the comparison " +
+        "parsed, checked against its own recorded read set."));
     }
-  }
-  if ((ev.env_rows || []).length) {
-    lines.push(line("ok",
-      "Cross-environment PDF-vs-PDF cells — both environments' own prints",
-      "The env cells of the PDF-edition reports render highlighted crops of " +
-      "the exact per-route prints each side's comparison parsed (checked per " +
-      "cell against the comparison's own recorded read set)."));
+  } else {
+    for (const r of ev.reports || []) {
+      if (r.tsn_pdfs) {
+        lines.push(line("ok",
+          `${r.label} (PDF) — will generate (${r.tsn_pdfs} TSN print${r.tsn_pdfs === 1 ? "" : "s"})`,
+          `Print crops of the per-route TSMIS export and the TSN print, read from ${r.dir}. ` +
+          `Cells whose run lacks the ${r.label} (PDF) export skip with a note.`));
+      } else {
+        lines.push(line("todo",
+          `${r.label} (PDF) — needs its TSN PDFs in ${r.dir}`,
+          "Evidence is supported for this report's PDF edition, but its TSN " +
+          "prints aren't there yet."));
+      }
+    }
+    if ((ev.env_rows || []).length) {
+      lines.push(line("ok",
+        "Cross-environment PDF-vs-PDF cells — both environments' own prints",
+        "The env cells of the PDF-edition reports render highlighted crops of " +
+        "the exact per-route prints each side's comparison parsed (checked per " +
+        "cell against the comparison's own recorded read set)."));
+    }
   }
   if ((ev.unsupported || []).length) {
     lines.push(line("na", `No evidence: ${ev.unsupported.join(", ")}.`,
@@ -263,6 +286,11 @@ function syncDayMatrixEvidence() {
   syncEvidenceControls("dayMatrixEvidence", "dayMatrixEvidenceCountRow",
     "dayMatrixEvidenceCount", "dayMatrixEvidenceHint", "dayMatrixEvidenceLayout");
 }
+function syncBaselineMatrixEvidence() {
+  syncEvidenceControls("baselineMatrixEvidence", "baselineMatrixEvidenceCountRow",
+    "baselineMatrixEvidenceCount", "baselineMatrixEvidenceHint",
+    "baselineMatrixEvidenceLayout", "env");
+}
 
 // Whether a row can run the ON-DEMAND per-cell evidence action right now for
 // the given mode. Evidence exists ONLY on the PDF-vs-PDF lanes (the 2026-08-05
@@ -272,7 +300,9 @@ function syncDayMatrixEvidence() {
 function evidenceActionInfo(rowKey, mode) {
   const ev = (S.st && S.st.evidence) || {};
   if (!ev.deps_ok) return null;
-  const lane = mode === "env" ? ev.env_rows
+  // "baseline" rides the SAME lane as "env": both compare two TSMIS folders of
+  // per-route prints — two environments there, two export days here.
+  const lane = (mode === "env" || mode === "baseline") ? ev.env_rows
     : mode === "tsn" ? ev.rows : null;
   if (!(lane || []).includes(rowKey)) return null;
   const repKey = (ev.row_reports || {})[rowKey];
@@ -1349,7 +1379,9 @@ function updateDayMatrixProgress() {
 // same report (an earlier day's run folder, or the Everything store — same
 // source, same format). Reuses the matrix cell vocab (mxCellContent / mxActBtn
 // / mxHeadBtn) + the shared queue panel; compare-only — no TSN dataset, no
-// live re-export, no evidence.
+// live re-export. Evidence images DO run here (v0.38.3) on the PDF-edition
+// rows: both sides are per-route prints, so each cell crops that day's print
+// and the baseline's, through the same env lane the Everything matrix uses.
 let _blRenderSeq = 0;
 
 function syncBaselineMatrixFormulas() {
@@ -1505,6 +1537,8 @@ async function renderBaselineMatrix() {
     const top = document.createElement("div"); top.className = "mxrh-top";
     const lbl = document.createElement("span"); lbl.className = "mxrh-label";
     lbl.textContent = rlabel + (supported ? "" : " (soon)");
+    const evb = supported ? evidenceRowBadge(rk) : null;
+    if (evb) lbl.appendChild(evb);
     top.appendChild(lbl);
     if (supported && bl.id) {
       top.appendChild(mxHeadBtn("i-compare", `Rebuild ${rlabel} for every day vs the baseline`,
@@ -1557,6 +1591,27 @@ async function renderBaselineMatrix() {
               if (r && r.error) showMessage("error", "Can't open", r.error);
             });
           ob.classList.add("mx-open"); acts.appendChild(ob);
+        }
+        // Evidence images for the EXISTING comparison. The CAMERA (which
+        // GENERATES) follows the same rule as the other matrices: offered with
+        // the Evidence images toggle ON and a FRESH cell (a stale cell needs a
+        // rebuild first, which regenerates evidence itself). Opening an
+        // already-generated set is never gated on the toggle.
+        if (cmp.built && evidenceActionInfo(rk, "baseline")) {
+          if (evidenceOn() && !cmp.stale) {
+            acts.appendChild(mxActBtn("i-camera",
+              "Generate/refresh the evidence images for this comparison (no re-compare)",
+              false, async () => {
+                const r = await api.baseline_matrix_evidence_cell(rk, d);
+                if (r && r.error) showMessage("error", "Can't run evidence", r.error);
+              }));
+          }
+          acts.appendChild(mxActBtn("i-image",
+            "Open the evidence images for this comparison",
+            false, async () => {
+              const r = await api.open_baseline_cell_evidence(rk, d);
+              if (r && r.error) showMessage("error", "No evidence", r.error);
+            }));
         }
         cell.appendChild(acts);
       }
@@ -1616,6 +1671,7 @@ function updateBaselineMatrixProgress() {
   }
   renderQueuePanel("baselineQueueGroup", "baselineQueue", "baselineQueueCount");
   syncBaselineMatrixFormulas();
+  syncBaselineMatrixEvidence();
 }
 
 // ---- PDF-vs-Excel by-day matrix (M2-B) ----------------------------------- //

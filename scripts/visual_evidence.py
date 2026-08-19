@@ -100,9 +100,8 @@ DEPS_MSG = "Required components are missing (pdfplumber/Pillow/openpyxl)."
 # Excel rows are absent ON PURPOSE (their vs-TSN cells emit nothing; the
 # engine refuses them through this one registry). Highway Detail (PDF) JOINED
 # as the fifth family in v0.37.0, when the vendor's official release lifted the
-# 2026-07-21 pre-release freeze this registry was waiting on. It is vs-TSN ONLY:
-# its adapter carries `locate_tsn`/`tsn_value`/`tsn_box` but no `env_locate`/
-# `env_fields`, so `_ENV_ADAPTER_MODULES` below deliberately stays at four.
+# 2026-07-21 pre-release freeze this registry was waiting on, and gained its
+# env hooks in v0.38.3 — so `_ENV_ADAPTER_MODULES` below now names all five.
 _ADAPTER_MODULES = {
     "intersection_detail_pdf": "evidence_intersection_detail",
     "highway_log_pdf": "evidence_highway_log",
@@ -186,15 +185,20 @@ FLAVOR_SELF = "self"      # RETIRED 2026-08-05 (owner): the self checks carry
 FLAVOR_ENV = "env"        # cross-environment: both sides are per-route prints
 FLAVORS = (FLAVOR_TSN, FLAVOR_ENV)
 
-# The ENV cells that carry evidence: the same four `_pdf` report families as
-# the vs-TSN lane (the 2026-08-05 amendment — the rule is by REPORT TYPE, not
+# The ENV cells that carry evidence: the same `_pdf` report families as the
+# vs-TSN lane (the 2026-08-05 amendment — the rule is by REPORT TYPE, not
 # source format, so Ramp Summary's env cell is out even though its export is
-# PDF-native; its adapter module stays on disk, dormant).
+# PDF-native; its adapter module stays on disk, dormant). "ENV" here means any
+# TSMIS-vs-TSMIS folder pair: the Everything matrix's two ENVIRONMENTS and the
+# vs-Baseline matrix's two export DAYS render through this same lane, because
+# both sides are per-route prints either way. Highway Detail (PDF) joined in
+# v0.38.3 (roadmap D1), closing the last `_pdf` family with no env adapter.
 _ENV_ADAPTER_MODULES = {
     "ramp_detail_pdf": "evidence_ramp_detail",
     "intersection_detail_pdf": "evidence_intersection_detail",
     "highway_log_pdf": "evidence_highway_log",
     "highway_sequence_pdf": "evidence_highway_sequence",
+    "highway_detail_pdf": "evidence_highway_detail",          # v0.38.3 (D1)
 }
 
 

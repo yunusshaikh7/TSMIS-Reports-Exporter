@@ -147,16 +147,19 @@ function makeMockApi() {
       // v0.25.0 Highway Sequence (raw-sourced like Highway Log);
       // v0.26.0 Ramp Detail (statewide print like Intersection Detail);
       // 2026-08-05 owner ruling: evidence is PRINT CROPS on the PDF-edition
-      // report families ONLY — rows = the four `_pdf` vs-TSN rows, env_rows =
-      // the same four env placements (Ramp Summary removed), and every other
-      // matrix row is named in `unsupported`.
-      on: false, examples: 2, layout: "pair", ready: true, deps_ok: true, tsn_pdfs: 26,
-      rows: ["highway_log_pdf", "highway_sequence_pdf",
+      // report families ONLY — rows = the `_pdf` vs-TSN rows, env_rows = the
+      // same `_pdf` print-pair placements (Ramp Summary removed), and every
+      // other matrix row is named in `unsupported`. Highway Detail (PDF)
+      // joined `rows` in v0.37.0 and `env_rows` in v0.38.3.
+      on: false, examples: 2, layout: "pair", ready: true, deps_ok: true, tsn_pdfs: 27,
+      rows: ["highway_detail_pdf", "highway_log_pdf", "highway_sequence_pdf",
              "intersection_detail_pdf", "ramp_detail_pdf"],
-      env_rows: ["highway_log_pdf", "highway_sequence_pdf",
+      env_rows: ["highway_detail_pdf", "highway_log_pdf", "highway_sequence_pdf",
                  "intersection_detail_pdf", "ramp_detail_pdf"],
       dir: "C:\\demo\\tsn_library\\intersection_detail\\pdf",
       reports: [
+        { key: "highway_detail", label: "Highway Detail", tsn_pdfs: 1,
+          dir: "C:\demo\tsn_library\highway_detail\pdf", source: "pdf" },
         { key: "highway_log", label: "Highway Log", tsn_pdfs: 12,
           dir: "C:\\demo\\tsn_library\\highway_log\\raw", source: "raw" },
         { key: "highway_sequence", label: "Highway Sequence", tsn_pdfs: 12,
@@ -167,6 +170,7 @@ function makeMockApi() {
           dir: "C:\\demo\\tsn_library\\ramp_detail\\pdf", source: "pdf" },
       ],
       row_reports: {
+        highway_detail_pdf: "highway_detail",
         highway_log_pdf: "highway_log",
         highway_sequence_pdf: "highway_sequence",
         intersection_detail_pdf: "intersection_detail",
@@ -175,7 +179,7 @@ function makeMockApi() {
       unsupported: ["TSAR: Ramp Summary", "TSAR: Ramp Detail",
                     "Highway Sequence Listing", "Highway Log",
                     "Intersection Summary", "Intersection Detail",
-                    "Highway Detail", "Highway Detail (PDF)"],
+                    "Highway Detail"],
     },
   };
   const mockSettings = {
@@ -1590,6 +1594,13 @@ function makeMockApi() {
     },
     open_baseline_cell_comparison: async (rk, d) => {
       push({ t: "log", text: `(mock) open vs-baseline comparison: ${d} ${rk}.xlsx` });
+      return { ok: true };
+    },
+    baseline_matrix_evidence_cell: async (rk, d) =>
+      mockEnqueue("evidence", "cell", `Evidence images ${rk} — ${d} vs baseline`,
+                  { which: "baseline", total: 1 }),
+    open_baseline_cell_evidence: async (rk, d) => {
+      push({ t: "log", text: `(mock) open vs-baseline evidence: ${d} ${rk} (evidence).xlsx` });
       return { ok: true };
     },
     open_baseline_comparisons_folder: async () => {

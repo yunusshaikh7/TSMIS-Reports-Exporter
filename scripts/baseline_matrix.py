@@ -29,9 +29,12 @@ from pathlib import Path
 
 import artifact_store   # CMP-AUD-083: the shared accepted-data-file predicate
 import cache_envelope
+import consolidation_meta
 import matrix
+import outcome
 import reports
 import output_state
+from events import ConsolidateResult
 from paths import (OUTPUT_ROOT, day_source_dir, list_output_days,
                    parse_run_folder)
 
@@ -404,14 +407,23 @@ def cells_to_rebuild(snapshot, scope="stale", row=None, date=None):
 
 
 def build_baseline_cell(source, date, row_key, baseline_id, dest, events,
-                        confirm_overwrite=None, also_formulas=False):
+                        confirm_overwrite=None, also_formulas=False,
+                        evidence=None):
     """Build ONE (day, report) vs-baseline comparison: side A = the day's run
     folder, side B = the baseline (an earlier run folder or the store), compared
     by the row's own compare_env adapter — per-route files read straight from
     both folders, no consolidation. Writes the VALUES workbook to the
     baseline-by-day store (atomic commit; F9) and caches its counts. Returns the
     ConsolidateResult. Raises ValueError on an unknown/greyed row, a bad
-    date/baseline, or the baseline's own day."""
+    date/baseline, or the baseline's own day.
+
+    `evidence` ({'enabled','examples','layout'}) requests the visual-evidence
+    decoration on the `_pdf`-family rows (v0.38.3). Both sides here are per-route
+    TSMIS prints from two folders — structurally the SAME pair the cross-
+    environment lane illustrates, only picked by DAY instead of by environment —
+    so it rides `visual_evidence`'s env flavor unchanged, sources bound to the
+    comparison's own recorded provenance. Additive, never a gate: the comparison
+    result is identical with it on or off."""
     rows = _row_lookup()
     if row_key not in rows:
         raise ValueError(f"unknown baseline-matrix row: {row_key}")
@@ -479,4 +491,95 @@ def build_baseline_cell(source, date, row_key, baseline_id, dest, events,
                           fp_before, fp_folders, dest_path.name, events),
                       generation_id=published.artifact_generation.generation_id,
                       producer_versions=matrix.producer_identity())
+        matrix._run_env_evidence(row_key, dest_path, evidence, events, result,
+                                 None)
     return result
+
+
+def run_baseline_evidence_only(source, date, row_key, baseline_id, dest, events,
+                               examples=None, layout=None):
+    """On-demand evidence for ONE vs-Baseline cell's EXISTING comparison (the
+    per-cell camera). Compares nothing; the freshness gates mirror the
+    Everything matrix's env camera exactly — the comparison must exist with a
+    trusted, current, COMPLETE committed generation whose id matches this
+    matrix's own cache, and neither side's export folder may have changed since
+    it was built. The two compared folders come from the comparison's own
+    recorded provenance inside the generator (the exact-source rule), never from
+    anything recomputed here."""
+    import visual_evidence
+    if not visual_evidence.env_capable(row_key):
+        raise ValueError("this report doesn't support evidence images")
+    rows = _row_lookup()
+    if row_key not in rows:
+        raise ValueError(f"unknown baseline-matrix row: {row_key}")
+    if not parse_run_folder(day_folder_name(date, source)):
+        raise ValueError(f"invalid date/source for the baseline matrix: "
+                         f"{date!r} / {source!r}")
+    _k, _label, subdir, supported = rows[row_key]
+    if not supported:
+        raise ValueError(f"no cross-environment adapter for {row_key} yet")
+    parsed = parse_baseline(baseline_id)
+    if parsed is None:
+        raise ValueError("no baseline picked yet")
+    if parsed == ("day", date):
+        raise ValueError("that day IS the baseline — nothing to illustrate")
+    bdir = baseline_dir(source, baseline_id, dest)
+    if bdir is None:
+        raise ValueError(f"invalid baseline for the baseline matrix: {baseline_id!r}")
+
+    dest_path = out_path(date, source, row_key, baseline_id)
+    if not dest_path.exists():
+        raise ValueError("build the comparison first — evidence illustrates an "
+                         "existing comparison")
+    record = consolidation_meta.read_comparison_outcome(dest_path)
+    if (record is None or not record.trusted or not record.current
+            or record.comparison_outcome is None):
+        raise ValueError("the comparison workbook has no trusted, current "
+                         "generation record — refresh the comparison first")
+    generation = record.artifact_generation
+    cached = load_results().get(_result_key(date, source, row_key, baseline_id))
+    if (not cached or generation is None
+            or cached.get("generation_id") != generation.generation_id):
+        raise ValueError("the comparison is not the one the matrix recorded — "
+                         "refresh the comparison first")
+    if record.comparison_outcome.completion != outcome.COMPLETE:
+        raise ValueError(matrix._partial_comparison_reason(
+            record.comparison_outcome))
+    # The export-changed gate ALWAYS evaluates: a cell cached before fingerprints
+    # were recorded refuses rather than skipping the gate (the env camera's rule).
+    fp_folders = (tsmis_dir(date, source, subdir), bdir / subdir)
+    if cached.get("input_fingerprint") is None:
+        raise ValueError("the matrix cache records no input fingerprint for "
+                         "this comparison — refresh the comparison first")
+    if matrix._cell_input_fingerprint(*fp_folders) != cached.get("input_fingerprint"):
+        raise ValueError("the exports changed since the comparison was built — "
+                         "refresh the comparison first")
+
+    ev = visual_evidence.generate(
+        row_key, None, None, dest_path, None, events,
+        examples=visual_evidence.clamp_examples(examples),
+        layout=visual_evidence.normalize_layout(layout),
+        flavor=visual_evidence.FLAVOR_ENV)
+    # The same post-render generation re-check the other cameras make: a refresh
+    # landing mid-render would leave images of generation N under a manifest
+    # digesting generation N+1.
+    after = consolidation_meta.read_comparison_outcome(dest_path)
+    if (after is None or not after.trusted
+            or after.artifact_generation != record.artifact_generation):
+        raise ValueError(
+            "the comparison generation changed while evidence was rendering — "
+            "refresh the comparison and evidence")
+    note = ev.get("note") or "evidence run finished"
+    return ConsolidateResult(status="ok", message=note, summary_lines=[note])
+
+
+def evidence_path(date, source, row_key, baseline_id):
+    """The '(evidence).xlsx' sibling of one cell's comparison, or None when the
+    cell identity doesn't resolve. Existence is the caller's question."""
+    if not parse_baseline(baseline_id) or row_key not in _row_lookup():
+        return None
+    if not parse_run_folder(day_folder_name(date, source)):
+        return None
+    import visual_evidence
+    return visual_evidence.sibling_paths(out_path(date, source, row_key,
+                                                  baseline_id))[0]

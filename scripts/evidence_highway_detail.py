@@ -309,9 +309,11 @@ def _gmeta(group, page_no, win, edges, fb):
             "bottom": max(c["bottom"] for c in chars)}
 
 
-def locate_tsmis(pdf_path, needed_keys):
-    """{canonical_key: [record]} for `needed_keys`; a record carries the parsed
+def locate_tsmis(pdf_path, needed_keys, key_fn=None):
+    """{key: [record]} for `needed_keys`; a record carries the parsed
     34-column row plus per-line meta (page, y-extent, windows, edges, chars).
+    `key_fn(row)` overrides the vs-TSN canonical-PM keying — the env flavor
+    keys records by the raw Post Mile text the env comparison publishes.
 
     LOCKSTEP: this walk mirrors consolidate_tsmis_highway_detail_pdf.parse_pdf
     step for step (per-page windows, physical row groups, the postmile line-1
@@ -358,10 +360,12 @@ def locate_tsmis(pdf_path, needed_keys):
                     if not any(v and chd.DATE_TOKEN_RE.search(v) for v in vals2):
                         continue
                     row = chd._make_row(pending, vals2)
-                    canon = cht.pm_canon(row[0] or "", row[3] or "")
-                    if canon in needed_keys:
-                        found[canon].append(
-                            {"row": row, "m1": pending_meta,
+                    key = (key_fn(row) if key_fn is not None
+                           else cht.pm_canon(row[0] or "", row[3] or ""))
+                    if key in needed_keys:
+                        found[key].append(
+                            {"row": row, "src": str(pdf_path),
+                             "m1": pending_meta,
                              "m2": _gmeta(group, page_no, win2, e2, fb)})
                     pending = pending_meta = None
     require_document_route(
@@ -540,3 +544,50 @@ def tsn_box(rec, field):
     yspan = ((rec["l1"]["top"], rec["l2"]["bottom"])
              if rec["p1"] == rec["p2"] else (ln["top"], ln["bottom"]))
     return page_no, (x0 - 2, ln["top"] - 2, x1 + 2, ln["bottom"] + 2), yspan, xspan
+
+
+# --------------------------------------------------------------------------- #
+# cross-environment (HF-10) — both sides are per-route TSMIS prints
+# --------------------------------------------------------------------------- #
+# The env lane compares two TSMIS renders of the SAME report (two environments
+# on the Everything matrix, two export days on the vs-Baseline matrix), so both
+# panels crop a per-route Highway Detail print. It reuses the vs-TSN TSMIS
+# locator wholesale — same LOCKSTEP walk, same geometry — and differs only in
+# the KEY: the env comparison publishes the print's own glued Post Mile text
+# ('R012.243'), where the vs-TSN lane keys on the canonical roadbed-aware form.
+def env_fields():
+    """The env comparison's display columns minus the Post Mile key — the
+    export's own 34-column layout, which compare_env.HIGHWAY_DETAIL_PDF pins on
+    both sides, in report order."""
+    return [f for f in hdc.HEADER if f != cht.KEY]
+
+
+def _env_key(row):
+    """The env comparison's published row key: the print's own Post Mile text
+    (the env loader applies only the generic cell normalization)."""
+    return _xl_trim("" if row[0] is None else str(row[0]))
+
+
+def env_locate(pdf_path, needed_keys):
+    """{published_key: [record]} in one per-route print, keyed the way the env
+    comparison publishes rows."""
+    return locate_tsmis(pdf_path, needed_keys, key_fn=_env_key)
+
+
+def env_project(field, raw):
+    """Strict: the env comparison applies only the generic cell normalization,
+    so the print's parsed token must equal the published value verbatim (no
+    vs-TSN cross-system projections — both sides are the same system)."""
+    del field
+    return _xl_trim("" if raw is None else str(raw))
+
+
+def env_value(rec, field):
+    """The value this print record carries for an env display column."""
+    return env_project(field, rec["row"][hdc.HEADER.index(field)])
+
+
+def env_box(rec, field):
+    """(page_no, cell_box, record_yspan, table_xspan) for an env display
+    column — the same per-page window geometry the vs-TSN TSMIS side uses."""
+    return tsmis_box(rec, field)

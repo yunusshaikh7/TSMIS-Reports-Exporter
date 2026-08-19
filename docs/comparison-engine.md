@@ -1256,17 +1256,24 @@ exists ONLY for the `_pdf`-edition report families (`capable()` names exactly
 `highway_detail_pdf` / `highway_log_pdf` / `highway_sequence_pdf` /
 `intersection_detail_pdf` / `ramp_detail_pdf` — **Highway Detail (PDF) JOINED in
 v0.37.0**, when the vendor's official release lifted the pre-release freeze the
-registry was waiting on; it is vs-TSN ONLY, because its adapter carries
-`locate_tsn`/`tsn_value`/`tsn_box` but no `env_locate`/`env_fields`). On a vs-TSN cell the TSMIS side crops the per-route PDF export the
+registry was waiting on, and gained its `env_*` hooks in **v0.38.3**, so all
+five families now carry BOTH lanes). On a vs-TSN cell the TSMIS side crops the per-route PDF export the
 compared consolidated workbook was built from and the TSN side crops the TSN
 library print; each crop's value is read back through the adapter's LOCKSTEP
 walk, and a print that DISAGREES with the compared value renders WITH a
 disclosure note (image note line + the Summary's Note column), never a silent
 drop — disagreement is the parser-bug signal the spot check exists to catch.
-The four cross-environment PDF-vs-PDF cells (`FLAVOR_ENV`, HF-10 as amended —
-Ramp Summary's cell was removed by the report-type rule) crop both run
-folders' own per-route prints, the folders resolved from the comparison's own
-`.provenance.json`, never a caller's guess. Everything else REFUSES at the
+The TSMIS-vs-TSMIS PDF-vs-PDF cells (`FLAVOR_ENV`, HF-10 as amended — Ramp
+Summary's cell was removed by the report-type rule) crop both folders' own
+per-route prints, the folders resolved from the comparison's own
+`.provenance.json`, never a caller's guess. **`FLAVOR_ENV` is one lane serving
+TWO matrices** (v0.38.3): the Everything matrix picks its two folders by
+ENVIRONMENT, the vs-Baseline matrix picks them by exported DAY, and the
+generator cannot tell the difference — it reads two recorded folder-kind inputs
+with their per-file censuses and crops the prints they name. Nothing in the
+render is environment-specific, which is why the vs-Baseline lane needed no new
+evidence engine, only `baseline_matrix.build_baseline_cell(evidence=)` and its
+camera `run_baseline_evidence_only`. Everything else REFUSES at the
 engine boundary: the Excel rows' vs-TSN cells and every PDF-vs-Excel self cell
 produce no artifact of any kind (`FLAVOR_SELF` is not in `FLAVORS`;
 `self_capable()` is always False), and the workbook-panel renderer
@@ -1499,11 +1506,16 @@ columns THAT row's comparison counts (pinned in `check_visual_evidence`).
   present, since no lane needs TSN prints anymore.
 - **Wiring:** ONE hook in `matrix.consolidate_and_compare_tsn(evidence_opts=)` covers both
   matrices' vs-TSN lanes; the self lane decorates through `_run_self_evidence`, and the env
-  lane through `matrix.build_cell_comparison(evidence=)` → `_run_env_evidence` (HF-10), with
+  lane through `matrix.build_cell_comparison(evidence=)` → `_run_env_evidence` (HF-10) and,
+  since v0.38.3, `baseline_matrix.build_baseline_cell(evidence=)` → the SAME
+  `_run_env_evidence` (re-exported on the `matrix` facade), with
   the on-demand cameras `matrix.evidence_for_cell(mode_id=…)` /
-  `matrix.run_env_evidence_only` / `day_matrix.evidence_for_day_cell`. The user toggle is ONE
+  `matrix.run_env_evidence_only` / `day_matrix.evidence_for_day_cell` /
+  `baseline_matrix.run_baseline_evidence_only`. The user toggle is ONE
   persisted triple (`evidence_images` + `evidence_examples` + `evidence_layout`) surfaced
-  under *Comparison output* on BOTH matrix pages; `visual_evidence.availability()` rides the
+  under *Comparison output* on all THREE matrix pages (the vs-Baseline page passes
+  `lane="env"` to `syncEvidenceControls`, so it states what its own lane needs
+  instead of the vs-TSN print inventory, which it never reads); `visual_evidence.availability()` rides the
   state push (`ready` = deps only; `env_rows` names the five env placements; the per-report
   print counts remain as TSN-library facts). The render stack (Pillow + pypdfium2) SHIPS
   since v0.21.0 — see [build-and-release.md](build-and-release.md).

@@ -52,10 +52,13 @@ check("the vs-TSN lane locates PRINTS (_locate_tsmis_sources) and evidence "
 check("a pair that cannot be bound to what the comparison read has its own "
       "refusal type (EvidenceSourceBindingError)",
       hasattr(ve, "EvidenceSourceBindingError"))
-check("the cross-environment lane exists and names its four placements "
-      "(Ramp Summary removed by the third ruling)",
+check("the TSMIS-vs-TSMIS print lane exists and names its five `_pdf` "
+      "placements (Ramp Summary removed by the third ruling; HD added in "
+      "v0.38.3). One lane, two matrices: the Everything matrix's two "
+      "ENVIRONMENTS and the vs-Baseline matrix's two export DAYS both ride it.",
       hasattr(ve, "FLAVOR_ENV") and hasattr(ve, "env_rows")
-      and len(list(ve.env_rows())) == 4)
+      and sorted(ve.env_rows()) == sorted(ve.rows())
+      and len(list(ve.env_rows())) == 5)
 
 
 def refuses(fn, *a, **k):

@@ -48,6 +48,7 @@ from matrix_build import (                                       # noqa: F401
     _formulas_sibling, _pdf_store_consolidator, _try_formulas,
     _clear_stale_formulas_twin, _settle_formulas_twin,
     _compose_source_guard, _require_source_identity,
+    _partial_comparison_reason, _run_env_evidence,
     build_cell_comparison, build_comparison, cells_to_rebuild,
     captured_tsn_workbook,
     consolidate_and_compare_tsn, consolidate_tsn_pdfs, consolidated_state,

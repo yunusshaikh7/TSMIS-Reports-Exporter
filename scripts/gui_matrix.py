@@ -343,7 +343,8 @@ class GuiMatrixMixin:
         BaselineMatrixCompareWorker(
             source, cells, baseline_id, settings.get_batch_dest(),
             self._gated_queue(), self.cancel_event,
-            also_formulas=settings.get_baseline_matrix_formulas()).start()
+            also_formulas=settings.get_baseline_matrix_formulas(),
+            evidence=self._evidence_request()).start()
         return True
 
     def _dispatch_compare_job(self, job):
@@ -451,6 +452,9 @@ class GuiMatrixMixin:
                  "layout": settings.get_evidence_layout()}
         if which == "day":
             ident["source"] = settings.get_day_matrix_source()
+        elif which == "baseline":
+            ident["source"] = settings.get_baseline_matrix_source()
+            ident["baseline"] = settings.get_baseline_matrix_baseline()
         else:
             ident["baseline"] = self._current_baseline()
         return ident
@@ -478,6 +482,17 @@ class GuiMatrixMixin:
                       day_matrix.evidence_for_day_cell(
                 source, cell, row, dest, events, tsn_files=tsn_files,
                 examples=examples, layout=layout, commit_guard=commit_guard))
+        elif job.get("which") == "baseline":
+            # The vs-Baseline camera illustrates a TSMIS-vs-TSMIS folder pair,
+            # so it rides the same env flavor as the Everything matrix's env
+            # cells — only the two folders differ (two DAYS, not two envs).
+            source = ident.get("source") or settings.get_baseline_matrix_source()
+            baseline_id = (ident["baseline"] if "baseline" in ident
+                           else settings.get_baseline_matrix_baseline())
+            run_fn = (lambda events, commit_guard=None:
+                      baseline_matrix.run_baseline_evidence_only(
+                source, cell, row, baseline_id, dest, events,
+                examples=examples, layout=layout))
         else:
             base = ident.get("baseline") or self._current_baseline()
             mode_id = ident.get("mode") or "tsn"
@@ -1968,6 +1983,38 @@ class GuiMatrixMixin:
         return self._enqueue_matrix_job(job)
 
     @_api_method
+    def baseline_matrix_evidence_cell(self, row_key, date):
+        """Queue an ON-DEMAND evidence run for ONE vs-Baseline cell's EXISTING
+        comparison — images only, no re-compare (runs even with the Evidence
+        images toggle off).
+
+        Both sides of a vs-Baseline cell are the SAME report's per-route TSMIS
+        prints from two folders, so evidence exists for exactly the `_pdf`-family
+        rows the cross-environment lane covers; an Excel row is refused here AND
+        at the engine boundary."""
+        snap = self._baseline_matrix_snapshot()
+        if row_key not in {r["key"] for r in snap["all_rows"]}:
+            return {"error": "Unknown report for the matrix."}
+        if not snap.get("row_supported", {}).get(row_key):
+            return {"error": "That comparison isn't available yet for this report."}
+        if date not in snap["days"]:
+            return {"error": "Add that day first."}
+        if not snap["baseline"]["id"]:
+            return {"error": "Pick a baseline first."}
+        if snap["baseline"]["date"] == date:
+            return {"error": "That day IS the baseline — nothing to illustrate."}
+        import visual_evidence                       # lazy: pulls PIL/pdfium
+        if not visual_evidence.env_capable(row_key):
+            return {"error": "Evidence images exist only for the PDF-edition "
+                             "reports — both sides have to be prints to crop."}
+        job = self._make_job(
+            "evidence", "cell",
+            f"Evidence images {self._matrix_row_label(row_key)} — {date} vs baseline",
+            row=row_key, env=date, which="baseline")
+        job["evidence"] = self._capture_evidence_identity("baseline")
+        return self._enqueue_matrix_job(job)
+
+    @_api_method
     def rebuild_baseline_matrix(self, scope="stale", row=None, date=None):
         """Queue a vs-Baseline comparison rebuild in scope ('stale'/'all'),
         optionally scoped to one report row or one day column. {nothing:True}
@@ -2010,6 +2057,24 @@ class GuiMatrixMixin:
         if not path.exists():
             return {"error": "No comparison built yet — use “⟳ rebuild” first."}
         self._open_file(path)
+        return {"ok": True}
+
+    @_api_method
+    def open_baseline_cell_evidence(self, row_key, date):
+        """Open ONE vs-Baseline cell's evidence workbook when it exists
+        (independent of the Evidence images toggle: opens PREVIOUSLY generated
+        evidence — the camera is what generates it)."""
+        snap = self._baseline_matrix_snapshot()
+        if date not in snap["days"] or row_key not in snap["rows"]:
+            return {"error": "Unknown cell."}
+        baseline_id = snap["baseline"]["id"]
+        if not baseline_id:
+            return {"error": "Pick a baseline first."}
+        ev_wb = baseline_matrix.evidence_path(date, snap["source"], row_key,
+                                              baseline_id)
+        if ev_wb is None or not ev_wb.exists():
+            return {"error": "No evidence images yet — use the camera to generate them."}
+        self._open_file(ev_wb)
         return {"ok": True}
 
     @_api_method

@@ -3,6 +3,31 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.38.3 — 2026-08-19
+
+Evidence images now work on the **vs Baseline Matrix**, and **Highway Detail
+(PDF)** is the report they were asked for.
+
+- **The vs-Baseline matrix collects evidence.** Tick *Evidence images* under
+  Matrix options and a PDF-edition cell renders highlighted crops of the two
+  prints it actually diffed — this day's export and the baseline's — beside the
+  comparison, exactly as the Everything matrix's cross-environment cells do.
+  Built, fresh cells also get the per-cell camera (regenerate without
+  re-comparing) and an image button that opens an existing set. Nothing about
+  the comparison itself changes: evidence is a decoration, and a cell reads the
+  same with it on or off.
+- **Highway Detail (PDF) can be evidenced against another TSMIS export.** Its
+  adapter had the TSN-side hooks but never the TSMIS-vs-TSMIS ones, so it was
+  the one PDF family the print-pair lane refused. It now supplies them, reusing
+  the same locator and geometry its vs-TSN evidence already used — the only
+  difference is the row key (the print's own `R012.243`, not the canonical
+  roadbed-aware form). That closes the last gap in that lane: all five PDF
+  families are covered, on both the Everything and vs-Baseline matrices.
+- **The toggle stops describing the wrong lane.** On the vs-Baseline page the
+  status lines used to list which reports have their **TSN** prints staged —
+  irrelevant there, since both sides are your own exports and no TSN print is
+  read. It now says what that lane actually needs.
+
 ## v0.38.2 — 2026-08-18
 
 The matrices answer the pointer. Reordering day columns actually worked in

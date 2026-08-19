@@ -517,7 +517,7 @@ class BaselineMatrixCompareWorker(threading.Thread):
     compare workers so the bridge lifecycle is identical."""
 
     def __init__(self, source, cells, baseline_id, dest, queue, cancel_event,
-                 also_formulas=False):
+                 also_formulas=False, evidence=None):
         super().__init__(daemon=True, name="baseline-matrix-compare")
         self.source = source
         self.cells = [(c[0], c[1]) for c in cells]   # (date, row_key)
@@ -526,6 +526,7 @@ class BaselineMatrixCompareWorker(threading.Thread):
         self.q = queue
         self.cancel = cancel_event
         self.also_formulas = also_formulas
+        self.evidence = evidence
 
     def run(self):
         events = Events(is_cancelled=self.cancel.is_set,
@@ -551,7 +552,8 @@ class BaselineMatrixCompareWorker(threading.Thread):
                 try:
                     res = baseline_matrix.build_baseline_cell(
                         self.source, date, row_key, self.baseline_id, self.dest,
-                        events, also_formulas=self.also_formulas)
+                        events, also_formulas=self.also_formulas,
+                        evidence=self.evidence)
                     attempt, why = _attempt_state(res)
                     status = res.status
                     if status != "ok":

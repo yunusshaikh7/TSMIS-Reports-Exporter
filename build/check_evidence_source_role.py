@@ -280,9 +280,11 @@ check("generate() on an Excel row is refused at the engine boundary",
 
 # --------------------------------------------------------------------------- #
 print("the cross-environment lane (HF-10, amended 2026-08-05)")
-check("exactly the four `_pdf`-family env placements are env-capable "
-      "(Ramp Summary removed by the third ruling)",
-      sorted(ve.env_rows()) == ["highway_log_pdf", "highway_sequence_pdf",
+check("exactly the five `_pdf`-family env placements are env-capable "
+      "(Ramp Summary removed by the third ruling; Highway Detail added in "
+      "v0.38.3 — roadmap D1)",
+      sorted(ve.env_rows()) == ["highway_detail_pdf", "highway_log_pdf",
+                                "highway_sequence_pdf",
                                 "intersection_detail_pdf", "ramp_detail_pdf"]
       and all(ve.env_capable(rk) for rk in ve.env_rows()))
 check("ramp_summary has no evidence lane at all (its adapter is dormant)",
