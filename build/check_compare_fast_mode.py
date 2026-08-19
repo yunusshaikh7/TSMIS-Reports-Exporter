@@ -11,6 +11,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+from openpyxl import Workbook
+from openpyxl.cell.cell import Cell
+from openpyxl.styles import Font
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT / "build"), str(ROOT)]
 
@@ -60,6 +64,56 @@ RIGHT = [
 ]
 
 
+def _binding_probe(fast_mode):
+    wb = Workbook(write_only=True)
+    wb._tsmis_fast_styles = fast_mode
+    ws = wb.create_sheet("Probe")
+    calls = []
+    original = Cell._bind_value
+
+    def counted(cell, value):
+        calls.append(value)
+        return original(cell, value)
+
+    Cell._bind_value = counted
+    try:
+        cell = core._styled_cell(
+            ws, "=1+1", font=Font(name="Arial", size=10), guard=True)
+    finally:
+        Cell._bind_value = original
+        wb.close()
+    return calls, cell.data_type
+
+
+def _hot_loop_contract():
+    wb = Workbook(write_only=True)
+    wb._tsmis_fast_styles = True
+    ws = wb.create_sheet("Identity")
+    font = Font(name="Arial", size=10)
+    same_value_distinct_font = Font(name="Arial", size=10)
+    first = core._styled_cell(ws, "first", font=font)
+    second = core._styled_cell(ws, "second", font=font)
+    cache = wb._tsmis_fast_style_cache
+    first_key = next(iter(cache))
+    first_entry = cache[first_key]
+    check("style cache keys are component identities",
+          len(cache) == 1 and all(isinstance(item, int) for item in first_key)
+          and first_entry[0] is font and first._style == second._style)
+    third = core._styled_cell(ws, "third", font=same_value_distinct_font)
+    check("equal-but-distinct components cannot alias an identity entry",
+          font == same_value_distinct_font and len(cache) == 2
+          and first._style == third._style)
+    wb.close()
+
+    standard_calls, standard_type = _binding_probe(False)
+    fast_calls, fast_type = _binding_probe(True)
+    check("Fast guarded literals bind once; Standard keeps its historical path",
+          standard_calls == ["=1+1", "=1+1"]
+          and fast_calls == ["=1+1"]
+          and standard_type == fast_type == "s",
+          f"standard={standard_calls!r}; fast={fast_calls!r}")
+
+
 def _one_mode(root, mode):
     standard = root / f"{mode}-standard.xlsx"
     fast = root / f"{mode}-fast.xlsx"
@@ -93,6 +147,7 @@ def _one_mode(root, mode):
 
 def main():
     print("Fast vs TSN serializer equivalence:")
+    _hot_loop_contract()
     with tempfile.TemporaryDirectory(prefix="tsmis_fast_compare_") as tmp:
         root = Path(tmp)
         _one_mode(root, "values")

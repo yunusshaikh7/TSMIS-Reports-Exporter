@@ -2375,15 +2375,23 @@ def _styled_cell(ws, value, *, font, fill=None, align=None, border=None,
     the real-corpus benchmark additionally requires the canonical XLSX package
     digest to remain exact before this path can ship.
     """
-    c = WriteOnlyCell(ws, value=value)
-    if getattr(ws.parent, "_tsmis_fast_styles", False):
+    fast_styles = bool(getattr(ws.parent, "_tsmis_fast_styles", False))
+    # In Fast mode a guarded literal is bound only after its exact Excel-safe
+    # form is known. Standard mode retains its historical construction path.
+    c = (WriteOnlyCell(ws) if fast_styles and guard
+         else WriteOnlyCell(ws, value=value))
+    if fast_styles:
         cache = getattr(ws.parent, "_tsmis_fast_style_cache", None)
         if cache is None:
             cache = {}
             ws.parent._tsmis_fast_style_cache = cache
-        key = (font, fill, align, border)
-        style = cache.get(key)
-        if style is None:
+        # Serialisable style components have deep __hash__/__eq__ methods. The
+        # same handful of component instances are reused across millions of
+        # calls, so an identity key avoids re-walking their descriptor trees.
+        key = (id(font), id(fill), id(align), id(border))
+        entry = cache.get(key)
+        if (entry is None or entry[0] is not font or entry[1] is not fill
+                or entry[2] is not align or entry[3] is not border):
             prototype = WriteOnlyCell(ws)
             prototype.font = font
             if fill:
@@ -2393,7 +2401,11 @@ def _styled_cell(ws, value, *, font, fill=None, align=None, border=None,
             if border:
                 prototype.border = border
             style = copy(prototype._style)
-            cache[key] = style
+            # Retaining the exact components both documents the identity
+            # contract and makes a theoretical recycled id fail closed.
+            cache[key] = (font, fill, align, border, style)
+        else:
+            style = entry[4]
         c._style = copy(style)
     else:
         c.font = font

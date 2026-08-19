@@ -74,7 +74,7 @@ Completed result:
 
 ## Improvement 2: cheaper Fast-mode cell construction
 
-Status: **in progress**
+Status: **completed**
 
 Remove deep style-object hashing/equality from the hot cell-writing loop by using
 identity-checked style-cache keys. For guarded literal cells, bind the value once
@@ -91,9 +91,22 @@ Profile evidence: `_styled_cell` was called 1,339,433 times in the profiled Ramp
 run. Deep serialisable hashing/equality consumed roughly 24 cumulative seconds,
 and guarded value binding was performed twice.
 
+Completed result:
+
+- Fast style-cache lookup now uses identity keys with retained component
+  references; equal-but-distinct objects remain separate cache entries and
+  converge to the same registered style.
+- Fast guarded literals bind once. Standard mode retains its historical cell
+  construction sequence.
+- Real Ramp comparison: 53.117 s to 47.931 s (9.76%, 1.108x) over improvement 1.
+- Typed outcome and all 20 stable OOXML members remained exact with package
+  SHA-256 `85a43aa3fa805a9aa5d2b04a6f1257b9b8c90be8ce2c5634a45400f102436d03`.
+- Cumulative same-day reduction versus Fast serialization with legacy validation:
+  30.31%; current speed is 2.27x the original Standard Ramp baseline.
+
 ## Improvement 3: TSN-library normalized-row cache
 
-Status: **pending**
+Status: **in progress**
 
 Move repeatable TSN parsing/normalization work behind a library-owned cache. The
 cache is bound to the consolidated workbook's identity/SHA, report type, and a
@@ -153,3 +166,6 @@ Correctness gates:
 - 2026-08-19: Improvement 1 completed. Direct OOXML validation removed duplicate
   post-write workbook loads in Fast mode with a controlled 22.77% Ramp speedup
   and exact output equivalence. Improvement 2 started.
+- 2026-08-19: Improvement 2 completed. Identity-keyed style reuse and single-bind
+  guarded literals produced another 9.76% Ramp reduction with exact output.
+  Improvement 3 started.
