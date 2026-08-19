@@ -18,7 +18,7 @@ is complete; Stage 6 conservation and the Stage 8 base audit are complete at 7/7
 Product perfection, companion/historical coverage, and end-to-end evidence remain red
 and are deferred under the current product-code freeze. Live status and the handoff are
 owned by `comparison-perfection-project.md`  
-Finding ledger: continuous and authoritative through `CMP-AUD-244`  
+Finding ledger: continuous and authoritative through `CMP-AUD-245`  
 Capability baseline AS AUDITED (v0.28.0): 29 classic comparison recipes, 12 matrix
 rows, 30 matrix row-mode placements, 7 canonical TSN datasets. **Current product
 (v0.37.0): 30 recipes and 13 matrix rows** — Highway Summary added its cross-env
@@ -529,6 +529,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-242 | P1 | Resolved 2026-07-22 (chunk names 167→71 chars, legacy names read-compatible, two unconditional field-depth gates red→green, RD real-corpus canary-exact; rides the completion release per the owner's no-interim-release policy) | Payload chunk basename (167 chars) overran Windows MAX_PATH at the field install depth; on `LongPathsEnabled=0` machines publication failed and the matrix hid correctly-built comparisons |
 | CMP-AUD-243 | P1 | **Resolved 2026-08-17 (v0.37.0)** — the page-local recovery ladder gained a final rung: a band-less page takes its line-2 grid from its OWN header rule row, then line 1 derives from that as before. 13 lost records recovered; all 12 routes convert warning-free at exact Excel row parity, 6 of them cell-for-cell identical | Highway Detail (PDF) silently lost the record on every single-record page (13 pages / 12 routes statewide) and marked the run partial |
 | CMP-AUD-244 | P1 | **Resolved 2026-08-18 (v0.38.2)** — `ditto_nonasserting` + a span-based paired-roadbed `ditto_resolver` on BOTH vs-TSN flavors (explicitly OFF for the PDF-vs-Excel self-check, where both sides expand). Statewide, through the shipped compare(): differing cells **174,837 → 160,347** (−14,490, matching the evidence Ledger's context count exactly), pairing untouched (48,477 paired / 2,850 only-TSMIS / 11,606 only-TSN all unchanged). Red→green in `check_highway_detail_ditto` | **Highway Detail vs TSN counted the paired-roadbed ditto convention as data.** TSN prints one roadbed concrete and the other as width-matched `+` runs — a POINTER to the paired row — and TSMIS expands them, so 14,490 pointer-vs-value cells were reported as differences (~8% of the statewide total). The engine has had the rule since Highway Log; the Highway Detail schema simply never switched it on |
+| CMP-AUD-245 | P1 | **Resolved 2026-08-19 (v0.39.1)** — the projection now carries the CA HIGHWAYS build's skip facts onto its own marker sheet and returns `PARTIAL` with `skipped_inputs`, and `compare_highway_detail_arcgis` arms the opt-in `unavailable_rule` off those facts (Summary + Notes disclosure). Statewide same-date, through the shipped compare(): differing cells **207,030 -> 206,875** (-155), moving EXACTLY the four marker-bearing columns (`LB #Ln` -76, `LB Wid` -77, `RB OT-TO` -1, `RB OT-TR` -1) and no other; pairing untouched (45,124 / 6,073 / 6,203). Red->green in `check_arcgis_report` (6 checks fail pre-fix) | **Highway Detail vs ArcGIS counted the HF-01 unavailable marker as data, and reported COMPLETE over a PARTIAL source.** Where the Clean Road build cannot place a source span it writes a reserved non-asserting token; the v0.39.0 projection inherited the TOKENS but not the RULE, so 155 cells saying "unknowable" were reported as differences, and the comparison called itself complete while resting on a build that was not |
 
 The ` != ` text above represents the engine's spaced not-equal glyph. It is written
 in ASCII in this ledger heading/table to keep terminals that use cp1252 from
@@ -11811,3 +11812,67 @@ flavors and OFF for the self-check, proves a dittoed block against the values it
 past counts 0 differences while a real disagreement in the same row still counts 1, and
 proves the resolver fills from a covering span but returns `None` for the uncovered and
 ambiguous cases. Every assertion fails on the pre-fix schema.
+
+---
+
+### CMP-AUD-245 — Highway Detail vs ArcGIS counted the unavailable marker as data, and reported COMPLETE over a PARTIAL source (RESOLVED v0.39.1)
+
+**Status:** Resolved 2026-08-19 (v0.39.1). Found by rechecking the v0.39.0 "Reports vs
+layers" lane on a refreshed layer library, not by a report.
+
+**What was wrong.** HF-01/RB-1 established the contract for the Clean Road build: where
+an as-of span's begin or end postmile is unreadable, the build refuses to guess its
+position, records it, and writes the reserved token `(unavailable: source span skipped)`
+into the anchor cells it would have painted. Those cells assert that a value is
+UNKNOWABLE — not that it differs — so `compare_clean_highway_tsn` declares the token
+non-asserting through the opt-in `CompareSchema.unavailable_rule`, and the build reports
+`PARTIAL`.
+
+`arcgis_report_highway_detail` PROJECTS that build onto Highway Detail's shape. It
+therefore inherits the tokens — they travel into whichever report column the unplaceable
+span would have painted — but v0.39.0 inherited neither half of the contract:
+
+* `compare_highway_detail_arcgis` set no `unavailable_rule`, so each token was compared
+  as literal text and COUNTED. Statewide that rendered cells reading
+  `'(unavailable: source span skipped) ≠ 05'` and contributed to their row's `Diffs`.
+  The app's own refusal to guess was being reported as a discrepancy in the report.
+* `consolidate()` returned `outcome.COMPLETE` unconditionally, so a comparison resting
+  on a build that had skipped 102 spans described itself as complete — the exact
+  "partial shown as green" class the completion vocabulary exists to prevent.
+
+**Measured, statewide, through the shipped path** (2026-08-19 layer drop rebuilt as-of
+2026-08-17 × the 2026-08-17 export — a same-date pair, so nothing here is drift):
+the projection carries 162 token cells (`LB #Ln` 79, `LB Wid` 80, `RB OT-TO` 2,
+`RB OT-TR` 1) across 82 records; 155 of them sit on paired rows and were being counted,
+the other 7 on one-sided rows that were never counted.
+
+| | pre-fix | post-fix |
+|---|---|---|
+| Differing cells | 207,030 | **206,875** (−155) |
+| Matched rows with differences | 35,546 | 35,540 |
+| Rows fully identical | 9,578 | **9,584** |
+| Paired / only-ArcGIS / only-TSMIS | 45,124 / 6,073 / 6,203 | unchanged |
+| Projection completion | `complete` | **`partial`**, `skipped_inputs=102` |
+
+Per-field, exactly four columns move — `LB #Ln` −76, `LB Wid` −77, `RB OT-TO` −1,
+`RB OT-TR` −1 — and the other thirty are identical, which is the scoping proof: the
+change reaches the marker and nothing else.
+
+**The fix.** `built_facts` reads the four HF-01 keys off the CA HIGHWAYS marker sheet;
+the projection writes them onto its OWN marker sheet (so the comparison can read the
+condition from the side it actually loads, without reopening — or requiring — the source
+workbook), returns `PARTIAL` with `skipped_inputs`, names the counts in its message, and
+records them in the sidecar. `_unavailable_rule()` builds the `(token, Summary note)`
+pair from those facts, and the Notes sheet states the condition directly under the
+vintage section. A build with no skips arms nothing and is byte-identical to before —
+the pre-HF-01 marker shape reads as zero, never as unknown.
+
+**Marker cells are still SHOWN.** The token stays visible in the cell so the gap is
+legible; what changed is that it renders non-asserting and is excluded from every count.
+Hiding it would trade a false difference for a false agreement.
+
+**Red→green:** `build/check_arcgis_report.py` — a synthetic CA HIGHWAYS build carrying
+the HF-01 marker rows must make the projection PARTIAL with the source's count, carry
+all four keys onto its own marker sheet, arm the rule with both counts in the note, and
+put the marker cell in the report (the fixture asserts its own teeth); a skip-free build
+must stay COMPLETE and arm nothing. Six assertions fail against the pre-fix behaviour.

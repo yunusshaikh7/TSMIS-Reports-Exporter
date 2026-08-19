@@ -1716,6 +1716,33 @@ cells sum to the same; the real-Excel COM full rebuild of the formulas
 edition equals the values twin cell-for-cell across all 65,164 rows. Oracle
 JSON beside `audit_v0290.py`. Gate 153/153 + ruff clean at the tag.
 
+### CRH-SW-E4 — the DA2 build-only column (OWED: not yet run)
+
+**Status: PENDING on the owner's machine.** v0.39.1 adds a 75th column to the
+BUILT sheet — `THY_POPULATION_EFF_DATE`, sourced from
+`SHS Population.InventoryItemStartDate` (roadmap DA2; Highway Detail prints it as
+`RU Eff` on 99.3% of its rows and could not fill it before). The dev box cannot
+run this canary: it has no staged `CA HIGHWAYS` extract, so the E3 numbers below
+could not be re-measured here.
+
+**What is expected to change:** the built workbook's header and every row gain one
+cell, so its SHA changes and the values twin gains a column.
+
+**What is expected NOT to change:** every count. The new column is declared CONTEXT
+(`chc.CONTEXT_COLUMNS`, now 25) because the TSN extract has no counterpart for it, so
+it is shown with both sides' values and never counted — the same treatment the other
+24 already get. `chc.HEADER` is untouched at exactly TSN's 74, so the raw-extract gate
+and the normalized library are byte-identical; `chc.ARC_HEADER` (74 + build-only) is
+what the build writes and what the comparison shares, and a TSN row simply has no cell
+at the build-only position. Paired / one-sided / differing rows / differing cells /
+fully identical should all read exactly as E3.
+
+`build/check_clean_road.py` proves that shape end to end on its synthetic library
+(the built header is `ARC_HEADER`, provenance covers every built column, and the
+counted-difference assertion still reports exactly the ONE planted difference), which
+is why this is recorded as an expected no-op rather than a predicted new number. Run
+it and record the actual counts before treating it as blessed.
+
 ### CRH-SW-E3 — the RB-1 / HF-01 re-bless (supersedes CRH-SW-E2's expected counts)
 
 Same recipe and the same raw inputs (the ArcGIS layer library and the

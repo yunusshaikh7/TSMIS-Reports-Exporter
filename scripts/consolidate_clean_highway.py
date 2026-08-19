@@ -72,7 +72,7 @@ SKIP_REASON = ("as-of spans whose begin or end postmile is unreadable cannot "
                "anchors are marked instead of guessed")
 
 # The 74-column THY header (clean_highway_columns is the shared contract).
-THY_HEADER = list(chc.HEADER)
+THY_HEADER = list(chc.ARC_HEADER)   # the TSN 74 + our build-only columns
 _COL = {name: i for i, name in enumerate(THY_HEADER)}
 
 # The identity/span columns every span layer contributes. District rides every
@@ -568,6 +568,11 @@ def _paint_row(route, county, prefix, b, e, seg, kind, pts, asof_date):
     put("THY_TERRAIN_CODE", _seg_code(seg, "TER"))
     put("THY_DESIGN_SPEED_AMT", _seg_num(seg, "DSP"))
     put("THY_POPULATION_CODE", _seg_code(seg, "POP"))
+    # Build-only (DA2): the same span's own item date. Not a composite like the
+    # block dates above — one layer, one date, exactly as THY_ACCESS_EFF_DATE
+    # takes SHS Access Control's.
+    put("THY_POPULATION_EFF_DATE",
+        crl.serial_to_date(seg["POP"].item) if seg.get("POP") else None)
     city = seg.get("CITY")
     if city is not None:
         put("THY_CITY_CODE", city_codes.norm_city(city.vals[0]) or None)

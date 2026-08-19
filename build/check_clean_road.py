@@ -10,7 +10,7 @@ Covers:
     passes);
   * the consolidator end-to-end on a tiny library: base/R/L rows, the X
     coverage-gap row, city cuts, the ADT profile family, TOLL/FOREST mux,
-    point attachments, cross-county splitting, the 74-column header, the
+    point attachments, cross-county splitting, the built header, the
     Provenance sheet (every column tiered), the build marker, and the
     missing-layer / truncated-layer refusals;
   * the TSN normalizer (verbatim projection + CMP-AUD-037 marker) and the
@@ -417,8 +417,9 @@ def test_consolidator_end_to_end():
         check("build complete", res.completion == "complete")
         check("build names output", res.output_path == str(out))
         header, rows = _rows_of(out, chc.ARC_SHEET)
-        check("74-column header", header == chc.HEADER)
-        col = {n: i for i, n in enumerate(chc.HEADER)}
+        check("build header = the TSN 74 + our build-only columns",
+              header == chc.ARC_HEADER)
+        col = {n: i for i, n in enumerate(chc.ARC_HEADER)}
 
         def rows_where(**kw):
             keep = []
@@ -510,9 +511,9 @@ def test_consolidator_end_to_end():
               any(r[col["THY_BREAK_DESC"]] == "U-BR" for r in ora))
 
         pheader, prows = _rows_of(out, "Provenance")
-        check("provenance covers all 74 columns",
-              len(prows) == len(chc.HEADER)
-              and [r[0] for r in prows] == chc.HEADER)
+        check("provenance covers every built column",
+              len(prows) == len(chc.ARC_HEADER)
+              and [r[0] for r in prows] == chc.ARC_HEADER)
         check("provenance carries FeatureServer sources",
               any("https://gis.example/" in str(r[5] or "") for r in prows))
         mheader, mrows = _rows_of(out, chc.ARC_MARKER_SHEET)
@@ -611,7 +612,9 @@ def test_normalizer_and_comparator():
         col = {n: i for i, n in enumerate(chc.HEADER)}
         tsn_rows = []
         for i, r in enumerate(arows):
-            rr = list(r)
+            # TSN's extract is the 74-column schema: our build-only columns
+            # (chc.BUILD_ONLY_COLUMNS) simply do not exist on that side.
+            rr = list(r)[:len(chc.HEADER)]
             rr[col["THY_MAINT_SVC_LVL_CODE"]] = 2          # context-only delta
             if i == 1:
                 rr[col["THY_HIGHWAY_GROUP_CODE"]] = "Q"    # ONE real diff
@@ -882,7 +885,7 @@ def test_skipped_span_source_truth():
         header, arows = _rows_of(out, chc.ARC_SHEET)
         tsn_rows = []
         for i, r in enumerate(arows):
-            rr = list(r)
+            rr = list(r)[:len(chc.HEADER)]      # TSN's own 74-column schema
             begin = rr[col["THY_BEGIN_PM_AMT"]]
             end = rr[col["THY_END_PM_AMT"]] or 0
             suffix = rr[col["THY_PM_SUFFIX_CODE"]]

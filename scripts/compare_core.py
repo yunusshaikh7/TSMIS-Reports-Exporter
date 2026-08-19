@@ -95,6 +95,19 @@ _SPOT_LABEL_MAX_WIDTH = 34.0
 # A Comparison field cell shows "<side A value> ≠ <side B value>", so it needs
 # more room than Excel's 8.43 general default. Schema-declared widths still win.
 _CMP_FIELD_MIN_WIDTH = 13.0
+# ...and the same pair display is why a field column also needs a CEILING. One
+# pathological value sizes the whole column: a Highway Detail Description whose
+# TSMIS side is a " / "-joined pile of landmark names rendered a 272-character
+# pair and pinned the column at Excel's own 255 ceiling, while every other field
+# column on that sheet sat at 13-43 — one column wider than the other thirty-
+# three put together, which is not a readable sheet. Measured on the statewide
+# Highway Detail corpus, a Description pair display runs median 19 / p95 35 /
+# p99 42 characters, so this ceiling shows over 99% of them whole and clips only
+# the outliers that no width could have made readable anyway. Unlike an identity
+# cell (which must read correctly at a glance and is never capped), a clipped
+# VALUE cell stays fully reachable — select it and the formula bar has it, and
+# the Spot Check sheet audits any single location field by field.
+_CMP_FIELD_MAX_WIDTH = 60.0
 # The point size the Comparison/Only-in body is written at. Sizing a column
 # MEASURES at this size, so the constant is shared rather than repeated: a
 # candidate chosen at one size and fitted at another is not a fit at all.
@@ -2159,11 +2172,15 @@ def _px_to_width(px):
 def fitted_width(texts, *, bold=False, size_pt=11.0, minimum=0.0, maximum=None):
     """A stored width that fits every one of `texts`, clamped to [min, max].
 
-    `maximum` caps a runaway instruction string: the caller wraps whatever the
-    cap cannot fit (see `_wrap_overflow`), which is what a long sentence wants
-    anyway — so a cap is only ever passed by a caller that WRAPS. An identity
-    cell passes none and is always widened to fit, because nothing downstream
-    will wrap it and a clipped identity reads as a different value (RB2-R2-002).
+    `maximum` caps a runaway string. Two callers legitimately pass one. An
+    instruction cell wraps whatever the cap cannot fit (see `_wrap_overflow`),
+    which is what a long sentence wants anyway. A Comparison VALUE cell does not
+    wrap, and takes the cap because one outlier pair display would otherwise
+    size the column for every row (`_CMP_FIELD_MAX_WIDTH`) — the value stays
+    fully reachable in the formula bar and on Spot Check, so clipping costs
+    reading room, not truth. An identity cell passes none and is always widened
+    to fit, because nothing downstream will wrap it and a clipped identity reads
+    as a different value (RB2-R2-002).
 
     Excel's own ceiling is applied unconditionally and last. It bounds the
     format, not the presentation: a wider stored width is rejected on open, so
@@ -2323,6 +2340,24 @@ def _ceiling_wrapped_columns(ws):
             and float(dim.width) >= _EXCEL_MAX_COL_WIDTH}
 
 
+def _capped_field_positions(sc, field_widths, col_for):
+    """Zero-based positions of the FIELD columns `_auto_field_widths` had to
+    cap — the same "fitting stopped here" case as the Excel ceiling above, just
+    reached at the product's own bound instead of the format's.
+
+    A capped column must wrap for exactly the reason a ceiling column does: it
+    is the one place a stored width is not known to fit its content, and RB-2
+    established that clipping is never the answer to a value that does not fit.
+    Identity columns are absent by construction — only `_auto_field_widths`
+    caps, and it sizes field columns only."""
+    if not field_widths:
+        return set()
+    return {column_index_from_string(col_for(f)) - 1
+            for f, width in field_widths.items()
+            if float(width) >= max(_CMP_FIELD_MAX_WIDTH,
+                                   float(sc.cmp_widths.get(sc.header[f], 0)))}
+
+
 def _ceiling_wrap_align(align=None):
     """How a ceiling-wrapped cell sits: top-anchored so its first line reads
     against its neighbours, and left to Excel's automatic row height so every
@@ -2332,10 +2367,11 @@ def _ceiling_wrap_align(align=None):
                      vertical="top", wrap_text=True)
 
 
-def _ceiling_wrapper(ws):
+def _ceiling_wrapper(ws, extra=()):
     """`align_for(position, align=None)` for a sheet whose widths are declared.
 
-    Returns the wrap alignment for any column stored AT Excel's ceiling and the
+    Returns the wrap alignment for any column stored AT Excel's ceiling (plus
+    any `extra` position the caller knows it capped) and the
     caller's own alignment everywhere else, so every body writer applies the
     rule identically and a NEW writer has one call to make instead of three
     lines to remember.
@@ -2346,7 +2382,7 @@ def _ceiling_wrapper(ws):
     place to live. `check_workbook_presentation` drives every one of these
     writers with ceiling-width content, so a writer that forgets this call
     fails the gate rather than a review."""
-    ceiling = _ceiling_wrapped_columns(ws)
+    ceiling = _ceiling_wrapped_columns(ws) | set(extra)
 
     def align_for(position, align=None, value=None):
         if position in ceiling or (value is not None
@@ -2514,9 +2550,11 @@ def _auto_field_widths(sc, lay, rows_t, rows_n, off):
     measured `1873 ≠ 1874`, and the schema-declared 12 that installed Excel says
     needs 12.57). A schema's declared width is therefore a FLOOR — never a
     ceiling that clips its own content — and every column is fitted to the
-    widest pair its data can produce, bounded so one pathological value cannot
-    make the sheet unusable. Computed once per comparison so both twins carry
-    identical geometry.
+    widest pair its data can produce, bounded by `_CMP_FIELD_MAX_WIDTH` so one
+    pathological value cannot make the sheet unusable. That bound never falls
+    below a schema's own declared width, so a report that asks for room still
+    gets it. Computed once per comparison so both twins carry identical
+    geometry.
 
     The winning value per field and side is the RENDERED-WIDEST one, never the
     longest (RB2-R2-001). Character count and pixel width do not order the same
@@ -2561,6 +2599,8 @@ def _auto_field_widths(sc, lay, rows_t, rows_n, off):
         [_pair_display(side_display(f, 0), side_display(f, 1))],
         bold=_CMP_FIELD_BOLD, size_pt=_CMP_FIELD_PT,
         minimum=max(_CMP_FIELD_MIN_WIDTH,
+                    float(sc.cmp_widths.get(sc.header[f], 0))),
+        maximum=max(_CMP_FIELD_MAX_WIDTH,
                     float(sc.cmp_widths.get(sc.header[f], 0))))
         for f in fields}
 
@@ -2780,7 +2820,8 @@ def _write_comparison(wb, union, lay, events, vals=None, helper_tokens=None,
     for f, width in (field_widths or {}).items():
         ws.column_dimensions[lay.field_col(f)].width = width
 
-    align_for = _ceiling_wrapper(ws)
+    align_for = _ceiling_wrapper(
+        ws, _capped_field_positions(sc, field_widths, lay.field_col))
 
     for chunk in lay.state_chunks:
         ws.column_dimensions[chunk["col"]].hidden = True
@@ -3331,6 +3372,7 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None,
     _apply_field_widths(ws, sc.cmp_widths, fcol, lay)
     for f, width in (field_widths or {}).items():
         ws.column_dimensions[fcol(f)].width = width
+    capped_positions = _capped_field_positions(sc, field_widths, fcol)
     if lay.has_route and keys:
         # Whole-route gaps stand out; single-location gaps stay plain. Colors
         # mirror the Comparison sheet's one-sided row tints. (`keys` can be
@@ -3340,7 +3382,7 @@ def _write_only_sheet(wb, side, other, tab_color, keys, lay, events, vals=None,
         ws.conditional_formatting.add(f"A2:{last_field}{last}", FormulaRule(
             formula=[f'${c_why}2="entire route"'], fill=PatternFill(bgColor=tint)))
 
-    align_for = _ceiling_wrapper(ws)
+    align_for = _ceiling_wrapper(ws, capped_positions)
 
     link_font = _link_font()
     link_col = 3 if lay.has_route else 2              # the "<side> Row" position

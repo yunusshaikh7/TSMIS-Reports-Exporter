@@ -50,6 +50,30 @@ HEADER = [
     "THY_SCENIC_FREEWAY_CODE", "THY_EXTRACT_DATE",
 ]
 
+# Columns OUR build carries that the TSN extract has no counterpart for.
+#
+# `HEADER` above is the TSN CA HIGHWAYS extract's own 74-column schema and is
+# used as an EXACT gate when the library loads the raw extract
+# (`tsn_load_clean_road` → `ctc.exact_raw_rows`), so nothing may be added to it.
+# Our build's sheet is `HEADER + BUILD_ONLY_COLUMNS`, a strict superset with the
+# TSN 74 as its prefix, so every existing index stays put.
+#
+# THY_POPULATION_EFF_DATE (DA2): the CA HIGHWAYS table gives four attribute
+# blocks an effective date — left road, median, right road, access control — but
+# gives population only a CODE. Highway Detail nonetheless PRINTS the Rural/Urban
+# effective date, on 99.3% of its rows, so a projection of this table could not
+# fill a column the report always shows. The date exists in the layer the code
+# already comes from: `SHS Population.InventoryItemStartDate`, populated on all
+# 12,706 rows, whose value distribution matches the printed column in the same
+# rank order (1964-01-01 and 2010-12-31 lead both; 1,237 distinct layer values
+# against 1,194 printed). Carried exactly the way THY_ACCESS_EFF_DATE already
+# carries SHS Access Control's, and CONTEXT in the vs-TSN comparison because TSN
+# has no column to compare it against.
+BUILD_ONLY_COLUMNS = ("THY_POPULATION_EFF_DATE",)
+
+# The header our own ArcGIS build writes (and the vs-TSN comparison shares).
+ARC_HEADER = list(HEADER) + list(BUILD_ONLY_COLUMNS)
+
 # --------------------------------------------------------------------------- #
 # Per-column provenance: {column: (tier, source layer, source column, note)}.
 # Tiers: "sourced" (painted from a mapped layer), "synthesized" (derived from
@@ -177,6 +201,13 @@ PROVENANCE = {
                                 "arithmetic wobble never counts)"),
     "THY_LANDMARK_SHORT_DESC": (_S, "SHS Landmark", "Landmarks_Short", ""),
     "THY_POPULATION_CODE": (_S, "SHS Population", "Population_Code", ""),
+    "THY_POPULATION_EFF_DATE": (_S, "SHS Population", "InventoryItemStartDate",
+                                "BUILD-ONLY: the TSN extract has no such "
+                                "column, so it is shown and never counted "
+                                "here. Carried because Highway Detail PRINTS "
+                                "this date ('RU Eff') on 99.3% of its rows "
+                                "(DA2); same single-layer passthrough as "
+                                "THY_ACCESS_EFF_DATE"),
     "THY_POPULATION_GROUP_CODE": (_N, "", "",
                                   "all-null in the TSN extract too"),
     "THY_LAST_SIG_CHG_DATE": (_N, "", "", "TASAS change tracking — no layer"),
@@ -219,9 +250,9 @@ PROVENANCE = {
 # the sheet with both sides' values visible.
 _SYNTHESIZED_CONTEXT = ("THY_BEGIN_OFFSET_AMT", "THY_END_OFFSET_AMT")
 CONTEXT_COLUMNS = tuple(
-    name for name in HEADER
+    name for name in ARC_HEADER
     if PROVENANCE[name][0] in (_N, _T) or name == "THY_EXTRACT_DATE"
-    or name in _SYNTHESIZED_CONTEXT)
+    or name in _SYNTHESIZED_CONTEXT or name in BUILD_ONLY_COLUMNS)
 
 
 def provenance_line(name):

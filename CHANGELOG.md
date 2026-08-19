@@ -3,6 +3,51 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.39.1 — 2026-08-19
+
+Two fixes to the comparison workbook, both found by rechecking Highway Detail
+against a freshly delivered ArcGIS layer library.
+
+- **The Description column is no longer absurdly wide.** A Comparison field cell
+  renders `"<A value> ≠ <B value>"` and every column is sized to fit the widest
+  pair its data can produce. Statewide Highway Detail has one cell whose TSMIS
+  side is a `" / "`-joined pile of landmark names; that single 272-character pair
+  pinned Description at Excel's own 255 maximum — wider than the other
+  thirty-three field columns put together. Value columns now stop at 60 and
+  **wrap** past it, so the bound costs reading room and never content. The sheet's
+  field columns are 20% narrower overall. Identity columns are unchanged: they are
+  still widened to fit, never capped, because nothing wraps a key.
+- **The "unavailable" marker is no longer counted as a difference** (CMP-AUD-245).
+  Where the Clean Road build cannot place a source span it writes a reserved token
+  instead of guessing a position. Highway Detail rendered from the layers inherits
+  those tokens, but v0.39.0 did not inherit the rule that they assert nothing — so
+  155 cells meaning "unknowable" were being reported as disagreements, and the
+  comparison called itself complete while resting on a build that was not.
+  Statewide the differing-cell count drops 207,030 → 206,875, moving exactly the
+  four marker-bearing columns and no others; the projection now reports `partial`
+  and both Summary and Notes state the condition.
+
+- **`RU Eff` is no longer blank on Highway Detail built from the layers.** It was
+  the one printed column with nothing behind it: the CA HIGHWAYS table gives four
+  attribute blocks an effective date but gives population only a code, so the
+  report rendered it empty and the comparison could only show it, never count it.
+  The date was never actually missing — it is `SHS Population`'s
+  `InventoryItemStartDate`, the same layer row the code itself comes from, and its
+  values line up with the printed column. The Clean Road build now carries it as a
+  build-only 75th column, exactly the way it already carries Access Control's, and
+  the report prints it. **Every column Highway Detail prints now has a source.**
+  It also sharpened the row boundaries: a real change in that date starts a new
+  record, which the report does too, so the projection now produces 51,277 records
+  against the export's 51,327 — a gap of 50 where it was 130.
+
+The TSN side is untouched. The extract's own 74-column schema is still the exact
+gate the library loads it through; our build simply writes a superset, and the
+extra column is shown-not-counted when comparing against TSN, which has no
+counterpart for it.
+
+Nothing else changed: pairing, every other column's counts, and every other
+report's comparisons are untouched.
+
 ## v0.39.0 — 2026-08-19
 
 The ArcGIS tab splits in two, and the second half answers a new question: not

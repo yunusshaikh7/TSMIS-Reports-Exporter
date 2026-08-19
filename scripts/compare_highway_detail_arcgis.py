@@ -133,6 +133,20 @@ def _notes_lines(arcgis_path, tsmis_path):
              "a gap it measures network change instead: rebuild the Clean Road "
              "workbook with the as-of date set to the export's day, re-project, "
              "and compare again."),
+    ]
+    # HF-01/RB-1: stated HIGH, right after vintage — a reader weighing the
+    # counts needs to know which cells were never in a position to be counted.
+    rule = _unavailable_rule(arcgis_path)
+    if rule:
+        lines += [
+            ("§", "Source coverage — cells that assert nothing"),
+            ("", rule[1].split("— ", 1)[-1].strip().capitalize()),
+            ("", f"They are shown with the marker text so the gap is visible, "
+                 f"render as non-asserting (not a difference), and are excluded "
+                 f"from every differing-cell count on this sheet. The build's "
+                 f"own '{ah.MARKER_SHEET}' sheet names the spans."),
+        ]
+    lines += [
         ("§", "Row identity"),
         ("", "Rows pair on the canonical roadbed-aware Post Mile (prefix + "
              "zero-padded mile + the R/L roadbed letter); the equation marker is "
@@ -212,11 +226,38 @@ def suggest_name(arcgis_path):
                               "ArcGIS_vs_TSMIS_HighwayDetail")
 
 
+def _unavailable_rule(arcgis_path):
+    """The non-asserting rule for the CA HIGHWAYS build's unplaceable spans, or
+    `()` when this build had none.
+
+    HF-01/RB-1 established the contract on the clean-road comparison: where the
+    build could not place a source span, the anchor cell carries a reserved
+    token instead of a value. Those cells state that a value is UNKNOWABLE, not
+    that it differs — counting them would report the app's own refusal to guess
+    as a discrepancy in the report. The projection inherits the tokens, so it
+    inherits the rule; the counts are read from the ArcGIS side's own marker
+    sheet (`arcgis_report_highway_detail` carries them forward)."""
+    facts = ah.report_facts(arcgis_path)
+    token = (facts.get("unavailable_marker") or "").strip()
+    skipped = ah._skipped_spans(facts)
+    if not token or not skipped:
+        return ()
+    marked = (facts.get("marked_anchor_cells") or "?").strip()
+    reason = (facts.get("skipped_source_reason") or "").strip()
+    return (token,
+            f"SOURCE COVERAGE — the CA HIGHWAYS build behind the {SIDE_A} side "
+            f"could not place {skipped:,} source span(s)"
+            + (f" ({reason})" if reason else "")
+            + f"; {marked} cell(s) on that side show '{token}' and are never "
+            f"asserted or counted as differences.")
+
+
 def compare(arcgis_path, tsmis_path, out_path, events=None,
             confirm_overwrite=None, mode="formulas", commit_guard=None):
     """Build the ArcGIS-vs-TSMIS Highway Detail discrepancy workbook(s)."""
     schema = replace(
         _SCHEMA,
+        unavailable_rule=_unavailable_rule(arcgis_path),
         legend_writer=lambda wb: _write_notes(wb, arcgis_path, tsmis_path))
     return run_files_compare(
         schema, arcgis_path, tsmis_path, out_path,

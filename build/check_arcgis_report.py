@@ -31,7 +31,9 @@ from openpyxl import Workbook, load_workbook
 import arcgis_report_highway_detail as ah
 import clean_highway_columns as chc
 import compare_highway_detail_arcgis as cmp_arc
+import consolidate_clean_highway as cch
 import highway_detail_columns as hdc
+import outcome
 
 _fail = []
 
@@ -50,12 +52,12 @@ def _raises(fn, needle=None):
         return needle is None or needle.lower() in str(e).lower()
 
 
-_T = {n: i for i, n in enumerate(chc.HEADER)}
+_T = {n: i for i, n in enumerate(chc.ARC_HEADER)}
 
 
 def thy(begin, end, **over):
     """One CA HIGHWAYS row: a plausible base record with `over` applied."""
-    r = [None] * len(chc.HEADER)
+    r = [None] * len(chc.ARC_HEADER)
     base = {
         "THY_COUNTY_CODE": "ORA", "THY_ROUTE_NAME": "001",
         "THY_PM_PREFIX_CODE": "R", "THY_BEGIN_PM_AMT": begin,
@@ -72,17 +74,25 @@ def thy(begin, end, **over):
     return r
 
 
-def build_source(path, rows):
+def build_source(path, rows, skips=None):
+    """A CA HIGHWAYS build. `skips` adds the HF-01 unassertable-span record the
+    real build writes when it could not place a source span."""
     wb = Workbook()
     ws = wb.active
     ws.title = chc.ARC_SHEET
-    ws.append(list(chc.HEADER))
+    ws.append(list(chc.ARC_HEADER))
     for r in rows:
         ws.append(r)
     mk = wb.create_sheet(chc.ARC_MARKER_SHEET)
     mk.append(["Build version", 1])
     mk.append(["As-of date", "2026-08-17"])
     mk.append(["Layer library", r"C:\demo\arcgis_layers"])
+    if skips:
+        spans, marked = skips
+        mk.append(["Skipped source spans", spans])
+        mk.append(["Marked anchor cells", marked])
+        mk.append(["Unavailable marker", cch.UNAVAILABLE_TOKEN])
+        mk.append(["Skipped source reason", cch.SKIP_REASON])
     wb.save(path)
 
 
@@ -104,10 +114,19 @@ def main():
     print("the projection contract:")
     check("every printed column is mapped (import-time assert holds)",
           set(ah.PROJECTION) == set(hdc.HEADER))
-    check("RU Eff is the declared context column — the report prints it and the "
-          "THY table has no date for the population code",
-          ah.CONTEXT_COLUMNS == ("RU Eff",)
-          and cmp_arc.CONTEXT_FIELDS == ("RU Eff",))
+    check("every printed column now has a source — no context columns left "
+          "(DA2 closed: RU Eff prints THY_POPULATION_EFF_DATE)",
+          ah.CONTEXT_COLUMNS == () and cmp_arc.CONTEXT_FIELDS == ())
+    check("RU Eff maps to the build-only population effective date",
+          ah.PROJECTION["RU Eff"][0] == ("THY_POPULATION_EFF_DATE",))
+    check("...which the TSN 74-column schema does NOT carry, so the TSN raw "
+          "gate is untouched and our build is a strict superset",
+          "THY_POPULATION_EFF_DATE" not in chc.HEADER
+          and list(chc.ARC_HEADER[:len(chc.HEADER)]) == list(chc.HEADER)
+          and chc.ARC_HEADER[-1] == "THY_POPULATION_EFF_DATE")
+    check("...and it is CONTEXT on the vs-TSN side, where TSN has no column "
+          "to compare it against",
+          "THY_POPULATION_EFF_DATE" in chc.CONTEXT_COLUMNS)
     check("the merge rule ignores position AND description, nothing else",
           set(hdc.HEADER) - set(ah._MERGE_FIELDS)
           == {"Post Mile", "Length", "Description"})
@@ -172,7 +191,75 @@ def main():
     check("'A' (add mileage) prints BLANK, as the report does",
           at("NA") in (None, ""))
     check("the description prints upper-case", at("Description") == "JCT 5 CAMINO")
-    check("RU Eff is emitted EMPTY — never invented", at("RU Eff") in (None, ""))
+
+    print("DA2 — RU Eff prints the population block's own effective date:")
+    import datetime
+    build_source(src, [thy(0.129, 0.204, THY_POPULATION_CODE="U",
+                           THY_POPULATION_EFF_DATE=datetime.date(1964, 1, 1))])
+    ah.consolidate(built_path=src, out_path=out, confirm_overwrite=lambda p: True)
+    header, rows = read_out(out)
+    at2 = lambda name: rows[0][header.index(name)]
+    check("a real date renders in the report's YY-MM-DD form, not blank",
+          at2("RU Eff") == "64-01-01")
+    check("...beside the code it belongs to", at2("RU") == "U")
+    # It is a printed column like any other, so a change in it is a record
+    # boundary — the same rule every other printed column obeys.
+    build_source(src, [thy(0.129, 0.170,
+                           THY_POPULATION_EFF_DATE=datetime.date(1964, 1, 1)),
+                       thy(0.170, 0.204,
+                           THY_POPULATION_EFF_DATE=datetime.date(2010, 12, 31))])
+    ah.consolidate(built_path=src, out_path=out, confirm_overwrite=lambda p: True)
+    _h, rows = read_out(out)
+    check("a differing RU Eff now BLOCKS the merge, as a printed column must",
+          len(rows) == 2)
+    # A span the population layer never covered has no date, and that must read
+    # as blank rather than as some neighbour's date.
+    build_source(src, [thy(0.129, 0.204)])
+    ah.consolidate(built_path=src, out_path=out, confirm_overwrite=lambda p: True)
+    header, rows = read_out(out)
+    check("a span with no population date renders blank, never invented",
+          rows[0][header.index("RU Eff")] in (None, ""))
+
+    print("a PARTIAL source build stays partial through the projection:")
+    # HF-01/RB-1: where the CA HIGHWAYS build could not place a source span it
+    # writes a reserved token into the anchor cell. The token travels into this
+    # report, so the projection must not report COMPLETE over it and the
+    # comparison must not COUNT it as a difference — it says "unknowable", not
+    # "different".
+    build_source(src, [thy(0.129, 0.204,
+                           THY_LT_LANES_AMT=cch.UNAVAILABLE_TOKEN)],
+                 skips=(102, 174))
+    res = ah.consolidate(built_path=src, out_path=out,
+                         confirm_overwrite=lambda p: True)
+    check("the projection still builds", res.status == "ok")
+    check("...but reports PARTIAL, not COMPLETE, over an unassertable source",
+          res.completion == outcome.PARTIAL)
+    check("...and carries the source's skipped-span count",
+          res.skipped_inputs == 102)
+    check("...and says so in the message",
+          "102" in (res.message or "") and "assert" in (res.message or ""))
+    facts = ah.report_facts(out)
+    check("the report's own marker sheet carries the counts forward",
+          facts.get("skipped_source_spans") == "102"
+          and facts.get("marked_anchor_cells") == "174"
+          and facts.get("unavailable_marker") == cch.UNAVAILABLE_TOKEN)
+    rule = cmp_arc._unavailable_rule(out)
+    check("the comparison arms the non-asserting rule off those facts",
+          bool(rule) and rule[0] == cch.UNAVAILABLE_TOKEN)
+    check("...and its Summary note states both counts",
+          bool(rule) and "102" in rule[1] and "174" in rule[1])
+    check("the marker cell reached the report (the fixture has teeth)",
+          any(cch.UNAVAILABLE_TOKEN in str(c)
+              for c in read_out(out)[1][0]))
+
+    print("a skip-free build is untouched:")
+    build_source(src, [thy(0.129, 0.204)])
+    res = ah.consolidate(built_path=src, out_path=out,
+                         confirm_overwrite=lambda p: True)
+    check("a build with no skips is COMPLETE", res.completion == outcome.COMPLETE)
+    check("...with no skipped inputs", not res.skipped_inputs)
+    check("...and the comparison arms no rule at all",
+          cmp_arc._unavailable_rule(out) == ())
 
     print("identity + role gates:")
     check("our build identifies itself", ah.is_arcgis_report(out))

@@ -94,6 +94,16 @@ Population, `THY_NON_ADD_CODE` ← SHS Non Add Mileage (flag → `N`, default `A
 `THY_CITY_CODE` ← City (`SHS_` rows only), `THY_RECORD_DATE` + `THY_SEG_ORDER_ID`
 ← SHS Inv Network Date (`Network_Start_Date`, `SegOrderId`).
 
+**Build-only columns (v0.39.1)** — ours, with no TSN counterpart, so CONTEXT in the
+vs-TSN comparison and never counted there. `chc.HEADER` stays exactly TSN's 74 (the
+library loads the raw extract through it as an exact gate); `chc.ARC_HEADER` =
+`HEADER + BUILD_ONLY_COLUMNS` is what the build writes, a strict superset so every
+existing index holds.
+
+| Column | Source | Why it exists |
+|---|---|---|
+| `THY_POPULATION_EFF_DATE` | SHS Population (`InventoryItemStartDate`) | The TSN table gives four blocks an eff date but population only a CODE — yet **Highway Detail PRINTS the Rural/Urban effective date on 99.3% of its rows** (`RU Eff`), so a projection of this table could not fill a column the report always shows (DA2). Same single-layer passthrough as `THY_ACCESS_EFF_DATE`; the layer's value distribution matches the printed column in the same rank order (1964-01-01 / 2010-12-31 lead both). |
+
 **Identity/structural (synthesized by the overlay):** district, county, route,
 route suffix, PM prefix/begin/end/suffix, length (= end−begin), the offsets
 (cumulate county PM spans along the route — matches THY's convention), and

@@ -27,6 +27,7 @@ from _checklib import Checker, ROOT, scripts_path, temp_dir
 scripts_path()
 
 from compare_core import (CompareSchema, _CELL_PAD_PX,  # noqa: E402
+                          _CMP_FIELD_MAX_WIDTH,
                           _text_px, _usable_px, run_compare)
 from openpyxl import load_workbook  # noqa: E402
 from summary_layout import (Cat, Section, SummarySpec,  # noqa: E402
@@ -133,11 +134,17 @@ WIDE_CAT_A = [[label, str(10 + i)] for i, label in enumerate(WIDE_CATS)]
 WIDE_CAT_B = [[label, str(11 + i)] for i, label in enumerate(WIDE_CATS)]
 
 # ---- RB2-R2-002: a real value is wider than any product cap -----------------
-# RB-2 briefly bounded identity columns at this stored width. It gave them 425
+# RB-2 briefly bounded IDENTITY columns at this stored width. It gave them 425
 # usable pixels and clipped 4,978 actual cells across the corpus, because a cap
 # is only safe where the caller WRAPS what it cannot fit and an identity column
-# never wraps. The number survives HERE, and only here, so the fixture can prove
-# the cap would have clipped: nothing in the product reads it any more.
+# never wraps. That remains true and identity columns are still uncapped — the
+# assertions below prove it. The number survives HERE so the fixture can show
+# what the retired cap would have done to a key.
+#
+# It is NOT `_CMP_FIELD_MAX_WIDTH`, which the product does read: that one bounds
+# VALUE columns, whose cells the writers wrap, so it satisfies the very
+# condition this comment names. The two happen to be the same number and mean
+# opposite things, so both are spelled out rather than shared.
 RETIRED_CAP_WIDTH = 60.0
 
 # Two real-shaped Highway Log descriptions differing by one word, so the cell
@@ -991,11 +998,40 @@ def main():
 
             if col is not None:
                 from openpyxl.utils import get_column_letter
-                width = _stored_width(path, "Comparison", get_column_letter(col))
-                c.check(f"long/{mode}: the column was widened past the retired "
-                        "cap rather than clipped at it",
-                        width is not None and width > RETIRED_CAP_WIDTH,
+                letter = get_column_letter(col)
+                width = _stored_width(path, "Comparison", letter)
+                # A VALUE column stops at the product's field bound — one
+                # outlier pair display must not size the column for every row
+                # (the statewide Highway Detail Description reached Excel's own
+                # 255 ceiling, three times every other field column combined).
+                c.check(f"long/{mode}: the value column stops at the field "
+                        "bound instead of growing to fit one outlier",
+                        width is not None
+                        and abs(width - _CMP_FIELD_MAX_WIDTH) < 1e-6,
                         f"stored width {width}")
+                # ...and because it is bounded, it WRAPS: the cap costs reading
+                # room, never content. This is the condition RB-2 named as the
+                # only one under which a cap is safe.
+                wb_long = load_workbook(path, read_only=False)
+                try:
+                    cell = wb_long["Comparison"][f"{letter}2"]
+                    c.check(f"long/{mode}: the bounded value cell WRAPS rather "
+                            "than being cut off",
+                            bool(cell.alignment and cell.alignment.wrap_text),
+                            repr(cell.alignment))
+                finally:
+                    wb_long.close()
+                # The identity column keeps the RB-2 ruling: widened, never
+                # bounded, because nothing wraps it and a clipped key reads as
+                # a different location.
+                key_col = _column_of(path, "Comparison", "Key")
+                key_width = (_stored_width(path, "Comparison",
+                                           get_column_letter(key_col))
+                             if key_col else None)
+                c.check(f"long/{mode}: the IDENTITY column is still widened "
+                        "past the retired cap, not bounded with the values",
+                        key_width is not None and key_width > RETIRED_CAP_WIDTH,
+                        f"stored width {key_width}")
 
         # ---- RB2-R2-002: what happens AT Excel's ceiling --------------------
         # The remedy leaves exactly one bound in place, and a bound that clips
@@ -1078,10 +1114,25 @@ def main():
             from openpyxl.utils import get_column_letter
             letter = get_column_letter(col) if col else None
             width = _stored_width(path, "Comparison", letter) if letter else None
-            c.check(f"ceiling/{mode}: the column stops at Excel's own limit, "
-                    "not below it",
-                    width is not None and abs(width - EXCEL_MAX_COL_WIDTH) < 1e-6,
+            # A VALUE column stops at the product's own field bound. Excel's
+            # 255 ceiling is no longer reachable from a value, so the branch
+            # that wraps AT the ceiling is proved on the IDENTITY column below
+            # instead — identity is uncapped, so it is the one thing that can
+            # still get there.
+            c.check(f"ceiling/{mode}: even a value this pathological stops at "
+                    "the field bound",
+                    width is not None
+                    and abs(width - _CMP_FIELD_MAX_WIDTH) < 1e-6,
                     f"stored width {width} in column {letter}")
+            key_col = _column_of(path, "Comparison", "Key")
+            key_letter = get_column_letter(key_col) if key_col else None
+            key_width = (_stored_width(path, "Comparison", key_letter)
+                         if key_letter else None)
+            c.check(f"ceiling/{mode}: an uncapped IDENTITY column still reaches "
+                    "Excel's own limit, so the ceiling branch stays live",
+                    key_width is not None
+                    and abs(key_width - EXCEL_MAX_COL_WIDTH) < 1e-6,
+                    f"stored width {key_width} in column {key_letter}")
 
             wb = load_workbook(path, read_only=False)
             try:

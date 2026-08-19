@@ -210,16 +210,38 @@ counts as migration drift, not defect — see C4 + D5.
 
 | # | Item | Notes |
 |---|---|---|
-| DA1 | **The three block effective dates are the reconstruction's weakest columns** | `LB Eff` / `Med Eff` / `RB Eff` agree with the TSMIS export on only ~56% of matched rows — by far the lowest of the counted columns (the rest sit 81–100%). The Clean Road build derives each as a composite "newest member layer's item date", which its own provenance calls a **candidate rule**, not a proven one. They also fragment `Length` (85%), because a flickering eff date blocks the record merge. Worth a measured rule the way the ADT anchor was measured. First place to look when a run reports more differences than expected. |
-| DA2 | **`RU Eff` has no source in the CA HIGHWAYS table** | The report prints the Rural/Urban effective date; the THY table carries the population CODE with no date column for it (TSN's own doesn't either). Emitted empty + declared CONTEXT (shown, never counted). Closing it means carrying `SHS Population`'s `InventoryItemStartDate` through the Clean Road build — a new THY-shaped column that TSN has no counterpart for, so it needs an owner decision before it is added. |
-| DA3 | **A same-date pair has never been run** | Every measurement so far pairs the 2025-09-08 build against 2026-08 exports (~11 months). The numbers below are therefore drift-dominated and are NOT a correctness baseline. The first real read needs a Clean Road rebuild with the as-of set to an export day — owner-only, since the layer library is stocked by hand and is not on the dev box. |
+| DA1 | **The three block effective dates are the reconstruction's weakest columns — and now the TOP open item here** | `Med Eff` 20,067 · `LB Eff` 19,530 · `RB Eff` 19,208 differing cells on 45,124 matched rows = **55.5% / 56.7% / 57.4% agreement**, against 81–99.5% for every other counted column. Confirmed on a SAME-DATE pair (DA3), so this is not drift: those three alone are **28% of all differing cells**. The Clean Road build derives each as a composite "newest member layer's item date", which its own provenance calls a **candidate rule**, not a proven one. They also fragment `Length` (85.1%), because a flickering eff date blocks the record merge, which in turn feeds the ~6,000-a-side unpaired population. Worth a measured rule the way the ADT anchor was measured — it is the single highest-value thing left in this group. |
+| DA2 | ~~`RU Eff` has no source~~ — **CLOSED 2026-08-19 (v0.39.1)**. The Clean Road build carries `THY_POPULATION_EFF_DATE` from `SHS Population.InventoryItemStartDate` as a build-only 75th column (`chc.BUILD_ONLY_COLUMNS`; `chc.HEADER` stays exactly TSN's 74 because the library loads the raw extract through it as an exact gate, and `chc.ARC_HEADER` is the strict superset the build writes). CONTEXT vs TSN, which has no counterpart; COUNTED in the report comparison. **Measured: 4,470 differing cells on 45,138 matched rows = 90.1% agreement** — 4th-best of the 35 counted columns and above the 87% `Acc-Cont Eff` precedent it was modelled on. Every printed column now has a source; the report comparison has no context columns left. Side effect, disclosed: `RU Eff` is a printed column, so a change in it is a record boundary — records went 51,197 → 51,277 against the export's 51,327 (gap 130 → 50), but only 14 of those 80 new records paired, so one-sided rows grew by 52 (0.1%). Those are places our eff date changes and the report does not split — a small follow-on question, not a regression. **Owed on the owner's machine: the `CRH-SW-E2` clean-road canary re-bless** — the built sheet gained a column, and though it is context (counted cells should be unchanged, as `check_clean_road` proves on the synthetic library) the statewide run needs the staged TSN extract, which the dev box does not have. The old entry, for reference: | The report prints the Rural/Urban effective date on **99.3%** of rows (51,327 rows, 334 blank, 1,194 distinct). The 74-column THY table — TSN's own schema, which ours mirrors — carries eff dates for four blocks (`THY_LEFT_ROAD_EFF_DATE`, `THY_MEDIAN_EFF_DATE`, `THY_RIGHT_ROAD_EFF_DATE`, `THY_ACCESS_EFF_DATE`) but for population carries only `THY_POPULATION_CODE` / `THY_POPULATION_GROUP_CODE`. No date column, so the projection has nothing to print and emits empty + CONTEXT (counting it would be ~45,000 false differences). **The data is NOT missing.** `SHS Population.InventoryItemStartDate` is populated on all 12,706 rows and its as-of distribution matches the report's `RU Eff` in the same rank order — `1964-01-01` and `2010-12-31` lead both, 1,237 distinct layer values vs 1,194 printed — i.e. it IS the printed date. **Closing it is a known pattern**: `THY_ACCESS_EFF_DATE` already carries `SHS Access Control`'s `InventoryItemStartDate` the same way, and that single-layer passthrough shape scores 87.0% (vs ~56% for the three composite dates in DA1), so `RU Eff` should land near it rather than with the weak ones. **Cost, and why it is still an owner call:** it adds a 75th THY column TSN has no counterpart for, so it must be CONTEXT in the clean-road vs-TSN comparison, and it re-shapes the Clean Road build — a canary re-bless. |
+| DA3 | ~~A same-date pair has never been run~~ — **CLOSED 2026-08-19** | Run on the 2026-08-19 layer drop, rebuilt as-of 2026-08-17 to match the export. **The vintage gap was not what the differences were made of**: closing eleven months moved the differing-cell count under 2% (see the measured block below). The drift explanation is therefore RETIRED — what remains is structural, and DA1 is most of it. Vintage still has to match for a run to mean anything, so the warning stays; it just is not the answer. Note the as-of does NOT follow the layer library — `resolve_default_asof()` takes it from the staged TSN extract, so a default build off fresh layers still reconstructs 2025-09-08. Set it explicitly in the Clean Road sub-tab's as-of box. |
 | DA4 | **The other reports** | Highway Detail proved the pattern (project the CA HIGHWAYS build onto the report's shape + a merge rule). Highway Log, Highway Sequence and the Intersection/Ramp reports follow the same recipe once their own mappings are censused — and the Intersection/Ramp ones additionally need the CA INTERSECTIONS / CA RAMPS builds (group G). |
 
-**Measured 2026-08-19** (2025-09-08 build × the 2026-08-17 export, so read as drift, not
-defect): 51,227 projected records vs 50,738 export rows; 44,484 paired on
-(route, postmile) with **100% Post Mile agreement**; 6,242 only-ArcGIS / 6,254
-only-TSMIS. Per-column agreement runs 81–100% apart from the three block eff dates
-(~56%) and the context column.
+**Measured 2026-08-19 — the SAME-DATE baseline.** Read off the shipped comparison's own
+Summary sheet (an earlier ad-hoc script produced numbers that did not reconcile with each
+other or with the export's real row count; those are withdrawn). Both sides 2026-08-17:
+the 2026-08-19 layer drop rebuilt as-of the export's day.
+
+| | |
+|---|---|
+| CA HIGHWAYS build | 57,747 rows · 252 routes · 102 unplaceable spans / 174 marked anchors |
+| Projected records | **51,277** (6,470 merged away) |
+| TSMIS export rows | **51,327** |
+| Paired locations | **45,138** · 6,139 only-ArcGIS · 6,189 only-TSMIS |
+| Differing cells | **211,448** on 35,613 rows · 9,525 rows fully identical |
+| Counted columns | **35** — every column the report prints (DA2 closed) |
+
+Per-column agreement is 81–99.5% everywhere except the three block effective dates
+(55–57%, DA1). **The ~11-month-gap run of the same export measured 207,030 differing
+cells against 206,875 at the same date — 155 apart, under 2%** — which is what retires
+the drift explanation: the disagreement is structural, not temporal.
+
+The headline 211,448 is ABOVE that 206,875 only because `RU Eff` joined the counted
+columns (DA2): it contributes 4,470 of its own, and the remaining +103 is pairing noise
+from 14 rows that re-paired. Read as agreement rather than as a total, the run improved —
+a column that was 100% blank now agrees 90.1% of the time.
+
+The 155 are themselves the CMP-AUD-245 fix, not network change: the marker cells that
+were being counted as differences. Post-fix, exactly four columns move (`LB #Ln` −76,
+`LB Wid` −77, `RB OT-TO` −1, `RB OT-TR` −1) and the other thirty are identical.
 
 ### E. Hygiene / low priority
 

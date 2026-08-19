@@ -60,7 +60,7 @@ NORMALIZATION_VERSION = 1
 _NORMALIZED_SIDECARS = ()          # the normalized copy is the verbatim 74 cols
 
 TSN_RAW_HEADER = tuple(chc.HEADER)
-SHARED_HEADER = list(chc.HEADER)
+SHARED_HEADER = list(chc.ARC_HEADER)
 KEY = "THY_BEGIN_PM_AMT"
 KEY_FIELD = SHARED_HEADER.index(KEY)
 CONTEXT_FIELDS = chc.CONTEXT_COLUMNS
@@ -92,9 +92,9 @@ def _provenance_table_lines():
     layer + source column it is PAINTED FROM, and whether it is COUNTED or shown as
     CONTEXT. So a reader sees exactly what matched what. Reads
     clean_highway_columns.PROVENANCE + CONTEXT_FIELDS; no count/pairing effect."""
-    counted = set(chc.HEADER) - set(CONTEXT_FIELDS)
+    counted = set(chc.ARC_HEADER) - set(CONTEXT_FIELDS)
     out = []
-    for name in chc.HEADER:
+    for name in chc.ARC_HEADER:
         _tier, layer, column, _note = chc.PROVENANCE[name]
         if layer and column:
             src = f"{layer} ({column})"
@@ -278,9 +278,13 @@ def _physical_span_key(route, county, prefix, begin_raw, roadbed, source_hint):
 
 
 def _thy_row(vals, source_hint):
-    """Project one 74-cell THY-shaped row (either side) onto
-    [route, *SHARED_HEADER] with the begin-PM cell as the physical key."""
-    h = {name: i for i, name in enumerate(chc.HEADER)}
+    """Project one THY-shaped row (either side) onto [route, *SHARED_HEADER]
+    with the begin-PM cell as the physical key.
+
+    Indexed by `ARC_HEADER`, of which the TSN 74 is a strict PREFIX: a TSN row
+    simply has no cell at a build-only position and `g` reads it as None, which
+    is exactly what a column TSN does not carry should look like."""
+    h = {name: i for i, name in enumerate(chc.ARC_HEADER)}
 
     def g(name):
         i = h[name]
@@ -330,10 +334,11 @@ def _load_arc(path):
                              "the Clean Road Highway workbook.")
         it = wb[ARC_SHEET].iter_rows(values_only=True)
         header = [_s(c) for c in (next(it, None) or ())]
-        if header != chc.HEADER:
+        if header != chc.ARC_HEADER:
             raise ValueError(
-                f"{name} does not carry the exact 74-column THY header — "
-                "rebuild the Clean Road Highway workbook with this version.")
+                f"{name} does not carry the exact "
+                f"{len(chc.ARC_HEADER)}-column THY header — rebuild the Clean "
+                "Road Highway workbook with this version.")
         return [_thy_row(list(r), f"{name} ({ARC_SHEET})")
                 for r in it if ctc.row_has_data(r)]
     finally:

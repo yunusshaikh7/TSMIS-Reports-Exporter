@@ -133,7 +133,7 @@ types override the data-shape fields and side names.
 | `sides_noun` | `"systems"` | "both systems" / "both environments" |
 | `medwid_fields` | `()` | field NAMES normalized like Med Wid |
 | `date_fields` | `()` | field NAMES date-formatted on Spot Check |
-| `data_widths` / `cmp_widths` | `{}` | field name → column width |
+| `data_widths` / `cmp_widths` | `{}` | field name → column width — a FLOOR, never a ceiling (see the width note below) |
 | `scope_flat` / `scope_consolidated` | "Per-route" / "Consolidated (all routes)" | Summary scope label |
 | `one_sided_note_extra` / `trim_note_extra` | `""` | appended to the yellow/blue note / TRIM note |
 | `key_field` | `0` | which header column is the row-identity key (see [§5](#5-key-field-which-column-is-a-rows-identity)) |
@@ -285,6 +285,22 @@ comparison carries ~2M formula cells, which normal in-memory mode cannot save in
 or RAM (same reason the consolidators stream). Streaming rules: sheets created in DISPLAY order;
 `freeze_panes` / widths / `auto_filter` / conditional formatting set BEFORE rows are appended;
 styled cells are `WriteOnlyCell`s.
+
+**Column widths (RB-2, amended v0.39.1).** A Comparison field cell renders
+`"<A value> ≠ <B value>"`, so columns are FITTED to the widest pair their data can produce —
+measured in pixels at the bold 10pt the difference rule uses, never by character count.
+A schema's `cmp_widths` entry is a **floor**. Two rules bound the result:
+
+- **Identity columns are never capped.** RB-2 briefly capped them at 60 and clipped 4,978 real
+  cells; a clipped key reads as a different location, and nothing wraps it. They are widened to
+  fit, and only Excel's own 255 ceiling stops them (a column that lands there WRAPS).
+- **Value columns stop at `_CMP_FIELD_MAX_WIDTH` (60) and wrap past it.** One outlier otherwise
+  sizes the column for every row: statewide Highway Detail has a `Description` whose TSMIS side is
+  a `" / "`-joined pile of landmark names, and that single 272-character pair display pinned the
+  column at the full 255 — wider than the other thirty-three field columns combined. The bound
+  never falls below the schema's own declared width, and a bounded column wraps, so the cap costs
+  reading room and never content (`_capped_field_positions` feeds `_ceiling_wrapper`).
+  `check_workbook_presentation` proves both rules, and that nothing is clipped either way.
 
 ---
 
@@ -986,10 +1002,19 @@ rule stays OFF (neither side emits a `+` run). Pairing is the canonical roadbed-
 Post Mile with the raw printed token carried as its own compared cell (CMP-AUD-067), and
 county-blind like every HD-Excel comparison (CMP-AUD-045).
 
-**`RU Eff` is a CONTEXT column.** The report prints the Rural/Urban effective date and
-the THY table carries the population CODE with no date column for it (TSN's own table
-doesn't either), so ours is empty by construction — shown with both sides' values,
-never counted. Counting it would measure a known gap on every row.
+**`RU Eff` is now sourced and counted (v0.39.1, DA2 closed) — this paragraph is the
+history.** The CA HIGHWAYS table gives four attribute blocks an effective date but gives
+population only a code, so the projection had nothing to print. The date was never
+missing: it is `SHS Population.InventoryItemStartDate`, the same layer row the code comes
+from, and its distribution matches the printed column in the same rank order. The Clean
+Road build carries it as the build-only 75th column `THY_POPULATION_EFF_DATE`
+(`clean_highway_columns.BUILD_ONLY_COLUMNS` — `HEADER` stays exactly the TSN 74 because
+the library uses it as the raw extract's exact gate, and `ARC_HEADER` is the strict
+superset our build writes). It is CONTEXT on the vs-TSN side, where TSN has no column to
+compare against, and COUNTED here. **Every column Highway Detail prints now has a source;
+this comparison has no context columns left.** Until v0.39.1 it was emitted empty and
+declared context, because counting a by-construction blank would have measured a known gap
+on every row rather than anything about the report.
 
 **VINTAGE is the first thing to read.** The ArcGIS side is a reconstruction AS OF a
 chosen date; the TSMIS side is a particular day's export. Across a gap the comparison

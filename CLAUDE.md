@@ -100,11 +100,16 @@ pairs county-blind by decision with the exposure measured and disclosed in the N
 manually-stocked `arcgis_layers/` library, which never touches the site.
 
 **Clean Road (v0.29.0) builds the HIGHWAY clean-road file**: our
-own 74-column CA HIGHWAYS table from the owner's per-layer ArcGIS exports in
+own CA HIGHWAYS table from the owner's per-layer ArcGIS exports in
 `arcgis_layers/` (the 40-layer library; county+PM overlay as-of the TSN extract's own
 date; per-column Provenance colour-coded by tier), compared vs the TSN extract in both
-flavors with every column indexed to its source layer and the 24 context columns
-tinted grey in the values sheet (v0.32.0). Blessed statewide canary `CRH-SW-E2`;
+flavors with every column indexed to its source layer and the 25 context columns
+tinted grey in the values sheet (v0.32.0). **`chc.HEADER` is the TSN extract's own
+74-column schema and is the EXACT gate the library loads the raw extract through — never
+add to it.** Our build writes `chc.ARC_HEADER`, a strict superset (TSN's 74 as prefix +
+`BUILD_ONLY_COLUMNS`), so every existing index holds; a build-only column is CONTEXT
+vs TSN, which has no counterpart for it. `THY_POPULATION_EFF_DATE` is the first
+(v0.39.1, DA2 — it is what Highway Detail prints as `RU Eff`). Blessed statewide canary `CRH-SW-E2`;
 measured build rules + provenance tiers in
 [docs/planning/cleanroad-highways.md](docs/planning/cleanroad-highways.md), the family
 in [docs/comparison-engine.md](docs/comparison-engine.md) §9j. `tsn_load_clean_road`
@@ -118,12 +123,13 @@ it against our own export of it** — TSMIS vs TSMIS, so the two sides SHOULD ag
 IS the CA HIGHWAYS table printed (33 of its 34 columns are THY columns), so it PROJECTS
 the Clean Road build — one measured build behind every report rendered this way, and
 the next report is a mapping table, not a second engine. Two rules make it a build
-rather than a rename: THY segments on all 74 columns, so **adjacent spans agreeing
-across every printed column merge into one record** (57,728 → 51,227, vs the export's
-51,327) and the printed Length is the merged span's own extent; and **Description is
-start-anchored** (landmarks are point features), so a following blank continues the
-record. `RU Eff` has **no source** in the THY table and is emitted empty + declared a
-CONTEXT column — shown, never counted. **Read the VINTAGE line first**: the build is a
+rather than a rename: THY segments on every one of its columns, so **adjacent spans
+agreeing across every printed column merge into one record** (57,747 → 51,277, vs the
+export's 51,327) and the printed Length is the merged span's own extent; and
+**Description is start-anchored** (landmarks are point features), so a following blank
+continues the record. **Every printed column is now sourced and counted** — `RU Eff`
+was the last gap and closed in v0.39.1 (DA2: the build carries
+`THY_POPULATION_EFF_DATE` from `SHS Population`). **Read the VINTAGE line first**: the build is a
 reconstruction as-of a chosen date, so the as-of must match the compared export's day
 or the comparison measures network change instead of correctness — the card says so in
 warning colour and the Notes sheet leads with it.

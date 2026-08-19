@@ -18,11 +18,15 @@ collapse to 53,738 printed rows, and route 001's first record then reads
 `R000.129 / 000.075` — the export's own value, which the unmerged THY row
 (0.041) does not.
 
-`RU Eff` has NO source here: the report prints the Rural/Urban effective date,
-and the THY table the build produces carries the population CODE but no date
-column for it (TSN's own table doesn't either). It is emitted EMPTY and declared
-a context column, so the comparison shows it and never counts it. Nothing is
-invented to fill it.
+`RU Eff` used to be the one column with nothing to print from (DA2): the CA
+HIGHWAYS table gives four attribute blocks an effective date but gives population
+only a CODE, so the projection emitted it empty and declared it context. The date
+was never actually missing — it is `SHS Population.InventoryItemStartDate`, the
+same layer row the code comes from — so the Clean Road build now carries it as
+the build-only column `THY_POPULATION_EFF_DATE`
+(`clean_highway_columns.BUILD_ONLY_COLUMNS`) and this projection prints it like
+any other date. Every column the report prints is now sourced and counted; there
+are no context columns left here.
 
 Vintage is the other thing to know: the built workbook is a reconstruction
 AS OF a chosen date, so a faithful comparison needs that as-of date to match the
@@ -79,7 +83,7 @@ PROJECTION = {
     "Acc-Cont Eff": (("THY_ACCESS_EFF_DATE",), "date"),
     "City": (("THY_CITY_CODE",), "code"),
     "RU": (("THY_POPULATION_CODE",), "code"),
-    "RU Eff": ((_NONE,), "no source in the THY build - emitted empty"),
+    "RU Eff": (("THY_POPULATION_EFF_DATE",), "date"),
     "Description": (("THY_LANDMARK_SHORT_DESC",), "text, upper-cased"),
     "NA": (("THY_NON_ADD_CODE",), "'A' (add mileage) prints blank"),
     "LB Eff": (("THY_LEFT_ROAD_EFF_DATE",), "date"),
@@ -130,7 +134,7 @@ CONTEXT_COLUMNS = tuple(name for name, (src, _how) in PROJECTION.items()
 _MERGE_FIELDS = tuple(f for f in hdc.HEADER
                       if f not in ("Post Mile", "Length", "Description"))
 
-_T = {name: i for i, name in enumerate(chc.HEADER)}
+_T = {name: i for i, name in enumerate(chc.ARC_HEADER)}
 
 
 # --------------------------------------------------------------------------- #
@@ -205,7 +209,7 @@ def _project(r):
         "Acc-Cont Eff": _date(_at(r, "THY_ACCESS_EFF_DATE")),
         "City": _s(_at(r, "THY_CITY_CODE")),
         "RU": _s(_at(r, "THY_POPULATION_CODE")),
-        "RU Eff": "",
+        "RU Eff": _date(_at(r, "THY_POPULATION_EFF_DATE")),
         "Description": _desc(_at(r, "THY_LANDMARK_SHORT_DESC")),
         "NA": _na(_at(r, "THY_NON_ADD_CODE")),
         "LB Eff": _date(_at(r, "THY_LEFT_ROAD_EFF_DATE")),
@@ -272,6 +276,18 @@ def built_facts(path):
                 facts["source_build_version"] = _s(val)
             elif key == "Layer library":
                 facts["layer_library"] = _s(val)
+            # HF-01/RB-1: the source build's unassertable spans. A projection
+            # inherits them — the marker token travels into whichever report
+            # column the span would have painted — so the counts travel with
+            # it. An older, skip-free build simply has no such rows.
+            elif key == "Skipped source spans":
+                facts["skipped_source_spans"] = _s(val)
+            elif key == "Marked anchor cells":
+                facts["marked_anchor_cells"] = _s(val)
+            elif key == "Unavailable marker":
+                facts["unavailable_marker"] = _s(val)
+            elif key == "Skipped source reason":
+                facts["skipped_source_reason"] = _s(val)
     finally:
         wb.close()
     return facts
@@ -295,9 +311,22 @@ def is_arcgis_report(path):
         wb.close()
 
 
+def _skipped_spans(facts):
+    """How many source spans the CA HIGHWAYS build could not place, as an int.
+    Absent / unreadable / not a number reads as 0 — a build that says nothing
+    about skips is a build with none (the pre-HF-01 shape), and a bad value is
+    never rounded up into a claim."""
+    try:
+        return max(0, int(str(facts.get("skipped_source_spans", "")).strip()
+                          or 0))
+    except ValueError:      # silent-ok: a marker sheet that does not state a number states nothing
+        return 0
+
+
 def report_facts(path):
     """The build facts THIS module's marker sheet records (as-of date, source
-    workbook, row counts). `{}` when absent/unreadable — never invented."""
+    workbook, row counts, and any unassertable-span counts inherited from the
+    CA HIGHWAYS build). `{}` when absent/unreadable — never invented."""
     from openpyxl import load_workbook
 
     facts = {}
@@ -308,7 +337,11 @@ def report_facts(path):
         keys = {"As-of date": "asof", "Source workbook": "source",
                 "Build version": "build_version",
                 "Report records written": "rows",
-                "Rows merged away": "merged_away", "Routes": "routes"}
+                "Rows merged away": "merged_away", "Routes": "routes",
+                "Skipped source spans": "skipped_source_spans",
+                "Marked anchor cells": "marked_anchor_cells",
+                "Unavailable marker": "unavailable_marker",
+                "Skipped source reason": "skipped_source_reason"}
         for r in wb[MARKER_SHEET].iter_rows(values_only=True):
             if not r or r[0] is None:
                 continue
@@ -340,9 +373,9 @@ def _require_built(path):
         ws = wb[chc.ARC_SHEET]
         it = ws.iter_rows(values_only=True)
         header = [_s(c) for c in (next(it, ()) or ())]
-        if header[:len(chc.HEADER)] != list(chc.HEADER):
+        if header[:len(chc.ARC_HEADER)] != list(chc.ARC_HEADER):
             raise ValueError(
-                f"{path.name} does not carry the {len(chc.HEADER)}-column "
+                f"{path.name} does not carry the {len(chc.ARC_HEADER)}-column "
                 "CA HIGHWAYS header — rebuild the Clean Road Highway workbook.")
         for row in it:
             if row and any(c is not None for c in row):
@@ -473,6 +506,16 @@ def _write_workbook(out_path, rows, stats, facts, source_path):
                        "is the merged span's end PM - begin PM"),
         ("Columns with no source", ", ".join(CONTEXT_COLUMNS) or "(none)"),
     ]
+    # Carried from the source build so the comparison can read the condition
+    # off the side it actually loads, without opening the CA HIGHWAYS workbook
+    # a second time (it may not even still be on disk).
+    if _skipped_spans(facts):
+        lines += [
+            ("Skipped source spans", facts.get("skipped_source_spans", "")),
+            ("Marked anchor cells", facts.get("marked_anchor_cells", "")),
+            ("Unavailable marker", facts.get("unavailable_marker", "")),
+            ("Skipped source reason", facts.get("skipped_source_reason", "")),
+        ]
     for k, v in lines:
         mk.append([k, v])
     mk.column_dimensions["A"].width = 24
@@ -531,17 +574,28 @@ def _consolidate(events, confirm_overwrite, built_path, out_path):
                     "rebuild it and try again.")
 
     _write_workbook(out_path, rows, stats, facts, source)
+    # A projection is exactly as assertable as the build under it. When the CA
+    # HIGHWAYS build could not place a span, its marker token is sitting in
+    # this report's cells too, so this result must not read COMPLETE over it
+    # (the completion is what the comparison and the sidecar go by).
+    skipped = _skipped_spans(facts)
+    marked = facts.get("marked_anchor_cells", "")
     result = ConsolidateResult(
         status="ok",
         message=(f"Built {stats['rows']:,} Highway Detail records "
                  f"({stats['routes']} routes) from the ArcGIS layers as of "
                  f"{asof}. {stats['merged_away']:,} CA HIGHWAYS row(s) merged "
                  f"into a neighbouring record (they split only on columns the "
-                 f"report does not print)."),
+                 f"report does not print)."
+                 + (f" The CA HIGHWAYS build could not place {skipped:,} "
+                    f"source span(s), so {marked} cell(s) here carry "
+                    f"'{facts.get('unavailable_marker', '')}' and assert "
+                    f"nothing." if skipped else "")),
         output_path=str(out_path),
         summary_lines=[f"{REPORT_NAME}: {stats['rows']:,} records, "
                        f"{stats['routes']} routes -> {out_path.name}"],
-        completion=outcome.COMPLETE)
+        skipped_inputs=skipped,
+        completion=outcome.PARTIAL if skipped else outcome.COMPLETE)
     if not consolidation_meta.write_outcome(
             out_path, result,
             extra={"arcgis_report_build": {
@@ -551,6 +605,9 @@ def _consolidate(events, confirm_overwrite, built_path, out_path):
                 "source_workbook": str(source),
                 "source_build_version": facts.get("source_build_version", ""),
                 "context_columns": list(CONTEXT_COLUMNS),
+                "skipped_source_spans": skipped,
+                "marked_anchor_cells": marked,
+                "unavailable_marker": facts.get("unavailable_marker", ""),
                 **stats,
             }}):
         return ConsolidateResult(
