@@ -37,6 +37,15 @@ ROOT = BUILD_DIR.parent
 # those never block in CI either.)
 _COMPILEALL = [sys.executable, "-m", "compileall", "-q",
                str(ROOT / "scripts"), str(ROOT / "build"), str(ROOT / "version.py")]
+# compileall is the one check that WRITES into the tree every other check reads:
+# it rewrites `scripts/__pycache__/*.pyc` while the parallel check processes are
+# importing those same modules and writing the same files. On Windows the atomic
+# rename onto a .pyc another interpreter holds open fails with
+# `PermissionError: [WinError 5]` — which failed the v0.38.3 RELEASE run on
+# `matrix.py` (the most widely imported module) while both `checks` runs on the
+# identical tree passed. So it runs FIRST and ALONE under -j, which removes the
+# race and leaves the pool warm bytecode.
+_SERIAL_FIRST = ("compileall",)
 
 # The comparison-perfection AUDIT INSTRUMENTS (Phase 3/4/6/8 oracles, family gates,
 # product witnesses) also live in build/ and are named check_phase*.py, so the glob
@@ -129,8 +138,17 @@ def main(argv=None):
             passed += 1
 
     if args.jobs > 1:
+        # The tree-WRITING checks go first, alone (see _SERIAL_FIRST); the rest
+        # only read, so they parallelize safely.
+        first = [c for c in checks if c[0] in _SERIAL_FIRST]
+        parallel = [c for c in checks if c[0] not in _SERIAL_FIRST]
+        for name, a in first:
+            report(*_run_one(name, a))
+            if failed and not args.keep_going:
+                parallel = []
+                break
         with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as ex:
-            futures = {ex.submit(_run_one, n, a): n for n, a in checks}
+            futures = {ex.submit(_run_one, n, a): n for n, a in parallel}
             for fut in concurrent.futures.as_completed(futures):
                 report(*fut.result())
                 if failed and not args.keep_going:
