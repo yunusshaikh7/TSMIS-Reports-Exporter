@@ -163,13 +163,22 @@ def main():
     _h, rows = read_out(out)
     check("a differing PRINTED column blocks the merge", len(rows) == 2)
 
-    # A DIFFERENT non-blank description starts a record (a landmark is exactly
-    # what does), while a blank one continues it.
+    # ANY non-blank description starts a record (a landmark is exactly what
+    # does), while a blank one continues it.
     build_source(src, [thy(0.129, 0.170, THY_LANDMARK_SHORT_DESC="JCT 5"),
                        thy(0.170, 0.204, THY_LANDMARK_SHORT_DESC="RAMP NOSE")])
     ah.consolidate(built_path=src, out_path=out, confirm_overwrite=lambda p: True)
     _h, rows = read_out(out)
     check("a DIFFERENT description starts a new record", len(rows) == 2)
+
+    # DA6: a landmark whose text REPEATS the record before it is still its own
+    # record — the export prints 85 that the old rule merged away.
+    build_source(src, [thy(0.129, 0.170, THY_LANDMARK_SHORT_DESC="BEGIN OF COUNTY"),
+                       thy(0.170, 0.204, THY_LANDMARK_SHORT_DESC="BEGIN OF COUNTY")])
+    ah.consolidate(built_path=src, out_path=out, confirm_overwrite=lambda p: True)
+    _h, rows = read_out(out)
+    check("a REPEATED description still starts a new record — a landmark is a "
+          "landmark even when its text is not unique", len(rows) == 2)
 
     # Non-touching spans never merge, however equal.
     build_source(src, [thy(0.129, 0.170), thy(0.200, 0.240)])
@@ -287,11 +296,14 @@ def main():
           == cch.crl.serial_to_date(NEW))
     check("a block with nothing covering it has no date — never invented",
           cch._block_eff_date({}, left, "TWL") is None)
-    check("the clean-road build's own rule is UNCHANGED (oldest member) — it "
-          "reproduces the TSN table and has no ground truth measured here",
+    check("the retired oldest-member rule is still REACHABLE, so the two can "
+          "be scored against each other (DA5 did exactly that)",
           cch._block_eff_date(seg, left) == cch.crl.serial_to_date(OLD)
           and cch._block_eff_date({"TWL": _S(NEW), "SUL": _S(OLD)}, left)
           == cch.crl.serial_to_date(OLD))
+    check("...but the measured rule is the DEFAULT for BOTH builds now (DA5: "
+          "it beat oldest-member against the TSN extract too, on all three)",
+          cch.consolidate.__kwdefaults__["primary_eff"] is True)
     check("every block names a primary, and each is its own layer",
           cch.BLOCK_PRIMARY == {"MED": "MED", "L": "TWL", "R": "TWR"})
     check("...and each primary is a member of the block it leads",

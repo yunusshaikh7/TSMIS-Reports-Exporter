@@ -3,6 +3,34 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.39.3 — 2026-08-20
+
+The block effective-date rule measured in v0.39.2 turns out to be right for the
+Clean Road build too, so it becomes the default everywhere.
+
+- **The Clean Road build adopts the measured rule** (DA5). v0.39.2 left it opt-in
+  because there was said to be no TSN extract to measure against; there was one
+  all along, just not in the staged location. Scored against the TSN CA HIGHWAYS
+  extract on a same-dated build over 52k rows, the primary-layer rule wins on all
+  three columns — `LEFT` 57.7%→59.8%, `MEDIAN` 54.4%→62.0%, `RIGHT` 58.9%→60.2%.
+  Confirmed by a same-layers A/B of the full statewide comparison: **differing
+  cells 287,193 → 281,393, rows matching perfectly 2,841 → 3,687, and pairing
+  bit-identical at 52,629** — the rule moves values, never row identity.
+- **A repeated landmark now starts its own record** (DA6). Two consecutive
+  landmarks with the same text — "BEGIN OF COUNTY" after "BEGIN OF COUNTY" — were
+  merged into one record; the export prints both. Worth 85 records.
+
+Two things this deliberately does NOT claim. Neither rule explains about 40% of
+those columns against the TSN extract (both sit near 60%, where the same columns
+reach 79–80% against the report), so something else still differs there. And row
+boundaries remain misaligned: most of the gap is caused by the effective dates
+themselves still being only ~80% right, not by a boundary rule — see the roadmap.
+
+Also measured, and worth knowing: **the layer library refresh changed the
+historical reconstruction.** Rebuilding as-of 2025-09-08 from the August drop
+finds 146 unplaceable source spans where the July drop found 102. Picking an
+old as-of date does not freeze the answer.
+
 ## v0.39.2 — 2026-08-20
 
 Highway Detail built from the ArcGIS layers gets its own build and its own

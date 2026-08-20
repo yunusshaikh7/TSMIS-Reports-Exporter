@@ -1716,7 +1716,41 @@ cells sum to the same; the real-Excel COM full rebuild of the formulas
 edition equals the values twin cell-for-cell across all 65,164 rows. Oracle
 JSON beside `audit_v0290.py`. Gate 153/153 + ruff clean at the tag.
 
-### CRH-SW-E4 — the DA2 build-only column (OWED: not yet run)
+### CRH-SW-E4 — the DA2 build-only column + the DA5 block-eff-date rule (MEASURED 2026-08-20)
+
+**Superseded the PENDING placeholder that stood here.** It said the dev box could not run
+this canary because no TSN extract was staged. That was wrong: the extract is not in
+`tsn_library/`, but `CA HIGHWAYS 09.08.2025.xlsx` is in the local corpus, and the run was
+made from it.
+
+Two changes since E3, and they were separated by a same-layers A/B rather than attributed
+by assumption:
+
+| | E3 (2026-07-20 layers, oldest-member rule) | control (2026-08-19 layers, oldest-member) | **E4 (2026-08-19 layers, primary rule)** |
+|---|---|---|---|
+| paired | 52,647 | 52,629 | **52,629** |
+| differing cells | 291,127 | 287,193 | **281,393** |
+| fully identical | 2,635 | 2,841 | **3,687** |
+| skipped source spans | 102 | 146 | 146 |
+
+* **The layer refresh** accounts for −3,934 cells, +206 identical, −18 paired — and for
+  the skipped-span count going 102 → **146**. The August drop carries 44 more unplaceable
+  spans in the 2025-09-08 slice than the July drop did; the historical reconstruction is
+  NOT frozen just because the as-of is.
+* **The rule (DA5)** accounts for −5,800 cells and +846 identical rows, with **pairing
+  bit-identical at 52,629** — it moves values only, which is exactly what a per-cell rule
+  change should do.
+
+Also present since E3: `THY_POPULATION_EFF_DATE`, the build-only 75th column (DA2). It is
+CONTEXT here — TSN has no counterpart — so it is shown and never counted, and it does not
+appear in any figure above.
+
+**Not claimed.** These numbers come from the raw extract directly, not from the normalized
+TSN library, and the ArcGIS side is a `partial` build (146 unplaceable spans). Both sides
+of E3 used the July layer drop, which no longer exists on this machine, so the E3 column
+is quoted from its own record rather than re-measured.
+
+### (superseded) CRH-SW-E4 — the DA2 build-only column (OWED: not yet run)
 
 **Status: PENDING on the owner's machine.** v0.39.1 adds a 75th column to the
 BUILT sheet — `THY_POPULATION_EFF_DATE`, sourced from

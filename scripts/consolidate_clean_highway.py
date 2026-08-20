@@ -514,9 +514,9 @@ def _block_eff_date(seg, tags, primary=None):
 
     Two rules, because two callers measured two different answers:
 
-    `primary=None` — the OLDEST member layer's InventoryItemStartDate. This is
-    what the clean-road build uses to reproduce the TSN CA HIGHWAYS table; it
-    was measured on route 001 only, and its own provenance calls it a candidate.
+    `primary=None` — the OLDEST member layer's InventoryItemStartDate. The
+    ORIGINAL rule, measured on route 001 only. Retired as the default in v0.39.3
+    and kept reachable so the two can still be scored against each other.
 
     `primary=<tag>` — that layer's own date, falling back to the NEWEST of the
     block's other layers only where the primary has no covering span. Measured
@@ -531,6 +531,15 @@ def _block_eff_date(seg, tags, primary=None):
     Every single-layer and pairwise combination scored below these; the ranking
     was the same for all three blocks, which is what makes it a rule rather than
     a fit. The fallback fires on 2.3% / 0.1% / 0.4% of rows.
+
+    It also wins against the TSN CA HIGHWAYS extract itself (DA5 — a same-dated
+    build, 52k joined rows), which is why it is the default for BOTH builds and
+    not just the report's. Smaller margins there, and neither rule explains the
+    remaining ~40%, which is its own open question:
+
+        LEFT     min 57.73%  ->  primary  59.83%
+        MEDIAN   min 54.37%  ->  primary  62.01%
+        RIGHT    min 58.85%  ->  primary  60.15%
     """
     if primary is not None:
         span = seg.get(primary)
@@ -573,7 +582,7 @@ def _pick_landmark(values):
 
 
 def _paint_row(route, county, prefix, b, e, seg, kind, pts, asof_date,
-               primary_eff=False):
+               primary_eff=True):
     """One output row (a 74-slot list) for segment [b, e) of `kind` in
     {'base', 'R', 'L'}. ADT/offsets/break-desc are finalized later."""
     m = _ROUTE_TOKEN_RE.match(route)
@@ -767,7 +776,7 @@ def _overlap_len(window, intervals):
 
 
 def _build_cp(route, county, prefix, rbucket, lbucket, pts, asof_date,
-              primary_eff=False):
+              primary_eff=True):
     """All rows for one (route, county, prefix): base rows outside the
     independent windows, R/L rows inside them. HG coverage GAPS yield NO row
     at all — measured on the ORA 001 unconstructed gap, TSN skips the PM
@@ -884,7 +893,7 @@ def _finalize_route(recs):
             put(rec, "THY_BREAK_DESC", best)
 
 
-def _build_route(route, buckets, points, asof_date, primary_eff=False):
+def _build_route(route, buckets, points, asof_date, primary_eff=True):
     """Every output row for one route token, ordered along the route (county
     groups by odometer — ordering only, never a value — then PM)."""
     keys = [k for k in buckets if k[0] == route]
@@ -1455,7 +1464,7 @@ def _resolve_asof(asof):
 # --------------------------------------------------------------------------- #
 def consolidate(events=None, confirm_overwrite=None, day=None, *, asof=None,
                 lib_root=None, out_path=None, routes=None, span_tags=None,
-                primary_eff=False):
+                primary_eff=True):
     """Build the CA HIGHWAYS clean-road workbook from the ArcGIS layer library.
 
     `asof` is the reconstruction date (date / ISO text / Excel serial); None
@@ -1484,7 +1493,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None, *, asof=None,
 
 
 def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes,
-                 span_tags=None, primary_eff=False):
+                 span_tags=None, primary_eff=True):
     lib_root = Path(lib_root) if lib_root else crl.root()
     out_path = Path(out_path) if out_path else OUT_PATH
     lib = crl.inventory(lib_root)

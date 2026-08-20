@@ -136,8 +136,11 @@ CONTEXT_COLUMNS = tuple(name for name, (src, _how) in PROJECTION.items()
 # a difference split route 001's first record in two (000.041 + 000.034) where
 # the export prints one 000.075 record. So a following span whose description is
 # BLANK continues the record and keeps the first one's text; a following span
-# with a DIFFERENT non-blank description starts a new record, because a landmark
-# is exactly what does start one.
+# with ANY non-blank description starts a new record, because a landmark is
+# exactly what does start one — including one whose text repeats the record
+# before it (two consecutive "BEGIN OF COUNTY" landmarks are two records).
+# Measured (DA6): allowing a repeated description to merge cost 85 records the
+# export prints.
 _MERGE_FIELDS = tuple(f for f in hdc.HEADER
                       if f not in ("Post Mile", "Length", "Description"))
 
@@ -448,7 +451,7 @@ def project_rows(built_rows, events=None):
             desc = proj["Description"]
             if (prev is not None and prev[1] == begin
                     and all(prev[2][f] == proj[f] for f in _MERGE_FIELDS)
-                    and desc in ("", prev[2]["Description"])):
+                    and desc == ""):
                 prev[1] = end                       # same printed record, longer
                 merged_away += 1
             else:
