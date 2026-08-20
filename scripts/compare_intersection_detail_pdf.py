@@ -106,35 +106,41 @@ class _IntDetailFileCompare:
     def suggest_name(self, path_a):
         return suggest_route_name(path_a, "Intersection_Detail", self._name_tag)
 
-    def _load_pair(self, path_a, path_b):
+    def _load_pair(self, path_a, path_b, extras=None):
         # CMP-AUD-066: the "TSMIS (PDF)" side must carry the PDF-conversion
         # marker; a vs-Excel second side must not (the TSN side keeps its own
         # normalization gate inside its loader).
         require_pdf_source(path_a, self.file_a_label, "Intersection Detail")
         if self._excel_side_b:
             reject_pdf_source(path_b, self.file_b_label, "Intersection Detail")
-        rows_a, _ = self._load_a(path_a)   # PDF side: same 36-col consolidated layout
-        rows_b, _ = self._load_b(path_b)
+        # Only the vs-TSN flavor builds the Report View: side A supplies its
+        # Locations and side B its TSN-only columns, so both loaders capture.
+        rows_a, _ = (self._load_a(path_a, extras=extras) if extras is not None
+                     else self._load_a(path_a))
+        rows_b, _ = (self._load_b(path_b, extras=extras) if extras is not None
+                     else self._load_b(path_b))
         if self._same_source:
             rows_a = same_source_render_rows(rows_a)
             rows_b = same_source_render_rows(rows_b)
         return rows_a, rows_b, None
 
-    def _schema_for(self, path_a, path_b):
+    def _schema_for(self, path_a, path_b, extras=None):
         """The per-call schema. The vs-TSN flavor adds the 'Report View' replica
         (needs both paths, so it can't be baked into the __init__ schema); every
         other flavor uses the static schema as-is."""
         if self._report_view:
-            return _id.add_report_view(self._schema, path_a, path_b)
+            return _id.add_report_view(self._schema, path_a, path_b, extras=extras)
         return self._schema
 
     def compare(self, path_a, path_b, out_path, events=None, confirm_overwrite=None,
                 mode="formulas", commit_guard=None):
+        extras = {} if self._report_view else None
         return run_files_compare(
-            self._schema_for(path_a, path_b), path_a, path_b, out_path,
+            self._schema_for(path_a, path_b, extras=extras), path_a, path_b, out_path,
             banner=(f"Intersection Detail Comparison — {self.file_a_label} vs "
                     f"{self.file_b_label}"),
-            has_route=True, loader=self._load_pair, deps_ok=_id._DEPS_OK,
+            has_route=True,
+            loader=lambda a, b: self._load_pair(a, b, extras=extras), deps_ok=_id._DEPS_OK,
             side_a=self.file_a_label, side_b=self.file_b_label,
             events=events, confirm_overwrite=confirm_overwrite, mode=mode,
             commit_guard=commit_guard)

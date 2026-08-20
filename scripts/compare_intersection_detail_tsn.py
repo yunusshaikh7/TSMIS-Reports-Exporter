@@ -415,12 +415,27 @@ def require_tsn_raw_header(header):
     ctc.require_exact_raw_header(header, TSN_RAW_HEADER, REPORT_NAME)
 
 
-def tsn_rows_from_raw(path):
+def tsn_rows_from_raw(path, extras=None):
+    """The compared TSN rows from the raw statewide workbook.
+
+    With `extras`, the Report View's one-sided columns are collected in this
+    SAME pass instead of re-opening the file later (E6a). That is exactly
+    equivalent, not merely aligned in practice: `exact_raw_rows` keeps a row on
+    `row_has_data` — the same predicate the standalone reader uses — and RAISES
+    on any row missing LOCATION/POST_MILE, so no accepted workbook can produce
+    a different row set for the two readers."""
     with ctc.exact_raw_rows(
             path, TSN_SHEET, TSN_RAW_HEADER, REPORT_NAME,
             required_nonblank=("LOCATION", "POST_MILE")) as (header, rows_in):
         h = {n: i for i, n in enumerate(header)}
-        return [_tsn_row(r, h) for r in rows_in]
+        if extras is None:
+            return [_tsn_row(r, h) for r in rows_in]
+        onesided, rows = [], []
+        for r in rows_in:
+            onesided.append(_tsn_onesided_row(r, h))
+            rows.append(_tsn_row(r, h))
+        extras["tsn_onesided"] = onesided
+        return rows
 
 
 def _normalized_row(r):
@@ -453,7 +468,7 @@ def _normalized_row(r):
     return out
 
 
-def _load_tsn(path):
+def _load_tsn(path, extras=None):
     path = Path(path)
     try:
         wb = load_workbook(path, read_only=True, data_only=True)
@@ -479,10 +494,14 @@ def _load_tsn(path):
                 "pre-v5: no in-workbook normalization marker")
             rows = [_normalized_row(r)
                     for r in it if r and any(c not in (None, "") for c in r)]
+            if extras is not None:
+                # The normalized library doesn't store these columns; the
+                # replica shows them blank (same as the standalone reader).
+                extras["tsn_onesided"] = None
             return rows, True
     finally:
         wb.close()
-    return tsn_rows_from_raw(path), True
+    return tsn_rows_from_raw(path, extras=extras), True
 
 
 def _tsmis_row_with(r, project):
@@ -518,8 +537,15 @@ def _tsmis_row(r):
     return _tsmis_row_with(r, _project)
 
 
-def _load_tsmis(path):
-    return load_consolidated_rows(
+def _load_tsmis(path, extras=None):
+    locations = [] if extras is not None else None
+
+    def transform(r):
+        if locations is not None:
+            locations.append(_tsmis_location_of(r))
+        return _tsmis_row(r)
+
+    result = load_consolidated_rows(
         path, TSMIS_SHEET,
         missing_sheet_hint="pick the consolidated TSMIS Intersection Detail workbook.",
         bad_header_msg="isn't a CONSOLIDATED Intersection Detail workbook in the "
@@ -529,7 +555,10 @@ def _load_tsmis(path):
                        "used the old 36-column layout, which this version doesn't "
                        "compare.",
         header_ok=_header_ok,
-        row_transform=_tsmis_row)
+        row_transform=transform)
+    if locations is not None:
+        extras["tsmis_locations"] = locations
+    return result
 
 
 # --------------------------------------------------------------------------- #
@@ -789,6 +818,17 @@ def _rv_classify(field, tm, tn):
     return "hard"
 
 
+def _tsn_onesided_row(values, index_of):
+    """The Report View's TSN-only columns for ONE raw row. The single home for
+    that projection: both the in-pass capture and the standalone re-read call
+    it, so they cannot drift."""
+    def gv(col):
+        i = index_of.get(col)
+        return ("" if i is None or i >= len(values) or values[i] is None
+                else str(values[i]).strip())
+    return {k: gv(col) for k, col in _RV_ONE.items()}
+
+
 def _tsn_onesided(path):
     """Raw TSN one-sided columns (the second ML eff-date TSMIS no longer exports +
     the ADT counts) + Location, aligned to the rows `tsn_rows_from_raw` yields.
@@ -809,16 +849,16 @@ def _tsn_onesided(path):
         it = wb[sn].iter_rows(values_only=True)
         hdr = next(it, None) or []
         h = {str(n).strip(): i for i, n in enumerate(hdr) if n is not None}
-        out = []
-        for r in it:
-            if not row_has_data(r):
-                continue
-            out.append({k: ("" if h.get(col) is None or h[col] >= len(r) or r[h[col]] is None
-                            else str(r[h[col]]).strip())
-                        for k, col in _RV_ONE.items()})
-        return out
+        return [_tsn_onesided_row(r, h) for r in it if row_has_data(r)]
     finally:
         wb.close()
+
+
+def _tsmis_location_of(values):
+    """The consolidated TSMIS 'Location' (pos 4) for ONE row — the single home
+    for that projection (see `_tsn_onesided_row`)."""
+    return ("" if len(values) <= 4 or values[4] is None
+            else str(values[4]).strip())
 
 
 def _tsmis_locations(path):
@@ -834,12 +874,7 @@ def _tsmis_locations(path):
             return []
         it = wb[TSMIS_SHEET].iter_rows(values_only=True)
         next(it, None)
-        out = []
-        for r in it:
-            if not row_has_data(r):
-                continue
-            out.append("" if len(r) <= 4 or r[4] is None else str(r[4]).strip())
-        return out
+        return [_tsmis_location_of(r) for r in it if row_has_data(r)]
     finally:
         wb.close()
 
@@ -1106,7 +1141,18 @@ def suggest_name(tsmis_path):
                               "TSMIS_vs_TSN_IntersectionDetail")
 
 
-def add_report_view(schema, tsmis_path, tsn_path):
+def _rv_captured(extras, key, read_again):
+    """The loader's captured column set, or a fresh read when it didn't capture.
+
+    The fallback is what keeps `extras` an optimization rather than a contract:
+    a caller that doesn't thread it (or a loader that didn't reach the capture)
+    still gets the Report View, just at the cost of re-opening the file."""
+    if extras is not None and key in extras:
+        return extras[key]
+    return read_again()
+
+
+def add_report_view(schema, tsmis_path, tsn_path, extras=None):
     """Augment `schema` with the two-line 'Report View' replica — the printed
     Intersection Detail record, comparison-coloured — via the EXISTING
     extra_sheet_writer opt-in plus its Diffs-column self-check. Shared by BOTH
@@ -1117,20 +1163,27 @@ def add_report_view(schema, tsmis_path, tsn_path):
     layout, Location at position 4), so the replica is identical no matter which
     TSMIS render fed the comparison. The TSN-only columns come from the raw TSN
     file (None for a normalized library) and the locations from the consolidated
-    TSMIS — both read lazily inside the writer, so the workbooks are only opened
-    when the sheet is actually built (after a successful load)."""
+    TSMIS. `extras` is the dict the matching loader filled while it was already
+    reading those same two files; without it both are read again here, lazily
+    inside the writer, so the workbooks are only opened when the sheet is
+    actually built (after a successful load)."""
     return dataclasses.replace(
         schema,
         extra_sheet_writer=lambda wb, ctx: _write_report_view(
-            wb, ctx, _tsn_onesided(Path(tsn_path)), _tsmis_locations(Path(tsmis_path))),
+            wb, ctx,
+            _rv_captured(extras, "tsn_onesided",
+                         lambda: _tsn_onesided(Path(tsn_path))),
+            _rv_captured(extras, "tsmis_locations",
+                         lambda: _tsmis_locations(Path(tsmis_path)))),
         report_view_diff_check=("Report View", "B", 2))
 
 
-def _load_pair(tsmis_path, tsn_path):
+def _load_pair(tsmis_path, tsn_path, extras=None):
     """(rows_t, rows_n, warnings) for the shared driver — no input warnings on this
-    FLAT detail pair, so run_compare uses its () default."""
-    rows_t, _ = _load_tsmis(tsmis_path)
-    rows_n, _ = _load_tsn(tsn_path)
+    FLAT detail pair, so run_compare uses its () default. `extras` collects the
+    Report View's own columns from these same two reads."""
+    rows_t, _ = _load_tsmis(tsmis_path, extras=extras)
+    rows_n, _ = _load_tsn(tsn_path, extras=extras)
     return rows_t, rows_n, None
 
 
@@ -1143,6 +1196,9 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
     A per-call schema adds the two-line 'Report View' replica via `add_report_view`
     (the shared extra_sheet_writer opt-in; the flat Comparison sheet is untouched and
     compare_core stays unmodified)."""
+    # One dict, filled by the loader and read by the Report View writer, so the
+    # replica's own columns ride the reads the comparison already performs.
+    extras = {}
     schema = add_report_view(
         # Default provenance: the "Source Files" sheet, composed centrally by
         # run_files_compare. The file route is the consolidated Route column, which
@@ -1150,11 +1206,11 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
         # equate row still names its true per-route export.
         dataclasses.replace(
             _SCHEMA, source_file_a=("intersection_detail", TSMIS_SHEET, "xlsx")),
-        tsmis_path, tsn_path)
+        tsmis_path, tsn_path, extras=extras)
     return ctc.run_files_compare(
         schema, tsmis_path, tsn_path, out_path,
         banner="Intersection Detail Comparison — TSMIS vs TSN", has_route=True,
-        loader=_load_pair, deps_ok=_DEPS_OK,
+        loader=lambda t, n: _load_pair(t, n, extras=extras), deps_ok=_DEPS_OK,
         deps_msg="Required components are missing (openpyxl).",
         events=events, confirm_overwrite=confirm_overwrite, mode=mode,
         commit_guard=commit_guard)

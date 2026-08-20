@@ -3,6 +3,40 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.40.1 — 2026-08-20
+
+Comparisons stopped reading their own inputs twice. **Statewide Intersection
+Detail: another 16.4% off (1.20x)** on top of v0.40.0, with the produced
+workbook byte-for-byte the same one v0.39.3 wrote.
+
+- **The Report View no longer re-opens both input files.** Highway Detail and
+  Intersection Detail print a replica of the real report beside the comparison,
+  and it needs a few columns the comparison itself doesn't carry — the TSN-only
+  ADT block, the TSMIS Location. Those were fetched by re-opening and re-parsing
+  the same two workbooks the loader had just finished reading: **14.0s wasted on
+  Intersection Detail, 27.9s on Highway Detail**, every run. They now ride the
+  read that already happens. Both PDF-sourced flavors get it too.
+- **The two readers can't drift apart**, because each projection now lives in
+  one function that both the in-pass capture and the standalone re-read call.
+  And the re-read is still there: a caller that doesn't hand the loader its
+  collecting dict gets the Report View anyway, just slower. Verified column for
+  column on the real statewide corpus — 60,083 Highway Detail rows and 16,626 +
+  16,459 Intersection Detail rows, exactly equal to what the old path returned.
+
+Measured by alternating the two versions on the same inputs, three paired
+rounds; the package digest was identical on all six runs, and it is the same
+digest v0.39.3 and v0.40.0 produced.
+
+**Also closed, with a measurement instead of an opinion.** The other open item
+was openpyxl's XML writer, which is now the single biggest cost. The one
+available lever — swapping its pure-Python serializer for `lxml` — turns out to
+produce **different bytes** and to be worth about **2%**, so it fails the
+byte-identity bar and buys nothing. A phase breakdown of the remaining 129s
+shows no hot spot left: writing is 70% of the comparison, spread evenly across
+four writers that each serialize content the workbook has to contain. Making
+comparisons meaningfully faster again means not writing a workbook at all, which
+is a product decision rather than a tuning one — the roadmap says so and why.
+
 ## v0.40.0 — 2026-08-20
 
 **Comparisons are about a third faster, and not one cell of output changed.** A

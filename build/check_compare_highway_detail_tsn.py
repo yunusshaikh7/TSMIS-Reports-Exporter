@@ -17,6 +17,7 @@ Run with the build venv:
 """
 import inspect
 import os
+import shutil
 import sys
 import tempfile
 from datetime import datetime
@@ -483,9 +484,72 @@ def test_normalized_library_idempotent():
               "older TSN converter" in str(e) and "rebuild" in str(e))
 
 
+def test_report_view_capture_matches_reread():
+    """E6a: the loader collects the Report View's TSN-only columns while it is
+    already reading that file, on BOTH the raw and the normalized-library path.
+    That is a SPEED change only, so each capture must equal what the standalone
+    reader returns — and dropping it must still produce the replica, since
+    `extras` is an optimization, not a contract."""
+    print("Report View columns captured in-pass == read standalone:")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_hd_capture_"))
+    tsmis, tsn = root / "t.xlsx", root / "n.xlsx"
+    _write_tsmis(tsmis, [
+        _tsmis_row("007", "S000.000", "000.055", "96-12-02", "D", "E", "96-12-02",
+                   None, "R", "96-12-02", "BEGIN SPUR ROUTE 7", "N",
+                   "96-12-02", "H", "02", None, "08", "08", "24", "08", "08",
+                   "96-12-02", "J", "7", "Z", "08V",
+                   "96-12-02", "H", "02", "Z", "08", "08", "24", "08", "08"),
+    ])
+    _write_tsn(tsn, [_tsn_base("000.000", PP="S", NON_ADD="N", L_SF=None)])
+    try:
+        extras = {}
+        hdt._load_pair(tsmis, tsn, extras=extras)
+        check("the loader captured the TSN one-sided columns",
+              "tsn_onesided" in extras)
+        check("captured TSN one-sided == the standalone reader (RAW path)",
+              extras["tsn_onesided"] == hdt._tsn_onesided(tsn))
+        check("the capture is aligned to the compared rows (same length)",
+              extras["tsn_onesided"] is None
+              or len(extras["tsn_onesided"]) == len(hdt._load_tsn(tsn)[0]))
+        # The canonical library path is the one the matrices actually take, so
+        # cover the normalized shape too, not just the raw dump.
+        lib = root / "lib.xlsx"
+        wb = Workbook()
+        ws = wb.active
+        ws.title = hdt.NORMALIZED_SHEET
+        ws.append(["Route"] + hdt.SHARED_HEADER + list(hdt._NORMALIZED_SIDECARS))
+        body = {"Post Mile": "000.080", "HG": "R"}
+        ws.append(["001"] + [body.get(f, "") for f in hdt.SHARED_HEADER]
+                  + ["x"] * len(hdt._NORMALIZED_SIDECARS))
+        ctc.write_normalization_marker(wb, hdt.NORMALIZATION_VERSION)
+        wb.save(lib)
+        wb.close()
+        lib_extras = {}
+        lib_rows, _ = hdt._load_tsn(lib, extras=lib_extras)
+        check("captured TSN one-sided == the standalone reader (LIBRARY path)",
+              lib_extras["tsn_onesided"] == hdt._tsn_onesided(lib))
+        check("the library capture is aligned to its compared rows",
+              lib_extras["tsn_onesided"] is None
+              or len(lib_extras["tsn_onesided"]) == len(lib_rows))
+        check("a v4 library really does carry the Report View sidecar "
+              "(so the assertion above is not vacuously None)",
+              lib_extras["tsn_onesided"] is not None)
+
+        no_capture = hdt.add_report_view(hdt._SCHEMA, tsmis, tsn)
+        with_capture = hdt.add_report_view(hdt._SCHEMA, tsmis, tsn, extras=extras)
+        check("both schemas expose the Report View writer + its diff check",
+              callable(no_capture.extra_sheet_writer)
+              and callable(with_capture.extra_sheet_writer)
+              and no_capture.report_view_diff_check
+              == with_capture.report_view_diff_check)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
 def main():
     test_schema()
     test_report_view_typed_truth()
+    test_report_view_capture_matches_reread()
     test_end_to_end()
     test_roadbed_and_ps()
     test_normalized_library_idempotent()

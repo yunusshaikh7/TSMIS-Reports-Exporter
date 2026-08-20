@@ -19,6 +19,7 @@ Run with the build venv:
 """
 import inspect
 import os
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -612,9 +613,64 @@ def test_whitespace_normalization():
           idt._norm_text(5) == 5)
 
 
+def test_report_view_capture_matches_reread():
+    """E6a: the loader collects the Report View's own columns while it is already
+    reading those files. That is a SPEED change only, so the capture must equal
+    what the standalone readers return — and dropping the capture must still
+    produce the replica, since `extras` is an optimization, not a contract."""
+    print("Report View columns captured in-pass == read standalone:")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_id_capture_"))
+    tsmis, tsn = root / "t.xlsx", root / "n.xlsx"
+    _write_tsmis(tsmis, [
+        _tsmis_row("001", "R", "000.204", "73-10-19", "D", "DAPT", "U", "T", "S",
+                   "Y", "Y", "N", "N", "P", "3", "JCT 5", int_st="73-10-19"),
+        _tsmis_row("001", "R", "001.000", "73-10-19", "D", "DAPT", "U", "T", "A",
+                   "Y", "Y", "N", "N", "P", "4", "JCT 6", int_st="73-10-19"),
+    ])
+    _write_tsn(tsn, [
+        {"PP": "R", "POST_MILE": " 000.204", "LOCATION": "12 ORA 001",
+         "DATE_REC": "73-10-19", "HG": "D", "CITY_CODE": "DAPT", "RU": "U",
+         "TY_INT": "T", "TY_CT": "P", "LT_TY": "Y", "MAIN_SM": "Y",
+         "MAIN_LC": "N", "MAIN_RC": "N", "MAIN_TF": "P", "MAIN_NL": 3,
+         "DESCRIPTION": "JCT 5", "EFF_DATE_INT": "73-10-19",
+         "EFF_DATE_CT": "73-10-19", "EFF_DATE_LT": "73-10-19",
+         "EFF_DATE_ML": "73-10-19", "CROSS_BEGIN_DATE": "73-10-19",
+         "EFF_DATE": "73-10-19"},
+    ])
+    try:
+        extras = {}
+        idt._load_pair(tsmis, tsn, extras=extras)
+        check("the loader captured both column sets",
+              set(extras) == {"tsn_onesided", "tsmis_locations"})
+        check("captured TSN one-sided == the standalone reader",
+              extras["tsn_onesided"] == idt._tsn_onesided(tsn))
+        check("captured TSMIS locations == the standalone reader",
+              extras["tsmis_locations"] == idt._tsmis_locations(tsmis))
+        # The two readers cannot disagree on WHICH rows exist: a row the
+        # consolidated loader keeps but whose Location is blank is REFUSED
+        # outright by `_physical_id_key`, and `exact_raw_rows` raises on a TSN
+        # row missing its identity claims. So this asserts the structural
+        # invariant (one captured slot per compared row); what it really guards
+        # is a future filter change on either side.
+        check("the capture is aligned to the compared rows (same length)",
+              len(extras["tsmis_locations"]) == len(idt._load_tsmis(tsmis)[0])
+              and len(extras["tsn_onesided"]) == len(idt._load_tsn(tsn)[0]))
+        # Without extras the schema must still build the replica by re-reading.
+        no_capture = idt.add_report_view(idt._SCHEMA, tsmis, tsn)
+        with_capture = idt.add_report_view(idt._SCHEMA, tsmis, tsn, extras=extras)
+        check("both schemas expose the Report View writer + its diff check",
+              callable(no_capture.extra_sheet_writer)
+              and callable(with_capture.extra_sheet_writer)
+              and no_capture.report_view_diff_check
+              == with_capture.report_view_diff_check)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
 def main():
     test_schema()
     test_report_view_typed_truth()
+    test_report_view_capture_matches_reread()
     test_end_to_end()
     test_old_format_refused()
     test_route_suffix_match()

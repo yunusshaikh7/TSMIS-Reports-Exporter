@@ -1,6 +1,7 @@
 # Comparison speed — the record
 
-**Status: SHIPPED in v0.40.0.** This is the project record, not an open plan.
+**Status: SHIPPED in v0.40.0, extended in v0.40.1.** This is the project
+record, not an open plan.
 
 Started on `codex/vs-tsn-comparison-speed` (2026-08-19, four commits), taken over
 and reshaped 2026-08-20. Read this before touching `compare_core._styled_cell` or
@@ -152,8 +153,42 @@ Harness: `build/benchmark_vs_tsn_speed.py` (`--writer historical` swaps
 
 ---
 
-## Where the remaining time goes
+## v0.40.1 — the duplicate input reads (roadmap E6a)
 
-Profiled after the change, so the next person does not have to re-derive it.
-See the CHANGELOG entry for v0.40.0 and the roadmap for whether any of it is
-worth taking.
+Both sides were read twice: the loader read the consolidated TSMIS workbook and
+the TSN workbook, then the Report View re-opened and re-parsed the same two
+files for its own columns — **14.0 s on Intersection Detail, 27.9 s on Highway
+Detail**. They now ride the read the comparison already performs.
+Interleaved, 3 paired rounds, statewide Intersection Detail: **229.2 s →
+191.7 s (16.4%, 1.20x)**, one package digest across all six runs. See
+[comparison-engine.md](../comparison-engine.md) §2b for the two rules that keep
+it a speed change.
+
+## Where the remaining time goes — measured, and why it stops here
+
+An undistorted phase breakdown of the 129 s Intersection Detail comparison
+(wrapping each writer, no profiler):
+
+| Phase | Seconds | Share |
+|---|---:|---:|
+| `_write_data_sheet` (the two visible source sheets) | 31.0 | 24% |
+| `_write_snapshot_sheet` (the two hidden integrity snapshots) | 21.9 | 17% |
+| `_write_report_view` | 20.5 | 16% |
+| `_write_comparison` | 16.4 | 13% |
+| input loading (both sides) | 12.0 | 9% |
+| everything else (pairing, diffing, commit, counts, provenance) | 27.3 | 21% |
+
+**Writing is 70% of a comparison, with no hot spot** — four writers, each
+serializing content the workbook must contain. The one available lever on the
+serializer itself was `lxml` (openpyxl uses it when installed): measured, it
+produces **different bytes** and is worth **~2%**, so it fails the acceptance
+bar and buys nothing, quite apart from adding a compiled dependency to the
+frozen work-PC bundle.
+
+So the tuning is finished. The only change left that is worth an order of
+magnitude is **not writing a workbook at all** — a matrix refresh that
+recomputes a cell's verdict and counts and skips serialization. That is a
+product decision, not a performance one: the matrix's green state is bound to a
+committed artifact generation, so a counts-only result cannot be recorded as a
+normal cached cell and would need its own clearly marked, non-certifying state.
+The roadmap carries that note under section E.

@@ -193,6 +193,30 @@ Two facts do NOT depend on machine load, and they are the ones to hold on to:
   it made two full reads. That is a count, not a duration, and
   `check_comparison_artifact_schema` asserts it.
 
+**Neither input is read twice (v0.40.1).** Highway Detail and Intersection
+Detail print a Report View replica that needs a few columns the comparison
+itself doesn't carry — the TSN-only ADT block, the TSMIS Location. Those used to
+be fetched by re-opening the same two workbooks the loader had just read
+(measured: 14.0 s on Intersection Detail, 27.9 s on Highway Detail). The loaders
+now collect them in the pass they were already making, via an `extras` dict the
+comparator threads from `compare()` to `add_report_view`.
+
+Two rules keep that a speed change. Each projection lives in ONE function
+(`_tsn_onesided_row`, `_tsmis_location_of`, `_onesided_row_from_normalized`)
+that both the in-pass capture and the standalone reader call, so they cannot
+drift. And `extras` is an optimization, never a contract: `_rv_captured` falls
+back to the original read whenever a caller didn't thread the dict, so the two
+PDF-sourced flavors, the same-source self-check, and any future caller keep
+working untouched. The row sets provably cannot disagree — `exact_raw_rows`
+raises on a TSN row missing its identity claims and `_physical_id_key` refuses a
+consolidated row with no usable county, so a row one reader keeps and the other
+drops cannot exist in an accepted workbook. `check_compare_highway_detail_tsn`
+and `check_compare_intersection_detail_tsn` hold the capture equal to the
+re-read on both the raw and the normalized-library path.
+
+Interleaved on statewide Intersection Detail, 3 paired rounds: **229.2 s →
+191.7 s (16.4%, 1.20x)**, package digest identical on all six runs.
+
 `build/benchmark_vs_tsn_speed.py` is the repeatable harness; `--writer historical`
 swaps `_styled_cell` back to the pre-cache assignment sequence so the same real
 inputs can be run both ways and the package digests compared. CI cannot reach
