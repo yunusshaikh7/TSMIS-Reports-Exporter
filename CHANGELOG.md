@@ -3,6 +3,48 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.39.2 — 2026-08-20
+
+Highway Detail built from the ArcGIS layers gets its own build and its own
+measured rules. **Differing cells against the real export drop 211,448 →
+180,078, and the number of rows that match perfectly nearly doubles, 9,525 →
+19,132.**
+
+- **The block effective dates were computed the wrong way** (DA1). `LB Eff`,
+  `Med Eff` and `RB Eff` were the oldest date among all five layers in each
+  block — a rule measured on one route, whose own note called it a candidate.
+  Measured properly against the 2026-08-17 export over 44–46k rows, each block's
+  date is its **primary layer's own**: the travel way IS the roadbed and the
+  median layer IS the median; surface, shoulders, special features, barrier and
+  curb are attributes hanging off it, not the thing the date describes. Where the
+  primary layer doesn't cover a stretch it falls back to the newest of the rest
+  (2.3% / 0.1% / 0.4% of rows).
+
+  | | was | now |
+  |---|---|---|
+  | `LB Eff` | 56.6% | **79.0%** |
+  | `Med Eff` | 55.5% | **79.4%** |
+  | `RB Eff` | 57.4% | **79.7%** |
+
+  Every single-layer and pairwise alternative scored lower, and all three blocks
+  ranked identically and independently — which is what makes it a rule rather
+  than a fit. No other column regressed.
+- **Highway Detail now builds itself from the layers.** It no longer reads the
+  Clean Road workbook. The two are reproducing different things: Clean Road
+  reproduces the vendor's CA HIGHWAYS table, so it segments on that table's 74
+  columns; a REPORT wants its own columns' boundaries. Building on its own 19
+  printed layers removes ~3,100 splits it never draws.
+- **It has its own as-of date**, on the Reports sub-tab, defaulting to the export
+  day you're comparing against, with a button to snap to it. A reconstruction
+  dated differently from the export measures network change rather than
+  correctness, and that trap is now designed out instead of only warned about.
+
+The Clean Road build is deliberately UNCHANGED — same segmentation, same
+oldest-member block dates. Those columns are counted in its own vs-TSN
+comparison and its blessed canary, and the report-side evidence suggests the
+same rule would improve them by ~20 points, but that needs measuring against a
+staged TSN extract before anything moves.
+
 ## v0.39.1 — 2026-08-19
 
 Two fixes to the comparison workbook, both found by rechecking Highway Detail

@@ -261,6 +261,62 @@ def main():
     check("...and the comparison arms no rule at all",
           cmp_arc._unavailable_rule(out) == ())
 
+    print("DA1 — the block effective date is its PRIMARY layer's own date:")
+    # Measured 2026-08-19 against the real 2026-08-17 export (44-46k joined
+    # rows per block): the travel way IS the roadbed and the median layer IS
+    # the median, so the block's date is that layer's, not a composite over
+    # every attribute hanging off it. min() scored 56-60%, this scores 78-82%,
+    # and the ranking was identical across all three blocks independently.
+    class _S:
+        def __init__(self, item):
+            self.item = item
+
+    OLD, NEW, OTHER = 20000, 40000, 30000   # Excel serials: old < other < new
+    seg = {"TWL": _S(OLD), "SUL": _S(NEW), "OSL": _S(OTHER)}
+    left = cch._LEFT_TAGS
+    check("the primary layer wins even when it is the OLDEST in its block "
+          "(this is what min() got right by accident and max() got wrong)",
+          cch._block_eff_date(seg, left, "TWL")
+          == cch.crl.serial_to_date(OLD))
+    check("...and even when it is the NEWEST",
+          cch._block_eff_date({"TWL": _S(NEW), "SUL": _S(OLD)}, left, "TWL")
+          == cch.crl.serial_to_date(NEW))
+    check("where the primary has NO covering span it falls back to the "
+          "NEWEST of the block's other layers",
+          cch._block_eff_date({"SUL": _S(OLD), "OSL": _S(NEW)}, left, "TWL")
+          == cch.crl.serial_to_date(NEW))
+    check("a block with nothing covering it has no date — never invented",
+          cch._block_eff_date({}, left, "TWL") is None)
+    check("the clean-road build's own rule is UNCHANGED (oldest member) — it "
+          "reproduces the TSN table and has no ground truth measured here",
+          cch._block_eff_date(seg, left) == cch.crl.serial_to_date(OLD)
+          and cch._block_eff_date({"TWL": _S(NEW), "SUL": _S(OLD)}, left)
+          == cch.crl.serial_to_date(OLD))
+    check("every block names a primary, and each is its own layer",
+          cch.BLOCK_PRIMARY == {"MED": "MED", "L": "TWL", "R": "TWR"})
+    check("...and each primary is a member of the block it leads",
+          cch.BLOCK_PRIMARY["L"] in cch._LEFT_TAGS
+          and cch.BLOCK_PRIMARY["R"] in cch._RIGHT_TAGS)
+
+    print("the report is built on its OWN layers, not the TSN table's:")
+    check("the five layers Highway Detail never prints are excluded, so a "
+          "split on them is not a row of this report",
+          set(cch.SPAN_LAYERS) - set(ah.SEGMENT_TAGS)
+          == {"TVS", "TER", "DSP", "TOLL", "FOR"})
+    check("...and every layer feeding a PRINTED column is still in",
+          all(t in ah.SEGMENT_TAGS
+              for t in ("HG", "ACC", "POP", "CITY", "NON", "NET")
+              + tuple(cch._LEFT_TAGS) + tuple(cch._RIGHT_TAGS)
+              + ("MED", "BAR", "CURB")))
+    check("an unknown tag is refused rather than silently ignored",
+          _raises(lambda: cch.consolidate(
+              lib_root=tmp, out_path=out, span_tags=("HG", "NOPE"),
+              asof="2026-08-17", confirm_overwrite=lambda p: True),
+              "unknown span layer")
+          or cch.consolidate(lib_root=tmp, out_path=out,
+                             span_tags=("HG", "NOPE"), asof="2026-08-17",
+                             confirm_overwrite=lambda p: True).status == "error")
+
     print("identity + role gates:")
     check("our build identifies itself", ah.is_arcgis_report(out))
     facts = ah.report_facts(out)

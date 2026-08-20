@@ -972,11 +972,14 @@ rendered from the ArcGIS layer library by `arcgis_report_highway_detail`; side B
 app's own consolidated Highway Detail export for a chosen day. It lives on the **ArcGIS
 tab's "Reports vs layers" sub-tab**, not in `COMPARE_REPORTS` or the matrices.
 
-**Side A is a PROJECTION, not a second build.** Highway Detail *is* the CA HIGHWAYS
-table printed — 33 of its 34 columns are THY columns under report labels — so the
-module maps the Clean Road build (§9j) onto the report's own shape rather than
-re-deriving anything from the layers. One measured build (the `CRH-SW-E2` canary) sits
-behind every report rendered this way, and the next report is a mapping table.
+**Side A has its OWN build (v0.39.2).** It shares the span engine with Clean Road but
+not that build's output, because the two reproduce different things: Clean Road
+reproduces the vendor's CA HIGHWAYS table, so it segments on TSN's 74 columns and dates
+its blocks the way TSN's table was measured; a REPORT gets its own segmentation and its
+own measured rules. Two passes — the engine over `SEGMENT_TAGS` (the 19 layers this
+report prints) with `primary_eff` block dates, then the projection onto the 34 printed
+columns. Tying it to Clean Road's output cost ~6,500 boundaries the report never draws
+and a block-date rule that scored 56-60% where the report's own scores 79-80% (DA1).
 
 Two rules make it a build rather than a column rename, both measured on the 2025-09-08
 build (57,728 THY rows → **51,227** records, against the export's 51,327):

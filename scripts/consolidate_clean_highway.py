@@ -502,11 +502,48 @@ def _seg_num(seg, tag, pos=0):
     return int(f) if f == int(f) else f
 
 
-def _block_eff_date(seg, tags):
-    """The composite block effective date: the OLDEST member layer's
-    InventoryItemStartDate over the covering spans (measured on route 001 —
-    newest lost to 1964-domain dates; single layers agree only 82–96%, the
-    block date is a composite and this is the closer candidate)."""
+# Each roadbed/median block's PRIMARY layer — the one the block is actually
+# about. The travel way IS the roadbed; the median layer IS the median. The
+# other member layers describe attributes attached to it (surface, shoulders,
+# special features, barrier, curb).
+BLOCK_PRIMARY = {"MED": "MED", "L": "TWL", "R": "TWR"}
+
+
+def _block_eff_date(seg, tags, primary=None):
+    """One block's effective date.
+
+    Two rules, because two callers measured two different answers:
+
+    `primary=None` — the OLDEST member layer's InventoryItemStartDate. This is
+    what the clean-road build uses to reproduce the TSN CA HIGHWAYS table; it
+    was measured on route 001 only, and its own provenance calls it a candidate.
+
+    `primary=<tag>` — that layer's own date, falling back to the NEWEST of the
+    block's other layers only where the primary has no covering span. Measured
+    2026-08-19 against the real 2026-08-17 Highway Detail export over 44–46k
+    joined rows, which is the first time this had a ground truth to be measured
+    against (DA1):
+
+        LB Eff   min 56.57%  ->  TWL else newest  77.92%
+        Med Eff  min 57.77%  ->  MED else newest  81.51%
+        RB Eff   min 59.74%  ->  TWR else newest  81.71%
+
+    Every single-layer and pairwise combination scored below these; the ranking
+    was the same for all three blocks, which is what makes it a rule rather than
+    a fit. The fallback fires on 2.3% / 0.1% / 0.4% of rows.
+    """
+    if primary is not None:
+        span = seg.get(primary)
+        if span is not None and span.item is not None:
+            return crl.serial_to_date(span.item)
+        best = None
+        for tag in tags:
+            if tag == primary:
+                continue
+            other = seg.get(tag)
+            if other is not None and other.item is not None:
+                best = other.item if best is None else max(best, other.item)
+        return crl.serial_to_date(best)
     best = None
     for tag in tags:
         span = seg.get(tag)
@@ -535,7 +572,8 @@ def _pick_landmark(values):
     return max(texts, key=len) if texts else None
 
 
-def _paint_row(route, county, prefix, b, e, seg, kind, pts, asof_date):
+def _paint_row(route, county, prefix, b, e, seg, kind, pts, asof_date,
+               primary_eff=False):
     """One output row (a 74-slot list) for segment [b, e) of `kind` in
     {'base', 'R', 'L'}. ADT/offsets/break-desc are finalized later."""
     m = _ROUTE_TOKEN_RE.match(route)
@@ -556,7 +594,11 @@ def _paint_row(route, county, prefix, b, e, seg, kind, pts, asof_date):
     put("THY_HIGHWAY_GROUP_CODE", _seg_code(seg, "HG"))
     put("THY_EXTRACT_DATE", asof_date)
 
-    put("THY_MEDIAN_EFF_DATE", _block_eff_date(seg, ("MED", "BAR", "CURB")))
+    def _eff(block, tags):
+        return _block_eff_date(
+            seg, tags, BLOCK_PRIMARY[block] if primary_eff else None)
+
+    put("THY_MEDIAN_EFF_DATE", _eff("MED", ("MED", "BAR", "CURB")))
     put("THY_MEDIAN_TYPE_CODE", _seg_code(seg, "MED", 0))
     put("THY_MEDIAN_WIDTH_AMT", _seg_num(seg, "MED", 1))
     put("THY_MEDIAN_WIDTH_VAR_CODE", _seg_code(seg, "MED", 2))
@@ -587,7 +629,7 @@ def _paint_row(route, county, prefix, b, e, seg, kind, pts, asof_date):
         put("THY_SEG_ORDER_ID", _seg_num(seg, "NET", 1))
 
     if kind in ("base", "R"):
-        put("THY_RIGHT_ROAD_EFF_DATE", _block_eff_date(seg, _RIGHT_TAGS))
+        put("THY_RIGHT_ROAD_EFF_DATE", _eff("R", _RIGHT_TAGS))
         put("THY_RT_SURF_TYPE_CODE", _seg_code(seg, "SUR"))
         put("THY_RT_TRAV_WAY_WIDTH_AMT", _seg_num(seg, "TWR", 0))
         put("THY_RT_LANES_AMT", _seg_num(seg, "TWR", 1))
@@ -597,7 +639,7 @@ def _paint_row(route, county, prefix, b, e, seg, kind, pts, asof_date):
         put("THY_RT_I_SHD_TOT_WIDTH_AMT", _seg_num(seg, "ISR", 0))
         put("THY_RT_I_SHD_TRT_WIDTH_AMT", _seg_num(seg, "ISR", 1))
     if kind in ("base", "L"):
-        put("THY_LEFT_ROAD_EFF_DATE", _block_eff_date(seg, _LEFT_TAGS))
+        put("THY_LEFT_ROAD_EFF_DATE", _eff("L", _LEFT_TAGS))
         put("THY_LT_SURF_TYPE_CODE", _seg_code(seg, "SUL"))
         put("THY_LT_TRAV_WAY_WIDTH_AMT", _seg_num(seg, "TWL", 0))
         put("THY_LT_LANES_AMT", _seg_num(seg, "TWL", 1))
@@ -724,7 +766,8 @@ def _overlap_len(window, intervals):
     return total
 
 
-def _build_cp(route, county, prefix, rbucket, lbucket, pts, asof_date):
+def _build_cp(route, county, prefix, rbucket, lbucket, pts, asof_date,
+              primary_eff=False):
     """All rows for one (route, county, prefix): base rows outside the
     independent windows, R/L rows inside them. HG coverage GAPS yield NO row
     at all — measured on the ORA 001 unconstructed gap, TSN skips the PM
@@ -754,7 +797,7 @@ def _build_cp(route, county, prefix, rbucket, lbucket, pts, asof_date):
             continue
         kind = "R" if crl.code_of(hg.vals[0]) == "R" else "base"
         rows.append(_paint_row(route, county, prefix, b, e, seg, kind, pts,
-                               asof_date))
+                               asof_date, primary_eff))
 
     # The L universe: the L-alignment whole-road spans exist only on the
     # independent stretches; left-side layers clipped INTO those windows.
@@ -769,7 +812,7 @@ def _build_cp(route, county, prefix, rbucket, lbucket, pts, asof_date):
         if hg is None or crl.code_of(hg.vals[0]) != "L":
             continue
         rows.append(_paint_row(route, county, prefix, b, e, seg, "L", pts,
-                               asof_date))
+                               asof_date, primary_eff))
     return rows
 
 
@@ -841,7 +884,7 @@ def _finalize_route(recs):
             put(rec, "THY_BREAK_DESC", best)
 
 
-def _build_route(route, buckets, points, asof_date):
+def _build_route(route, buckets, points, asof_date, primary_eff=False):
     """Every output row for one route token, ordered along the route (county
     groups by odometer — ordering only, never a value — then PM)."""
     keys = [k for k in buckets if k[0] == route]
@@ -865,7 +908,7 @@ def _build_route(route, buckets, points, asof_date):
         lbucket = buckets.get((route, "L", county, prefix), {})
         pts = points.get((route, county, prefix), {})
         cp_rows = _build_cp(route, county, prefix, rbucket, lbucket, pts,
-                            asof_date)
+                            asof_date, primary_eff)
         cp_rows.sort(key=lambda r: (r["b"], {"base": 0, "R": 1,
                                              "L": 2}[r["kind"]]))
         _apply_adt(cp_rows)
@@ -1411,23 +1454,37 @@ def _resolve_asof(asof):
 # the public consolidate()
 # --------------------------------------------------------------------------- #
 def consolidate(events=None, confirm_overwrite=None, day=None, *, asof=None,
-                lib_root=None, out_path=None, routes=None):
+                lib_root=None, out_path=None, routes=None, span_tags=None,
+                primary_eff=False):
     """Build the CA HIGHWAYS clean-road workbook from the ArcGIS layer library.
 
     `asof` is the reconstruction date (date / ISO text / Excel serial); None
     resolves it from the staged TSN clean-road extract so the comparison is
     same-dated by default. `routes` (a set of route tokens) restricts the
-    build — a development/verification convenience, never exposed in the UI."""
+    build — a development/verification convenience, never exposed in the UI.
+
+    `span_tags` restricts WHICH span layers take part. It is not an
+    optimization: `crl.overlay` cuts a segment wherever ANY supplied span
+    changes, so the tag set IS the segmentation. The full set reproduces the
+    TSN CA HIGHWAYS table (that table's own 74 columns are what it segments
+    on). A REPORT built from these layers wants its OWN columns' boundaries
+    instead — a split on a layer the report never prints is not a row of that
+    report — so a report build passes its own set (see
+    `arcgis_report_highway_detail.SEGMENT_TAGS`). Columns fed only by an
+    omitted layer come out empty, which is why only a caller that does not
+    print them may omit one. None = every layer = the clean-road build."""
     del day     # ConsolidateWorker passes it; the library build has no run days
     events = events or Events()
     try:
         return _consolidate(events, confirm_overwrite, asof=asof,
-                            lib_root=lib_root, out_path=out_path, routes=routes)
+                            lib_root=lib_root, out_path=out_path, routes=routes,
+                            span_tags=span_tags, primary_eff=primary_eff)
     except ValueError as e:
         return ConsolidateResult(status="error", message=str(e))
 
 
-def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes):
+def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes,
+                 span_tags=None, primary_eff=False):
     lib_root = Path(lib_root) if lib_root else crl.root()
     out_path = Path(out_path) if out_path else OUT_PATH
     lib = crl.inventory(lib_root)
@@ -1456,7 +1513,11 @@ def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes)
     buckets = defaultdict(lambda: defaultdict(list))
     points = defaultdict(dict)
     parked, warnings, skips = [], [], []
-    for tag in SPAN_LAYERS:
+    tags = tuple(span_tags) if span_tags else tuple(SPAN_LAYERS)
+    unknown = [t for t in tags if t not in SPAN_LAYERS]
+    if unknown:
+        raise ValueError(f"Unknown span layer tag(s): {', '.join(unknown)}")
+    for tag in tags:
         if events.is_cancelled():
             return _cancelled(events)
         _read_span_layer(lib, index, tag, asof=asof_serial, events=events,
@@ -1483,7 +1544,8 @@ def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes)
     for i, route in enumerate(all_routes, start=1):
         if events.is_cancelled():
             return _cancelled(events)
-        rows.extend(_build_route(route, buckets, points, asof_date))
+        rows.extend(_build_route(route, buckets, points, asof_date,
+                                 primary_eff))
         if i % 25 == 0 or i == len(all_routes):
             events.on_log(f"  built {i}/{len(all_routes)} routes "
                           f"({len(rows):,} rows)")

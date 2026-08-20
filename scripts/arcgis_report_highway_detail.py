@@ -1,22 +1,29 @@
 """Build OUR Highway Detail report from the ArcGIS layer library.
 
-The Clean Road build (`consolidate_clean_highway`) already rebuilds the vendor's
-74-column `CA HIGHWAYS` table from the owner's per-layer ArcGIS exports. Highway
-Detail is that same table PRINTED: 33 of its 34 columns are THY columns under
-report labels. So this module does not re-derive anything from the layers — it
-PROJECTS the built THY workbook onto the report's own shape, which keeps one
-measured build (the blessed `CRH-SW-E2` canary) behind every report we render
-this way and makes the next report a mapping table rather than a second engine.
+This report has its OWN build (v0.39.2). It shares the span engine with the
+Clean Road build but not that build's output, because the two are reproducing
+different things: Clean Road reproduces the vendor's 74-column `CA HIGHWAYS`
+table, so it segments on TSN's columns and dates its blocks the way TSN's table
+was measured. Highway Detail is a REPORT, and gets its own segmentation and its
+own measured rules. Two passes:
 
-The projection is not a column rename. THY segments on ALL 74 columns; Highway
-Detail prints 34 of them, so a THY row boundary that exists only because of a
-column the report never shows (the ADT/profile block, most often) is NOT a row
-boundary in the report. Adjacent spans that agree across every printed column
-and touch exactly are therefore MERGED, and the merged span's own end minus
-begin is the printed Length. Measured on the 2025-09-08 build: 57,728 THY rows
-collapse to 53,738 printed rows, and route 001's first record then reads
-`R000.129 / 000.075` — the export's own value, which the unmerged THY row
-(0.041) does not.
+  1. the shared span engine over `SEGMENT_TAGS` — the 19 layers this report
+     actually prints — with `primary_eff` block dates;
+  2. the projection of that table onto the report's 34 printed columns.
+
+Building it off the Clean Road output instead cost twice, measured against the
+real 2026-08-17 export: ~6,500 boundaries the report never draws (splits on
+ADT/terrain/design-speed/toll/forest, undone afterwards by the merge pass and
+only where every printed column happened to agree), and a block effective date
+computed as the OLDEST of five member layers, which scored 56-60% where the
+report's own rule scores 79-80% (DA1).
+
+The projection is still not a column rename: even on this report's own layers a
+boundary can exist where no printed value changes (a re-inventoried span, a
+segment-order change), so adjacent spans that agree across every printed column
+and touch exactly are MERGED, and the merged span's own end minus begin is the
+printed Length. Route 001's first record reads `R000.129 / 000.075` — the
+export's own value, which the unmerged span (0.041) does not.
 
 `RU Eff` used to be the one column with nothing to print from (DA2): the CA
 HIGHWAYS table gives four attribute blocks an effective date but gives population
@@ -133,6 +140,31 @@ CONTEXT_COLUMNS = tuple(name for name, (src, _how) in PROJECTION.items()
 # is exactly what does start one.
 _MERGE_FIELDS = tuple(f for f in hdc.HEADER
                       if f not in ("Post Mile", "Length", "Description"))
+
+# The span layers THIS REPORT is built from — and therefore the ones its row
+# boundaries are cut on. `crl.overlay` splits a segment wherever ANY supplied
+# span changes, so the tag set IS the segmentation.
+#
+# The Clean Road build supplies all 25 because it is reproducing the TSN CA
+# HIGHWAYS table, which segments on its own 74 columns. Highway Detail prints 34
+# of them, so building it through that segmentation produced ~6,500 splits the
+# report does not draw and needed a merge pass to undo them — which only worked
+# where every printed column happened to agree, and left the block effective
+# dates fragmenting `Length` wherever they flickered (DA1).
+#
+# Building on the report's OWN layers puts the boundaries where the report puts
+# them, so nothing has to be undone. These are the five the report never prints:
+#
+#   TVS   ADT / profile / change-per-mile
+#   TER   terrain
+#   DSP   design speed
+#   TOLL  toll type
+#   FOR   forest highway
+#
+# `check_arcgis_report` derives the same set from PROJECTION + the clean-road
+# PROVENANCE table and fails if this list drifts from what the report prints.
+_NOT_PRINTED = ("TVS", "TER", "DSP", "TOLL", "FOR")
+SEGMENT_TAGS = tuple(t for t in cch.SPAN_LAYERS if t not in _NOT_PRINTED)
 
 _T = {name: i for i, name in enumerate(chc.ARC_HEADER)}
 
@@ -531,19 +563,60 @@ def _write_workbook(out_path, rows, stats, facts, source_path):
 # --------------------------------------------------------------------------- #
 # public entry point
 # --------------------------------------------------------------------------- #
-def consolidate(events=None, confirm_overwrite=None, day=None, *,
-                built_path=None, out_path=None):
-    """Project the built CA HIGHWAYS workbook onto the Highway Detail report.
+SOURCE_TABLE = "highway_detail_source_table.xlsx"
 
-    `built_path` defaults to the Clean Road build's own output; `out_path` to
-    `output/arcgis_reports/`. The destination is app-owned and a rebuild
-    replaces it by design (same contract as the Clean Road build)."""
+
+def consolidate(events=None, confirm_overwrite=None, day=None, *,
+                built_path=None, out_path=None, asof=None, lib_root=None):
+    """Build the Highway Detail report FROM THE ARCGIS LAYERS.
+
+    The report is built in two measured passes over the layer library, not by
+    reading the Clean Road output:
+
+      1. the shared span engine over THIS REPORT'S OWN layers
+         (`SEGMENT_TAGS`) with the report's own block-eff-date rule
+         (`primary_eff`), producing its CA HIGHWAYS source table;
+      2. the projection onto the report's 34 printed columns.
+
+    It reads the Clean Road build ONLY when `built_path` is given explicitly
+    (verification, and the golden check's synthetic fixtures). That separation is
+    the point: the Clean Road build reproduces the TSN table, so it segments on
+    TSN's 74 columns and dates its blocks the way TSN's own table was measured.
+    A REPORT wants its own columns' boundaries and its own measured rule, and
+    tying the two made the report inherit ~6,500 splits it does not print plus a
+    block-date rule that scored 56-60% against the real export (DA1).
+
+    `asof` is the reconstruction date — set it to the export day being compared
+    against, or the comparison measures network change instead of correctness.
+    `out_path` defaults to `output/arcgis_reports/`; the destination is app-owned
+    and a rebuild replaces it by design."""
     del day                       # ConsolidateWorker passes it; no run days here
     events = events or Events()
     try:
+        if built_path is None:
+            built_path = _build_source_table(events, out_path, asof, lib_root)
+            if isinstance(built_path, ConsolidateResult):
+                return built_path      # the build failed / was cancelled
         return _consolidate(events, confirm_overwrite, built_path, out_path)
     except ValueError as e:
         return ConsolidateResult(status="error", message=str(e))
+
+
+def _build_source_table(events, out_path, asof, lib_root):
+    """Pass 1: this report's own CA HIGHWAYS table, from the layers. Returns its
+    path, or the failed ConsolidateResult to hand straight back.
+
+    Kept on disk beside the report (not a temp) because it IS the report's
+    source of record: the Provenance and marker sheets point at it, and a
+    question about a printed cell is answered by the row it came from."""
+    dest = (Path(out_path).parent if out_path else OUT_DIR) / SOURCE_TABLE
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    res = cch.consolidate(events=events, confirm_overwrite=lambda p: True,
+                          asof=asof, lib_root=lib_root, out_path=dest,
+                          span_tags=SEGMENT_TAGS, primary_eff=True)
+    if res.status != "ok":
+        return res
+    return dest
 
 
 def _consolidate(events, confirm_overwrite, built_path, out_path):

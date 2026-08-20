@@ -94,6 +94,21 @@ Population, `THY_NON_ADD_CODE` ← SHS Non Add Mileage (flag → `N`, default `A
 `THY_CITY_CODE` ← City (`SHS_` rows only), `THY_RECORD_DATE` + `THY_SEG_ORDER_ID`
 ← SHS Inv Network Date (`Network_Start_Date`, `SegOrderId`).
 
+**Block effective dates — two rules, deliberately (v0.39.2, DA1).**
+`_block_eff_date` computes `THY_LEFT_ROAD_EFF_DATE` / `THY_MEDIAN_EFF_DATE` /
+`THY_RIGHT_ROAD_EFF_DATE`. The clean-road build (this doc's subject) keeps the ORIGINAL
+rule — the OLDEST `InventoryItemStartDate` among the block's member layers, measured on
+route 001. A REPORT build passes `primary_eff=True` and gets the rule measured against
+the real TSMIS export over 44-46k rows: **the block's PRIMARY layer's own date**
+(`BLOCK_PRIMARY` — travel way for a roadbed, the median layer for the median), falling
+back to the NEWEST of the block's other layers only where the primary has no covering
+span. It scored 79-80% where the oldest-member rule scored 56-60%.
+
+They differ only because the clean-road side has never been measured: Highway Detail
+PRINTS `THY_LEFT_ROAD_EFF_DATE`, so the report's rule is very likely right here too, but
+these columns are COUNTED in the vs-TSN comparison and its blessed canary and the dev box
+has no staged TSN extract. Roadmap **DA5** owns that measurement.
+
 **Build-only columns (v0.39.1)** — ours, with no TSN counterpart, so CONTEXT in the
 vs-TSN comparison and never counted there. `chc.HEADER` stays exactly TSN's 74 (the
 library loads the raw extract through it as an exact gate); `chc.ARC_HEADER` =

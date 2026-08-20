@@ -154,10 +154,10 @@ async function renderArcgisReports() {
   $("agRepSourceMeta").textContent = src.exists
     ? (src.asof ? "as of " + src.asof : "built") : "not built yet";
   $("agRepSource").textContent = src.exists
-    ? `The Highway Detail report is projected from this workbook — it is the CA `
-      + `HIGHWAYS table, and the report is that table printed.   ·   ${src.path}`
-    : "No Clean Road Highway workbook yet — build it on the Clean Road sub-tab "
-      + "first. The report is projected from it, not from the layers directly.";
+    ? `This report's own source table, built from the layers it prints.`
+      + `   ·   ${src.path}`
+    : "Not built yet — Build makes it from the ArcGIS layers. This report has "
+      + "its own build and does not read the Clean Road workbook.";
 
   $("agRepHdMeta").textContent = built.exists
     ? `${Number(built.rows || 0).toLocaleString()} records`
@@ -169,6 +169,11 @@ async function renderArcgisReports() {
          ? `   ·   ${Number(built.merged_away).toLocaleString()} CA HIGHWAYS rows merged `
            + `(they split only on columns Highway Detail doesn't print)` : "")
     : "Not built yet — Build renders the layers as Highway Detail's own 34 columns.";
+
+  // The as-of box defaults to the export day, because a same-date pair is the
+  // only kind that measures correctness rather than network change.
+  const asofBox = $("agRepAsof");
+  if (asofBox && !asofBox.value && built.asof) asofBox.value = built.asof;
 
   // Export-day picker: only days whose Highway Detail is CONSOLIDATED.
   const sel = $("agRepDay");
@@ -190,6 +195,7 @@ async function renderArcgisReports() {
 
   // The vintage line — the first thing that makes this comparison honest.
   const day = sel.value, asof = built.asof || (src.exists ? src.asof : "");
+  if (asofBox && !asofBox.value && day) asofBox.value = day;
   const vint = $("agRepVintage");
   if (!day || !asof) {
     vint.textContent = "";
@@ -224,8 +230,14 @@ function bindArcgis() {
   $("btnAgRepOpenOut").onclick = () => api.open_arcgis_reports_folder();
   $("btnAgRepCancel").onclick = () => api.cancel_run();
   $("agRepDay").onchange = () => renderArcgisReports();
+  const asofDayBtn = $("btnAgRepAsofDay");
+  if (asofDayBtn) asofDayBtn.onclick = () => {
+    const d = $("agRepDay") && $("agRepDay").value;
+    if (d) $("agRepAsof").value = d;
+  };
   $("btnAgRepBuild").onclick = async () => {
-    const r = await api.start_arcgis_report_build();
+    const box = $("agRepAsof");
+    const r = await api.start_arcgis_report_build(box ? box.value.trim() : "");
     if (r && r.error) showMessage("error", "Can't build", r.error);
   };
   $("btnAgRepCompare").onclick = async () => {

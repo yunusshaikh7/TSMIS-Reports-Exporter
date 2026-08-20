@@ -19,6 +19,7 @@ Both comparisons ride the shared `_begin_compare` claim → save-dialog → laun
 tail like every other comparison (formulas + values twins included).
 Composition only — every `self._*` it touches lives on GuiApi.
 """
+import functools
 import logging
 from pathlib import Path
 
@@ -109,17 +110,21 @@ class GuiArcgisMixin:
     # ------------------------------------------------------------------ #
     @_api_method
     def arcgis_report_status(self):
-        """The Reports sub-tab's one status payload: the Clean Road build this
-        projects FROM (with its as-of date), our built report, and the export
-        days available as the TSMIS side. Pure filesystem; no task lock."""
+        """The Reports sub-tab's one status payload: the report's OWN source
+        table (with its as-of date), our built report, and the export days
+        available as the TSMIS side. Pure filesystem; no task lock.
+
+        `source` is this report's own build (v0.39.2), not the Clean Road
+        workbook — the report no longer reads that. The key name is unchanged so
+        the sub-tab's status card keeps working."""
         import arcgis_report_highway_detail as ah
-        import consolidate_clean_highway as cch
         import consolidate_highway_detail as chd
         import paths
 
-        source = {"exists": cch.OUT_PATH.is_file(), "path": str(cch.OUT_PATH)}
+        src_path = ah.OUT_DIR / ah.SOURCE_TABLE
+        source = {"exists": src_path.is_file(), "path": str(src_path)}
         if source["exists"]:
-            source.update(self._arcgis_built_marker(cch.OUT_PATH))
+            source.update(self._arcgis_built_marker(src_path))
         built = {"exists": ah.OUT_PATH.is_file(), "path": str(ah.OUT_PATH)}
         if built["exists"]:
             try:
@@ -141,17 +146,24 @@ class GuiArcgisMixin:
         }
 
     @_api_method
-    def start_arcgis_report_build(self):
-        """Project the CA HIGHWAYS build onto the Highway Detail report shape.
+    def start_arcgis_report_build(self, asof=None):
+        """Build Highway Detail FROM THE LAYERS (v0.39.2 — it no longer needs,
+        or reads, the Clean Road build). `asof` is the reconstruction date:
+        set it to the export day you mean to compare against, or the comparison
+        measures network change instead of correctness. Empty resolves the same
+        way the Clean Road build's does, from the staged TSN extract.
+
         The destination is app-owned (output/arcgis_reports) and a rebuild
         replaces it by design."""
         import arcgis_report_highway_detail as ah
-        import consolidate_clean_highway as cch
+        import clean_road_layers as crl
 
-        if not cch.OUT_PATH.is_file():
-            return {"error": "Build the Clean Road Highway workbook first — the "
-                             "report is projected from it, not from the layers "
-                             "directly."}
+        missing = crl.inventory().get("missing") or []
+        if missing:
+            return {"error": "The ArcGIS layer library is missing "
+                             f"{len(missing)} layer(s) this report needs — "
+                             "stock them and try again."}
+        asof = (asof or "").strip() or None
         err = self._claim_task_error("consolidate")
         if err:
             return err
@@ -159,9 +171,11 @@ class GuiArcgisMixin:
         self._emit_log(f"Starting ArcGIS report build: {ah.REPORT_NAME}")
         self._set_dot("busy", "Building the report from the layers…")
         self._emit({"t": "run_started", "mode": "consolidate",
-                    "label": "Building Highway Detail from the ArcGIS layers…"})
+                    "label": "Building Highway Detail from the ArcGIS layers"
+                             + (f" as of {asof}…" if asof else "…")})
         self._push_state()
-        ConsolidateWorker(ah.consolidate, self._gated_queue(), self.cancel_event,
+        ConsolidateWorker(functools.partial(ah.consolidate, asof=asof),
+                          self._gated_queue(), self.cancel_event,
                           lambda _p: True).start()
         return {"ok": True}
 

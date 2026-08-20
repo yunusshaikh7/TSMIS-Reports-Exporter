@@ -123,11 +123,15 @@ it against our own export of it** — TSMIS vs TSMIS, so the two sides SHOULD ag
 IS the CA HIGHWAYS table printed (33 of its 34 columns are THY columns), so it PROJECTS
 the Clean Road build — one measured build behind every report rendered this way, and
 the next report is a mapping table, not a second engine. Two rules make it a build
-rather than a rename: THY segments on every one of its columns, so **adjacent spans
-agreeing across every printed column merge into one record** (57,747 → 51,277, vs the
-export's 51,327) and the printed Length is the merged span's own extent; and
-**Description is start-anchored** (landmarks are point features), so a following blank
-continues the record. **Every printed column is now sourced and counted** — `RU Eff`
+rather than a rename. **Since v0.39.2 Highway Detail has its OWN build and does not
+read the Clean Road workbook** — it runs the shared span engine over the 19 layers it
+actually prints (`SEGMENT_TAGS`) with its own measured block-eff-date rule
+(`primary_eff`), then projects. Clean Road reproduces the TSN table so it segments on
+TSN's 74 columns; a REPORT wants its own columns' boundaries. **Adjacent spans agreeing
+across every printed column still merge** (54,649 → 51,064, vs the export's 51,327) and
+the printed Length is the merged span's own extent; **Description is start-anchored**
+(landmarks are point features), so a following blank continues the record. Statewide vs
+the same-day export: **180,078 differing cells, 19,132 rows fully identical**. **Every printed column is now sourced and counted** — `RU Eff`
 was the last gap and closed in v0.39.1 (DA2: the build carries
 `THY_POPULATION_EFF_DATE` from `SHS Population`). **Read the VINTAGE line first**: the build is a
 reconstruction as-of a chosen date, so the as-of must match the compared export's day
