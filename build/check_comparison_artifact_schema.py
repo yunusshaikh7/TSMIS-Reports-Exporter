@@ -49,6 +49,32 @@ def _commit(final, writer, mode="values", rows=1, twin=False):
                              requested_mode=mode, twin=twin)
 
 
+def _no_temp_leak(folder):
+    """No `.tmp-*` residue left behind (P2-R04: a held handle blocks cleanup)."""
+    return not [q for q in Path(folder).iterdir() if ".tmp-" in q.name]
+
+
+def _openpyxl_loads(fn):
+    """Run `fn`; return (result, how many times openpyxl opened a workbook).
+
+    `artifact_store` imports `load_workbook` from the package inside each
+    function, so patching the package attribute counts every one of them.
+    """
+    import openpyxl
+    calls = []
+    original = openpyxl.load_workbook
+
+    def counted(*args, **kwargs):
+        calls.append(args[0] if args else kwargs.get("filename"))
+        return original(*args, **kwargs)
+
+    openpyxl.load_workbook = counted
+    try:
+        return fn(), len(calls)
+    finally:
+        openpyxl.load_workbook = original
+
+
 def _sheet(path, header, rows=(), title="Comparison"):
     wb = Workbook()
     ws = wb.active
@@ -69,6 +95,26 @@ def main(tmp: Path) -> None:
             res.status == "ok" and good.exists(), repr(res.message))
     c.check("the schema is versioned", isinstance(a.COMPARISON_ARTIFACT_SCHEMA, int)
             and a.COMPARISON_ARTIFACT_SCHEMA >= 1)
+
+    # The gate reads the finished package ONCE. openpyxl sizes every read-only
+    # sheet by parsing it to the end (our writer emits no <dimension>), which
+    # cost 44 s on a statewide artifact when this ran twice — so a silent
+    # regression to the openpyxl path is a real, invisible cost. Assert it.
+    print("the accept path reads the package once, without openpyxl:")
+    streamed = tmp / "streamed.xlsx"
+    res, loads = _openpyxl_loads(
+        lambda: _commit(streamed, lambda p: write_comparison_stub(p, rows=3)))
+    c.check("a valid values commit never loads the artifact through openpyxl",
+            res.status == "ok" and streamed.exists() and loads == 0,
+            f"status={res.status!r} openpyxl loads={loads}")
+    declined = tmp / "declined.xlsx"
+    res, loads = _openpyxl_loads(
+        lambda: _commit(declined, lambda p: _sheet(p, ["Status", "Diffs"],
+                                                   [["Both", "not-a-number"]]),
+                        rows=5))
+    c.check("...and a decline still falls back to openpyxl for the refusal",
+            res.status == "error" and loads >= 1,
+            f"status={res.status!r} openpyxl loads={loads}")
 
     print("the audit's own artifacts are REFUSED, last-good kept:")
     prior = good.read_bytes()
@@ -98,6 +144,9 @@ def main(tmp: Path) -> None:
         c.check(f"REFUSED: {label}",
                 res.status == "error" and good.read_bytes() == prior,
                 f"status={res.status} message={res.message!r}")
+        # The streamed reader opens the temp too: a refusal must not leave a
+        # handle holding it open where cleanup cannot remove it (P2-R04).
+        c.check(f"...{label}: no temp residue", _no_temp_leak(tmp))
     c.check("the refusal names the artifact and keeps the previous file",
             "left unchanged" in (res.message or ""), repr(res.message))
 

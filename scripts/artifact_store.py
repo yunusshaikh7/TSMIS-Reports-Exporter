@@ -24,18 +24,21 @@
 Console-free (the core contract): reports via ``log`` + return values / raises, never
 print/input/exit. Module-level imports are stdlib plus the dependency-light comparison
 contracts and ``events`` result shape; ``openpyxl`` is imported LAZILY inside
-``_openable_xlsx`` (workbook validation opens the produced file to reject a
-malformed/unreadable XLSX before committing it).
+``_openable_xlsx`` / ``_comparison_counts_openpyxl`` (workbook validation opens the
+produced file to reject a malformed/unreadable XLSX before committing it — a typed
+comparison reads its own package directly instead, and falls back to those).
 """
 import hashlib
 import json
 import logging
 import os
+import posixpath
 import re
 import stat as statmod
 import time
 import uuid
 import zipfile
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -377,9 +380,15 @@ def _openable_xlsx(path, expect_sheet=None):
     """A produced workbook is committable iff openpyxl can actually OPEN it — so a corrupt
     ZIP or a malformed workbook part (e.g. ``xl/workbook.xml`` = ``b"not xml"``) is
     REJECTED, not just name-checked (P2-B05) — AND it has >=1 sheet (and `expect_sheet`,
-    when given, is present: the per-comparison sheet contract). ``read_only`` load is lazy
-    (it parses ``workbook.xml`` + the sheet list, not the cells), so it stays cheap even
-    for a big live-formulas workbook. Never raises — any open/parse failure ⇒ invalid.
+    when given, is present: the per-comparison sheet contract). Never raises — any
+    open/parse failure ⇒ invalid.
+
+    This is NOT cheap on a large artifact, whatever ``read_only`` suggests. openpyxl
+    sizes every read-only sheet on construction, and our write-only writer emits no
+    ``<dimension>``, so sizing parses each worksheet to its END: 10 s on a 30 MB
+    comparison, 44 s on a statewide 120 MB one. Typed comparison commits therefore
+    take `_comparison_counts_streamed`'s single package pass instead and only fall
+    back here — which is where the refusal authority still lives.
 
     The workbook is opened on a caller-owned file object closed by ``with`` (P2-R04): if
     ``load_workbook`` raises on a malformed part it would otherwise leave openpyxl's ZIP
@@ -401,6 +410,356 @@ def _openable_xlsx(path, expect_sheet=None):
         return expect_sheet is None or expect_sheet in names
     except Exception:                                # noqa: BLE001 — open/parse failure => invalid
         return False
+
+
+_OOXML_WORKBOOK_CONTENT_TYPES = {
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+    "application/vnd.ms-excel.sheet.macroEnabled.main+xml",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml",
+    "application/vnd.ms-excel.template.macroEnabled.main+xml",
+}
+_OOXML_CELL_REF_RE = re.compile(r"^([A-Za-z]+)([1-9][0-9]*)$")
+_OOXML_INTEGER_RE = re.compile(r"^[+-]?[0-9]+$")
+
+
+def _xml_local_name(tag):
+    """Namespace-independent local name for one ElementTree tag."""
+    return str(tag).rsplit("}", 1)[-1]
+
+
+def _xml_part(package, member):
+    """Parse one small/metadata XML package member, raising on any defect."""
+    with package.open(member, "r") as stream:
+        return ET.parse(stream).getroot()
+
+
+def _xml_part_is_well_formed(package, member):
+    """Stream one XML member to EOF without retaining its tree."""
+    with package.open(member, "r") as stream:
+        for _event, element in ET.iterparse(stream, events=("end",)):
+            element.clear()
+
+
+def _package_target(source_part, target):
+    """Resolve an internal OOXML relationship target without allowing traversal."""
+    if not isinstance(target, str) or not target or "\\" in target:
+        raise ValueError("invalid package relationship target")
+    if "?" in target or "#" in target:
+        raise ValueError("query/fragment package relationship target")
+    if target.startswith("/"):
+        candidate = target.lstrip("/")
+    else:
+        candidate = posixpath.join(posixpath.dirname(source_part), target)
+    resolved = posixpath.normpath(candidate)
+    if (not resolved or resolved in (".", "..") or resolved.startswith("../")
+            or resolved.startswith("/") or ":" in resolved.split("/", 1)[0]):
+        raise ValueError("package relationship escapes the archive")
+    return resolved
+
+
+def _relationships_part(source_part):
+    """Package member holding relationships for `source_part` (or package root)."""
+    if not source_part:
+        return "_rels/.rels"
+    directory, filename = posixpath.split(source_part)
+    return posixpath.join(directory, "_rels", filename + ".rels")
+
+
+def _relationships(root, source_part):
+    """Return a strict Id -> (type, target, external) relationship map."""
+    if _xml_local_name(root.tag) != "Relationships":
+        raise ValueError("relationships part has the wrong root")
+    result = {}
+    for node in root:
+        if _xml_local_name(node.tag) != "Relationship":
+            continue
+        rel_id = node.attrib.get("Id")
+        rel_type = node.attrib.get("Type")
+        target = node.attrib.get("Target")
+        external = node.attrib.get("TargetMode") == "External"
+        if not rel_id or not rel_type or not target or rel_id in result:
+            raise ValueError("invalid or duplicate package relationship")
+        resolved = None if external else _package_target(source_part, target)
+        result[rel_id] = (rel_type, resolved, external)
+    return result
+
+
+def _relationship_id(node):
+    """The namespaced `r:id` attribute of a workbook sheet node."""
+    matches = [value for key, value in node.attrib.items()
+               if _xml_local_name(key) == "id"]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _column_index(cell_ref):
+    """Return ``(column, row)``, both 1-based, from an A1 cell reference."""
+    match = _OOXML_CELL_REF_RE.fullmatch(str(cell_ref or ""))
+    if match is None:
+        raise ValueError("invalid worksheet cell reference")
+    result = 0
+    for char in match.group(1).upper():
+        result = result * 26 + ord(char) - ord("A") + 1
+    return result, int(match.group(2))
+
+
+def _rich_text_value(container):
+    """Plain value represented by `<t>` or rich `<r><t>` children."""
+    pieces = []
+    for child in container:
+        local = _xml_local_name(child.tag)
+        if local == "t":
+            pieces.append(child.text or "")
+        elif local == "r":
+            for run_child in child:
+                if _xml_local_name(run_child.tag) == "t":
+                    pieces.append(run_child.text or "")
+    return "".join(pieces)
+
+
+def _shared_string_values(package, member):
+    root = _xml_part(package, member)
+    if _xml_local_name(root.tag) != "sst":
+        raise ValueError("shared-string part has the wrong root")
+    return [_rich_text_value(node) for node in root
+            if _xml_local_name(node.tag) == "si"]
+
+
+def _cell_value(cell, shared_strings):
+    """Decode the cell scalar types needed by the values Comparison contract."""
+    cell_type = cell.attrib.get("t")
+    if cell_type == "inlineStr":
+        inline = next((node for node in cell
+                       if _xml_local_name(node.tag) == "is"), None)
+        return None if inline is None else _rich_text_value(inline)
+    value_node = next((node for node in cell
+                       if _xml_local_name(node.tag) == "v"), None)
+    if value_node is None or value_node.text is None:
+        return None
+    value = value_node.text
+    if cell_type == "s":
+        index = int(value)
+        if index < 0 or index >= len(shared_strings):
+            raise ValueError("shared-string index is out of range")
+        return shared_strings[index]
+    if cell_type == "b":
+        if value not in ("0", "1"):
+            raise ValueError("invalid boolean cell")
+        return value == "1"
+    if cell_type in ("str", "e"):
+        return value
+    if cell_type not in (None, "n"):
+        raise ValueError("unsupported worksheet cell type")
+    return int(value) if _OOXML_INTEGER_RE.fullmatch(value) else float(value)
+
+
+def _worksheet_prefix_is_readable(package, member):
+    """Mirror openpyxl read-only initialization: parse through dimension/sheetData."""
+    root_seen = False
+    with package.open(member, "r") as stream:
+        for _event, element in ET.iterparse(stream, events=("start",)):
+            local = _xml_local_name(element.tag)
+            if not root_seen:
+                if local != "worksheet":
+                    raise ValueError("worksheet part has the wrong root")
+                root_seen = True
+            if local in ("dimension", "sheetData"):
+                return True
+    return root_seen
+
+
+def _comparison_counts_from_xml(package, member, shared_strings):
+    """Stream Comparison.xml and enforce the same Status/Diffs schema as openpyxl."""
+    status_col = diffs_col = None
+    diff_cells = one_sided = data_rows = 0
+    saw_root = saw_sheet_data = saw_header = False
+    previous_row = 0
+    with package.open(member, "r") as stream:
+        for event, element in ET.iterparse(stream, events=("start", "end")):
+            local = _xml_local_name(element.tag)
+            if event == "start" and not saw_root:
+                if local != "worksheet":
+                    raise ValueError("Comparison part has the wrong root")
+                saw_root = True
+            if event == "start" and local == "sheetData":
+                saw_sheet_data = True
+                continue
+            if event != "end" or local != "row":
+                continue
+
+            row_text = element.attrib.get("r")
+            row_number = int(row_text) if row_text is not None else previous_row + 1
+            if row_number <= previous_row:
+                raise ValueError("worksheet rows are not strictly increasing")
+            previous_row = row_number
+            values = {}
+            for cell in element:
+                if _xml_local_name(cell.tag) != "c":
+                    continue
+                column, cell_row = _column_index(cell.attrib.get("r"))
+                if cell_row != row_number or column in values:
+                    raise ValueError("worksheet cell does not match its row")
+                values[column] = _cell_value(cell, shared_strings)
+
+            if not saw_header:
+                saw_header = True
+                if row_number != 1:
+                    raise ValueError("Comparison header is not row 1")
+                status_matches = [column for column, value in values.items()
+                                  if value == "Status"]
+                diffs_matches = [column for column, value in values.items()
+                                 if value == "Diffs"]
+                if len(status_matches) != 1 or len(diffs_matches) != 1:
+                    raise ValueError("Comparison lacks unique Status/Diffs labels")
+                status_col, diffs_col = status_matches[0], diffs_matches[0]
+                element.clear()
+                continue
+
+            if not values or all(value is None for value in values.values()):
+                element.clear()
+                continue
+            data_rows += 1
+            status = values.get(status_col)
+            diffs = values.get(diffs_col)
+            if status == "Both":
+                if (isinstance(diffs, bool) or not isinstance(diffs, (int, float))
+                        or not float(diffs).is_integer() or diffs < 0):
+                    raise ValueError("matched row has an invalid Diffs value")
+                diff_cells += int(diffs)
+            elif isinstance(status, str) and status:
+                if diffs not in (None, ""):
+                    raise ValueError("one-sided row unexpectedly carries Diffs")
+                one_sided += 1
+            else:
+                raise ValueError("row has an invalid Status value")
+            element.clear()
+    if not saw_root or not saw_sheet_data or not saw_header:
+        raise ValueError("Comparison sheet has no header row")
+    return (diff_cells, one_sided, data_rows)
+
+
+def _comparison_counts_streamed(path):
+    """The Comparison sheet's ``(diff_cells, one_sided, data_rows)``, or None.
+
+    Reads the finished package directly instead of loading it into openpyxl:
+    it resolves the sheet through real package relationships (never by guessing
+    a member name), decodes only the cell types the values contract can carry,
+    and enforces the SAME Status/Diffs schema
+    ``_comparison_counts_openpyxl`` does.  On a statewide Ramp Detail artifact
+    that read is 9.8 s of openpyxl against 2.2 s here, and it is the whole
+    reason a commit no longer reopens its own output twice.
+
+    Every package or XML defect returns None — INCLUDING the strictnesses
+    openpyxl does not share (duplicate/unsafe ZIP members, a non-worksheet
+    sheet, a malformed metadata part, out-of-order rows).  None is never a
+    refusal on its own: `comparison_counts` hands those cases to openpyxl,
+    which stays the authority on what a commit may reject.
+    """
+    try:
+        path = Path(path)
+        if (not path.is_file() or path.stat().st_size == 0
+                or not zipfile.is_zipfile(path)):
+            return None
+        with zipfile.ZipFile(path, "r") as package:
+            members = package.namelist()
+            member_set = set(members)
+            if len(member_set) != len(members):
+                raise ValueError("duplicate ZIP package member")
+            if any((not member or "\\" in member or member.startswith("/")
+                    or any(part in ("", ".", "..")
+                           for part in member.rstrip("/").split("/")))
+                   for member in members):
+                raise ValueError("unsafe ZIP package member")
+            required = {"[Content_Types].xml", "_rels/.rels"}
+            if not required.issubset(member_set):
+                raise ValueError("missing core OOXML package part")
+
+            parsed_parts = set(required)
+            content_types = _xml_part(package, "[Content_Types].xml")
+            if _xml_local_name(content_types.tag) != "Types":
+                raise ValueError("content-types part has the wrong root")
+            workbook_parts = []
+            for node in content_types:
+                if (_xml_local_name(node.tag) == "Override"
+                        and node.attrib.get("ContentType") in _OOXML_WORKBOOK_CONTENT_TYPES):
+                    workbook_parts.append(_package_target("", node.attrib.get("PartName")))
+            if len(workbook_parts) != 1:
+                raise ValueError("package does not identify exactly one workbook")
+            workbook_part = workbook_parts[0]
+            workbook_rels_part = _relationships_part(workbook_part)
+            if workbook_part not in member_set or workbook_rels_part not in member_set:
+                raise ValueError("missing workbook package part")
+
+            root_rels = _relationships(_xml_part(package, "_rels/.rels"), "")
+            office_targets = [target for rel_type, target, external in root_rels.values()
+                              if rel_type.endswith("/officeDocument") and not external]
+            if office_targets != [workbook_part]:
+                raise ValueError("root relationship does not identify the workbook")
+
+            workbook = _xml_part(package, workbook_part)
+            workbook_rels = _relationships(
+                _xml_part(package, workbook_rels_part), workbook_part)
+            parsed_parts.update((workbook_part, workbook_rels_part))
+            if _xml_local_name(workbook.tag) != "workbook":
+                raise ValueError("workbook part has the wrong root")
+
+            sheets = []
+            seen_names = set()
+            seen_targets = set()
+            for node in workbook.iter():
+                if _xml_local_name(node.tag) != "sheet":
+                    continue
+                name = node.attrib.get("name")
+                rel_id = _relationship_id(node)
+                if not name or name in seen_names or rel_id not in workbook_rels:
+                    raise ValueError("invalid or duplicate workbook sheet")
+                rel_type, target, external = workbook_rels[rel_id]
+                if external or not rel_type.endswith("/worksheet"):
+                    raise ValueError("comparison contains a non-worksheet sheet")
+                if target not in member_set or target in seen_targets:
+                    raise ValueError("missing or duplicate worksheet target")
+                seen_names.add(name)
+                seen_targets.add(target)
+                sheets.append((name, target))
+            if "Comparison" not in seen_names:
+                raise ValueError("missing Comparison sheet")
+
+            shared_parts = [target for rel_type, target, external in workbook_rels.values()
+                            if rel_type.endswith("/sharedStrings") and not external]
+            if len(shared_parts) > 1:
+                raise ValueError("multiple shared-string parts")
+            shared_strings = []
+            if shared_parts:
+                shared_part = shared_parts[0]
+                if shared_part not in member_set:
+                    raise ValueError("missing shared-string part")
+                shared_strings = _shared_string_values(package, shared_part)
+                parsed_parts.add(shared_part)
+
+            comparison_target = next(target for name, target in sheets
+                                     if name == "Comparison")
+            counts = _comparison_counts_from_xml(
+                package, comparison_target, shared_strings)
+            for _name, target in sheets:
+                if target == comparison_target:
+                    continue
+                if not _worksheet_prefix_is_readable(package, target):
+                    raise ValueError("unreadable worksheet part")
+
+            # openpyxl also parses styles, themes, relationships, properties,
+            # and shared strings during load. Consume every other XML part so a
+            # malformed metadata member cannot be certified merely because its
+            # filename exists. Large worksheet bodies retain the same lazy
+            # prefix boundary as openpyxl read-only initialization.
+            for member in members:
+                if (member in parsed_parts or member in seen_targets
+                        or not member.lower().endswith((".xml", ".rels"))):
+                    continue
+                _xml_part_is_well_formed(package, member)
+            return counts
+    except Exception as error:  # noqa: BLE001 - all package/XML defects fail closed
+        log.debug("streamed comparison read declined %s (%s: %s)", path,
+                  type(error).__name__, error)
+        return None
 
 
 def _commit_one(tmp, final, validate, proceed=None, discard=None,
@@ -672,7 +1031,17 @@ def comparison_counts(values_path):
     is never inspected: the spaced not-equal glyph is legitimate source content
     and cannot encode state. A missing, duplicate, or malformed count contract
     returns the unknown triple instead of guessing a layout or silently
-    certifying zero differences."""
+    certifying zero differences.
+
+    The streaming XML reader answers first — on a statewide artifact it is ~7x
+    the openpyxl scan — and openpyxl answers whenever it declines, so the
+    unknown triple still means exactly what it has always meant."""
+    counts = _comparison_counts_streamed(values_path)
+    return counts if counts is not None else _comparison_counts_openpyxl(values_path)
+
+
+def _comparison_counts_openpyxl(values_path):
+    """The historical read: it decides every case the streaming reader declines."""
     try:
         from openpyxl import load_workbook
         wb = load_workbook(values_path, read_only=True, data_only=True)
@@ -740,7 +1109,12 @@ def _typed_row_claim(typed_outcome):
 def comparison_artifact_problem(values_path, typed_outcome=None):
     """None when `values_path` satisfies COMPARISON_ARTIFACT_SCHEMA, else a
     one-line reason for the commit refusal."""
-    diff_cells, _one_sided, data_rows = comparison_counts(values_path)
+    return _comparison_schema_problem(comparison_counts(values_path), typed_outcome)
+
+
+def _comparison_schema_problem(counts, typed_outcome):
+    """The schema verdict for counts already read (see comparison_artifact_problem)."""
+    diff_cells, _one_sided, data_rows = counts
     if diff_cells is None:
         return ("its Comparison sheet does not carry uniquely labelled Status and "
                 "Diffs columns with a valid status on every row")
@@ -794,6 +1168,7 @@ def commit_workbook(final, produce_fn, *, twin=False, expect_sheet=None, validat
         path_error = _comparison_path_limit_error(final, twin)
         if path_error is not None:
             return ConsolidateResult(status="error", message=path_error)
+    default_validation = validate is None
     validate = validate or (lambda p: _openable_xlsx(p, expect_sheet))
     confirm = confirm_overwrite or (lambda _p: True)
     guard_error = [None]
@@ -1049,10 +1424,23 @@ def commit_workbook(final, produce_fn, *, twin=False, expect_sheet=None, validat
     # versioned comparison-artifact schema before it can replace a good file.
     primary_validate = validate
     if typed_outcome is not None and (twin or requested_mode == "values"):
+        # One pass, not three. The streamed reader walks the whole package AND
+        # returns the counts, and it proves everything `_openable_xlsx` proves
+        # (openpyxl-openable, >=1 sheet, the Comparison sheet present) — so on
+        # the ordinary accept path the openpyxl load is pure duplicate work.
+        # It is NOT cheap duplicate work: openpyxl's write-only writer emits no
+        # <dimension>, so a read_only load sizes each sheet by parsing it to the
+        # end (44 s on a statewide 120 MB Highway Detail artifact).  A decline
+        # still hands the refusal to openpyxl, which stays the authority.
+        can_stream = default_validation and expect_sheet in (None, "Comparison")
+
         def primary_validate(path, _base=validate):
-            if not _base(path):
-                return False
-            problem = comparison_artifact_problem(path, typed_outcome)
+            counts = _comparison_counts_streamed(path) if can_stream else None
+            if counts is None:
+                if not _base(path):
+                    return False
+                counts = _comparison_counts_openpyxl(path)
+            problem = _comparison_schema_problem(counts, typed_outcome)
             if problem is None:
                 return True
             schema_block[0] = (
