@@ -239,6 +239,14 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
   Write as if the user authored it. (Project-specific reinforcement of the global rule.)
 - **Never commit** `scripts/tsmis_auth.json` (treat as a credential), generated
   `output/`, or build artifacts (`build/.venv`, `dist/`, `.claude/` state).
+- **The comparison WRITER is output-locked** (v0.40.0). `_styled_cell` caches each
+  composite cell style per workbook and `artifact_store` reads a finished comparison's
+  counts straight out of the package — both are SPEED changes whose acceptance bar is
+  byte-identical OOXML members (`check_compare_style_cache`, plus a zero-openpyxl-loads
+  assertion in `check_comparison_artifact_schema`). Style is bound BEFORE the value and
+  each cell owns its `StyleArray`; the streamed package reader never decides a REFUSAL
+  (openpyxl still does). Prove any change here with
+  `build/benchmark_vs_tsn_speed.py --writer historical` on the real corpus.
 - **`compare_core` semantics are correctness-locked, not history-locked.** Equality,
   formula, normalization, identity, pairing, and count changes must follow the approved
   domain contract and be proved cell-for-cell against the independent oracle plus both

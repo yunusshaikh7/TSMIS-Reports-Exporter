@@ -147,7 +147,7 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 
 ---
 
-## ▣ OPEN WORK INVENTORY (current as of v0.38.2, 2026-08-18)
+## ▣ OPEN WORK INVENTORY (current as of v0.40.0, 2026-08-20)
 
 **This is the definitive list of what is left.** Everything below is genuinely
 open; anything not here is either shipped (see `CHANGELOG.md`) or a historical
@@ -254,6 +254,7 @@ were being counted as differences. Post-fix, exactly four columns move (`LB #Ln`
 | E3 | **gh-pages landing-page regen** | Owed since v0.17.0; website only ([website.md](website.md)). |
 | E4 | **Clean-road sliver policy** | The 0.001-mi boundary-calibration class (rows keyed 9.256 vs 9.257) pairs one-sided today; a few hundred statewide. |
 | E5 | The smaller standing items | In the themed sections below: cancel-latency, narrow-mode matrix polish, console `run_cli_multi` coalescing, the shared whitespace-collapse helper, doc/comment line-ref drift. |
+| E6 | **Comparison speed — the two measured leftovers** | v0.40.0 took the two safe wins (see [the record](planning/vs-tsn-comparison-speed.md)). Profiling the shipped Intersection Detail comparison afterwards leaves two ranked, un-taken items. **(a) Both sides are loaded TWICE**: `_load_pair` reads the consolidated TSMIS workbook and the TSN workbook, then `add_report_view` re-opens and re-parses both to build the Report View — 7 `load_workbook` calls in one comparison, ~30 s cumulative under the profiler. Threading the already-loaded rows through is the obvious fix and is worth real seconds, but the Report View reads more than the compared rows, so it needs its own output-equivalence proof. **(b) openpyxl's XML writer itself** is now the single largest cost (`etree_write_cell` + `_serialize_ns_xml` ≈ half of `run_compare`). Nothing short of replacing the writer touches it — out of proportion for an internal tool. Also noted and NOT taken: a fast path in `set_safe_literal_cell` (~5% of the write loop, and it is correctness-locked code), and **the live-formulas sibling still pays the full `_openable_xlsx` size scan** — the streamed reader cannot count a formulas sheet, so only the VALUES artifact takes the one-pass route. That is the opt-in "also write a live-formulas copy" flavor, off by default, so it was left alone rather than given a package-only variant of its own. |
 
 ### F. Design-first / gated — **NOTHING OPEN.** All of F is shipped (verified 2026-08-18)
 

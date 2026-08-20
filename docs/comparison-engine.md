@@ -116,6 +116,97 @@ semantic key→row mirror; deliver samples to Downloads as
 delete superseded). Excel is installed — COM automation works for empirical behavior tests (e.g.
 proving whole-row `57:57` link targets don't scroll right while bounded ranges do).
 
+### How the writer stays fast (§2b)
+
+A statewide comparison is dominated by two costs that have nothing to do with
+comparison rules: building cells, and reading the finished workbook back. Both
+were reduced in v0.40.0 **without any output changing** — the acceptance bar for
+this whole area is that the produced package stays byte-identical, so there is
+no mode, no toggle, and no second writer to keep in step.
+
+**Composite cell styles are registered once.** openpyxl's `font` / `fill` /
+`alignment` / `border` descriptors re-walk and re-hash a style component on
+every assignment, and the writers hand out a handful of shared component
+instances across millions of cells — a statewide Ramp Detail run calls
+`compare_core._styled_cell` 1,339,433 times. `_styled_cell` now registers each
+distinct component set once per workbook and copies the resulting `StyleArray`
+onto later cells. Three properties keep it output-neutral, and
+`check_compare_style_cache.py` holds all three:
+
+- **Each cell owns its `StyleArray`.** The guard's `number_format='@'`, the
+  Highway Log ditto tint, and the Summary grid's explicit formats all mutate a
+  cell after construction; a shared prototype would leak those to siblings.
+- **The cache is keyed by component IDENTITY and retains its components.** An
+  equal-but-distinct object simply gets its own entry (both converge on the same
+  registered ids), and holding the references makes a recycled `id()` impossible
+  rather than merely unlikely.
+- **Style is bound BEFORE the value.** openpyxl sets `number_format` while
+  binding a date, so a style copy applied afterwards would erase it. (The
+  ordering was the other way round when this arrived on `codex/`; no call site
+  passes a date today, which is exactly why it needed a lock rather than a
+  comment.)
+
+**The commit no longer reloads its own output through openpyxl — twice.**
+`artifact_store.comparison_counts` reads the finished package directly —
+resolving the Comparison sheet through real package relationships, never a
+guessed member name, and decoding only the cell types the values contract can
+carry. It enforces the SAME Status/Diffs schema. It is also stricter than
+openpyxl in places (duplicate or unsafe ZIP members, a non-worksheet sheet, a
+malformed metadata part, out-of-order rows), and **strictness on a commit gate
+is a hazard** — refusing a good workbook would stop a real comparison
+publishing. So it never decides a refusal: anything it declines goes to
+`_comparison_counts_openpyxl`, which remains the authority on what may be
+rejected.
+
+That streamed pass also proves everything `_openable_xlsx` proves, so a typed
+comparison's VALUES artifact takes ONE pass rather than an openpyxl load plus a
+count read. That second half matters more than it looks: **`_openable_xlsx` is
+not cheap on a large artifact**, despite what its docstring used to claim.
+openpyxl sizes every read-only sheet on construction, and openpyxl's write-only
+writer emits no `<dimension>`, so sizing parses each worksheet to its END —
+**10.3 s on the 30.8 MB Intersection Detail comparison, 44.2 s on the statewide
+120 MB Highway Detail one.** The gate itself is unchanged for every other caller
+(ordinary consolidations keep it, and it still decides refusals); it just is not
+run twice over the same bytes any more.
+
+Measured through the shipped comparators on the real corpus, values mode, same
+consolidated inputs. **This is a developer machine with other software running,
+so single runs swing widely** — the headline figure comes from ALTERNATING the
+two versions on the same inputs (`--writer historical`), which puts the drift on
+both sides:
+
+| Measurement | v0.39.3 | v0.40.0 | Reduction |
+|---|---:|---:|---:|
+| Intersection Detail, statewide — 3 paired rounds, medians | 569.9 s | 346.6 s | 39.2% |
+| Intersection Detail, statewide — quiet-moment pair | 202.6 s | 127.9 s | 36.9% |
+| Comparison counts on the 30.8 MB artifact, back to back | 16.9 s | 5.0 s | 70.4% |
+
+Two facts do NOT depend on machine load, and they are the ones to hold on to:
+
+- **Output is identical.** Across all six interleaved statewide runs plus the
+  standalone ones, the Intersection Detail package digest was a single value;
+  statewide Highway Detail (48,477 paired rows, 120.6 MB, 27 members) was
+  byte-identical to v0.39.3's output; Highway Log route 1 matched in BOTH
+  flavors. Every blessed canary held — HD 160,347 differing cells, ID
+  21,675 / 687, HL 969 / 87.
+- **A comparison commit now makes ZERO openpyxl loads of its own output**, where
+  it made two full reads. That is a count, not a duration, and
+  `check_comparison_artifact_schema` asserts it.
+
+`build/benchmark_vs_tsn_speed.py` is the repeatable harness; `--writer historical`
+swaps `_styled_cell` back to the pre-cache assignment sequence so the same real
+inputs can be run both ways and the package digests compared. CI cannot reach
+the corpus, so `check_compare_style_cache.py` holds the same byte-for-byte A/B
+on a synthetic fixture in both flavors.
+
+**What was deliberately NOT taken.** The branch this came from also reused one
+attempt-local TSN certification, skipping four of the `_require_source_identity`
+checkpoints in `matrix_build` and replacing them with a single guard at the
+cache `os.replace`. Its own benchmark priced that entire identity surface at
+0.298 s → 0.075 s — about 0.2 s against a 60 s saving — so it bought ~0.3% of
+the improvement in exchange for weakening an audited contract. It was dropped;
+every checkpoint runs as before.
+
 ---
 
 ## 3. CompareSchema (the parameterization)

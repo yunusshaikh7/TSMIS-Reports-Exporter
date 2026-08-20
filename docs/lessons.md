@@ -340,6 +340,42 @@ from a verification path as a question, not a pass; that refusal WAS the bug rep
 [comparison-engine.md](comparison-engine.md) §13.
 
 
+## 16. A comment that says "this is cheap" is a claim, and claims need measuring
+
+`artifact_store._openable_xlsx` — the gate that decides whether a produced workbook
+may replace a good one — carried this in its docstring for most of the project's life:
+
+> ``read_only`` load is lazy (it parses ``workbook.xml`` + the sheet list, not the
+> cells), so it stays cheap even for a big live-formulas workbook.
+
+It was wrong, and it was wrong in the one direction nobody checks. openpyxl **sizes
+every read-only worksheet the moment it constructs one**, and it sizes by looking for
+a `<dimension>` element — which openpyxl's own write-only writer does not emit. With
+no `<dimension>`, the size scan runs to the end of `<sheetData>`, i.e. it parses each
+worksheet in full. Measured on real artifacts: **10.3 s on a 30 MB Intersection Detail
+comparison and 44.2 s on a statewide 120 MB Highway Detail one**, on every commit — 8%
+of the whole comparison, spent proving a file could be opened.
+
+Nothing was ever wrong with the output, which is exactly why it survived: a false
+performance claim produces no bug report, no red check, and no complaint beyond "this
+is a bit slow". It surfaced only because a profile was run for an unrelated reason and
+`parse_dimensions` appeared near the top with 20 calls.
+
+**The rule:** a performance claim in a comment is untested code. Either measure it and
+write the number down, or do not make the claim. And when a dependency is doing work
+you did not ask for, the profile is the only place it is visible — reading the calling
+code will never show you `_get_size()`.
+
+Corollary that shaped the fix: the same profile said the streaming package reader
+already proved everything that gate proves, so the answer was to stop asking twice, not
+to make the gate cleverer. The single-pass property is now asserted (a valid values
+commit must make **zero** openpyxl loads) — because an invisible cost needs a guard
+that fails loudly, not a comment saying it was fixed.
+
+→ [comparison-engine.md](comparison-engine.md) §2b;
+[the speed record](planning/vs-tsn-comparison-speed.md).
+
+
 ### Quick index of the lessons
 
 | # | Lesson | Owns the detail |
@@ -359,3 +395,4 @@ from a verification path as a question, not a pass; that refusal WAS the bug rep
 | 13 | Upstream format change: census first, then refuse the old format | tsn-parsers + comparison-engine §9f/§13 |
 | 14 | A green suite that never runs the failing path is not information | it-and-security + build-and-release |
 | 15 | Build guards, not more careful code — they catch what you write next | comparison-engine §13 |
+| 16 | A comment that says "this is cheap" is a claim, and claims need measuring | comparison-engine §2b + planning/vs-tsn-comparison-speed |

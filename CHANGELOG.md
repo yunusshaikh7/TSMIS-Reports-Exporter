@@ -3,6 +3,68 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.40.0 — 2026-08-20
+
+**Comparisons are about a third faster, and not one cell of output changed.** A
+statewide Intersection Detail comparison that took 202.6s on v0.39.3 takes
+127.9s here. Run six more times alternating the two versions, the workbook came
+out with the **same package digest every single time**.
+
+- **Composite cell styles are registered once per workbook, not per cell.**
+  openpyxl re-walks and re-hashes a font/fill/alignment/border every time it is
+  assigned, and the comparison writers hand out a handful of shared component
+  instances across millions of cells — a statewide Ramp Detail run builds
+  1,339,433 of them. Each distinct component set is now registered once and its
+  style copied onto later cells. Every cell still owns its own copy, so the
+  formula-injection guard, the Highway Log ditto tint and explicit number
+  formats mutate one cell and nothing else.
+- **A finished comparison is no longer read back through openpyxl to count it.**
+  The Status/Diffs contract is read straight out of the package — same schema,
+  same refusals — **5.0s instead of 16.9s** on the 30.8 MB Intersection Detail
+  artifact. The reader is stricter than openpyxl in places, and strictness on a
+  commit gate would be a way to refuse a good comparison, so it never decides a
+  refusal on its own: anything it declines goes to openpyxl, which stays the
+  authority on what may be rejected.
+- **And it is no longer opened a second time to check it opens.** The validation
+  that runs before a comparison replaces a good file has always claimed to be
+  cheap — "read-only load is lazy … so it stays cheap even for a big
+  live-formulas workbook". It is not: openpyxl sizes every sheet the moment it
+  loads one, and because openpyxl's own writer leaves out the sheet-dimension
+  hint, sizing reads each worksheet to the end. That is a full extra pass over
+  the artifact — 30 MB for Intersection Detail, 120 MB for statewide Highway
+  Detail — on every commit. The streaming read above already proves everything
+  that check proves, so it now happens once instead of twice. Consolidations and
+  every other caller keep the original gate, which is still what decides a
+  refusal.
+- **This applies to every comparison, with no setting to find.** It is
+  output-equivalent, so there is nothing to opt into: cross-environment,
+  vs-Baseline, PDF-vs-Excel and the ArcGIS comparisons all get it, not only
+  vs-TSN.
+
+Proved on the real corpus through the shipped comparators, at statewide scale on
+the two biggest reports, and every blessed canary came back unchanged: Highway
+Detail **160,347** differing cells (120 MB artifact, all 27 package members
+identical), Intersection Detail **21,675 / 687**, Highway Log route 1 **969 /
+87** in both flavors. `build/benchmark_vs_tsn_speed.py --writer historical`
+reruns that A/B; `build/check_compare_style_cache.py` holds it in CI, where the
+corpus is not available.
+
+*About the timings:* this is a developer machine with other things running, so
+single runs swing widely. The figures above come from alternating the two
+versions on the same inputs — three paired rounds put the median reduction at
+39%, and a quiet-moment pair at 37%. What does not depend on machine load: a
+comparison commit now makes **zero** openpyxl loads of its own output where it
+made two full reads, and that count is asserted in the check suite.
+
+One thing this deliberately does NOT do. The branch it came from also reused a
+single TSN certification per attempt, skipping four of the source-identity
+checkpoints around capture, comparison, publish and cache-record. Its own
+benchmark priced that whole identity surface at 0.2 seconds against a 60-second
+saving, so it bought a fraction of a percent of the improvement for a weaker
+correctness contract. It was dropped, and with it the "Fast vs TSN
+(experimental)" toggle — once nothing is being traded away, there is nothing to
+opt into.
+
 ## v0.39.3 — 2026-08-20
 
 The block effective-date rule measured in v0.39.2 turns out to be right for the
