@@ -73,7 +73,7 @@ from compare_tsn_common import (load_consolidated_rows, row_has_data,
                                 suggest_route_name)
 from compare_core import (CompareSchema, compared_cell, normalize_value, keys_for,
                           pair_occurrences_by_similarity, union_keys,
-                          set_safe_literal_cell, _PROGRESS_EVERY)
+                          _styled_cell, _PROGRESS_EVERY)
 import highway_detail_columns as hdc
 
 log = logging.getLogger("tsmis.compare")
@@ -947,16 +947,17 @@ def _write_report_view(wb, ctx, tsn_one):
         return ("", "blank")
 
     def woc(val, status, alt, *, bottom=False, align=None):
-        c = set_safe_literal_cell(WriteOnlyCell(ws), val)
-        c.alignment = align or (lft if status == "id" else ctr)
-        c.border = _BD_BOTTOM if bottom else _BD_NORM
-        c.fill = _FILL_CACHE.get((status, bool(alt)), _FILL_CACHE[("eq", bool(alt))])
-        c.font = _FONT_CACHE.get(status, _FONT_DEFAULT)
-        return c
+        return _styled_cell(
+            ws, val, font=_FONT_CACHE.get(status, _FONT_DEFAULT),
+            fill=_FILL_CACHE.get((status, bool(alt)),
+                                 _FILL_CACHE[("eq", bool(alt))]),
+            align=align or (lft if status == "id" else ctr),
+            border=_BD_BOTTOM if bottom else _BD_NORM,
+            guard=True)
 
     def hcell(val, fillc, font, align, comment_ref=None):
-        c = WriteOnlyCell(ws, value=val)
-        c.fill = fillc; c.font = font; c.alignment = align; c.border = bd
+        c = _styled_cell(
+            ws, val, font=font, fill=fillc, align=align, border=bd)
         t = _RV_COMMENTS.get(comment_ref) if comment_ref else None
         if t:
             cm = Comment(t, "TSMIS vs TSN"); cm.width = 250; cm.height = 130

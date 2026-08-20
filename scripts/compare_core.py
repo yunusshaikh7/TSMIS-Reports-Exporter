@@ -36,6 +36,7 @@ import difflib
 import math
 import re
 import textwrap
+from copy import copy
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
@@ -2393,18 +2394,70 @@ def _ceiling_wrapper(ws, extra=()):
     return align_for
 
 
-def _styled(ws, value, font, fill=None, align=None, guard=False,
-            exact_source_numeric=False):
-    c = WriteOnlyCell(ws, value=value)
-    c.font = font
-    if fill:
-        c.fill = fill
-    if align:
-        c.alignment = align
+def _styled_cell(ws, value, *, font, fill=None, align=None, border=None,
+                 guard=False, exact_source_numeric=False):
+    """Build one streamed cell, reusing the composite style it was given.
+
+    openpyxl's style descriptors are the hot spot of every comparison workbook:
+    a statewide Ramp Detail run calls this 1.34 million times, and assigning
+    ``font``/``fill``/``alignment``/``border`` re-walks each component's
+    descriptor tree to hash and index it EVERY time, even though the writers
+    hand out a handful of shared component instances.  So the composite style
+    is registered once per distinct component set and copied afterwards.
+
+    The cache is keyed by component IDENTITY and retains the components it was
+    built from — equal-but-distinct objects simply get their own entry (they
+    converge on the same registered ids anyway), and holding the references
+    makes a recycled ``id()`` impossible rather than merely unlikely.
+
+    Each cell gets its OWN ``StyleArray`` copy, so a later mutation — the
+    ``number_format='@'`` a guarded literal applies, the Highway Log ditto
+    tint, an explicit format on the Summary grid — changes that cell alone and
+    never the cached prototype or an already-appended sibling.
+
+    Style is bound BEFORE the value: openpyxl sets ``number_format`` while
+    binding a date/time, so a style copy applied afterwards would silently
+    erase it.  This is presentation-neutral by construction — it changes
+    neither the component objects nor their order in the workbook style
+    table — and `check_compare_style_cache` holds it to byte-exact OOXML
+    package members against the historical assignment sequence.
+    """
+    c = WriteOnlyCell(ws)
+    wb = ws.parent
+    cache = getattr(wb, "_tsmis_style_cache", None)
+    if cache is None:
+        cache = {}
+        wb._tsmis_style_cache = cache
+    key = (id(font), id(fill), id(align), id(border))
+    entry = cache.get(key)
+    if (entry is None or entry[0] is not font or entry[1] is not fill
+            or entry[2] is not align or entry[3] is not border):
+        prototype = WriteOnlyCell(ws)
+        prototype.font = font
+        if fill:
+            prototype.fill = fill
+        if align:
+            prototype.alignment = align
+        if border:
+            prototype.border = border
+        style = copy(prototype._style)
+        cache[key] = (font, fill, align, border, style)
+    else:
+        style = entry[4]
+    c._style = copy(style)
     if guard:
         set_safe_literal_cell(
             c, value, exact_source_numeric=exact_source_numeric)
+    elif value is not None:
+        c.value = value
     return c
+
+
+def _styled(ws, value, font, fill=None, align=None, guard=False,
+            exact_source_numeric=False):
+    return _styled_cell(
+        ws, value, font=font, fill=fill, align=align, guard=guard,
+        exact_source_numeric=exact_source_numeric)
 
 
 def _header_row(ws, values, comment_fn=None, fill_fn=None):
