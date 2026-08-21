@@ -17,6 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
+import artifact_store
 import day_matrix
 import gui_api
 import gui_matrix
@@ -59,28 +60,45 @@ def _raises(fn):
 
 def test_newest_mtime_survives_a_bad_entry():
     """One transiently-locked/vanished file must not abort the whole mtime fold
-    (it used to mark the day's export 'not present'). Simulated by swapping
-    day_matrix.Path for a stub whose second entry raises OSError on stat."""
+    (it used to mark the day's export 'not present').
+
+    `day_matrix._folder_newest_mtime` is now an alias for the ONE shared reader,
+    `artifact_store.newest_report_file_mtime`, which walks `os.scandir` rather
+    than `Path.iterdir` — so the bad entry is injected by stubbing scandir, the
+    call the implementation actually makes. (The old stub swapped
+    `day_matrix.Path`; against the shared reader that patched nothing and the
+    test passed without exercising the guard at all.)"""
     good = Path(tempfile.mkdtemp(prefix="tsmis_day_mt_")) / "r001.xlsx"
     _touch(good)
+
+    class _GoodEntry:
+        name = good.name
+        def is_file(self):
+            return True
+        def stat(self):
+            return good.stat()
 
     class _BadEntry:
         name = "r002.xlsx"
         def is_file(self):
             raise OSError("locked / vanished mid-scan")
 
-    class _FakeDir:
+    class _FakeScandir:
         def __init__(self, _p):
             pass
-        def iterdir(self):
-            return [good, _BadEntry()]
+        def __enter__(self):
+            # bad entry FIRST: a fold that aborts on it returns None, not the
+            # good file's mtime, so the assertion below actually has teeth.
+            return iter([_BadEntry(), _GoodEntry()])
+        def __exit__(self, *_exc):
+            return False
 
-    saved = day_matrix.Path
-    day_matrix.Path = _FakeDir
+    saved = artifact_store.os.scandir
+    artifact_store.os.scandir = _FakeScandir
     try:
         got = day_matrix._folder_newest_mtime("ignored")
     finally:
-        day_matrix.Path = saved
+        artifact_store.os.scandir = saved
     check("a locked entry doesn't abort the fold (good file's mtime returned)",
           got == good.stat().st_mtime)
 

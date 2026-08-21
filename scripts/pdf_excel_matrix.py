@@ -26,7 +26,6 @@ import json
 import logging
 import os
 import time
-from pathlib import Path
 
 import artifact_store
 import cache_envelope
@@ -177,23 +176,11 @@ def record_result(date, source, row_key, verdict, diff_cells, one_sided,
 # --------------------------------------------------------------------------- #
 # filesystem helpers
 # --------------------------------------------------------------------------- #
-def _folder_newest_mtime(p):
-    """Newest report-data-file mtime in a folder, or None when empty/absent.
-    Only a real .xlsx/.pdf export counts (CMP-AUD-083)."""
-    newest = None
-    try:
-        entries = list(Path(p).iterdir())
-    except OSError:  # silent-ok: an absent/unreadable export folder has no mtime — None IS the answer
-        return None
-    for e in entries:
-        try:
-            if e.is_file() and artifact_store.is_report_data_file(e.name):
-                m = e.stat().st_mtime
-                if newest is None or m > newest:
-                    newest = m
-        except OSError:  # silent-ok: a locked/vanished entry contributes nothing to the newest mtime
-            continue
-    return newest
+# CMP-AUD-083 newest-data-mtime: ONE shared reader (artifact_store), not a
+# private copy — this module had a byte-identical one, as did the other two
+# matrix snapshots. Kept as a module-local alias so the call sites below read
+# unchanged.
+_folder_newest_mtime = artifact_store.newest_report_file_mtime
 
 
 def tsmis_dir(date, source, subdir):

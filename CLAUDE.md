@@ -174,17 +174,21 @@ per-field projections against the raw PDFs — the separately-tracked direct-sou
 acceptance. Details + acceptance oracles: §13 and the
 [finding ledger](docs/planning/comparison-perfection/comparison-audit-findings.md).
 
-**The comparison-perfection project is COMPLETE (2026-07-22, v0.28.0), and as of
-v0.38.0 EVERY finding in the ledger is closed — 243 of 243.** `main` is the completion
-state. The last five were the ⛔ Highway Detail pre-release block (133 · 142 · 186 ·
-192 + 045-HD); the vendor's 2026-08-17 delivery unblocked them and v0.37.0 / v0.38.0
-closed them (see the Highway Detail paragraph above; 243 was found and fixed on the
-released data). The
+**The comparison-perfection project is COMPLETE (2026-07-22, v0.28.0), and EVERY
+finding in the ledger is closed — 245 of 245.** `main` is the completion
+state. The ⛔ Highway Detail pre-release block (133 · 142 · 186 · 192 + 045-HD) fell
+to the vendor's 2026-08-17 delivery in v0.37.0 / v0.38.0 (see the Highway Detail
+paragraph above; 243 was found and fixed on the released data), and the last two were
+**244** (v0.38.2 — HD vs TSN was counting the paired-roadbed ditto convention as data)
+and **245** (v0.39.1 — the ArcGIS Highway Detail projection counted the HF-01
+unavailable marker as data and reported COMPLETE over a PARTIAL build). The
 [COMPLETION-PLAN](docs/planning/comparison-perfection/COMPLETION-PLAN.md) + finding
 ledger are the PROJECT RECORD of why each comparison behaves as it does (start at
 [README.md](docs/planning/comparison-perfection/README.md)).
 **Owed, and only the owner can do it: the work-PC acceptance run — now targeting
-v0.32.0** (the dev box cannot reach the TSMIS intranet): comparison + evidence output
+v0.41.0** (the dev box cannot reach the TSMIS intranet; seventeen releases have landed
+since v0.32.0 and every one is offline-verified only — the current checklist lives in
+[docs/roadmap.md](docs/roadmap.md) B1): comparison + evidence output
 intentionally differ from v0.26.2/v0.27.x (re-run both sides, never reconcile old
 against new), TSN libraries rebuild once, PDF-sourced workbooks re-consolidate once,
 plus the v0.30–v0.32 items in
@@ -218,6 +222,8 @@ evidence run).
 | How to verify (no test framework): golden `check_*.py`, COM-recalc, `#mock`, test-data locations | [docs/verification-and-testing.md](docs/verification-and-testing.md) |
 | The durable lessons (field failures, one-core, regression discipline, audit method) | [docs/lessons.md](docs/lessons.md) |
 | The narrative history | [docs/history.md](docs/history.md) |
+| Clean Road / ArcGIS builds: the measured build rules, the 74-column coverage census, and the censused CA INTERSECTIONS + CA RAMPS mappings the **next large build** starts from | [docs/planning/cleanroad-highways.md](docs/planning/cleanroad-highways.md) |
+| Making a comparison faster without moving a byte of its output | [docs/planning/vs-tsn-comparison-speed.md](docs/planning/vs-tsn-comparison-speed.md) |
 | **What's left to do — the definitive OPEN WORK INVENTORY** | [docs/roadmap.md](docs/roadmap.md) (the `▣ OPEN WORK INVENTORY` table at the top) |
 | The reusable read-only code-review prompt | [docs/code-review-prompt.md](docs/code-review-prompt.md) |
 
@@ -367,6 +373,18 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
   claims rows. That gate shares its reader with `read_counts`, so what it refuses was
   already unreadable — keep it that way; a gate that could refuse a workbook the Matrix
   can read would block a valid report.
+- **Matrix freshness reads the filesystem ONCE per folder.**
+  `artifact_store.newest_report_file_mtime` is the ONE newest-data-mtime reader —
+  the by-day, vs-Baseline and PDF-vs-Excel snapshots each carried a byte-identical
+  private `_folder_newest_mtime`, and every one of them paid TWO `os.stat` syscalls
+  per file (`Path.is_file()` then `Path.stat()`). It walks `os.scandir`, which
+  answers both from the directory read: **38.5 ms → 1.5 ms on a real 369-file
+  export folder**, and a 2-column by-day snapshot **90 ms → 9 ms**. CMP-AUD-083
+  semantics are unchanged and must stay so — only a real `.xlsx`/`.pdf` counts, and
+  a single locked or vanished entry must cost only ITSELF (it once aborted the
+  whole fold and marked a present export missing). Prove any change here with
+  `check_newest_report_mtime` plus a snapshot A/B with `now=` pinned — `age_seconds`
+  is derived from the clock and will otherwise differ between two runs.
 - **Workbook count scraping is diagnostic/migration-only.** `read_counts` locates
   Status/Diffs by HEADER LABEL (never hard-coded position), but Matrix, classic UI,
   and validation truth comes from the strict typed comparison generation. Workbook

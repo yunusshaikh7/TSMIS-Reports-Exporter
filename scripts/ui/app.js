@@ -313,6 +313,42 @@ function selectedDay() {
   return $("selDay").value || null;   // "" = legacy "(older exports)"
 }
 
+// Disable/enable every control that locks while a task runs, and flip the single
+// `body.busy` class the stylesheet greys the option rows from.
+//
+// This used to run unconditionally inside renderState — eight container sweeps
+// plus a document-wide [data-lock-when-busy] scan, writing `disabled` onto ~324
+// elements on EVERY state push, ~92 of which arrive per run. The DOM already
+// holds the right flags, so the work is skipped unless `locked` actually
+// changed.
+//
+// That is only safe while every locking control either exists before the first
+// render or sets its own `disabled` when built. Both hold: the option lists are
+// filled by buildStatic() ahead of the first renderState, and renderBatchLibrary
+// — the one thing that rebuilds controls mid-run — stamps `btn.disabled` from
+// the live task itself. A NEW dynamic control must do the same, or call this
+// again after building.
+function applyLockState(locked) {
+  if (locked === S._lockApplied) return;
+  S._lockApplied = locked;
+  document.body.classList.toggle("busy", locked);
+  document.querySelectorAll("[data-lock-when-busy]").forEach((el) => { el.disabled = locked; });
+  Object.keys(SETTING_INPUTS).forEach((id) => { $(id).disabled = locked; });
+  ["setDebugLog", "setDevtools", "setEnvCheckSignin", "setEnvCheckStart",
+   "setNotifyFinish"].forEach((id) => { $(id).disabled = locked; });
+  $("setSiteUrls").querySelectorAll("input").forEach((i) => { i.disabled = locked; });
+  // dataset.off rows (app-wide-disabled reports) stay disabled regardless of lock.
+  ["reportList", "batchReportList", "batchEnvList"].forEach((id) => {
+    $(id).querySelectorAll("input").forEach((c) => { c.disabled = locked || c.dataset.off === "1"; });
+  });
+  ["consList", "compareList", "cmpOutList"].forEach((id) => {
+    $(id).querySelectorAll("input").forEach((c) => { c.disabled = locked; });
+  });
+  $("batchLibrary").querySelectorAll("button").forEach((b) => { b.disabled = locked; });
+  ["btnPickTsmis", "btnPickTsn", "btnPickDirA", "btnPickDirB",
+   "cmpDirA", "cmpDirB", "btnOpenConsInput"].forEach((id) => { $(id).disabled = locked; });
+}
+
 function renderState() {
   const st = S.st;
   if (!st) return;
@@ -404,24 +440,9 @@ function renderState() {
 
   // config inputs lock while any task runs
   const locked = st.task != null;
-  // Every [data-lock-when-busy] control disables while any task runs (S5:
-  // the hand-kept ID lists became ONE attribute sweep — tag new controls in
-  // the HTML instead of extending an array here).
-  document.querySelectorAll("[data-lock-when-busy]").forEach((el) => { el.disabled = locked; });
-  Object.keys(SETTING_INPUTS).forEach((id) => { $(id).disabled = locked; });
-  ["setDebugLog", "setDevtools", "setEnvCheckSignin", "setEnvCheckStart", "setNotifyFinish"].forEach((id) => {
-    $(id).disabled = locked;
-    $(id).closest(".option-row").classList.toggle("disabled", locked);
-  });
-  $("setSiteUrls").querySelectorAll("input").forEach((i) => { i.disabled = locked; });
+  applyLockState(locked);
   $("btnChromiumCancel").classList.toggle("hidden", st.task !== "chromium");
   $("btnValidateCancel").classList.toggle("hidden", st.task !== "validate");
-  // dataset.off rows (app-wide-disabled reports) stay disabled regardless of lock.
-  $("reportList").querySelectorAll("input").forEach((c) => { c.disabled = locked || c.dataset.off === "1"; });
-  $("reportList").querySelectorAll(".option-row").forEach((r) => r.classList.toggle("disabled", locked));
-  $("consList").querySelectorAll("input").forEach((c) => { c.disabled = locked; });
-  $("consList").querySelectorAll(".option-row").forEach((r) => r.classList.toggle("disabled", locked));
-
   // fast mode: needs a saved login (device sign-in runs one browser at a time)
   const fastAllowed = st.authed && !locked;
   const fastCb = $("fastMode");
@@ -452,16 +473,10 @@ function renderState() {
   if (pbUse) pbUse.setAttribute("href", st.paused ? "#i-play" : "#i-pause");
   $("btnPauseBatchLabel").textContent = st.paused ? "Resume" : "Pause";
   $("btnCancelBatch").disabled = st.task !== "batch";
-  // Lock AND grey the whole Everything pane while any task runs (incl. env
-  // check), matching the Export/Consolidate/Compare panes: option rows dim via
-  // .option-row.disabled, fast toggles via .fast-toggle.disabled. The Saved-
-  // reports Refresh buttons are re-synced here too — renderBatchLibrary only
-  // re-runs on tab-switch/run-end, so without this they'd stay clickable.
-  ["batchReportList", "batchEnvList"].forEach((id) => {
-    $(id).querySelectorAll("input").forEach((c) => { c.disabled = locked || c.dataset.off === "1"; });
-    $(id).querySelectorAll(".option-row").forEach((r) => r.classList.toggle("disabled", locked));
-  });
-  $("batchLibrary").querySelectorAll("button").forEach((b) => { b.disabled = locked; });
+  // The Everything pane's inputs + Saved-reports buttons lock in applyLockState;
+  // its rows grey from `body.busy`. The fast toggles stay here — unlike the 98
+  // option rows, only 3 of the 8 `.fast-toggle`s grey on lock, so a blanket
+  // ancestor rule would catch five that must not dim.
   $("batchFast").disabled = locked;
   $("batchFast").closest(".fast-toggle").classList.toggle("disabled", locked);
   $("batchWorkers").disabled = locked || !$("batchFast").checked;
@@ -473,12 +488,6 @@ function renderState() {
     bp.hidden = false;
     bp.textContent = `Environment ${(st.batch.done || 0) + 1} of ${st.batch.total}: ${st.batch.label || ""}`;
   } else { bp.hidden = true; }
-  ["btnPickTsmis", "btnPickTsn", "btnPickDirA", "btnPickDirB",
-   "cmpDirA", "cmpDirB", "btnOpenConsInput"].forEach((id) => { $(id).disabled = locked; });
-  ["compareList", "cmpOutList"].forEach((id) => {
-    $(id).querySelectorAll("input").forEach((c) => { c.disabled = locked; });
-    $(id).querySelectorAll(".option-row").forEach((r) => r.classList.toggle("disabled", locked));
-  });
   $("btnCancelCompare").disabled = st.task !== "compare";
   // CMP-AUD-079: keep the running comparison's Cancel reachable — lock the Compare
   // sub-tab strip while a Compare-tab comparison is live, so the user can't
@@ -1013,28 +1022,59 @@ function endRunUi() {
   $("progressText").textContent = "Idle — ready to export";
 }
 
+// Repaint everything a state push can change. Split out of `dispatch` so a
+// batch carrying several states can assign each one (order-preserving, cheap)
+// but PAINT only the last — see dispatch.
+//
+// The four matrix progress updaters used to run unconditionally, so a state
+// push while the Export tab was open still repainted the Everything, by-day,
+// vs-Baseline and PDF-vs-Excel matrices. Only the visible one can be seen, and
+// arriving at any matrix tab runs its FULL render (setTab / setEverySub), so an
+// off-screen matrix has nothing to lose by being skipped.
+function paintState() {
+  renderState();
+  const onEverythingMatrix = S.tab === "everything" && S.everySub === "matrix";
+  const onCompareGroup = (g) => S.tab === "compare" && S.compareGroup === g;
+  if (onEverythingMatrix) updateMatrixProgress();
+  if (onCompareGroup(DAY_MATRIX_GROUP)) updateDayMatrixProgress();
+  if (onCompareGroup(BASELINE_MATRIX_GROUP)) updateBaselineMatrixProgress();
+  if (onCompareGroup(PVE_MATRIX_GROUP)) updatePveMatrixProgress();
+  if (typeof syncArcgisLock === "function") syncArcgisLock();
+  // env_access can change on a push (background active-env check / scan) —
+  // re-overlay the matrix warnings without a full rebuild when one is visible.
+  if (onEverythingMatrix || onCompareGroup(DAY_MATRIX_GROUP)) applyMatrixEnvFlags();
+}
+
 // ------------------------------------------------------- event dispatch ----
 // Python pushes batches of events through here (see gui_api._sender). Each
 // event is isolated: one bad payload must not take down the rest of the
 // batch, and the log pane scrolls once per batch, not once per line.
+//
+// STATE COALESCING: the sender drains up to 200 queued events into one batch,
+// and there are ~92 `_push_state()` call sites, so a batch routinely carries
+// several states. Each is a FULL snapshot, so painting every one of them draws
+// the same surface repeatedly and throws all but the last away — measured at
+// ~5 ms per state on the matrix tab. Every state is still ASSIGNED in order, so
+// anything an interleaved handler reads off `S.st` is unchanged; only the paint
+// is deferred to the last one, which by definition produces the same final DOM.
 function dispatch(events) {
   let sawLog = false;
-  for (const ev of events) {
+  let lastStateAt = -1;
+  for (let i = 0; i < events.length; i++) if (events[i] && events[i].t === "state") lastStateAt = i;
+  for (let i = 0; i < events.length; i++) {
+    const ev = events[i];
     try {
       switch (ev.t) {
         case "state":
-          S.st = ev.s; renderState(); updateMatrixProgress(); updateDayMatrixProgress();
-          updateBaselineMatrixProgress(); updatePveMatrixProgress();
-          if (typeof syncArcgisLock === "function") syncArcgisLock();
-          // env_access can change on a push (background active-env check / scan) —
-          // re-overlay the matrix warnings without a full rebuild when one is visible.
-          if ((S.tab === "everything" && S.everySub === "matrix")
-              || (S.tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP)) applyMatrixEnvFlags();
+          S.st = ev.s;
+          if (i === lastStateAt) paintState();
           // A TSN-library rebuild finished (task slot freed) → refresh its panel.
           // Keyed off the consolidate task ENDING, not off who started it: the
           // Settings button is only one entry point — the matrix rebuilds a stale
           // TSN dataset on its own before comparing, and that path never set the
           // pending flag, so the panel kept reading STALE until the next app start.
+          // Stays per-state (NOT coalesced): it watches for a task TRANSITION, so
+          // collapsing the states could step over the consolidate→idle edge.
           {
             const wasConsolidating = S._lastTask === "consolidate";
             S._lastTask = S.st ? S.st.task : null;

@@ -220,24 +220,11 @@ def record_result(date, source, row_key, baseline_id, verdict, diff_cells,
 # --------------------------------------------------------------------------- #
 # filesystem helpers
 # --------------------------------------------------------------------------- #
-def _folder_newest_mtime(p):
-    """Newest report-data-file mtime in a folder, or None when empty/absent.
-    CMP-AUD-083: only a real .xlsx/.pdf export counts — a folder holding only a
-    lock, sidecar, or notes file is NOT an export and never a fresher signal."""
-    newest = None
-    try:
-        entries = list(Path(p).iterdir())
-    except OSError:  # silent-ok: an absent/unreadable folder IS the "no export" answer
-        return None
-    for e in entries:
-        try:
-            if e.is_file() and artifact_store.is_report_data_file(e.name):
-                m = e.stat().st_mtime
-                if newest is None or m > newest:
-                    newest = m
-        except OSError:  # silent-ok: a locked/vanished entry contributes nothing
-            continue
-    return newest
+# CMP-AUD-083 newest-data-mtime: ONE shared reader (artifact_store), not a
+# private copy — this module had a byte-identical one, as did the other two
+# matrix snapshots. Kept as a module-local alias so the call sites below read
+# unchanged.
+_folder_newest_mtime = artifact_store.newest_report_file_mtime
 
 
 def tsmis_dir(date, source, subdir):

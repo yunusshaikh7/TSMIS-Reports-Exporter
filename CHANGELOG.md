@@ -3,6 +3,34 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## Unreleased
+
+**The interface stops doing the same work over and over.** No visible change —
+every control looks and behaves exactly as before — but the app spends a small
+fraction of the effort keeping it that way. Three fixes, all with the same
+acceptance bar: prove the result is identical, just cheaper.
+
+- **Matrix freshness reads each folder once instead of twice per file.** Working
+  out how fresh a cell is meant listing its export folder and then asking the
+  operating system about every file in it *twice*. A statewide export folder
+  holds 252 route files and a matrix asks this for every cell. Reading the
+  directory once instead: **38.5ms → 1.5ms per folder**, and a two-column by-day
+  matrix snapshot **90ms → 9ms**. Every matrix answers the same as before — the
+  four snapshots were compared field-for-field with the clock pinned. Expect the
+  biggest difference on a work PC, where antivirus inspects every file the app
+  opens.
+- **A burst of updates repaints once, not once per update.** The app receives
+  updates from its engine in batches, and each one carried a complete picture of
+  the app's state — so a batch of twenty repainted the whole window twenty times
+  and threw nineteen away. It now applies all of them and paints the final one.
+  A twenty-update batch: **194ms → 21ms**. It also stops repainting the three
+  comparison matrices you are not looking at.
+- **Greying out the controls during a run is no longer 324 separate writes.**
+  While a task runs, every option is disabled and dimmed. That was re-applied to
+  every control on every update; it now happens once when a run starts and once
+  when it ends, with the dimming done by the stylesheet. The controls end up in
+  exactly the same state — verified control-by-control, in every task mode.
+
 ## v0.41.0 — 2026-08-20
 
 **Refresh a matrix without building the workbooks.** A new **Counts only** option

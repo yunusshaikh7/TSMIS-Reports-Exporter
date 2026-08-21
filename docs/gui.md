@@ -62,6 +62,42 @@ app.js dispatch() routes each ev.t (state|log|progress|run_started|run_ended|
 JS user action ── window.pywebview.api.<method>() ──▶ GuiApi (Promise reply)
 ```
 
+### What a batch costs — the two coalescing rules
+
+A batch is drained from the queue, not metered, so it routinely carries SEVERAL
+full state snapshots — there are ~92 `_push_state()` call sites, 54 of them in
+`gui_matrix.py` alone. Two rules keep a burst cheap, and both are locked by
+`build/check_state_paint_coalescing.js`:
+
+- **`dispatch` assigns every state but paints only the last.** `S.st = ev.s` runs
+  for each one in order (so anything an interleaved handler reads is unchanged);
+  `paintState()` runs only at the final state index. Each state is a FULL
+  snapshot, so the last paint produces the same DOM the whole sequence would
+  have. Measured on the matrix tab: a 20-state batch went **194 ms → 21 ms**.
+  The `_lastTask` TSN-rebuild watcher deliberately stays OUTSIDE that guard — it
+  watches for a task *transition*, so collapsing the states could step over the
+  consolidate→idle edge.
+- **`paintState` repaints only the matrix on screen.** All four updaters used to
+  run on every push regardless of tab. Arriving at any matrix tab runs its own
+  full render (`setTab` / `setEverySub`), so an off-screen matrix loses nothing.
+
+The third piece is `applyLockState`: the ~324 `disabled` writes and eight
+container sweeps that greyed the UI on every push now run only when `locked`
+actually CHANGES, and the 98 option rows grey from a single **`body.busy`** class
+in CSS instead of a per-row class write. That is safe only while every locking
+control either exists before the first render or sets its own `disabled` when
+built — a new dynamic control must do one or the other. Together these took
+`renderState` from 22 `querySelectorAll` sweeps / 324 element writes to **5 / 58**.
+
+> **Measure before "optimizing" an animation here.** Three layout-animating CSS
+> rules look like obvious jank (`transition: flex-grow` on the two columns,
+> `transition: width` on the progress fill, `@keyframes indeterminate` animating
+> `left` forever). Profiled on the matrix tab against a forced-layout control
+> they cost **0.05–0.13 ms per frame** — 1.9 ms for the whole 240 ms column
+> transition, and ~194 ms per MINUTE for the indeterminate bar, i.e. under 0.4%
+> of a frame. They are in isolated layout scopes, so the textbook concern does
+> not apply. Left alone deliberately; see [lessons.md](lessons.md) #16.
+
 ## UI layering: Python owns state, JS owns presentation
 
 **Python owns all app state** (auth, task, checks, days, batch, update, env-access) and pushes **full snapshots** (`_state_snapshot()` → `{t:"state", s:…}`, sent on every `_push_state()`). `app.js` owns ONLY presentation + form fields and **never invents log lines** — everything shown in the log pane originates in Python so the `tsmis.ui` file-log mirror stays complete. The mirror: `_emit_log(text)` logs the line to the `tsmis.ui` logger AND emits it to JS; `_emit_modal` and `ui_event` likewise log every dialog and user UI event. So `tsmis.log` carries the user's view of a run (what was clicked, what was reported) next to the engine's own diagnostics — the "one log upload answers it" contract.
@@ -264,6 +300,56 @@ its OWN live-formulas toggle (`baseline_matrix_formulas`, `syncBaselineMatrixFor
 the report toggles. Jobs carry `which:"baseline"` → `BaselineMatrixCompareWorker` on the
 same queue. Engine + store: [comparison-engine.md](comparison-engine.md) §12c.
 Mock + bridge exercised at `/index.html#mock` (Compare ▸ vs Baseline Matrix).
+
+### The Compare-tab "PDF vs Excel Matrix" (v0.31.0)
+
+The **fourth** matrix, and the only one whose two sides come from the *same* run
+folder: the 5 dual-edition families × exported days, each cell self-checking that
+day's PDF export against its Excel export. It was built ON the
+`report_catalog.MATRIX` wiring the same day that wiring landed, which is what
+proved the wiring — a new matrix cost a table row per report instead of a fifth
+if-chain. Lives in `pdf_excel_matrix.py`; the sub-tab renders through the same
+`ui-matrix.js` as the other three.
+
+### The ArcGIS tab (v0.29.0; two sub-tabs since v0.39.0)
+
+The one tab that never touches the TSMIS site. Both sub-tabs build from the
+manually-stocked `arcgis_layers/` library, and both are ordinary
+build-then-compare flows driven from `gui_arcgis_api.py` (`arcgis_status` /
+`start_arcgis_build` / `start_arcgis_compare`, and the `*_report_*` mirrors) with
+`ui-arcgis.js` as their renderer:
+
+- **Clean Road** — builds our own CA HIGHWAYS table from the layers as-of a chosen
+  date and compares it against the TSN extract, both flavors. The as-of box
+  matters: `resolve_default_asof()` takes its default from the *staged TSN
+  extract*, not from the layer library, so a build off fresh layers still
+  reconstructs the extract's date unless you set it.
+- **Reports vs layers** — renders a TSMIS *report* from the same layers and diffs
+  it against the app's own export of that report (Highway Detail first). Because
+  both sides are TSMIS, they should agree; the card leads with the **vintage**
+  warning in warning colour, because an as-of that doesn't match the compared
+  export's day measures network change instead of correctness.
+
+Statewide runs here are long (~25–30 min for a report build), so both flows are
+cancellable and report progress through the same `Events` sink as an export.
+
+**Extending it** (roadmap G1 adds the CA INTERSECTIONS and CA RAMPS builds) is a
+new build + comparator behind the existing endpoint shape — read
+[planning/cleanroad-highways.md](planning/cleanroad-highways.md) first for the
+measured build rules, and don't re-derive them.
+
+### Matrix cell states, and the one that is deliberately not green
+
+`ui-matrix.js` renders a cell from `cmp` state. Beyond the familiar built /
+stale / match / failed states, v0.41.0 added **`mx-preview`**: a counts-only
+result showing the difference count in grey with *"counts only — build to
+certify"*. It is checked BEFORE the built/stale/match branches and can never
+render as `mx-match` — a zero-difference preview reads `match*`, never a green
+tick. That is enforced structurally rather than by convention (see
+[comparison-engine.md](comparison-engine.md) §2c) and asserted by
+`build/check_comparison_preview.py`, which reads this file to prove the branch
+order and the absence of `mx-match`. **If you reorder the branches in
+`ui-matrix.js`, that check fails — which is the point.**
 
 ### One-stop EXPORT on the by-day matrix (v0.17.0)
 

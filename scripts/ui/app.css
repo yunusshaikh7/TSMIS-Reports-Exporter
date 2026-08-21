@@ -611,8 +611,17 @@ body.matrix-wide .mx-pane .mx-rowhead { justify-content: center; }
   border-color: color-mix(in oklab, var(--primary) 30%, transparent);
   background: color-mix(in oklab, var(--primary) 5%, transparent);
 }
-.option-row.disabled { opacity: 0.55; cursor: default; }
-.option-row.disabled:hover { background: transparent; }
+/* Greying every option row while a task runs is PURELY visual, so one ancestor
+   class does it instead of a per-row class toggle. renderState used to sweep
+   eight containers and write the class onto all 98 rows on every state push —
+   and it covered all 98, with no exceptions, so `body.busy` is exactly
+   equivalent. `.disabled` stays supported for the handful of rows that are
+   greyed for their OWN reasons (an app-disabled report), independently of
+   whether a task is running. */
+.option-row.disabled,
+body.busy .option-row { opacity: 0.55; cursor: default; }
+.option-row.disabled:hover,
+body.busy .option-row:hover { background: transparent; }
 /* Permanently-greyed report rows (app-wide disabled, e.g. Intersection): shown
    but unpickable. Distinct from .disabled, which toggles only while a task runs. */
 .option-row.option-static { opacity: 0.5; cursor: default; }
