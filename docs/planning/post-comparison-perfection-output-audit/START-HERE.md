@@ -8,11 +8,26 @@ post-merge gate and frozen application self-test both passed;
 RB-4 is MERGED at `83a24896a5a970a3686df87934210f54cea43778`; its 158/158
 post-merge gate and frozen application self-test both passed;
 RB-5's readiness contract was prepared from `main` at
-`1e9446bb7f1f9771b7698482d63980840ee5ec28`; current clean `main` has since
-advanced to `800bea2f0835fa69ab8ded0ed46fd83368173d80` (`v0.35.0`);
-no RB-5 branch, RB-5 product change, generation, or acceptance run has begun**
+`1e9446bb7f1f9771b7698482d63980840ee5ec28`; no RB-5 branch, RB-5 product change,
+generation, or acceptance run has begun**
 
-Last updated: 2026-08-10
+Last updated: 2026-08-21
+
+> **`main` has moved a long way since this program last ran.** The readiness
+> contract above was prepared against `v0.34.0`-era `main`, and the state line
+> here tracked it to `v0.35.0`. **`main` is now `v0.41.1`** — eleven releases
+> later. Stage 4 must fetch and record the exact current clean base itself; the
+> readiness commit is PROVENANCE, not the branch point, and no hash written in
+> this folder should be treated as "current `main`".
+>
+> Re-read every scope statement against today's code before trusting it. Two are
+> known stale: **HF-07** excludes Highway Detail as *pre-release* (that freeze
+> lifted in v0.37.0 and HD's backlog closed in v0.38.0), and **HF-08** counts
+> *eight* supported TSN datasets (there are now eleven —
+> `python -c "import sys; sys.path.insert(0,'scripts'); import report_catalog as rc; print(len(rc.TSN))"`).
+> The program also predates the ArcGIS "Reports vs layers" lane (v0.39.0) and the
+> v0.40–v0.41 comparison-speed work, so a family it names may have grown a
+> sibling it does not.
 
 This is the entry point for every new Codex or Claude chat. Read this file
 before opening the other audit documents. The project deliberately separates
