@@ -1174,6 +1174,14 @@ function bindEvents() {
     }
   });
   // Live-formulas toggles — each matrix has its OWN persisted setting.
+  // Counts only — one persisted setting behind two checkboxes.
+  ["matrixPreviewOnly", "dayMatrixPreviewOnly"].forEach((id) =>
+    $(id)?.addEventListener("change", async (e) => {
+      const r = await api.set_setting("matrix_preview_only", e.target.checked);
+      if (r && r.error) showMessage("error", "Can't set the counts-only option", r.error);
+      syncPreviewOnly();
+    }));
+
   $("matrixFormulas")?.addEventListener("change", async (e) => {
     const r = await api.set_matrix_formulas(e.target.checked);
     if (r && r.error) showMessage("error", "Can't set formulas option", r.error);

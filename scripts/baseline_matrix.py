@@ -328,6 +328,7 @@ def baseline_matrix_snapshot(source, days, baseline_id, hidden=None, dest=None,
 
     cells = {}
     attempts = matrix.load_attempts(byday_root())
+    previews = matrix.load_previews(byday_root())
     for row_key, _label, subdir, supported in rows:
         per = {}
         for date in days:
@@ -349,15 +350,20 @@ def baseline_matrix_snapshot(source, days, baseline_id, hidden=None, dest=None,
                          "mtime": bl["mtime"]}]
                 # BOTH sides are multi-file folders — fingerprint both so a route
                 # deleted on either side reads the cell stale (F5/P2).
+                fp_folders = (tdir, bdir / subdir) if bdir else (tdir,)
                 cmp = matrix._cmp_state(
                     out_path(date, source, row_key, baseline_id) if parsed else "",
-                    srcs, rec,
-                    fp_folders=(tdir, bdir / subdir) if bdir else (tdir,))
+                    srcs, rec, fp_folders=fp_folders)
                 # CMP-AUD-089: render the durable last-attempt overlay here too.
                 attempt = matrix._last_attempt_for(
                     attempts, f"{row_key}|{source}|{baseline_id}", date, cmp)
                 if attempt is not None:
                     cmp["last_attempt"] = attempt
+                preview = matrix._preview_for(
+                    previews, f"{row_key}|{source}|{baseline_id}", date, cmp,
+                    srcs, fp_folders)
+                if preview is not None:
+                    cmp["preview"] = preview
             per[date] = {"export": export, "cmp": cmp}
         cells[row_key] = per
 

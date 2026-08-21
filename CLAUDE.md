@@ -247,6 +247,16 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
   each cell owns its `StyleArray`; the streamed package reader never decides a REFUSAL
   (openpyxl still does). Prove any change here with
   `build/benchmark_vs_tsn_speed.py --writer historical` on the real corpus.
+- **A counts-only PREVIEW certifies nothing** (v0.41.0). `mode="preview"` runs the
+  whole comparison and returns its typed truth without writing a workbook (~9x
+  faster). It commits no artifact, so it has no `artifact_generation` — keep it
+  that way STRUCTURALLY: previews live in their own `comparisons/_previews.json`,
+  never `_results.json`, never inside `_staleness`; `_preview_for` shows one only
+  while it still matches the inputs and only when the certified cell isn't fresh;
+  a real build clears it; the renderer uses `mx-preview` and a zero-difference
+  preview shows `match*`, never a green tick. Its numbers must equal the build's —
+  both paths call the one `_headline_truth`/`_headline_verdict` pair, and
+  `check_comparison_preview` proves it.
 - **`compare_core` semantics are correctness-locked, not history-locked.** Equality,
   formula, normalization, identity, pairing, and count changes must follow the approved
   domain contract and be proved cell-for-cell against the independent oracle plus both

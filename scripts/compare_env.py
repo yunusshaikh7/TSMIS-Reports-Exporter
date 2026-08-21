@@ -1307,10 +1307,12 @@ class EnvCompare:
         events.on_log("")
         # A folder comparison may spend minutes loading a statewide side. Check
         # again immediately before the direct run_compare write so a late alias
-        # cannot bypass this lower boundary.
-        blocked = alias_error()
-        if blocked is not None:
-            return blocked
+        # cannot bypass this lower boundary. A counts-only preview writes
+        # nothing, so it has no output that could alias an input.
+        if mode != "preview":
+            blocked = alias_error()
+            if blocked is not None:
+                return blocked
         try:
             sc = self._schema(header, la, lb)
         except ValueError as e:
@@ -1330,6 +1332,18 @@ class EnvCompare:
                                    "banner": f"{self.REPORT_NAME} Comparison "
                                              f"— {la} vs {lb}"},
                         "inputs": prov_sides}
+        if mode == "preview":
+            # Counts only: the comparison runs in full and returns its typed
+            # truth, with no workbook, no artifact generation and no provenance
+            # sidecar. See compare_core.run_compare's preview branch.
+            return run_compare(
+                sc, rows_a, rows_b, has_route, out_path,
+                events=events, confirm_overwrite=lambda _p: True, mode=mode,
+                name_a=str(dir_a.name), name_b=str(dir_b.name),
+                warnings=warnings, commit_guard=commit_guard,
+                input_completion=input_completion,
+                skipped_inputs=total_skipped, failed_inputs=total_failed,
+                failures=failures, coverage_diagnostics=coverage_diagnostics)
         result = artifact_store.commit_workbook(
             out_path,
             lambda tmp: run_compare(

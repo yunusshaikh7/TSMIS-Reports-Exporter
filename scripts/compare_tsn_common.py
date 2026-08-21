@@ -1147,6 +1147,22 @@ def run_files_compare(schema, tsmis_path, tsn_path, out_path, *, banner, has_rou
     except ValueError as e:
         return ConsolidateResult(status="error", message=str(e))
 
+    if mode == "preview":
+        # Counts only: compute the comparison and return its typed truth without
+        # writing anything. No commit_workbook, so no artifact generation and no
+        # provenance sidecar — the result is a legal terminal that can never be
+        # mistaken for a published one. The output-alias recheck below is
+        # deliberately skipped: there is no output to alias an input with.
+        return run_compare(
+            schema, rows_t, rows_n, has_route, out_path,
+            events=events, confirm_overwrite=lambda _p: True, mode=mode,
+            name_a=tsmis_path.name, name_b=tsn_path.name,
+            warnings=() if warnings is None else warnings,
+            input_completion=input_completion,
+            skipped_inputs=skipped_inputs,
+            failed_inputs=failed_inputs,
+            failures=input_failures)
+
     # Loading can be long enough for a destination to appear or be redirected.
     # Recheck at the public write boundary so direct callers receive the same
     # protection as GUI/Matrix callers wrapped by commit_workbook.

@@ -180,10 +180,20 @@ function syncFormulasToggle(cbId, stateKey) {
   const cb = $(cbId);
   if (cb) cb.checked = !!(S.st && S.st[stateKey]);
 }
+// One persisted counts-only option, mirrored on both matrix pages: a preview
+// is a property of the RUN, not of a particular grid.
+function syncPreviewOnly() {
+  ["matrixPreviewOnly", "dayMatrixPreviewOnly"].forEach((id) => {
+    const cb = $(id); if (cb) cb.checked = !!(S.st && S.st.matrix_preview_only);
+  });
+}
+
 function syncMatrixFormulas() {
+  syncPreviewOnly();
   syncFormulasToggle("matrixFormulas", "matrix_formulas");
 }
 function syncDayMatrixFormulas() {
+  syncPreviewOnly();
   syncFormulasToggle("dayMatrixFormulas", "day_matrix_formulas");
 }
 
@@ -375,6 +385,22 @@ function mxCellContent(cmp, tsnMeta) {
       : cmp.missing_side === "both" ? "neither exported"
       : cmp.missing_side === "other" ? "other format missing" : "not exported";
     return { cls: "mx-missing", main: "needs export", sub: why };
+  }
+  // A counts-only PREVIEW. matrix_state only offers one when the cell is not
+  // already built-and-fresh, so this never hides a certified result. It is
+  // deliberately never green, whatever it counted: no workbook was written, so
+  // there is no generation and nothing to certify — the number is a preview of
+  // what a real build would say, and the cell still needs building.
+  if (cmp.preview && Number.isFinite(cmp.preview.diff_cells)) {
+    const pd = cmp.preview.diff_cells;
+    const pos = Number.isFinite(cmp.preview.one_sided) ? cmp.preview.one_sided : 0;
+    const headline = (pd === 0 && pos === 0 && cmp.preview.verdict === "match")
+      ? "match*" : `${pd} diff${pd === 1 ? "" : "s"}${pos ? ` +${pos}` : ""}`;
+    return { cls: "mx-preview", main: headline,
+             sub: "counts only — build to certify",
+             title: "Counts only: this comparison was computed but no workbook "
+                    + "was written, so the cell is not certified. Build it to "
+                    + "produce the workbook and a certified result." };
   }
   if (!cmp.built) return { cls: "mx-stale", main: "compare", sub: "not built yet" };
   const d = Number.isFinite(cmp.diff_cells) ? cmp.diff_cells : null;

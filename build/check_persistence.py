@@ -112,6 +112,15 @@ def test_settings_dedup_and_atomicity():
         check("legacy path-only settings remain distinguishable for fail-closed migration",
               settings.get_matrix_tsn_selections()["ramp_detail_pdf"]
               == r"C:\TSN\legacy.xlsx")
+        check("counts-only defaults OFF when the setting is absent",
+              settings.get_matrix_preview_only() is False)
+        settings.set_matrix_preview_only(True)
+        persisted_preview = json.loads(
+            settings.CONFIG_FILE.read_text(encoding="utf-8"))
+        settings.set_matrix_preview_only(False)
+        check("counts-only persists on and clears back to the safe default",
+              persisted_preview.get("matrix_preview_only") is True
+              and settings.get_matrix_preview_only() is False)
         # atomic: a failed os.replace raises, leaves the prior config intact, no .tmp sibling
         before = settings.CONFIG_FILE.read_bytes()
         settings._cache = settings._cache_mtime = None

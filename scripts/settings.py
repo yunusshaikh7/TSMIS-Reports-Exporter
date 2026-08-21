@@ -688,6 +688,21 @@ def set_matrix_fast(on):
     return _set_flag("matrix_fast", on)
 
 
+def get_matrix_preview_only():
+    """Whether a matrix Build refreshes COUNTS ONLY, writing no workbook (off).
+
+    A preview runs the whole comparison and skips only the serialization, so its
+    numbers are the build's numbers — but it publishes no artifact, so it can
+    never certify a cell. Deliberately off by default: the workbook is the
+    deliverable, and a user who forgot this was on would find no file."""
+    return _get_flag("matrix_preview_only")
+
+
+def set_matrix_preview_only(on):
+    """Persist the counts-only matrix option (cleared when off)."""
+    return _set_flag("matrix_preview_only", on)
+
+
 def get_matrix_formulas():
     """Whether matrix comparisons ALSO write a live-formulas workbook beside the
     values copy (default off; the values copy always wins for the offline counts)."""

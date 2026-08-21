@@ -371,7 +371,8 @@ class GuiMatrixMixin:
                             tsn_files=self._matrix_tsn_selections(),
                             force_consolidate=job.get("force", False),
                             also_formulas=settings.get_matrix_formulas(),
-                            evidence=self._evidence_request()).start()
+                            evidence=self._evidence_request(),
+                            preview=settings.get_matrix_preview_only()).start()
         return True
 
     def _dispatch_day_compare_job(self, job):
@@ -391,7 +392,8 @@ class GuiMatrixMixin:
                                tsn_files=self._matrix_tsn_selections(),
                                force_consolidate=job.get("force", False),
                                also_formulas=settings.get_day_matrix_formulas(),
-                               evidence=self._evidence_request()).start()
+                               evidence=self._evidence_request(),
+                               preview=settings.get_matrix_preview_only()).start()
         return True
 
     def _resolve_pve_cells(self, job):

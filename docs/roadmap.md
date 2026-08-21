@@ -147,7 +147,7 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 
 ---
 
-## ▣ OPEN WORK INVENTORY (current as of v0.40.1, 2026-08-20)
+## ▣ OPEN WORK INVENTORY (current as of v0.41.0, 2026-08-20)
 
 **This is the definitive list of what is left.** Everything below is genuinely
 open; anything not here is either shipped (see `CHANGELOG.md`) or a historical
@@ -256,17 +256,16 @@ were being counted as differences. Post-fix, exactly four columns move (`LB #Ln`
 | E5 | The smaller standing items | In the themed sections below: cancel-latency, narrow-mode matrix polish, console `run_cli_multi` coalescing, the shared whitespace-collapse helper, doc/comment line-ref drift. |
 | E6 | ~~Comparison speed — the two measured leftovers~~ — **CLOSED 2026-08-20 (v0.40.1)** | **(a) DONE.** Both sides were read twice: the loader read the consolidated TSMIS and the TSN workbook, then the Report View re-opened and re-parsed the same two files for its own columns. Those columns now ride the read the comparison already performs, with the projections factored so the capture and the standalone reader share ONE expression, and a fallback re-read whenever a caller doesn't thread the dict. **Interleaved 3 paired rounds on statewide Intersection Detail: 229.2s → 191.7s, 16.4% (1.20x), package digest identical across all six runs.** The re-reads themselves measured 14.0s (ID) and 27.9s (HD). Applies to the two Excel comparators and their two PDF flavors; guarded in `check_compare_{intersection,highway}_detail_tsn` (red-tested: removing the capture fails the gate). **(b) NOT TAKEN, now measured rather than asserted.** The one available lever was swapping openpyxl's pure-Python serializer for `lxml`: it produces **different bytes** (`8bbc51f8…` vs the canonical `4590abe3…`) and is worth **~2%** — it fails the byte-identity bar and buys nothing, besides adding a compiled dependency to the frozen work-PC bundle. An undistorted phase breakdown of the current 129s ID comparison shows why there is no hot spot left: `_write_data_sheet` 31.0s (24%), `_write_snapshot_sheet` 21.9s (17%), `_write_report_view` 20.5s (16%), `_write_comparison` 16.4s (13%), input loading 12.0s (9%), everything else 27.3s (21%). Writing is **70%** of the comparison, spread across four writers each serializing content the workbook must contain. The only remaining lever is writing LESS, which changes the output — see the note below. |
 
-> **Where comparison speed goes next, if it ever needs to.** E6(b) closes with
-> "writing is 70% and every byte of it is required" — which is only true while
-> the workbook is the deliverable. A **matrix refresh that produces no workbook**
-> (recompute a cell's verdict and counts, skip serialization entirely) would skip
-> that 70% rather than shave it, and it is the only remaining change worth an
-> order of magnitude. It is NOT a drop-in: the matrix's green state is bound to a
-> committed artifact generation (`comparison_result_boundary` requires
-> `artifact_generation is None` when no workbook committed), so a counts-only run
-> could not be recorded as a normal cached cell — it would need its own clearly
-> marked, non-certifying state. That is a design decision for the owner, not a
-> performance tweak.
+> **Where comparison speed went next — SHIPPED in v0.41.0.** E6(b) closed with
+> "writing is 70% and every byte of it is required", which is only true while the
+> workbook is the deliverable. **Counts only** (`mode="preview"`) skips that 70%
+> rather than shaving it: the comparison runs in full and returns its typed
+> truth without writing anything — statewide Intersection Detail 185.9s → 20.4s
+> (9.1x), counts identical to the build's including the per-column breakdown.
+> The design constraint named here before it was built held: a preview commits
+> no artifact, so it has no generation and cannot certify a cell, and it is kept
+> that way structurally (its own store, outside `_staleness`; never `mx-match`;
+> cleared by a real build). See [comparison-engine.md](comparison-engine.md) §2c.
 
 ### F. Design-first / gated — **NOTHING OPEN.** All of F is shipped (verified 2026-08-18)
 

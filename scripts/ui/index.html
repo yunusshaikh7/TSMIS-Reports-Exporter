@@ -363,6 +363,7 @@
               <span class="mx-key mx-diff-lo">few diffs</span>
               <span class="mx-key mx-diff-hi">many diffs</span>
               <span class="mx-key mx-partial">partial inputs</span>
+              <span class="mx-key mx-preview">counts only</span>
               <span class="mx-key mx-stale">stale</span>
               <span class="mx-key mx-missing">needs export</span>
               <span class="mx-key mx-na">not available</span>
@@ -588,6 +589,7 @@
               <span class="mx-key mx-diff-lo">few diffs</span>
               <span class="mx-key mx-diff-hi">many diffs</span>
               <span class="mx-key mx-partial">partial inputs</span>
+              <span class="mx-key mx-preview">counts only</span>
               <span class="mx-key mx-stale">stale</span>
               <span class="mx-key mx-missing">needs export</span>
               <span class="mx-key mx-na">not available</span>
@@ -645,6 +647,7 @@
               <span class="mx-key mx-diff-lo">few diffs</span>
               <span class="mx-key mx-diff-hi">many diffs</span>
               <span class="mx-key mx-partial">partial inputs</span>
+              <span class="mx-key mx-preview">counts only</span>
               <span class="mx-key mx-stale">stale</span>
               <span class="mx-key mx-missing">needs export</span>
               <span class="mx-key mx-na">not available</span>
@@ -689,6 +692,7 @@
               <span class="mx-key mx-diff-lo">few diffs</span>
               <span class="mx-key mx-diff-hi">many diffs</span>
               <span class="mx-key mx-partial">partial inputs</span>
+              <span class="mx-key mx-preview">counts only</span>
               <span class="mx-key mx-stale">stale</span>
               <span class="mx-key mx-missing">needs export</span>
               <span class="mx-key mx-na">not available</span>
@@ -1179,6 +1183,12 @@
 
         <div class="mc-group">
           <div class="mc-label">Comparison output</div>
+          <label class="mc-fast" title="Recompute each cell's numbers WITHOUT writing a comparison workbook. Same comparison, same counts — it just skips the file, which is most of the time. Cells refreshed this way are marked 'counts only' and stay uncertified until you build them for real.">
+            <input type="checkbox" id="matrixPreviewOnly">
+            <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+            <svg class="ic"><use href="#i-zap"/></svg>
+            <span>Counts only <span class="muted">(no workbook)</span></span>
+          </label>
           <label class="mc-fast" title="Also write a live-formulas (recalculating, auditable) copy beside each values comparison">
             <input type="checkbox" id="matrixFormulas">
             <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
@@ -1270,6 +1280,12 @@
 
         <div class="mc-group">
           <div class="mc-label">Comparison output</div>
+          <label class="mc-fast" title="Recompute each cell's numbers WITHOUT writing a comparison workbook. Same comparison, same counts — it just skips the file, which is most of the time. Cells refreshed this way are marked 'counts only' and stay uncertified until you build them for real.">
+            <input type="checkbox" id="dayMatrixPreviewOnly">
+            <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+            <svg class="ic"><use href="#i-zap"/></svg>
+            <span>Counts only <span class="muted">(no workbook)</span></span>
+          </label>
           <label class="mc-fast" title="Also write a live-formulas (recalculating, auditable) copy beside each values comparison">
             <input type="checkbox" id="dayMatrixFormulas">
             <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>

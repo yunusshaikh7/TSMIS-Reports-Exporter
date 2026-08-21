@@ -90,11 +90,32 @@ def test_baseline_switch_uses_stale_scope():
           bool(m) and m.group(2) == "stale")
 
 
+def test_counts_only_toggle_contract():
+    print("counts-only toggle: markup, state sync, bridge call, and mock stay paired:")
+    html = (UI / "index.html").read_text(encoding="utf-8")
+    app = (UI / "app.js").read_text(encoding="utf-8")
+    matrix = (UI / "ui-matrix.js").read_text(encoding="utf-8")
+    mock = (UI / "mock.js").read_text(encoding="utf-8")
+    check("Everything and by-day each expose exactly one counts-only checkbox",
+          html.count('id="matrixPreviewOnly"') == 1
+          and html.count('id="dayMatrixPreviewOnly"') == 1)
+    check("both controls call the one persisted bridge endpoint",
+          'api.set_setting("matrix_preview_only"' in app)
+    check("both controls mirror the shared state key",
+          '"matrixPreviewOnly", "dayMatrixPreviewOnly"' in matrix
+          and "matrix_preview_only" in matrix)
+    check("the mock carries the same state key",
+          "matrix_preview_only: false" in mock)
+    check("the legend names the state on every matrix that can show it",
+          html.count('mx-key mx-preview') >= 2)
+
+
 def main():
     test_contract_enum_parity()
     test_mock_carries_contract()
     test_ui_script_references_exist()
     test_baseline_switch_uses_stale_scope()
+    test_counts_only_toggle_contract()
     print()
     if _failures:
         print(f"FAILED: {len(_failures)} check(s): {_failures}")

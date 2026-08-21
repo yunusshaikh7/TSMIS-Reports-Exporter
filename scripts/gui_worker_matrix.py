@@ -33,13 +33,18 @@ def _fmt_dur(seconds):
     return f"{m}m{sec}s" if sec else f"{m}m"
 
 
-def _cell_done_line(row_key, cell_key, mode_id, attempt, why, dur):
+def _cell_done_line(row_key, cell_key, mode_id, attempt, why, dur, preview=False):
     """The one structured per-cell outcome line (M1-B): a glyph, the cell's full
     identity, how long it took, and — on anything but a clean success — exactly
     what went wrong. One log read reconstructs a whole run."""
     where = f"{row_key} · {cell_key} ({mode_id})"
     took = _fmt_dur(dur)
     if attempt == matrix.ATTEMPT_OK:
+        if preview:
+            # Say it on EVERY line: a user who left the option on and went
+            # looking for workbooks should find the answer in the log, not by
+            # searching the output folder.
+            return f"  ✓ {where} — counts only, no workbook ({took})"
         return f"  ✓ {where} — done in {took}"
     if attempt == "cancelled":
         return f"  ■ {where} — stopped after {took}"
@@ -135,14 +140,27 @@ def _attempt_state(res, cancelled=False):
 
 
 def _record_attempt(root, result_key, cell_key, status, reason,
-                    commit_guard=None, error_type=None):
+                    commit_guard=None, error_type=None, clear_preview=True,
+                    preview_run=False):
     """Persist one cell's attempt overlay. Best-effort by contract (matrix_state
-    logs the why) — diagnostic state must never fail a published artifact."""
+    logs the why) — diagnostic state must never fail a published artifact.
+
+    A succeeded attempt also clears the cell's counts-only PREVIEW: a certified
+    generation supersedes it, and showing both would put an uncertifiable number
+    beside a real one. `clear_preview=False` is for the preview runner itself,
+    which must not delete what it just recorded."""
     if not root:
+        return
+    if preview_run and status == matrix.ATTEMPT_OK:
+        # A succeeded PREVIEW refreshed no artifact, so it must not clear a real
+        # failed-attempt badge — the cell's last actual refresh still failed.
         return
     try:
         matrix.record_attempt(root, result_key, cell_key, status, reason=reason,
                               commit_guard=commit_guard, error_type=error_type)
+        if status == matrix.ATTEMPT_OK and clear_preview:
+            matrix.record_preview(root, result_key, cell_key, None,
+                                  commit_guard=commit_guard)
     except Exception as e:                       # noqa: BLE001 - diagnostic only
         log.warning("matrix: attempt overlay for %s/%s not recorded (%s: %s)",
                     result_key, cell_key, type(e).__name__, e)
@@ -298,7 +316,8 @@ class MatrixCompareWorker(threading.Thread):
     ('matrix_done', {...}) at the end."""
 
     def __init__(self, dest, baseline, cells, queue, cancel_event, tsn_files=None,
-                 force_consolidate=False, also_formulas=False, evidence=None):
+                 force_consolidate=False, also_formulas=False, evidence=None,
+                 preview=False):
         super().__init__(daemon=True, name="matrix-compare")
         self.dest = dest
         self.baseline = baseline
@@ -310,6 +329,7 @@ class MatrixCompareWorker(threading.Thread):
         self.force_consolidate = force_consolidate
         self.also_formulas = also_formulas
         self.evidence = evidence
+        self.preview = bool(preview)
 
     def run(self):
         tally = _AttemptTally(len(self.cells))
@@ -372,7 +392,8 @@ class MatrixCompareWorker(threading.Thread):
                                             "status": "running",
                                             "done": tally.done, "total": total,
                                             **clock.progress_extra()}))
-                self.q.put(("log", f"  ▸ comparing {row_key} · {cell_key} ({mode_id})…"))
+                self.q.put(("log", f"  ▸ comparing {row_key} · {cell_key} ({mode_id})"
+                                   + (" — counts only…" if self.preview else "…")))
                 error_type = None
                 started = clock.start()
                 try:
@@ -388,6 +409,7 @@ class MatrixCompareWorker(threading.Thread):
                         events=events, tsn_files=self.tsn_files,
                         force_consolidate=self.force_consolidate,
                         also_formulas=self.also_formulas, evidence=self.evidence,
+                        preview=self.preview,
                         commit_guard=(_target_guard
                                       if comparisons_lease is not None else None))
                     attempt, why = _attempt_state(res)
@@ -407,10 +429,12 @@ class MatrixCompareWorker(threading.Thread):
                         error_type = type(e).__name__
                 dur = clock.finish(f"{row_key}|{mode_id}", started)
                 self.q.put(("log", _cell_done_line(row_key, cell_key, mode_id,
-                                                   attempt, why, dur)))
+                                                   attempt, why, dur,
+                                                   preview=self.preview)))
                 tally.count(attempt)
                 _record_attempt(attempts_root, f"{row_key}|{mode_id}", cell_key,
                                 attempt, why, error_type=error_type,
+                                preview_run=self.preview,
                                 commit_guard=(_target_guard
                                               if comparisons_lease is not None
                                               else None))
@@ -438,7 +462,8 @@ class DayMatrixCompareWorker(threading.Thread):
     reusing the Everything matrix's progress events so the bridge handles both."""
 
     def __init__(self, source, cells, dest, queue, cancel_event, tsn_files=None,
-                 force_consolidate=False, also_formulas=False, evidence=None):
+                 force_consolidate=False, also_formulas=False, evidence=None,
+                 preview=False):
         super().__init__(daemon=True, name="day-matrix-compare")
         self.source = source
         self.cells = [(c[0], c[1]) for c in cells]   # (date, row_key)
@@ -449,6 +474,7 @@ class DayMatrixCompareWorker(threading.Thread):
         self.force_consolidate = force_consolidate
         self.also_formulas = also_formulas
         self.evidence = evidence
+        self.preview = bool(preview)
 
     def run(self):
         events = Events(is_cancelled=self.cancel.is_set,
@@ -467,7 +493,8 @@ class DayMatrixCompareWorker(threading.Thread):
                                             "status": "running",
                                             "done": tally.done, "total": total,
                                             **clock.progress_extra()}))
-                self.q.put(("log", f"  ▸ comparing {row_key} · {date} vs TSN…"))
+                self.q.put(("log", f"  ▸ comparing {row_key} · {date} vs TSN"
+                                   + (" — counts only…" if self.preview else "…")))
                 error_type = None
                 started = clock.start()
                 try:
@@ -475,7 +502,8 @@ class DayMatrixCompareWorker(threading.Thread):
                         self.source, date, row_key, self.dest, events,
                         tsn_files=self.tsn_files,
                         force_consolidate=self.force_consolidate,
-                        also_formulas=self.also_formulas, evidence=self.evidence)
+                        also_formulas=self.also_formulas, evidence=self.evidence,
+                        preview=self.preview)
                     attempt, why = _attempt_state(res)
                     status = res.status
                     if status != "ok":
@@ -491,10 +519,12 @@ class DayMatrixCompareWorker(threading.Thread):
                         error_type = type(e).__name__
                 dur = clock.finish(f"{row_key}|tsn", started)
                 self.q.put(("log", _cell_done_line(row_key, date, "tsn",
-                                                   attempt, why, dur)))
+                                                   attempt, why, dur,
+                                                   preview=self.preview)))
                 tally.count(attempt)
                 _record_attempt(attempts_root, f"{row_key}|{self.source}", date,
-                                attempt, why, error_type=error_type)
+                                attempt, why, error_type=error_type,
+                                preview_run=self.preview)
                 tally.done += 1
                 self.q.put(("matrix_cell", {"row": row_key, "cell": date,
                                             "status": status,

@@ -797,6 +797,143 @@ def record_attempt(root, result_key, cell_key, status, reason=None, at=None,
         return False
 
 
+# --------------------------------------------------------------------------- #
+# The counts-only PREVIEW store.
+#
+# A preview runs the whole comparison and skips only the serialization, so its
+# numbers are the build's numbers — but it publishes no workbook, and by the
+# comparison contract a result with no committed artifact has no generation and
+# therefore cannot certify anything. That is not a limitation to work around;
+# it is the point. Previews live HERE, in their own file, deliberately outside
+# `_results.json` and outside `_staleness`, so there is no code path by which a
+# preview can turn a cell green.
+#
+# The store mirrors the CMP-AUD-089 attempt overlay: one versioned file per
+# comparisons root, keyed "<row>|<mode>" -> cell, every write best-effort. A
+# certified build CLEARS the cell's preview, exactly as a succeeded attempt
+# clears its attempt badge — once a real generation exists, the preview is at
+# best redundant and at worst contradicts it.
+# --------------------------------------------------------------------------- #
+_PREVIEWS_FILE = "_previews.json"
+
+
+def previews_path(root):
+    """The organized preview-store path for a comparisons root."""
+    return output_state.state_file(root, _PREVIEWS_FILE)
+
+
+def load_previews(root):
+    """{"<row>|<mode>": {cell_key: {...}}}. Tolerant exactly like the result
+    caches and the attempt overlay: missing / corrupt / foreign / old-version
+    reads as {} and never raises — a lost preview costs a hint, never truth."""
+    p = output_state.named_read_file(root, _PREVIEWS_FILE)
+    try:
+        with open(p, encoding="utf-8") as f:
+            data = json.load(f)
+        return cache_envelope.unwrap(data, output_identity="previews")
+    except OSError:  # silent-ok: no previews yet is the normal state
+        return {}
+    except ValueError as e:                  # corrupt JSON: surface it, then degrade
+        log.warning("matrix: corrupt preview store %s (%s: %s); treating as empty",
+                    p, type(e).__name__, e)
+        return {}
+
+
+def record_preview(root, result_key, cell_key, record, commit_guard=None):
+    """Persist (or clear) one cell's counts-only preview; True when the store on
+    disk reflects the call. ``record=None`` CLEARS the entry — that is how a
+    certified build supersedes a preview it has just made redundant."""
+    p = previews_path(root)
+    tmp = p.with_name(p.name + ".tmp")
+    if output_state.ensure_state_dir(root, commit_guard) != p.parent:
+        log.warning("matrix: organized preview state directory is unavailable")
+        return False
+    for path in (p.parent, p, tmp):
+        if not consolidation_meta.guard_allows(commit_guard, path):
+            log.warning("matrix: preview not recorded for %s/%s "
+                        "(destination ownership changed)", result_key, cell_key)
+            return False
+    data = load_previews(root)
+    cells = data.get(result_key)
+    cells = dict(cells) if isinstance(cells, dict) else {}
+    if record is None:
+        if cell_key not in cells:
+            return True                      # nothing to clear — already current
+        cells.pop(cell_key, None)
+    else:
+        cells[cell_key] = dict(record)
+    if cells:
+        data[result_key] = cells
+    else:
+        data.pop(result_key, None)
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(cache_envelope.wrap(data, output_identity="previews"), f)
+        os.replace(tmp, p)
+        return True
+    except OSError as e:
+        log.warning("matrix: could not record the preview store %s (%s: %s)",
+                    p, type(e).__name__, e)
+        return False
+
+
+def preview_record(outcome_obj, source_identities, input_fingerprint, at=None):
+    """The durable form of one preview: its numbers plus the exact input
+    identities they were computed from, so a later snapshot can tell whether
+    they still describe the inputs on disk. `source_identities` and
+    `input_fingerprint` are recorded in the SAME shape `record_tsn_result`
+    records them, so `_preview_for` can hold a preview to the same input-side
+    agreements `_staleness` holds a trusted cache to."""
+    counts = outcome_obj.counts
+    return {
+        "verdict": outcome_obj.verdict,
+        "diff_cells": counts.differing_cells,
+        "one_sided": counts.side_a_only_rows + counts.side_b_only_rows,
+        "completion": outcome_obj.completion,
+        "at": float(at if at is not None else time.time()),
+        "input_fingerprint": input_fingerprint,
+        "source_identities": dict(source_identities or {}),
+        "producer_versions": producer_identity(),
+    }
+
+
+def _preview_for(previews, result_key, cell_key, cmp_state, sources, fp_folders):
+    """The preview to SHOW for one cell, or None.
+
+    Shown only when the certified cell is NOT already fresh (a real generation
+    always wins), and only while the preview still describes the inputs on
+    disk — the same three input-side agreements `_staleness` requires of a
+    trusted cache: the folder fingerprint, the per-source identity tokens, and
+    the semantic producer version. Anything else is dropped rather than shown
+    with a caveat: a number that no longer matches its inputs is not a weaker
+    answer, it is a wrong one."""
+    if isinstance(cmp_state, dict) and cmp_state.get("built") and not cmp_state.get("stale"):
+        return None
+    rec = _nested_record(previews, result_key, cell_key)
+    if not isinstance(rec, dict) or rec.get("verdict") is None:
+        return None
+    if rec.get("producer_versions") != producer_identity():
+        return None
+    current_ids = {s["name"]: s.get("identity") for s in sources
+                   if s.get("identity") is not None}
+    recorded_ids = rec.get("source_identities")
+    if not isinstance(recorded_ids, dict) or recorded_ids != current_ids:
+        return None
+    if fp_folders and _cell_input_fingerprint(*fp_folders) != rec.get("input_fingerprint"):
+        return None
+    try:
+        at = float(rec.get("at"))
+    except (TypeError, ValueError):  # silent-ok: a malformed stamp only drops the age filter
+        at = None
+    if at is not None and any(s.get("mtime") is not None and s["mtime"] > at + _MTIME_TOL_S
+                              for s in sources):
+        return None                          # an input changed after the preview ran
+    return {"verdict": rec.get("verdict"), "diff_cells": rec.get("diff_cells"),
+            "one_sided": rec.get("one_sided"), "completion": rec.get("completion"),
+            "at": rec.get("at")}
+
+
 def _last_attempt_for(attempts, result_key, cell_key, cmp_state):
     """The attempt overlay to SHOW for one cell, or None. An attempt older than
     the comparison workbook itself is dropped: the artifact was refreshed after
@@ -932,6 +1069,7 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
     # CMP-AUD-089: the durable last-attempt overlay is read ONCE per snapshot and
     # merged per cell below; it decorates the last-good state, never replaces it.
     attempts = load_attempts(comparisons_common_root(dest))
+    previews = load_previews(comparisons_common_root(dest))
     _absent = {"present": False, "mtime": None, "age_seconds": None}
 
     cells, modes_sel, modes_avail, tsn_meta = {}, {}, {}, {}
@@ -971,11 +1109,16 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
         for env in envs:
             export = ages.get(env, {}).get(env_subdir, _absent)
             is_baseline = (mode["kind"] == "env" and env == baseline_key)
+            sources, fp_folders = (), ()
             if not mode["supported"]:
                 cmp = {"supported": False}
             elif is_baseline:
                 cmp = None
             elif mode["kind"] == "env":
+                base = ages.get(baseline_key, {}).get(env_subdir, _absent)
+                sources = [{"name": "baseline", "mtime": base["mtime"]},
+                           {"name": "cell", "mtime": export["mtime"]}]
+                fp_folders = (dest / env / env_subdir, dest / baseline_key / env_subdir)
                 cmp = comparison_state(dest, baseline_key, row_key, env, env_subdir,
                                        ages, results)
             elif mode["kind"] == "tsn":
@@ -991,8 +1134,9 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
                             "identity_required": True}]
                 # F5/P2: the TSMIS store folder is the multi-file side where a deleted
                 # route hides from mtime — fingerprint it (the TSN side is a file, mtime).
+                fp_folders = (dest / env / env_subdir,)
                 cmp = _cmp_state(mode_out_path(dest, baseline_key, row_key, env, mode),
-                                 sources, rec, fp_folders=(dest / env / env_subdir,))
+                                 sources, rec, fp_folders=fp_folders)
             else:                            # self: TSMIS PDF vs Excel
                 other = ages.get(env, {}).get(mode["other_subdir"], _absent)
                 rec = _nested_record(tsn_results, f"{row_key}|{mode['id']}", env)
@@ -1000,15 +1144,19 @@ def matrix_snapshot(dest, baseline_key=BASELINE_DEFAULT, envs=None,
                            {"name": "other", "present": other["present"], "mtime": other["mtime"]}]
                 # F5/P2: both sides are TSMIS store folders — fingerprint both (env first,
                 # other second; build_comparison records them in this same order).
+                fp_folders = (dest / env / env_subdir,
+                              dest / env / mode["other_subdir"])
                 cmp = _cmp_state(mode_out_path(dest, baseline_key, row_key, env, mode),
-                                 sources, rec,
-                                 fp_folders=(dest / env / env_subdir,
-                                             dest / env / mode["other_subdir"]))
+                                 sources, rec, fp_folders=fp_folders)
             if isinstance(cmp, dict) and cmp.get("supported"):
                 attempt = _last_attempt_for(
                     attempts, f"{row_key}|{mode['id']}", env, cmp)
                 if attempt is not None:
                     cmp["last_attempt"] = attempt
+                preview = _preview_for(previews, f"{row_key}|{mode['id']}", env,
+                                       cmp, sources, fp_folders)
+                if preview is not None:
+                    cmp["preview"] = preview
             cell = {"export": export, "is_baseline": is_baseline, "cmp": cmp}
             if mode["kind"] == "env":
                 cell["comparison"] = cmp     # back-compat alias for the Stage-A UI

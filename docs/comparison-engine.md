@@ -217,6 +217,49 @@ re-read on both the raw and the normalized-library path.
 Interleaved on statewide Intersection Detail, 3 paired rounds: **229.2 s →
 191.7 s (16.4%, 1.20x)**, package digest identical on all six runs.
 
+### Counts only — the preview mode (§2c)
+
+`mode="preview"` is the fourth comparison mode beside `formulas` / `values` /
+`both`, and it asks for no output at all. `run_compare` runs the loaders,
+normalization, keys, duplicate pairing, the cancellation and Excel-limit gates
+and `count_diffs` exactly as a real build does, then returns its typed outcome
+and stops before the writers. Since writing is ~70% of a comparison, that is
+roughly an order of magnitude: **statewide Intersection Detail, same session,
+185.9 s to build vs 20.4 s to preview (9.1x), with every count identical —
+including the per-column breakdown.**
+
+The numbers are the build's numbers by construction, not by agreement: there is
+one `_headline_truth` / `_headline_verdict` pair and both paths call it, and
+everything upstream is literally the same code in the same order. That property
+is the whole reason the mode is worth having, so `check_comparison_preview`
+holds it directly.
+
+**A preview cannot certify anything, and that is the point.** It writes no
+workbook, so there is no committed artifact, so by
+`comparison_result_boundary` there is no `artifact_generation` and no
+`attempt_state.generation_id` — the contract already says such a terminal is
+legal and uncertifiable. The matrix layer keeps it that way structurally rather
+than by convention:
+
+- previews live in `comparisons/_previews.json`, their own versioned store,
+  deliberately outside `_results.json` AND outside `_staleness`, so no code path
+  exists by which a preview becomes a cell's verdict;
+- `matrix_state._preview_for` offers one only when the certified cell is not
+  already fresh, and only while the preview still describes the inputs on
+  disk — the same three input-side agreements a trusted cache must satisfy (the
+  folder fingerprint, the per-source identity tokens, the semantic producer
+  version), plus "no input moved after it ran". Anything else is dropped, not
+  shown with a caveat;
+- a succeeded real build CLEARS the cell's preview, exactly as it clears the
+  attempt badge — a real generation always wins;
+- the renderer paints `mx-preview`, never `mx-match`. **A preview that counted
+  zero differences shows `match*`, not a green tick**, because "no differences"
+  and "certified identical" are different claims.
+
+Off by default (`settings.matrix_preview_only`), because the workbook is the
+deliverable and a user who forgot the option was on would find no file. The log
+says "counts only, no workbook" on every affected line for the same reason.
+
 `build/benchmark_vs_tsn_speed.py` is the repeatable harness; `--writer historical`
 swaps `_styled_cell` back to the pre-cache assignment sequence so the same real
 inputs can be run both ways and the package digests compared. CI cannot reach

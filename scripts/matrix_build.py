@@ -29,7 +29,8 @@ from events import ConsolidateResult
 from matrix_state import (_MTIME_TOL_S, _cell_input_fingerprint, _mode_by_id,
                           _pdf_self_comparator, _row_defs, _row_modes,
                           _safe_mtime, cell_buildable, comparison_path,
-                          mode_out_path, producer_identity, record_result,
+                          comparisons_common_root, mode_out_path,
+                          producer_identity, record_result,
                           record_tsn_result, tsn_input_root, tsn_source)
 
 class _FacadeProxy:
@@ -721,7 +722,7 @@ def _twin_inputs_unchanged(fp_before, folders, out_name, events=None):
 # --------------------------------------------------------------------------- #
 def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
                           confirm_overwrite=None, row_defs=None, also_formulas=False,
-                          evidence=None, commit_guard=None):
+                          evidence=None, commit_guard=None, preview=False):
     """Compare (row's report, cell env) against the baseline env, writing the
     VALUES workbook to comparison_path(...), and record its verdict + discrepancy
     counts in the cache. Pure delegation to the adapter's compare_folders — the
@@ -731,6 +732,9 @@ def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
     decoration on the four `_pdf`-family PDF-vs-PDF env cells (HF-10, amended
     2026-08-05) — additive, never a gate: the comparison result is identical
     with it on or off.
+
+    `preview=True` computes the comparison and records ONLY its counts, writing
+    no workbook (see `build_comparison`).
 
     Raises ValueError on an unknown row_key or a baseline cell (nothing to
     compare); compare_folders itself returns a clean error result when a side
@@ -755,8 +759,21 @@ def build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
     # transaction and receives the Matrix's exact target-aware lease directly.
     result = adapter.compare_folders(
         dest / cell_key, dest / baseline_key, out_path, events=events,
-        confirm_overwrite=confirm_overwrite or (lambda _p: True), mode="values",
+        confirm_overwrite=confirm_overwrite or (lambda _p: True),
+        mode="preview" if preview else "values",
         commit_guard=commit_guard)
+    if preview:
+        # Counts only: nothing was written, so there is no twin, no evidence and
+        # no generation. The numbers go to the preview store, never the cache.
+        if result.status == "ok":
+            _m.record_preview(
+                comparisons_common_root(dest), f"{row_key}|env", cell_key,
+                _m.preview_record(
+                    result.comparison_outcome, {},
+                    _fingerprint_for_record(fp_before, fp_folders,
+                                            out_path.name, events)),
+                commit_guard=commit_guard)
+        return result
     if result.status == "ok":
         # CMP-AUD-082: refresh the live-formulas twin, or clear a stale prior one.
         do_write = also_formulas and _twin_inputs_unchanged(
@@ -1445,6 +1462,7 @@ def evidence_for_cell(dest, row_key, cell_key, baseline_key, events,
 def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, subdir,
                                 events, confirm_overwrite=None, force_consolidate=False,
                                 also_formulas=False, evidence_opts=None,
+                                preview=False,
                                 explicit_selection=None, commit_guard=None,
                                 source_identity_check=None,
                                 source_workbook_identity=None,
@@ -1475,6 +1493,7 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, su
                 confirm_overwrite=confirm_overwrite,
                 force_consolidate=force_consolidate,
                 also_formulas=also_formulas, evidence_opts=evidence_opts,
+                preview=preview,
                 explicit_selection=explicit_selection, commit_guard=commit_guard,
                 source_identity_check=source_identity_check,
                 source_workbook_identity=source_workbook_identity,
@@ -1528,6 +1547,13 @@ def consolidate_and_compare_tsn(tsmis_store_dir, tsn_path, out_path, row_key, su
             tsn_library.require_explicit_selection(explicit_selection)
         _require_source_identity(source_identity_check, "publishing the comparison")
         return compared
+
+    if preview:
+        # Counts only: compute the comparison and stop. Nothing is written, so
+        # there is no twin to settle, no evidence to decorate, and no generation
+        # to publish — the caller records the numbers in the preview store,
+        # which is not the certifying cache.
+        return _compare_checked(out_path, "preview")
 
     # The direct comparator performs its own source-alias checks and atomic commit.
     result = _compare_checked(
@@ -1666,7 +1692,7 @@ def _ensure_consolidated(store_dir, subdir, events, force,
 def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
                      tsn_files=None, confirm_overwrite=None, row_defs=None,
                      force_consolidate=False, also_formulas=False, evidence=None,
-                     commit_guard=None):
+                     commit_guard=None, preview=False):
     """(Re)build one cell's comparison for the row's SELECTED mode, write the VALUES
     workbook, and cache its counts. Dispatches to the existing comparison adapters
     (never edits them). Returns the ConsolidateResult. Raises ValueError for an
@@ -1674,7 +1700,13 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
     adapter's clean error result. `force_consolidate` rebuilds the persistent
     consolidated even when it looks fresh; `also_formulas` writes a live-formulas
     twin beside the values copy. `evidence` ({'enabled','examples'}) requests the
-    visual-evidence decoration on a TSN-mode cell of a supported row."""
+    visual-evidence decoration on a TSN-mode cell of a supported row.
+
+    `preview=True` computes the comparison and records ONLY its counts, writing
+    no workbook. It still consolidates (the comparison needs consolidated rows)
+    and still runs every source-identity checkpoint, but it publishes no
+    generation, so it can never make a cell green — the numbers land in the
+    preview store instead of the certifying cache."""
     rows = row_defs if row_defs is not None else _row_defs()
     if row_key not in rows:
         raise ValueError(f"unknown matrix row: {row_key}")
@@ -1688,7 +1720,8 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
         return _m.build_cell_comparison(dest, baseline_key, row_key, cell_key, events,
                                      confirm_overwrite=confirm_overwrite, row_defs=rows,
                                      also_formulas=also_formulas,
-                                     evidence=evidence, commit_guard=commit_guard)
+                                     evidence=evidence, commit_guard=commit_guard,
+                                     preview=preview)
 
     dest = Path(dest)
     out_path = mode_out_path(dest, baseline_key, row_key, cell_key, mode)
@@ -1734,8 +1767,9 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
             dest / cell_key / mode["env_subdir"], src["path"], out_path,
             row_key, mode["env_subdir"], events, confirm_overwrite=confirm_overwrite,
             force_consolidate=force_consolidate, also_formulas=also_formulas,
-            evidence_opts=evidence_opts_for(evidence, row_key,
-                                            lambda sub: dest / cell_key / sub),
+            preview=preview,
+            evidence_opts=(None if preview else evidence_opts_for(
+                evidence, row_key, lambda sub: dest / cell_key / sub)),
             explicit_selection=src.get("selection"),
             commit_guard=commit_guard,
             source_identity_check=source_identity_check,
@@ -1782,6 +1816,25 @@ def build_comparison(dest, row_key, cell_key, mode_id, baseline_key, events,
         # P1-R01: a PARTIAL side means the self comparison diffed INCOMPLETE inputs —
         # propagate it (either side partial -> the cell records partial) so a self
         # comparison can't hide that one side was built from incomplete inputs.
+
+    if preview:
+        # A preview publishes NOTHING: no workbook, so no generation, so nothing
+        # `record_tsn_result` could legitimately stamp. Its numbers go to the
+        # preview store, bound to the same input identities a real record binds,
+        # so a later snapshot drops them the moment an input moves.
+        if result.status == "ok":
+            if mode["kind"] == "tsn":
+                _require_source_identity(source_identity_check,
+                                         "recording the comparison preview")
+            _m.record_preview(
+                comparisons_common_root(dest), f"{row_key}|{mode['id']}", cell_key,
+                _m.preview_record(
+                    result.comparison_outcome,
+                    {"tsn": tsn_token} if mode["kind"] == "tsn" else {},
+                    _fingerprint_for_record(fp_before, fp_folders,
+                                            out_path.name, events)),
+                commit_guard=commit_guard)
+        return result
 
     if result.status == "ok" and out_path.exists():
         if mode["kind"] == "tsn":

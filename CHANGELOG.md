@@ -3,6 +3,39 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.41.0 — 2026-08-20
+
+**Refresh a matrix without building the workbooks.** A new **Counts only** option
+under Comparison output runs the comparison and reports its numbers without
+writing the file. Since writing the workbook is about 70% of the work, that is
+close to an order of magnitude: a statewide Intersection Detail comparison takes
+**20.4s instead of 185.9s (9.1x)** — and reports the same 21,675 differing cells
+and 687 one-sided rows, down to the per-column breakdown.
+
+- **The numbers are the build's numbers.** Not "close enough": the preview runs
+  the same loaders, the same normalization, the same duplicate pairing and the
+  same counting code, in the same order, and stops before the writers. The
+  headline verdict is computed in one place that both paths call, so a preview
+  cannot report something a build would contradict.
+- **A preview can never turn a cell green, whatever it counted.** No workbook
+  means no committed artifact, which by the comparison contract means no
+  generation — so a preview is a legal result that certifies nothing. That is
+  enforced by where it lives, not by a promise: previews are kept in their own
+  store, outside the result cache the matrix reads for truth, and a real build
+  clears the preview it supersedes. **A preview that finds zero differences
+  shows `match*`, not a green tick** — "no differences" and "certified
+  identical" are different claims, and the cell still says "build to certify".
+- **It goes stale like anything else.** A preview is only shown while it still
+  describes the inputs on disk — same fingerprint, same source identities, same
+  producer version, and nothing touched after it ran. If any of that moves, the
+  number disappears rather than lingering with a caveat.
+- **Off by default**, because the workbook is normally the point, and the log
+  says "counts only, no workbook" on every line it applies to so nobody goes
+  hunting for files that were never written.
+
+Use it to see where you stand across a whole matrix in a few minutes, then build
+the cells you actually need the workbooks for.
+
 ## v0.40.1 — 2026-08-20
 
 Comparisons stopped reading their own inputs twice. **Statewide Intersection

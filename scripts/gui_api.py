@@ -400,6 +400,7 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
         matrix_fast = {"on": settings.get_matrix_fast(),
                        "workers": settings.get("fast_workers")}
         matrix_formulas = settings.get_matrix_formulas()
+        matrix_preview_only = settings.get_matrix_preview_only()
         day_matrix_formulas = settings.get_day_matrix_formulas()
         baseline_matrix_formulas = settings.get_baseline_matrix_formulas()
         evidence = self._evidence_view()
@@ -428,6 +429,7 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
                                    if self._current_job else None),
                 "matrix_fast": matrix_fast,
                 "matrix_formulas": matrix_formulas,
+                "matrix_preview_only": matrix_preview_only,
                 "day_matrix_formulas": day_matrix_formulas,
                 "baseline_matrix_formulas": baseline_matrix_formulas,
                 "evidence": evidence,

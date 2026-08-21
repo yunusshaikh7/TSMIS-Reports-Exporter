@@ -773,6 +773,13 @@ body.matrix-wide .mx-pane .mx-rowhead { justify-content: center; }
 .mx-cell.mx-partial  { background: color-mix(in oklab, var(--warning) 18%, var(--card));
                        box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--warning) 55%, transparent); }
 .mx-cell.mx-partial .mx-num { font-style: italic; }
+/* A counts-only PREVIEW: the comparison ran but no workbook was written, so the
+   cell is NOT certified. Deliberately the muted/stale ground rather than any
+   result colour — a preview that counted zero differences must never read as a
+   green match — with a dotted outline saying "a real number, but provisional". */
+.mx-cell.mx-preview  { background: color-mix(in oklab, var(--muted) 45%, var(--card));
+                       box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--muted-foreground) 40%, transparent); }
+.mx-cell.mx-preview .mx-num { font-style: italic; font-weight: 500; }
 /* CMP-AUD-089: the last REFRESH of this cell failed / was stopped / came back
    incomplete. The cell keeps the previous result's own colour and number — the
    attempt only adds a destructive-tinted left edge and a trailing sub note, so a
@@ -858,6 +865,9 @@ body.matrix-wide .mx-pane .mx-rowhead { justify-content: center; }
 .mx-key.mx-diff-hi { background: color-mix(in oklab, var(--destructive) 18%, var(--card)); }
 .mx-key.mx-partial { background: color-mix(in oklab, var(--warning) 18%, var(--card));
                      box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--warning) 55%, transparent); }
+.mx-key.mx-preview { background: color-mix(in oklab, var(--muted) 45%, var(--card));
+                     box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--muted-foreground) 40%, transparent);
+                     font-style: italic; }
 .mx-key.mx-stale { background: color-mix(in oklab, var(--muted) 60%, var(--card)); }
 .mx-key.mx-missing { background: var(--card); font-style: italic; }
 .mx-key.mx-na { background: var(--card); color: var(--muted-foreground); font-style: italic; }

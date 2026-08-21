@@ -332,6 +332,7 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
 
     cells = {}
     attempts = matrix.load_attempts(byday_root())
+    previews = matrix.load_previews(byday_root())
     for row_key, _label, subdir, fmt, supported, tsn_subdir in rows:
         per = {}
         for date in days:
@@ -354,8 +355,9 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
                          "identity_required": True}]
                 # F5/P2: fingerprint the day's TSMIS store folder so a deleted route reads
                 # the cell stale (the TSN side is a file, captured by mtime).
+                fp_folders = (tdir,)
                 cmp = matrix._cmp_state(day_out_path(date, source, row_key), srcs, rec,
-                                        fp_folders=(tdir,))
+                                        fp_folders=fp_folders)
                 # CMP-AUD-089: the same durable last-attempt overlay the Everything
                 # matrix renders — a failed/stopped/incomplete rebuild marks the cell
                 # here too instead of vanishing behind the previous result.
@@ -363,6 +365,10 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
                     attempts, f"{row_key}|{source}", date, cmp)
                 if attempt is not None:
                     cmp["last_attempt"] = attempt
+                preview = matrix._preview_for(
+                    previews, f"{row_key}|{source}", date, cmp, srcs, fp_folders)
+                if preview is not None:
+                    cmp["preview"] = preview
             per[date] = {"export": export, "cmp": cmp}
         cells[row_key] = per
 
@@ -491,13 +497,17 @@ def evidence_for_day_cell(source, date, row_key, dest, events, tsn_files=None,
 
 def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
                    confirm_overwrite=None, force_consolidate=False,
-                   also_formulas=False, evidence=None, commit_guard=None):
+                   also_formulas=False, evidence=None, commit_guard=None,
+                   preview=False):
     """Build ONE (day, report) vs-TSN comparison: resolve the shared TSN dataset,
     consolidate that day's per-route export (reusing the day folder's persistent
     consolidated unless stale or `force_consolidate`), compare vs TSN, write the
     VALUES workbook to the by-day store, and cache its counts. Pure delegation to
     matrix.consolidate_and_compare_tsn (the SHARED path). Returns the
-    ConsolidateResult. Raises ValueError on an unknown/greyed row or no TSN."""
+    ConsolidateResult. Raises ValueError on an unknown/greyed row or no TSN.
+
+    `preview=True` computes the comparison and records ONLY its counts, writing
+    no workbook (see matrix.build_comparison)."""
     rows = _row_lookup()
     if row_key not in rows:
         raise ValueError(f"unknown by-day matrix row: {row_key}")
@@ -544,13 +554,28 @@ def build_day_cell(source, date, row_key, dest, events, tsn_files=None,
     result = matrix.consolidate_and_compare_tsn(
         tsmis_dir(date, source, subdir), src_tsn["path"], out_path, row_key, subdir,
         events, confirm_overwrite=confirm_overwrite, force_consolidate=force_consolidate,
-        also_formulas=also_formulas,
-        evidence_opts=matrix.evidence_opts_for(
-            evidence, row_key, lambda sub: tsmis_dir(date, source, sub)),
+        also_formulas=also_formulas, preview=preview,
+        evidence_opts=(None if preview else matrix.evidence_opts_for(
+            evidence, row_key, lambda sub: tsmis_dir(date, source, sub))),
         explicit_selection=src_tsn.get("selection"),
         commit_guard=commit_guard,
         source_identity_check=source_identity_check,
         source_workbook_identity=source_workbook_identity)
+    if preview:
+        # Counts only: nothing written, so nothing to publish or cache. The
+        # numbers land in the by-day preview store, bound to the same input
+        # identities the real record binds.
+        if result.status == "ok":
+            matrix._require_source_identity(
+                source_identity_check, "recording the by-day comparison preview")
+            matrix.record_preview(
+                byday_root(), f"{row_key}|{source}", date,
+                matrix.preview_record(
+                    result.comparison_outcome, {"tsn": tsn_token},
+                    matrix._fingerprint_for_record(
+                        fp_before, fp_folders, out_path.name, events)),
+                commit_guard=commit_guard)
+        return result
     # P1-B05: reduce the TSN side too — a partial TSN consolidation (categories /
     # district PDFs left out) flags the by-day cell partial just like a partial TSMIS side.
     if result.status == "ok" and out_path.exists():

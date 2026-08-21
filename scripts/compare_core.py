@@ -4218,6 +4218,23 @@ def _write_provenance_sheet(wb, provenance):
                "beside this workbook."])
 
 
+def _headline_truth(counts, input_incomplete, pairing_capped):
+    """``(matches, incomplete)`` for one counted comparison.
+
+    ONE home for the headline decision, because two callers now reach it: the
+    run that writes a workbook, and the counts-only PREVIEW that does not. A
+    preview whose verdict could disagree with the build it previews would be
+    worse than no preview at all, so neither computes this itself."""
+    one_sided = counts["t_only"] + counts["n_only"]
+    return (counts["diff_cells"] == 0 and one_sided == 0,
+            bool(input_incomplete or pairing_capped))
+
+
+def _headline_verdict(matches, incomplete):
+    """Incomplete ⇒ never certify a clean match (the GUI greens only on 'match')."""
+    return "diff" if (incomplete or not matches) else "match"
+
+
 def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
                 confirm_overwrite=None, mode="formulas",
                 name_a="", name_b="", warnings=(), commit_guard=None,
@@ -4422,8 +4439,11 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
                          "'Only in …')."))
         seen_sheets[low] = sheet
 
+    # "preview" asks for no output at all: the comparison is computed and its
+    # typed truth returned, and nothing is ever written. Every other mode names
+    # the workbook flavor(s) to write.
     modes = {"formulas": ("formulas",), "values": ("values",),
-             "both": ("formulas", "values")}.get(mode)
+             "both": ("formulas", "values"), "preview": ()}.get(mode)
     if modes is None:
         return _result(status="error",
                        message=f"Unknown comparison mode: {mode}")
@@ -4571,6 +4591,34 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
                        skipped_inputs=exact_skipped,
                        failed_inputs=exact_failed)
     computed_counts = counts
+
+    if mode == "preview":
+        # Everything above is the comparison: the same loaders, normalization,
+        # keys, duplicate pairing and `count_diffs` a real build runs, in the
+        # same order, including the cancellation and Excel-limit gates — so a
+        # preview cannot report a number the build would not. Everything BELOW
+        # is serialization, which is ~70% of the work and is exactly what this
+        # mode exists to skip. No path is opened, nothing is committed, and the
+        # caller gets a typed outcome with NO artifact generation, which is what
+        # keeps it uncertifiable by contract.
+        matches, incomplete = _headline_truth(
+            counts, input_incomplete, pairing_capped)
+        return _result(
+            status="ok",
+            summary_lines=[
+                "Counts only — no comparison workbook was written.",
+                f"{a} rows: {len(rows_t):,}   {b} rows: {len(rows_n):,}",
+                f"Differing cells: {counts['diff_cells']:,}   "
+                f"one-sided {sc.id_noun_plural}: "
+                f"{counts['t_only'] + counts['n_only']:,}",
+            ],
+            verdict=_headline_verdict(matches, incomplete),
+            completion=outcome.PARTIAL if incomplete else outcome.COMPLETE,
+            raw_counts=counts,
+            warning_items=structured_warnings,
+            failure_items=failure_items,
+            skipped_inputs=exact_skipped,
+            failed_inputs=exact_failed)
 
     # Shared model for every output flavor (parsed/aligned/counted ONCE).
     spot_row = counts.get("first_diff_row") or 2
@@ -4750,10 +4798,9 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
     # changed", so say so in one loud line (mirrored by the workbook's
     # Summary verdict; the GUI also keys its result dialog on `verdict`).
     one_sided = counts["t_only"] + counts["n_only"]
-    matches = counts["diff_cells"] == 0 and one_sided == 0
     # Unreadable inputs or capped duplicate identity make the comparison
     # INCOMPLETE: neither condition may certify a clean match.
-    incomplete = input_incomplete or pairing_capped
+    matches, incomplete = _headline_truth(counts, input_incomplete, pairing_capped)
     if pairing_capped:
         qualifier = (" and incomplete input coverage" if input_incomplete else "")
         verdict_line = (
@@ -4830,8 +4877,7 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
     if "values" in modes:
         lines.append(f"Values file: {out_paths['values']}")
     primary = out_paths["formulas" if "formulas" in modes else "values"]
-    # Incomplete ⇒ never certify a clean match (GUI greens only on "match").
-    verdict = "diff" if (incomplete or not matches) else "match"
+    verdict = _headline_verdict(matches, incomplete)
     return _result(
         status="ok",
         output_path=str(primary),

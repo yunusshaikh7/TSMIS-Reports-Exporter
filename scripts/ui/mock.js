@@ -121,6 +121,7 @@ function makeMockApi() {
     matrix_current: null,        // v0.16.0 running job
     matrix_fast: { on: false, workers: 3 },
     matrix_formulas: false,
+    matrix_preview_only: false,
     matrix_baseline: "ssor-prod",
     matrix_hidden: [],
     matrix_hidden_envs: [],
