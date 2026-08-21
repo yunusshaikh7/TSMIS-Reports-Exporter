@@ -428,6 +428,26 @@ tick. That is enforced structurally rather than by convention (see
 order and the absence of `mx-match`. **If you reorder the branches in
 `ui-matrix.js`, that check fails — which is the point.**
 
+v0.41.2 added one sub-state inside that branch. A counts-only run writes no
+file, so a stale cell's existing workbook is untouched; when the preview
+re-derives that workbook's own published counts, the cell reads **"counts
+confirmed"** — the same `mx-preview` class plus an `mx-confirmed` accent class
+(success-coloured left edge + sub-line, muted background and italic number
+unchanged). It answers the only question a stale cell raises — *do the saved
+numbers still hold?* — without claiming the file itself is current, because
+equal totals don't mean equal rows. Same rule as the parent state: accent, never
+promotion, and `confirms` never reaches `_staleness`.
+
+The toggle behind all of this is the counts-only checkbox in each matrix's
+config zone. It has its OWN bridge endpoint (`set_matrix_preview_only`), like
+every other matrix toggle, because `matrix_preview_only` is a stored-only-when-on
+flag outside `settings.DEFAULTS` — the generic `set_setting` drops keys it
+doesn't know. It shipped wired to `set_setting` in v0.41.0 and so clicked,
+reported success, saved nothing, and snapped back on the next state sync
+(fixed v0.41.2). `set_setting` now REFUSES an unknown key instead of returning
+`ok`, and `check_ui_contract` asserts both that every `set_setting` key in the
+UI is a real DEFAULTS key and that this toggle calls its own endpoint.
+
 ### One-stop EXPORT on the by-day matrix (v0.17.0)
 
 The by-day matrix is the **export + consolidate + compare-vs-TSN** home for

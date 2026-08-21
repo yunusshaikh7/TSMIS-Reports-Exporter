@@ -898,6 +898,39 @@ def preview_record(outcome_obj, source_identities, input_fingerprint, at=None):
     }
 
 
+def _preview_confirms(rec, cmp_state):
+    """Does this preview re-derive exactly the counts the workbook beside it
+    already published?
+
+    A counts-only run writes nothing, so the workbook a stale cell still holds
+    is untouched — and when the preview's numbers come back identical to that
+    workbook's own certified generation, the cell has learned something real:
+    the published counts still describe today's inputs. That is worth showing,
+    because it answers the only question a stale cell actually raises.
+
+    It is NOT freshness, and nothing here may be routed into `_staleness`.
+    Equal headline counts do not make the workbook's cell-by-cell content equal
+    to what a rebuild would write — the same totals can arise from different
+    rows. So this confirms the NUMBERS and says nothing about the FILE, and the
+    cell stays stale, uncertified, and buildable.
+
+    Both sides must be COMPLETE (a partial confirms nothing), the workbook's
+    counts must come from a trusted published sidecar (`_staleness` leaves them
+    None otherwise, so an untrusted or missing generation can never confirm),
+    and verdict, differing cells and one-sided rows must all agree."""
+    if not isinstance(cmp_state, dict) or not cmp_state.get("built"):
+        return False
+    if cmp_state.get("completion") != outcome.COMPLETE:
+        return False
+    if rec.get("completion") != outcome.COMPLETE:
+        return False
+    for field in ("verdict", "diff_cells", "one_sided"):
+        published = cmp_state.get(field)
+        if published is None or published != rec.get(field):
+            return False
+    return True
+
+
 def _preview_for(previews, result_key, cell_key, cmp_state, sources, fp_folders):
     """The preview to SHOW for one cell, or None.
 
@@ -907,7 +940,11 @@ def _preview_for(previews, result_key, cell_key, cmp_state, sources, fp_folders)
     trusted cache: the folder fingerprint, the per-source identity tokens, and
     the semantic producer version. Anything else is dropped rather than shown
     with a caveat: a number that no longer matches its inputs is not a weaker
-    answer, it is a wrong one."""
+    answer, it is a wrong one.
+
+    `confirms` reports whether the preview re-derived the stale workbook's own
+    published counts — see `_preview_confirms`. It is a presentation flag on an
+    already-uncertified cell, never an input to freshness."""
     if isinstance(cmp_state, dict) and cmp_state.get("built") and not cmp_state.get("stale"):
         return None
     rec = _nested_record(previews, result_key, cell_key)
@@ -931,7 +968,7 @@ def _preview_for(previews, result_key, cell_key, cmp_state, sources, fp_folders)
         return None                          # an input changed after the preview ran
     return {"verdict": rec.get("verdict"), "diff_cells": rec.get("diff_cells"),
             "one_sided": rec.get("one_sided"), "completion": rec.get("completion"),
-            "at": rec.get("at")}
+            "at": rec.get("at"), "confirms": _preview_confirms(rec, cmp_state)}
 
 
 def _last_attempt_for(attempts, result_key, cell_key, cmp_state):

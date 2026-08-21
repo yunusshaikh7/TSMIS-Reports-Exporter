@@ -269,7 +269,19 @@ class GuiSettingsMixin:
         """Persist one setting and apply any live side effect. Timeouts and
         the worker default are read at run start, so they apply to the next
         run; verbose logging switches immediately; DevTools applies on the
-        next launch."""
+        next launch.
+
+        An unrecognised key is REFUSED, not quietly dropped. `settings.update`
+        ignores keys outside DEFAULTS (correct for a config file that may hold
+        older/newer entries), but returning `ok` for one here made a miswired
+        control look like it saved: the counts-only toggle rode this endpoint
+        for a key that is stored only when on and lives outside DEFAULTS, so it
+        clicked, reported success, persisted nothing, and snapped back. Toggles
+        of that family have their own endpoints; anything else is a wiring bug
+        and should say so the first time it is clicked."""
+        if key not in settings.DEFAULTS:
+            ui_log.warning("settings: refused unknown key %r", key)
+            return {"error": f"'{key}' isn't one of the saved settings."}
         new = settings.update({key: value})
         if key == "debug_logging":
             set_debug_logging(new["debug_logging"])

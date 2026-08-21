@@ -262,7 +262,13 @@ for each topic + internals doc: **[docs/INDEX.md](docs/INDEX.md)**.
   a real build clears it; the renderer uses `mx-preview` and a zero-difference
   preview shows `match*`, never a green tick. Its numbers must equal the build's —
   both paths call the one `_headline_truth`/`_headline_verdict` pair, and
-  `check_comparison_preview` proves it.
+  `check_comparison_preview` proves it. A preview writes no file, so a stale
+  cell's existing workbook is UNTOUCHED; when the preview re-derives that
+  workbook's own published counts `_preview_for` reports `confirms` and the cell
+  reads "counts confirmed" (v0.41.2). That is an ACCENT class on the same
+  uncertified `mx-preview` state, never a promotion — equal headline counts do
+  not make the workbook's rows equal to a rebuild's, so it confirms the NUMBERS
+  and says nothing about the FILE. `confirms` must never enter `_staleness`.
 - **`compare_core` semantics are correctness-locked, not history-locked.** Equality,
   formula, normalization, identity, pairing, and count changes must follow the approved
   domain contract and be proved cell-for-cell against the independent oracle plus both

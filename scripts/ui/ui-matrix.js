@@ -396,6 +396,20 @@ function mxCellContent(cmp, tsnMeta) {
     const pos = Number.isFinite(cmp.preview.one_sided) ? cmp.preview.one_sided : 0;
     const headline = (pd === 0 && pos === 0 && cmp.preview.verdict === "match")
       ? "match*" : `${pd} diff${pd === 1 ? "" : "s"}${pos ? ` +${pos}` : ""}`;
+    // The preview re-derived the counts the stale workbook already published, so
+    // the workbook's numbers still describe today's inputs. Worth saying — it is
+    // the question a stale cell raises — but it is an ACCENT on the same
+    // uncertified class, never a promotion: no workbook was written, and equal
+    // totals don't make the file's rows equal to a rebuild's.
+    if (cmp.preview.confirms) {
+      return { cls: "mx-preview", warn: "mx-confirmed", main: headline,
+               sub: "counts confirmed",
+               title: "Counts only: re-computed against the current inputs and "
+                      + "they match the workbook already saved for this cell, so "
+                      + "its numbers still hold. The workbook itself was not "
+                      + "rewritten — build the cell to refresh its contents and "
+                      + "certify it." };
+    }
     return { cls: "mx-preview", main: headline,
              sub: "counts only — build to certify",
              title: "Counts only: this comparison was computed but no workbook "

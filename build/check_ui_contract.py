@@ -26,6 +26,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
 import contract  # noqa: E402
+import gui_api   # noqa: E402
+import settings  # noqa: E402
 
 UI = ROOT / "scripts" / "ui"
 _failures = []
@@ -99,15 +101,49 @@ def test_counts_only_toggle_contract():
     check("Everything and by-day each expose exactly one counts-only checkbox",
           html.count('id="matrixPreviewOnly"') == 1
           and html.count('id="dayMatrixPreviewOnly"') == 1)
-    check("both controls call the one persisted bridge endpoint",
-          'api.set_setting("matrix_preview_only"' in app)
+    # The toggle shipped wired to the GENERIC set_setting, which only handles
+    # settings.DEFAULTS keys — and this flag is stored only when on, so it lives
+    # outside DEFAULTS. settings.update dropped it, the endpoint still returned
+    # ok, and the checkbox snapped back on the next sync. The old assertion here
+    # locked that wiring in: it proved the call existed, never that the key could
+    # survive it. Both halves are asserted now.
+    check("both controls call the toggle's OWN bridge endpoint, not set_setting",
+          "api.set_matrix_preview_only(" in app
+          and 'api.set_setting("matrix_preview_only"' not in app)
+    check("that endpoint exists on the bridge",
+          callable(getattr(gui_api.GuiApi, "set_matrix_preview_only", None)))
     check("both controls mirror the shared state key",
           '"matrixPreviewOnly", "dayMatrixPreviewOnly"' in matrix
           and "matrix_preview_only" in matrix)
-    check("the mock carries the same state key",
-          "matrix_preview_only: false" in mock)
+    check("the mock carries the same state key AND the same endpoint",
+          "matrix_preview_only: false" in mock
+          and "set_matrix_preview_only: async" in mock)
     check("the legend names the state on every matrix that can show it",
           html.count('mx-key mx-preview') >= 2)
+
+
+def test_set_setting_keys_are_real():
+    """Every key the UI hands the generic set_setting must be a DEFAULTS key.
+
+    set_setting refuses anything else now, so a stray key is a visible error at
+    the first click rather than a control that reports success and saves
+    nothing. This catches it at build time instead — including the two indirect
+    forms (the SETTING_INPUTS id->key map and the onSettingToggle bindings),
+    since neither passes its key as a literal at the call site."""
+    print("every set_setting key in the UI is a real settings key:")
+    keys = set()
+    for name in ("app.js", "ui-settings.js", "ui-export.js", "ui-batch.js",
+                 "ui-compare.js", "ui-matrix.js"):
+        js = (UI / name).read_text(encoding="utf-8")
+        keys |= set(re.findall(r'set_setting\(\s*"([^"]+)"', js))
+        keys |= set(re.findall(r'onSettingToggle\(\s*"[^"]+"\s*,\s*"([^"]+)"', js))
+        block = re.search(r"const SETTING_INPUTS = \{(.*?)\}", js, re.S)
+        if block:
+            keys |= set(re.findall(r':\s*"([^"]+)"', block.group(1)))
+    check("at least one key was actually found (the scan has teeth)", bool(keys))
+    unknown = sorted(k for k in keys if k not in settings.DEFAULTS)
+    check(f"all {len(keys)} key(s) are in settings.DEFAULTS"
+          + (f" — unknown: {unknown}" if unknown else ""), not unknown)
 
 
 def main():
@@ -116,6 +152,7 @@ def main():
     test_ui_script_references_exist()
     test_baseline_switch_uses_stale_scope()
     test_counts_only_toggle_contract()
+    test_set_setting_keys_are_real()
     print()
     if _failures:
         print(f"FAILED: {len(_failures)} check(s): {_failures}")

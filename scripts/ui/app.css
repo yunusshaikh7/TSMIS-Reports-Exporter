@@ -817,6 +817,14 @@ body.busy .option-row:hover { background: transparent; }
 .mx-cell.mx-preview  { background: color-mix(in oklab, var(--muted) 45%, var(--card));
                        box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--muted-foreground) 40%, transparent); }
 .mx-cell.mx-preview .mx-num { font-style: italic; font-weight: 500; }
+/* …and that preview re-derived the counts the workbook already beside this cell
+   published, so those numbers still describe today's inputs. An ACCENT on the
+   preview ground (mirroring how mx-attempt accents whatever cell it lands on),
+   never a promotion: the success colour touches only the sub-line and the left
+   edge, the muted preview background and italic provisional number stay, and the
+   cell is still stale, uncertified and buildable. */
+.mx-cell.mx-confirmed { border-left: 3px solid color-mix(in oklab, var(--success) 70%, transparent); }
+.mx-cell.mx-confirmed .mx-sub { color: color-mix(in oklab, var(--success) 80%, var(--foreground)); }
 /* CMP-AUD-089: the last REFRESH of this cell failed / was stopped / came back
    incomplete. The cell keeps the previous result's own colour and number — the
    attempt only adds a destructive-tinted left edge and a trailing sub note, so a

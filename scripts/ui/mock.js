@@ -322,6 +322,20 @@ function makeMockApi() {
     if (s === "stale") return { supported: true, built: true, stale: true,
       reason: "cell_newer", missing_side: null, completion: "complete",
       verdict: "diff", diff_cells: 18, one_sided: 2 };
+    // A counts-only PREVIEW on a cell with no workbook: real numbers, nothing
+    // written, so it can never be green however few differences it counted.
+    if (s === "preview") return { supported: true, built: false, stale: true,
+      reason: "missing", missing_side: null, verdict: null, diff_cells: null, one_sided: null,
+      preview: { verdict: "diff", diff_cells: 18, one_sided: 2,
+                 completion: "complete", at: 0, confirms: false } };
+    // …and a STALE cell whose counts-only run re-derived the workbook's OWN
+    // published counts: the saved numbers still describe the current inputs, so
+    // the cell says "counts confirmed" — still stale, still uncertified.
+    if (s === "confirmed") return { supported: true, built: true, stale: true,
+      reason: "cell_newer", missing_side: null, completion: "complete",
+      verdict: "diff", diff_cells: 18, one_sided: 2,
+      preview: { verdict: "diff", diff_cells: 18, one_sided: 2,
+                 completion: "complete", at: 0, confirms: true } };
     // CMP-AUD-089: a cell whose LAST refresh failed — the previous result stands,
     // marked, so the preview exercises the attempt overlay too.
     if (s === "attempt") return { supported: true, built: true, stale: false,
@@ -371,8 +385,8 @@ function makeMockApi() {
       ramp_detail: { "ssor-test": [25, 10], "ssor-dev": [25, 10], "ars-prod": [0, 0], "ars-test": [31, 10], "ars-dev": "missing" },
       highway_sequence: { "ssor-test": [25, 12], "ssor-dev": [23, 12], "ars-prod": [2, 0], "ars-test": [560, 156], "ars-dev": [102, 44] },
       highway_log: { "ssor-test": [7, 1], "ssor-dev": [7, 1], "ars-prod": [0, 0], "ars-test": [88, 12], "ars-dev": "stale" },
-      intersection_summary: { "ssor-test": [3, 0], "ssor-dev": [3, 0], "ars-prod": [0, 0], "ars-test": [40, 2], "ars-dev": "stale" },
-      intersection_detail: { "ssor-test": [12, 3], "ssor-dev": [12, 3], "ars-prod": [0, 0], "ars-test": [210, 44], "ars-dev": "stale" },
+      intersection_summary: { "ssor-test": [3, 0], "ssor-dev": [3, 0], "ars-prod": [0, 0], "ars-test": [40, 2], "ars-dev": "preview" },
+      intersection_detail: { "ssor-test": [12, 3], "ssor-dev": [12, 3], "ars-prod": [0, 0], "ars-test": [210, 44], "ars-dev": "confirmed" },
       highway_log_pdf: { "ssor-test": [7, 1], "ssor-dev": [7, 1], "ars-prod": [0, 0], "ars-test": [88, 12], "ars-dev": "stale" },
       intersection_detail_pdf: { "ssor-test": [12, 3], "ssor-dev": [12, 3], "ars-prod": [0, 0], "ars-test": [210, 44], "ars-dev": "stale" },
       highway_sequence_pdf: { "ssor-test": [25, 12], "ssor-dev": [23, 12], "ars-prod": [2, 0], "ars-test": [560, 156], "ars-dev": [102, 44] },
@@ -1118,6 +1132,10 @@ function makeMockApi() {
       return { ok: true, reports: stale.length };
     },
     set_setting: async (key, value) => {
+      // Mirror the bridge: an unrecognised key is REFUSED, never silently
+      // accepted. A toggle wired to the wrong endpoint has to look broken here
+      // too, or the mock hides exactly the class of bug it exists to catch.
+      if (!(key in mockSettings)) return { error: `'${key}' isn't one of the saved settings.` };
       const numeric = typeof mockSettings[key] === "number";
       const boolish = typeof mockSettings[key] === "boolean";
       // fast_workers floors at 2 (the matrix's effective minimum), like the engine.
@@ -1376,6 +1394,12 @@ function makeMockApi() {
     set_matrix_fast: async (on) => {
       st.matrix_fast = { on: !!on, workers: st.matrix_fast.workers || 3 };
       push({ t: "log", text: `Matrix fast mode ${on ? "on" : "off"}.` });
+      pushState();
+      return { ok: true, on: !!on };
+    },
+    set_matrix_preview_only: async (on) => {
+      st.matrix_preview_only = !!on;
+      push({ t: "log", text: `Matrix counts-only mode ${on ? "on" : "off"}.` });
       pushState();
       return { ok: true, on: !!on };
     },

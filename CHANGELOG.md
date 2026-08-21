@@ -3,6 +3,32 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.41.2 — 2026-08-21
+
+Fixes the counts-only option, which could not be turned on, and teaches a
+counts-only run to say when it has confirmed the comparison you already have.
+
+- **"Counts only (no workbook)" now actually turns on.** The checkbox on both
+  matrix pages could be clicked, reported success, and then quietly snapped back
+  to off — so the option shipped in v0.41.0 was unreachable. It was wired to the
+  general-purpose settings endpoint, which only handles settings that always have
+  a stored value; this one is stored only when it's on, so the save was dropped
+  on the way through and nothing complained. It has its own endpoint now, like
+  every other matrix toggle, and it sticks, mirrors across both matrix pages, and
+  survives a restart. Saving an unrecognised setting is an error rather than a
+  silent no-op from here on, so the same class of miswiring can't hide again.
+
+- **A counts-only run now tells you when your existing comparison still holds.**
+  A counts-only run writes no file, so whatever comparison workbook a stale cell
+  already has is left exactly as it was. When the re-computed numbers come back
+  identical to the ones that workbook published, the cell now says **"counts
+  confirmed"** with a green edge instead of just showing a provisional figure —
+  the saved numbers still describe today's data, so a full rebuild buys you
+  nothing but the file. It stays a counts-only cell: the same grey ground, the
+  same italic number, still uncertified and still offering a build. Matching
+  totals prove the totals, not the workbook's contents — the same figures can
+  come from different rows — so the cell never turns green on a preview alone.
+
 ## v0.41.1 — 2026-08-21
 
 A performance and polish release: the interface does far less work to show you

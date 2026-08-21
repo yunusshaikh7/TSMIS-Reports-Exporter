@@ -1186,6 +1186,24 @@ class GuiMatrixMixin:
         return {"ok": True, "on": val}
 
     @_api_method
+    def set_matrix_preview_only(self, on):
+        """Toggle the counts-only option for matrix Builds (persisted; ONE value
+        behind the checkbox on both matrix pages — a preview is a property of the
+        RUN, not of a grid).
+
+        It needs its OWN endpoint for the same reason every other matrix toggle
+        has one: this flag is stored only when on and is deliberately not part of
+        `settings.DEFAULTS`, so the generic `set_setting` could never persist it
+        (`settings.update` drops unknown keys), and without the `_push_state()`
+        below the checkbox would snap straight back to the state's stale value."""
+        val = settings.set_matrix_preview_only(bool(on))
+        self._emit_log("Matrix counts-only mode " + ("on" if val else "off")
+                       + (" — Builds recompute each cell's numbers and write NO "
+                          "comparison workbook." if val else "."))
+        self._push_state()
+        return {"ok": True, "on": val}
+
+    @_api_method
     def set_matrix_formulas(self, on):
         """Toggle whether matrix comparisons ALSO write a live-formulas workbook
         beside the values copy (persisted). The values copy always remains the

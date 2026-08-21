@@ -148,6 +148,67 @@ def test_preview_cannot_certify(root):
                      "fingerprint-1") is None)
 
 
+def test_a_preview_can_confirm_a_stale_workbook(root):
+    """A counts-only run writes nothing, so the workbook a stale cell holds is
+    untouched. When the preview re-derives that workbook's OWN published counts,
+    the cell says so — and stays uncertified while it does."""
+    print("a preview confirms (but never certifies) the workbook beside it:")
+    dest = root / "confirm"
+    comparisons = matrix_state.comparisons_common_root(dest)
+    comparisons.mkdir(parents=True, exist_ok=True)
+    key, cell = "highway_log|tsn", "ssor-prod"
+    diffed = _outcome(LEFT, RIGHT, "preview", root / "conf.xlsx").comparison_outcome
+    record = matrix_state.preview_record(diffed, {"tsn": "token-1"}, "fp")
+    matrix_state.record_preview(comparisons, key, cell, record)
+    previews = matrix_state.load_previews(comparisons)
+    current = [{"name": "tsn", "mtime": 1.0, "identity": "token-1"}]
+
+    def shown(**cmp_state):
+        base = {"built": True, "stale": True, "completion": "complete",
+                "verdict": record["verdict"], "diff_cells": record["diff_cells"],
+                "one_sided": record["one_sided"]}
+        return _shown(previews, key, cell, {**base, **cmp_state}, current, "fp")
+
+    check("the fixture actually counts differences (the probe can say yes)",
+          record["diff_cells"] > 0 and record["completion"] == "complete")
+    check("matching published counts CONFIRM the stale workbook",
+          shown()["confirms"] is True)
+    check("a different differing-cell count does not",
+          shown(diff_cells=record["diff_cells"] + 1)["confirms"] is False)
+    check("a different one-sided count does not",
+          shown(one_sided=(record["one_sided"] or 0) + 1)["confirms"] is False)
+    check("a different verdict does not",
+          shown(verdict="differs-elsewhere")["confirms"] is False)
+    check("an unreadable/untrusted published generation cannot confirm",
+          shown(verdict=None, diff_cells=None, one_sided=None)["confirms"] is False)
+    check("a PARTIAL workbook cannot be confirmed",
+          shown(completion="partial")["confirms"] is False)
+    check("a cell with NO workbook has nothing to confirm",
+          shown(built=False)["confirms"] is False)
+
+    partial_rec = dict(record, completion="partial")
+    matrix_state.record_preview(comparisons, key, cell, partial_rec)
+    check("a PARTIAL preview confirms nothing either",
+          _shown(matrix_state.load_previews(comparisons), key, cell,
+                 {"built": True, "stale": True, "completion": "complete",
+                  "verdict": record["verdict"], "diff_cells": record["diff_cells"],
+                  "one_sided": record["one_sided"]},
+                 current, "fp")["confirms"] is False)
+
+    # The whole point of the flag is that it is PRESENTATION. It must not be
+    # reachable from the freshness reader, or "confirmed" quietly becomes green.
+    src = (ROOT / "scripts" / "matrix_state.py").read_text(encoding="utf-8")
+    stale_fn = src.split("def _staleness(")[1].split("\ndef ")[0]
+    check("confirms never appears inside _staleness",
+          "confirm" not in stale_fn)
+    js = (ROOT / "scripts" / "ui" / "ui-matrix.js").read_text(encoding="utf-8")
+    branch = js[js.index("if (cmp.preview.confirms)"):js.index("if (!cmp.built)")]
+    check("the confirmed branch keeps the preview class and never mx-match",
+          'cls: "mx-preview"' in branch and "mx-match" not in branch)
+    check("it says the workbook was not rewritten",
+          "was not" in branch and "certify it" in branch)
+
+
 def test_a_certified_build_clears_the_preview():
     print("a certified build supersedes the preview it made redundant:")
     import gui_worker_matrix as gwm
@@ -252,6 +313,7 @@ def main():
     try:
         test_preview_equals_the_build(root)
         test_preview_cannot_certify(root)
+        test_a_preview_can_confirm_a_stale_workbook(root)
         test_a_certified_build_clears_the_preview()
         test_build_comparison_records_no_result(root)
         test_the_ui_never_greens_a_preview()

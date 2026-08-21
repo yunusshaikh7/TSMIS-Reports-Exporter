@@ -260,6 +260,25 @@ Off by default (`settings.matrix_preview_only`), because the workbook is the
 deliverable and a user who forgot the option was on would find no file. The log
 says "counts only, no workbook" on every affected line for the same reason.
 
+**What happens to the workbook a stale cell already holds: nothing.** A preview
+writes no file, so the previous comparison sits on disk untouched. `_preview_for`
+therefore also reports `confirms` (v0.41.2, `matrix_state._preview_confirms`) —
+true when the preview re-derived that workbook's OWN published counts, so its
+saved numbers still describe today's inputs. Both sides must be COMPLETE, the
+workbook's counts must come from a trusted published sidecar (`_staleness`
+leaves them `None` otherwise, so an untrusted or missing generation can never
+confirm), and verdict + differing cells + one-sided rows must all agree.
+
+The cell then reads **"counts confirmed"**: the same muted `mx-preview` ground
+and italic provisional number, plus an `mx-confirmed` accent (a success-coloured
+left edge and sub-line). It is deliberately an accent and not a promotion —
+**equal headline counts do not make the workbook's cell-by-cell content equal to
+what a rebuild would write** (the same totals can arise from different rows), so
+the flag confirms the NUMBERS and says nothing about the FILE. The cell stays
+stale, uncertified and buildable, and `confirms` never enters `_staleness`
+(`check_comparison_preview` asserts that structurally, alongside the count,
+completion, trust and no-workbook cases).
+
 `build/benchmark_vs_tsn_speed.py` is the repeatable harness; `--writer historical`
 swaps `_styled_cell` back to the pre-cache assignment sequence so the same real
 inputs can be run both ways and the package digests compared. CI cannot reach
