@@ -315,11 +315,15 @@ Explicit TSN picks are not stored as bare paths. `matrix_tsn_files` is read thro
 content hash, size/mtime, and file identity. A legacy/path-only, missing, unreadable,
 or replaced selection is a durable blocked state until the user re-picks or clears it.
 
-## High-level feature buckets (v0.12.0 / v0.13.0)
+## Feature buckets — the structural record (v0.12.0 → v0.18.1)
 
-These are the structural shape of recent features. Runtime details and the GUI
-mechanics are owned by [engine-and-reliability.md](engine-and-reliability.md) and
-[gui.md](gui.md); this is the "what is it and where does it plug in" map.
+**This section is a historical record, not the current shape of the app.** It
+captures how each early feature bucket plugged into the core, and the contracts it
+established are still live — but the app has grown five more tabs' worth of
+surfaces since. For what the app *is* today, read **[The app today](#the-app-today)**
+at the end of this file. Runtime details and the GUI mechanics are owned by
+[engine-and-reliability.md](engine-and-reliability.md) and [gui.md](gui.md); this is
+the "what is it and where does it plug in" map.
 
 ### v0.12.0 — output labeling, run control, batch export (roadmap A+B; A3 deferred)
 
@@ -346,6 +350,14 @@ syscall-sized Windows race; every surrounding boundary fails closed.
 A3 (results tab) was deferred. **The current GUI is a stopgap** — a full GUI
 overhaul is planned (the user designs it elsewhere and will hand it over). Fix bugs,
 but DON'T invest in redesigning the current layout (mock candidates were rejected).
+
+> **⚠ Age check (2026-08-20).** That "stopgap" ruling dates from **v0.13.0, June
+> 2026**, and it has shaped decisions ever since (it is why `app.js` was split only
+> so far). Nearly thirty releases later no overhaul has been handed over, and the
+> "current layout" it refers to has since grown two whole tabs and four matrices.
+> **It is still the owner's call, not ours** — so do not treat it as revoked. But
+> do not treat it as fresh either: if a UI question turns on it, ask, rather than
+> inheriting a fifteen-month-old assumption.
 
 ### v0.13.0 — interface declutter, run lifecycle, accessibility & self-revert
 
@@ -447,7 +459,7 @@ dataset serves both rows of a report; every other report uses its own. This repl
 `day_matrix.TSN_SUBDIR` (deleted) — the by-day matrix now
 resolves TSN per row, so plugging in a report is just registering it + flipping `supported`.
 
-### v0.18.0 — structural & engineering overhaul (this release)
+### v0.18.0 — structural & engineering overhaul
 
 A maintainability/reliability release: few user-visible features (one new report), a
 large internal restructuring, and packaging/updater hardening. The day-to-day behavior
@@ -499,6 +511,44 @@ detail lives in [reports.md](reports.md) → *Report grouping & site-menu-safe s
 
 `compare_core` and the comparison families are untouched by v0.18.1 — the only comparison change
 is a label rename (Intersection Detail's "Roadbed" → "Route Suffix").
+
+## The app today
+
+Current as of **v0.41.0 (2026-08-20)**. The sections above are the historical
+record of how the structure was built; this is what the structure now holds.
+
+### Six tabs, one core
+
+| Tab | What it does | Owning docs |
+|---|---|---|
+| **Export** | Picks report types × routes and drives the shared `ReportSpec` loop. Auto-consolidate, pause/resume, resume-after-crash, fast mode. | [engine-and-reliability.md](engine-and-reliability.md), [reports.md](reports.md) |
+| **Consolidate** | Turns a run folder's per-route exports into one workbook, per report; also the entry point for the PDF-sourced consolidations. | [reports.md](reports.md) |
+| **Compare** | Every file/folder comparison, in generated sub-tabs: cross-environment, vs TSN, the **vs TSN Matrix** (by day), the **vs Baseline Matrix** (a day against an earlier pull of the same report), and the **PDF vs Excel Matrix** (each dual-edition family self-checked inside one run folder). | [comparison-engine.md](comparison-engine.md) §9, §12b–§12c |
+| **Everything** | Two sub-tabs — the always-current batch store (report types × environments into one undated destination, stage-and-swap) and the **Everything comparison matrix** over it. | [comparison-engine.md](comparison-engine.md) §12 |
+| **ArcGIS** | Two sub-tabs, both built from the manually-stocked `arcgis_layers/` library and neither touching the site: **Clean Road** (our own CA HIGHWAYS table, compared vs the TSN extract) and **Reports vs layers** (a TSMIS report *rendered* from the layers and diffed against our own export of it — Highway Detail first). | [comparison-engine.md](comparison-engine.md) §9j–§9k, [planning/cleanroad-highways.md](planning/cleanroad-highways.md) |
+| **Settings** | Site/browser targets, timeouts, TSN datasets, comparison output options (including **Counts only**), the support bundle, updates. | [gui.md](gui.md), [build-and-release.md](build-and-release.md) |
+
+### Three source lanes, deliberately separate
+
+1. **The TSMIS site** — everything the Export tab pulls. One page serves every
+   (data source × environment) combination.
+2. **The TSN library** (`tsn_library/<report>/raw/`) — manually dropped district
+   prints and extracts, normalized once into a versioned canonical library.
+   **Frozen**: TSMIS replaced TSN at the 09/2025 cutover, so this lane cannot be
+   refreshed and vs-TSN measures migration drift rather than present-day
+   agreement.
+3. **The ArcGIS layer library** (`arcgis_layers/`) — manually dropped per-layer
+   exports, from which we build our own tables and render reports as-of a chosen
+   date. Never touches the site.
+
+### The rule that holds it together
+
+Every one of those surfaces runs on the **same console-free core**. A tab is a
+driver: it collects inputs, hands them to an engine function, and renders what
+comes back through the `Events` sink and the typed outcome contracts. Nothing in
+`scripts/` outside `cli.py` and `gui_*.py` prints, prompts, or exits — which is why
+the console flow and the GUI stayed interchangeable across four front-end
+generations, and why a new surface costs a driver rather than an engine.
 
 ## See also
 

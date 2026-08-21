@@ -1,8 +1,18 @@
 # Comparison audit findings ledger
 
-Last updated: 2026-07-22 (index table reconciled against per-entry statuses — the table
-rows for 042/138/144/145 were stale-open, 242 was missing; the per-entry Status line and
-the table must be updated TOGETHER when a finding closes)  
+Last updated: 2026-08-20 (header reconciled — the audit-state paragraph below had gone
+stale: it still described a product-code freeze that lifted in v0.37.0 and pointed live
+status at `comparison-perfection-project.md`, which is archived. The index table was last
+reconciled against per-entry statuses on 2026-07-22 — the rows for 042/138/144/145 were
+stale-open and 242 was missing; **the per-entry Status line and the table must be updated
+TOGETHER when a finding closes**)
+
+**ALL 245 FINDINGS ARE CLOSED.** The ledger is a project RECORD, not a worklist — read
+it to learn why a comparison behaves the way it does. The five that outlived the project
+were the Highway Detail pre-release block (133 · 142 · 186 · 192 + 045-HD), closed in
+v0.37.0 / v0.38.0 once the vendor released the report; 244 closed in v0.38.2 and 245 in
+v0.39.1. Open work now lives in [`docs/roadmap.md`](../../roadmap.md).
+
 Audit state: complete against executable behavior and available real data; Claude/Fable
 claims independently reconciled; Phase 1 safety remediation verified 98/98; Phase-2
 typed producer/publication/consumer contract closed offline 106/106; Matrix formula
@@ -15,16 +25,26 @@ checks; E2's 41,000-trace schema-v3 persistence, bounded decode, crash-safe chun
 installation, and serialized exact-generation publication gates are green; the clean
 production canary reproduced the corrected oracle with installed-Excel parity; Phase 3
 is complete; Stage 6 conservation and the Stage 8 base audit are complete at 7/7.
-Product perfection, companion/historical coverage, and end-to-end evidence remain red
-and are deferred under the current product-code freeze. Live status and the handoff are
-owned by `comparison-perfection-project.md`  
+*(The paragraph above is the audit state AS OF the project's completion in v0.28.0 and is
+kept verbatim as the point-in-time record. What it calls deferred "under the current
+product-code freeze" was Highway Detail work; that freeze lifted with the vendor's
+2026-08-17 release and the remaining findings closed in v0.37.0 / v0.38.0. The archived
+`archive/comparison-perfection-project.md` holds the Stage-8 audit history it points at;
+it is no longer a live status document.)*  
 Finding ledger: continuous and authoritative through `CMP-AUD-245`  
 Capability baseline AS AUDITED (v0.28.0): 29 classic comparison recipes, 12 matrix
-rows, 30 matrix row-mode placements, 7 canonical TSN datasets. **Current product
-(v0.37.0): 30 recipes and 13 matrix rows** — Highway Summary added its cross-env
-recipe + matrix row and no TSN dataset (no TSN source exists), so the TSN dataset
-count is unchanged. The audited figures above are the point-in-time baseline the
-findings were written against; they are deliberately NOT restated as current.
+rows, 30 matrix row-mode placements, 7 canonical TSN datasets. **The audited figures
+are the point-in-time baseline the findings were written against and are deliberately
+NOT restated as current** — the product has grown since (Highway Summary's cross-env
+and vs-TSN legs in v0.37.0, the ArcGIS Highway Detail projection in v0.39.0).
+**Never copy a capability count from this ledger into current documentation.**
+Measure it:
+
+```
+python -c "import sys; sys.path.insert(0,'scripts'); import reports, report_catalog as rc; print(len(reports.COMPARE_REPORTS), len(rc.MATRIX), len(rc.TSN))"
+```
+
+(2026-08-20: 31 compare recipes, 13 matrix rows, 11 registered TSN datasets.)
 
 This is the durable source of truth for defects found during the adversarial
 comparison audit. Keep stable finding IDs when correcting issues. A finding moves to

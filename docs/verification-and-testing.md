@@ -98,10 +98,17 @@ Strict artifact consumers continue to require a real committed generation and ma
 member metadata. These checks do not close the deferred Phase-5 Matrix formula-twin/provenance/
 attempt-overlay work or the Phase-7 exact-generation evidence transaction.
 
-**Current gate (2026-07-22, v0.28.0): `build/run_checks.py -j 4 -k` passes 152/152.**
+**Current gate (2026-08-20, v0.41.0): `build/run_checks.py -j 4 -k` passes 166/166.**
 Discovery globs `build/check_*.py` plus the Node checks and `compileall`, so a new
 `check_*.py` auto-registers — adding one is how you extend the gate.
-(Historical: the Phase-2 gate on 2026-07-11 was 106 runner entries, 106/106.)
+(Historical: 152/152 at v0.28.0, 2026-07-22; 106/106 at the Phase-2 gate,
+2026-07-11.)
+
+**The glob is the catalog — this document is not.** There are 176 `check_*.py`
+files and the curated tables below describe roughly half of them, by design: they
+carry the ones whose *contract* is non-obvious. To see the real list, run
+`build/run_checks.py` or `ls build/check_*.py`; never conclude a behavior is
+unguarded because it is missing from a table here.
 On local Windows shells, set `$env:PYTHONUTF8='1'` before the command so diagnostic
 symbols cannot be rejected by a cp1252 console.
 
@@ -367,6 +374,13 @@ re-bless every deliberate fix) is owned by [comparison-engine.md](comparison-eng
 | `check_highway_log_columns.py` | the corrected 31-column Highway Log labels (position → canonical label) — see [highway_log/columns.md](highway_log/columns.md) |
 | `check_highway_log_ditto.py` | the Highway Log ditto resolver (`is_ditto` / `fill_paired_roadbed` / `display_fills`) |
 | `check_highway_log_roadbed.py` | the roadbed-aware comparison key (`roadbed_tag` / `roadbed_canonical_location` / `keys_for` opt-in; strictly refines, never merges) |
+| `check_compare_style_cache.py` | **the writer is output-locked** (v0.40.0). A/Bs `_styled_cell`'s composite-style cache against the historical assignment sequence and requires every stable OOXML member byte-exact in BOTH flavors; also holds the three properties that make the cache safe (per-cell `StyleArray` ownership, identity keying with retained components, style bound before the value). |
+| `check_comparison_artifact_schema.py` | the versioned `COMPARISON_ARTIFACT_SCHEMA` at the commit boundary — plus, since v0.40.0, an assertion that a typed comparison commit makes **zero openpyxl loads of its own output**. |
+| `check_comparison_preview.py` | **a counts-only preview certifies nothing** (v0.41.0). Its counts equal the build's exactly; it writes no file and claims no artifact; the staleness rules that hide it; a real build clears it; the shipped `build_comparison(preview=True)` records to the preview store and never the result cache; the renderer never paints it as a match. |
+| `check_arcgis_report.py` | the ArcGIS "Reports vs layers" projection (Highway Detail) — the primary-layer effective-date rule, the printed-column merge and start-anchored Description, and the HF-01 unavailable-marker rule (CMP-AUD-245). |
+| `check_clean_road.py` | the CA HIGHWAYS clean-road build — `chc.HEADER` as the exact TSN gate, `ARC_HEADER` as its strict superset, and the build-only column contract. |
+| `check_highway_detail_ditto.py` | Highway Detail vs TSN honors the paired-roadbed ditto convention (CMP-AUD-244) — a `+` run is a pointer, not data. |
+| `check_tsn_highway_summary_masked.py` | a masked (`**********`) TSN Summary value is disregarded, shown one-sided, and recorded — but a category the print never mentions still reports PARTIAL. |
 
 ### v0.12.0+ feature checks (GUI/batch/filenames)
 
@@ -599,6 +613,14 @@ verification only happens on the locked-down Caltrans **work PC**. A live export
 against TSMIS is the only proof the engine works end to end, and several releases
 carry it as **owed** work (e.g. v0.10.0/0.10.1 shipped 2026-06-12 with work-PC
 live checks pending).
+
+**As of 2026-08-20 that debt is seventeen releases deep**: everything since
+v0.32.0 is offline-verified only. The maintained checklist — what to run, and what
+each release since added to it — is **[roadmap.md](roadmap.md) B1**; the method
+(the credential-safe `--collect-evidence` kit, the manual fallback, the per-item
+acceptance form) is [work-pc-validation.md](work-pc-validation.md), whose own
+version numbers are historical. **This is the top open item on the project and
+only the owner can close it.**
 
 Likewise the managed-PC security controls (Defender / DLP / corporate proxy /
 managed Edge) exist on **neither** the personal dev PC nor any cloud runner, so

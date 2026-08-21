@@ -59,6 +59,9 @@ its findings back-to-back, then update this roadmap.
 > **Updated 2026-08-17 (v0.37.0), on the vendor's HD release: 4 open** — 133/142/186 +
 > 045-HD, no longer deferred; ~~192~~ resolved by the same-build delivery and
 > ~~243~~ opened+closed (HD-PDF single-record-page data loss).
+> **Updated 2026-08-20: 0 open — 245 of 245 CLOSED.** ~~244~~ (v0.38.2, the HD ditto
+> convention) and ~~245~~ (v0.39.1, the ArcGIS HF-01 marker) were found after this plan
+> was written and closed on discovery.
 > **Updated 2026-08-18 (v0.38.0): 0 open — 243 of 243 CLOSED.** ~~186~~ + ~~053~~
 > (the logical line 2 stays OPEN and merges every following baseline; statewide
 > PDF-vs-Excel is now 51,327/51,327 identical, 0 differing cells, and HD-PDF

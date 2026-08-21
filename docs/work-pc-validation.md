@@ -1,4 +1,26 @@
-# Work-PC validation handoff & operational sign-off plan (cuts as v0.18.5)
+# Work-PC validation handoff & operational sign-off plan
+
+> ## ⚠ READ THIS FIRST — the target is **v0.41.0**, not v0.18.5
+>
+> **Everything below the next divider is the v0.18.x-era narrative, kept because
+> its METHOD is still exactly right: the evidence kit, the manual fallback, the
+> per-item acceptance checklist, and the sign-off process. Its VERSIONS and
+> release-gate framing are historical and must not be used as a target.**
+>
+> The live acceptance run is still owed and is **roadmap item B1 — the top
+> priority, and the only thing on the list that no one but the owner can do.**
+> Seventeen releases have landed since v0.32.0 and every one of them is
+> offline-verified only. The current, maintained checklist — what to run and what
+> each recent release added to it — lives in
+> [roadmap.md](roadmap.md) B1 and [`../CLAUDE.md`](../CLAUDE.md), not here.
+>
+> Nothing about the work-PC *reality* has changed: no PowerShell, cmd, admin, temp
+> scripts, or scheduled tasks; only an unsigned exe from a user-writable folder.
+> The dev PC cannot reach the TSMIS intranet, so live export / consolidate /
+> compare and all IT/DLP behavior verify **only** here. See
+> [it-and-security.md](it-and-security.md).
+
+---
 
 > **Two-tier release model.** **v0.18.0** is the *offline-validated candidate* — every phase is
 > provable from CI/offline before it ships, but anything that needs the live TSMIS site or the

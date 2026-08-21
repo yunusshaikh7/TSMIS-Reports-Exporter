@@ -376,6 +376,46 @@ that fails loudly, not a comment saying it was fixed.
 [the speed record](planning/vs-tsn-comparison-speed.md).
 
 
+## 17. A rule fitted on one probe case is a hypothesis; score it on the population
+
+The Clean Road build has to reconstruct each highway block's **effective date** from
+several ArcGIS layers that each carry their own. The original rule — take the OLDEST
+`InventoryItemStartDate` among all five member layers — was derived on **route 001**,
+looked right there, and shipped. Its own docstring was honest enough to call it a
+candidate. It survived for months.
+
+Scored against the real statewide export over 44–46k joined rows, it was right about
+**56%** of the time. The actual rule is that each block's date is its **primary
+layer's own**: the travel way *is* the roadbed, the median layer *is* the median, and
+surface / shoulders / barrier / curb are attributes hanging off it. That correction
+took the three columns to **79–80%**, cut statewide differing cells from 211,448 to
+180,078, and more than doubled the fully-identical rows — and it then won against the
+TSN extract too, so it became the default for both builds.
+
+Three things made the difference, and none of them was cleverness:
+
+- **Score every candidate, not just the favourite.** Every single-layer and pairwise
+  alternative was measured. All three blocks ranked the alternatives *identically and
+  independently*, which is what turns "this fits better" into "this is the rule."
+- **The probe case is the least informative row you own.** Route 001 is the one route
+  everyone hand-checks, so it is the one route every wrong rule is already tuned to.
+- **A wrong derived column is not contained.** Those dates are printed columns, so a
+  wrong date is also a wrong record boundary — roughly 63% of our spurious row splits
+  traced back to them. A rule that is 56% right does not cost you 44% of one column;
+  it corrupts everything downstream that keys on it.
+
+The residual is still open and still honest: the same columns cap near 60% against
+the TSN extract while reaching 80% against the report, so something else differs
+between our reconstruction and TSN's table. That gap is disclosed rather than
+explained away.
+
+**The rule:** when you derive a domain rule from data, the deliverable is not the rule
+— it is the rule *plus its score on the whole population, plus the scores of the
+alternatives you rejected*. Anything less is a guess wearing a docstring.
+
+→ [planning/cleanroad-highways.md](planning/cleanroad-highways.md) (the settled
+build-time rules); roadmap DA1 / DA5 / DA6.
+
 ### Quick index of the lessons
 
 | # | Lesson | Owns the detail |
@@ -396,3 +436,4 @@ that fails loudly, not a comment saying it was fixed.
 | 14 | A green suite that never runs the failing path is not information | it-and-security + build-and-release |
 | 15 | Build guards, not more careful code — they catch what you write next | comparison-engine §13 |
 | 16 | A comment that says "this is cheap" is a claim, and claims need measuring | comparison-engine §2b + planning/vs-tsn-comparison-speed |
+| 17 | A rule fitted on one probe case is a hypothesis; score it on the population | planning/cleanroad-highways + roadmap DA1/DA5/DA6 |

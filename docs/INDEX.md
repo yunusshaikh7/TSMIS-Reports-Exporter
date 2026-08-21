@@ -12,13 +12,20 @@ touching.
 
 ## Current status and work
 
+**Current release: v0.41.0 (2026-08-20).** Correctness has nothing open — all 245
+comparison-audit findings are closed.
+
+- **Start every session at [roadmap.md](roadmap.md)** — its `▣ OPEN WORK INVENTORY`
+  is the definitive list of what is left, and the banner above it says where things
+  stand and what is next. Re-verify a line against the code before acting on it.
 - **Active bounded workflow:**
   [planning/post-comparison-perfection-output-audit/START-HERE.md](planning/post-comparison-perfection-output-audit/START-HERE.md)
-  is the operational entry point for the post-comparison output program. Read it
-  before starting one of that program's RB bundles; it names the current queue
-  position, exact-base rule, and controlling prompt.
-- **General backlog:** [roadmap.md](roadmap.md) is the current home for deferred,
-  blocked, and owner-ranked work outside that bounded workflow.
+  is the operational entry point for the post-comparison output program. **RB-1
+  through RB-4 are merged; RB-5 is READY and not started, RB-6 is blocked behind
+  it** — five work items (HF-06 · 07 · 08 · 09 · 11) are still open and are tracked
+  as **group H** in the roadmap. Read START-HERE before starting a bundle; it names
+  the queue position, exact-base rule, and controlling prompt. The plan froze at
+  v0.35.0, so check its scope statements against today's code.
 - **Historical handoff:** [agent-handoffs/STATUS.md](agent-handoffs/STATUS.md) records
   the closed `sol-001` mission. It is retained as evidence, not as current project
   authority or a live worklist.
@@ -27,13 +34,13 @@ touching.
 
 | Doc | Read this when… |
 |---|---|
-| [architecture.md](architecture.md) | You need the big picture — the console-free core + two front-ends, the `Events` seam, the single report registry, run folders, the data-location model, and the v0.12/v0.13 feature buckets. |
+| [architecture.md](architecture.md) | You need the big picture — the console-free core + two front-ends, the `Events` seam, the single report registry, run folders, the data-location model, **"The app today"** (the six tabs and the three source lanes, current at v0.41.0), and the v0.12→v0.18 feature buckets as a historical record. |
 | [engine-and-reliability.md](engine-and-reliability.md) | You're touching the export loop's runtime behavior — resume + integrity gate, skip/cancel, retry, the fast-fails (`EmptyExport`/`ReportError`/`ReportUnavailableError`), timeouts, fast mode, preflight, run reports. |
 | [auth-and-signin.md](auth-and-signin.md) | Anything about signing into TSMIS — the token-in-hash session model, the `CONFIG` lexical-global trap, device sign-in / Edge recapture / portability, LNA pre-grant, signed-in detection, the two login chips. |
 | [gui.md](gui.md) | You're in the desktop GUI — pywebview/WebView2, the threading + queue model, Python↔JS layering, the **five pywebview traps**, the `#mock` preview and its gotchas. |
 | [reports.md](reports.md) | You need the report catalog, a single report's `ReportSpec`/save/empty behavior, the `cs-disabled` rule, or the "add a report / consolidator / comparison" recipes. |
-| [comparison-engine.md](comparison-engine.md) | You're in `compare_core` — the regression lock + harness, the two flavors, key-field / roadbed key / duplicate-pairing, ditto non-asserting, the verdict / incompleteness contract, write-path safety, the three comparison families, and the **visual-evidence decoration** (§13 — the five print-crop adapters: Highway Log, Highway Sequence, Intersection Detail, Ramp Detail, and **Highway Detail** since v0.37.0; HD is vs-TSN only, the env lane stays at four). |
-| [planning/comparison-perfection/README.md](planning/comparison-perfection/README.md) | You want to know **why a comparison behaves the way it does**. The comparison-perfection project's record — **COMPLETE, shipped as v0.28.0**; as of v0.38.0 **243/243 CLOSED, nothing open** (the last five — 133 · 142 · 186 · 192 + 045-HD — were the HD pre-release block; the vendor's 2026-08-17 release unblocked them and v0.37.0 / v0.38.0 closed them all). Audit ledgers, source bindings, canary bindings and advisory reviews in one folder. It is a record, not a worklist. |
+| [comparison-engine.md](comparison-engine.md) | You're in `compare_core` — the regression lock + harness, the two flavors, key-field / roadbed key / duplicate-pairing, ditto non-asserting, the verdict / incompleteness contract, write-path safety, the comparison families (including the two ArcGIS-sourced ones, §9j Clean Road and §9k Highway Detail vs layers), the **speed contract** (§2b — the composite-style cache and the streamed package read, both output-locked) and the **counts-only preview** (§2c — what it does and why it can never certify), and the **visual-evidence decoration** (§13 — the five print-crop adapters: Highway Log, Highway Sequence, Intersection Detail, Ramp Detail, and **Highway Detail** since v0.37.0; HD is vs-TSN only, the env lane stays at four). |
+| [planning/comparison-perfection/README.md](planning/comparison-perfection/README.md) | You want to know **why a comparison behaves the way it does**. The comparison-perfection project's record — **COMPLETE, shipped as v0.28.0**; **245/245 CLOSED, nothing open** — the HD pre-release block (133 · 142 · 186 · 192 + 045-HD) fell to the vendor's 2026-08-17 release in v0.37.0 / v0.38.0, and the last two findings were 244 (v0.38.2) and 245 (v0.39.1). Audit ledgers, source bindings, canary bindings and advisory reviews in one folder. It is a record, not a worklist. |
 | [planning/comparison-perfection/comparison-phase4-tsn-source-rebaseline.md](planning/comparison-perfection/comparison-phase4-tsn-source-rebaseline.md) | You're auditing or changing a vs-TSN source, normalizer, comparator, or evidence adapter — exact 29-member comparison-truth and 14-member evidence manifests, source roles, member hashes, raw identity facts, known admission defects, and the Phase-4 source-first gates. |
 | [highway_log/columns.md](highway_log/columns.md) | You need the corrected 31-column Highway Log labels (the vendor mislabeled most) — `highway_log_columns.py`, tooltips, the Legend sheet. |
 | [highway_log/pdf-and-tsn-parsing.md](highway_log/pdf-and-tsn-parsing.md) | You're parsing a Highway Log PDF — the TSMIS cell-rect parser and the TSN character-window parser (with the 3 description guards), the two PDF formats, the flawless-validation results. |
@@ -45,8 +52,10 @@ touching.
 | [verification-and-testing.md](verification-and-testing.md) | You need to verify a change — the golden `check_*.py` catalog, the COM-recalc compare loop, the `#mock` preview, the owed live-export, where the real test data + website source live (local only), and the diagnostics. |
 | [work-pc-validation.md](work-pc-validation.md) | You're running the **work-PC operational sign-off** (still owed) — the credential-safe `--collect-evidence` kit, the manual fallback, the §K2 work-PC acceptance checklist, and the sign-off process. The current acceptance target and additions are maintained in `CLAUDE.md` and [planning/v0.30-owner-backlog-plan.md](planning/v0.30-owner-backlog-plan.md) §4; do not use this document's historical v0.18.x narrative as a release target. |
 | [lessons.md](lessons.md) | You want the project's hard-won judgment — the three field failures, "refactor to one core," regression-lock discipline, "consolidate from raw," "verify agent claims," audit methodology. Distilled; links to the owners. |
-| [history.md](history.md) | You want the narrative — how a one-day console script became a self-updating desktop app, the dead ends and reverts, the field failures that rewrote the design (through v0.18.1). |
-| [roadmap.md](roadmap.md) | You're picking future work — the deferred/dormant/blocked backlog (A3, C1, D1, F1, code-signing, and live-export verification). |
+| [history.md](history.md) | You want the narrative — how a one-day console script became a self-updating desktop app, the dead ends and reverts, the field failures that rewrote the design, and the four threads running through all of it (17 chapters, through v0.41.0). |
+| [roadmap.md](roadmap.md) | **You're picking what to work on next** — the `▣ OPEN WORK INVENTORY` is the definitive remaining-work list (owner-owed acceptance run, vendor/site waits, the ArcGIS findings, the RB-5/RB-6 program, hygiene, and the next large build), with the themed sections below it holding the rationale. |
+| [planning/cleanroad-highways.md](planning/cleanroad-highways.md) | You're building or changing a **Clean Road** file from the ArcGIS layers — the measured overlay model, the 74-column THY coverage census, the layer-export input contract, and the already-censused CA INTERSECTIONS / CA RAMPS mappings that the next large build (roadmap G1) starts from. |
+| [planning/vs-tsn-comparison-speed.md](planning/vs-tsn-comparison-speed.md) | You're about to make a comparison faster — the v0.40–v0.41 record: what shipped, what was deliberately not taken and why, the measured phase breakdown (writing is 70%), and the benchmarking method that keeps numbers honest on a loaded box. |
 | [code-review-prompt.md](code-review-prompt.md) | You're running an audit — the reusable, project-tailored read-only review prompt. |
 | [agent-prompts.md](agent-prompts.md) | You're starting the **roadmap-curator** or the **fix-implementer** agent — the post-compact restart line + the fix-implementer prompt. |
 | [roadmap-curator.md](roadmap-curator.md) | The **to-do-list manager's** operating manual — point a cloud or local agent at this one file to run the roadmap curator (intake ideas + keep the list synced as patches ship). |
@@ -78,6 +87,8 @@ points), every claim anchored to `file:symbol`.
 - **Work-PC constraints / what's safe for IT / audit findings** → it-and-security.md
 - **Golden checks / how to verify / test-data locations** → verification-and-testing.md
 - **Adding a report / consolidator / comparison** → reports.md
+- **ArcGIS layers / Clean Road / rendering a report from the layers** → planning/cleanroad-highways.md + comparison-engine.md §9j–§9k
+- **Making a comparison faster (and the rules that keep it output-locked)** → comparison-engine.md §2b–§2c + planning/vs-tsn-comparison-speed.md
 
 ## Conventions, archive, and external resources
 

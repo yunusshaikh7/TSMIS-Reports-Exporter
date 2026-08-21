@@ -74,9 +74,12 @@ that rewrote the design.
 | `v0.29.0`–`v0.29.1` | Jul 22–23 | **The ArcGIS tab: the first report that needs no site** — our own 74-column CA HIGHWAYS clean-road table is BUILT from the owner's 40-layer ArcGIS library (county+PM overlay as-of the TSN extract's own date, per-column Provenance) and compared vs the TSN extract in both flavors, every column indexed to its source layer. Blessed statewide canary `CRH-SW-E2` (52,647 paired · 291,292 differing cells) with a three-leg self-audit (independent oracle, values-sum, real-Excel COM rebuild). v0.29.1 folded the owner's corrections: the ADT trio is compared AND counted, city names normalize through a derived 395-entry TASAS-code table |
 | `v0.30.0` | Jul 22 | **Marathon 1 of the owner's 20-comment backlog: the existing surfaces, made right** — the consolidate day picker filters per report; per-cell evidence cameras gate on the toggle + an open-evidence button; day columns drag on the by-day/baseline matrices; per-cell comparison logging with error types + input paths; comparison **ETAs** off a persisted timings store; self-identifying comparison FILENAMES (two days open in Excel at once); manual comparisons auto-save to `output/comparisons/manual/`; the `input/` folder RETIRED (`tsn_library/highway_log/raw/` is the one drop location); and the **Edge sign-on diagnosis kit** — the offline capture sweep REFUTED detector drift (sign-in is Azure-gated and intermittent, 44 successes vs 16 failures the same evening), so the release ships classification + surfaced reasons + a "Retry Edge sign-in" button that re-runs the silent device path, not a detector fix |
 | `v0.31.0` | Jul 23 | **Marathon 2, part 1: the structural run** — the four parallel per-report matrix if-chains collapse into ONE `report_catalog.MATRIX` table with `check_report_wiring` deriving what every registered report MUST have (the v0.17.3 "forgot one mirror" field-crash class, now a named failure); the **PDF vs Excel Matrix** Compare sub-tab (the 5 dual-edition families × exported days, each cell that day's PDF export self-checked against its Excel export from the SAME run folder); and 4 of the 5 Clean Road polish items (ArcGIS build Cancel, the Notes' column-match table, `output/comparisons/arcgis/`, the Provenance sheet colour-coded by tier) |
-| `v0.37.0` | Aug 17 | **The vendor's Highway release** — Highway Detail and Highway Summary went live, and the delivery (one same-build statewide pull) was the trigger the year's longest freeze had been waiting for. **Highway Summary integrated**: the app's first MILES-measured aggregate — a fixed 10-section statistics document consolidated one row per route (95 category mileages + a familiar statewide rollup), compared cross-environment, with a strict skeleton contract that refuses a reshaped layout instead of guessing. The owner supplied the statewide TSN print the same day, so its **vs-TSN leg landed too** — a two-column print whose sections are independent little tables (rows must be clustered inside a section's region: the two columns' baselines interleave, and page-wide clustering orphans a value), pairing on the within-section CODE because the two systems spell every label differently. **All 13 integrated reports now compare against TSN.** Four categories are honestly one-sided rather than reconciled — two group sub-headers, a row the print lacks, and one whose value overflowed its column into `**********` (an absent fact, not a zero) — and the total row is flagged NOT like-for-like, because the print excludes non-add and unconstructed mileage by its own footnotes. **The Highway Detail pre-release freeze LIFTED**: the released export's schema was UNCHANGED (the same 34 columns), so the freeze had been about data trust, not format. The release also caught a real defect the pre-release corpus had hidden — HD (PDF) silently lost the record on every page holding exactly ONE record (shading alternates on the global record index, so a lone unshaded record draws no band and the page yielded no column grid): 13 pages across 12 routes, 51,314 rows against Excel's 51,327. Fixed by one more page-LOCAL rung — read the grid from the page's own header rule — restoring exact parity |
-| `v0.33.0`–`v0.35.1` | Aug 2–11 | **The post-audit fix bundles** — the Clean Road workbook stops calling unreadable source data a difference and greys the headers it cannot source; every comparison workbook becomes legible (no cut-off text) and says what it means; **evidence images become a real spot check** (both panels are crops of the actual printed PDFs, so holding one next to the comparison can catch a bad parse — the only reason the feature exists — and cross-environment comparisons get evidence for the first time); Highway Sequence compares `HG`, `City` and `Distance To Next Point` instead of showing them as context; exports adapt to the newer TSMIS form (two controls labelled `District` had made Playwright's label lookup ambiguous); updates tolerate a transient Windows lock on the readiness marker; and generated folders move their internal bookkeeping under `_state` |
 | `v0.32.0` | Jul 23 | **Marathon 2 close-out** — fast mode coalesces dual editions (`run_export_parallel_combined`: each route generated ONCE across N browsers, every edition saved off that render; matrix-queued edition steps group the same way); every per-route file in a dated run folder carries the **run identity in its name** (legacy names honored on resume, so an old partial run never leaves one route with two files); the **Excel-side evidence column fix** (owner: "fix it rather than remove it" — adapters resolve columns the comparator's own way, regaining 26 of Intersection Detail's 35 columns, verified on real statewide workbooks); and the clean-road comparison's 24 context columns tint grey with a hover note (counts proven unchanged) |
+| `v0.33.0`–`v0.35.1` | Aug 2–11 | **The post-audit fix bundles** — the Clean Road workbook stops calling unreadable source data a difference and greys the headers it cannot source; every comparison workbook becomes legible (no cut-off text) and says what it means; **evidence images become a real spot check** (both panels are crops of the actual printed PDFs, so holding one next to the comparison can catch a bad parse — the only reason the feature exists — and cross-environment comparisons get evidence for the first time); Highway Sequence compares `HG`, `City` and `Distance To Next Point` instead of showing them as context; exports adapt to the newer TSMIS form (two controls labelled `District` had made Playwright's label lookup ambiguous); updates tolerate a transient Windows lock on the readiness marker; and generated folders move their internal bookkeeping under `_state` |
+| `v0.37.0` | Aug 17 | **The vendor's Highway release** — Highway Detail and Highway Summary went live, and the delivery (one same-build statewide pull) was the trigger the year's longest freeze had been waiting for. **Highway Summary integrated**: the app's first MILES-measured aggregate — a fixed 10-section statistics document consolidated one row per route (95 category mileages + a familiar statewide rollup), compared cross-environment, with a strict skeleton contract that refuses a reshaped layout instead of guessing. The owner supplied the statewide TSN print the same day, so its **vs-TSN leg landed too** — a two-column print whose sections are independent little tables (rows must be clustered inside a section's region: the two columns' baselines interleave, and page-wide clustering orphans a value), pairing on the within-section CODE because the two systems spell every label differently. **All 13 integrated reports now compare against TSN.** Four categories are honestly one-sided rather than reconciled — two group sub-headers, a row the print lacks, and one whose value overflowed its column into `**********` (an absent fact, not a zero) — and the total row is flagged NOT like-for-like, because the print excludes non-add and unconstructed mileage by its own footnotes. **The Highway Detail pre-release freeze LIFTED**: the released export's schema was UNCHANGED (the same 34 columns), so the freeze had been about data trust, not format. The release also caught a real defect the pre-release corpus had hidden — HD (PDF) silently lost the record on every page holding exactly ONE record (shading alternates on the global record index, so a lone unshaded record draws no band and the page yielded no column grid): 13 pages across 12 routes, 51,314 rows against Excel's 51,327. Fixed by one more page-LOCAL rung — read the grid from the page's own header rule — restoring exact parity |
+| `v0.38.0`–`v0.38.3` | Aug 18–19 | **Highway Detail's correctness backlog closes** — the last four HD audit findings fall together. A logical line 2 now stays OPEN and merges every following baseline until the next line 1, a DCR boundary or the document end (census first: the statewide continuation histogram was `{0: 51326, 2: 1}`, so the blast radius was exactly one record and 251 of 252 routes came out byte-identical), and the normalized TSN library gains a 15-column sidecar conserving the Report View's DCR + five-value ADT block — which every library-sourced comparison had been quietly blanking — plus validated snapshot-date provenance. **The statewide PDF-vs-Excel self-check reads 51,327 locations, 0 one-sided, 51,327 fully identical, 0 differing cells.** Then v0.38.2 found something older: Highway Detail vs TSN had been counting the paired-roadbed **ditto** convention as data. The engine has had the rule since the Highway Log work; HD's schema simply never switched it on. Statewide **174,837 → 160,347** differing cells with pairing completely untouched — 14,490 pointer-vs-value cells that were never differences |
+| `v0.39.0`–`v0.39.3` | Aug 19–20 | **Reports vs layers — TSMIS against TSMIS** — the ArcGIS tab gains a second sub-tab that *renders a TSMIS report* from the layer library and diffs it against our own export of the same report, so the two sides SHOULD agree. Highway Detail went first, not by re-deriving anything but by PROJECTING the clean-road build (HD *is* the CA HIGHWAYS table printed), plus two measured rules: merge adjacent spans that agree on every printed column, and anchor Description to the start because landmarks are point features. Then four days of chasing the disagreement down, and every step was a **measurement that overturned a guess**: the eleven-month vintage gap turned out to be worth under 2% (the drift explanation retired), while the three block effective dates — which the build had been deriving as the OLDEST date among five member layers, a rule fitted to one route — are each simply their PRIMARY layer's own date. That single correction took them from ~56% to ~79–80% and the statewide differing cells from 211,448 to 180,078, with fully-identical rows more than doubling. The same rule then won against the TSN extract too, so it became the default for both builds |
+| `v0.40.0`–`v0.41.0` | Aug 20 | **Comparisons get much faster, and the workbook never moves a byte** — taken over from a branch and reshaped by one boundary: no optimization may change the produced output, proved as byte-identical OOXML members on the real corpus. Composite cell styles register once per workbook instead of being re-walked 1.3 million times; the commit stops reading its own output back through openpyxl — twice, once for a gate whose docstring claimed it was cheap and which was in fact parsing every worksheet to its end (44 seconds on a statewide artifact). The branch's one real tradeoff — relaxing TSN identity checks — was **dropped after pricing it**: its own benchmark valued the entire identity surface at 0.3% of the win, so it went, and with nothing left to trade the experimental toggle went with it. Statewide runs fell ~39%, then another 16% when both inputs turned out to be read twice. And when the phase breakdown said writing is 70% of a comparison with no hot spot left, the answer was not to shave it: **Counts only** runs the whole comparison and skips the writers entirely — 9.1x — while certifying nothing, structurally |
 
 ---
 
@@ -551,6 +554,79 @@ per the owner's re-scope: "fix it rather than remove it."
 
 ---
 
+## Chapter 17 — The measuring era (August 2 → 20) · `v0.33.0` → `v0.41.0`
+
+Nineteen days, seventeen releases, and one habit running through all of them:
+**stop asserting, go measure.** Almost every change in this stretch started as a
+belief someone held confidently — including the project's own code comments — and
+ended with a number that said otherwise.
+
+**The output audit's fix bundles (v0.33 → v0.35)** shipped what an adversarial
+read of the app's own deliverables had found. The Clean Road workbook had been
+publishing 161 red cells for source data it simply could not read, which is a
+different thing from a difference, and it now says so. Every comparison workbook
+became legible — no cut-off text anywhere — after a review round discovered the
+data sheets, not the Comparison sheet, were the largest clipping class. Evidence
+images stopped grading their own homework: one panel used to be drawn from the
+compared workbook, which made it circular, and both panels are now crops of the
+actual printed PDFs, so holding one beside the comparison can finally catch a bad
+parse. Highway Sequence promoted three context columns to compared ones, which
+made its counts jump for entirely structural reasons the release said out loud.
+
+**Then the vendor delivered (v0.37.0).** Highway Detail and Highway Summary went
+live on August 17, ending the year's longest freeze — and the released Highway
+Detail export carried exactly the 34 columns the app had been reading all along,
+which retroactively reframed the whole freeze: it had been about trusting the
+*data*, never the format. Highway Summary integrated the same day, the app's first
+miles-measured aggregate, and the owner supplied its statewide TSN print within
+hours, so all thirteen integrated reports could compare against TSN. The delivery
+also exposed a defect the pre-release corpus had hidden — the PDF edition silently
+lost the record on every page holding exactly one, because shading alternates on a
+global index and a lone unshaded record draws no band to read a column grid from.
+
+**Highway Detail's backlog then closed for good (v0.38.x).** The last findings
+went one at a time, each preceded by a census rather than a hypothesis: a
+continuation histogram of `{0: 51326, 2: 1}` proved the blast radius of the
+line-merging fix was a single record before the fix was written, and 251 of 252
+routes came out byte-identical after it. The statewide self-check reached 51,327
+locations with zero differing cells. Then came the most instructive one: Highway
+Detail vs TSN had been counting the paired-roadbed **ditto** convention as data
+for as long as the comparison had existed. The engine had known that rule since
+the Highway Log work in June; Highway Detail's schema had simply never switched it
+on. Fourteen thousand cells that were never differences, in a comparison everyone
+had been reading as correct.
+
+**Reports vs layers (v0.39.x)** pushed the ArcGIS lane further: render a TSMIS
+report *from the layer library* and diff it against the app's own export of that
+same report, so both sides should agree. Highway Detail went first — not as a
+second engine, but as a projection of the clean-road build, since Highway Detail
+*is* the CA HIGHWAYS table printed. What followed was four days of measurements
+overturning explanations. The eleven-month vintage gap that everyone assumed was
+the cause turned out to be worth under two percent. The three block effective
+dates — derived as the oldest date among five member layers, a rule fitted to one
+route and honest enough to call itself a candidate in its own docstring — are
+each simply their primary layer's own date, and correcting that moved them from
+~56% to ~80% and cut 31,000 differing cells. A claim that the dev box could not
+measure something turned out to be wrong too: the file was sitting in the corpus,
+just not staged.
+
+**And the speed trilogy (v0.40.0 → v0.41.0)** closed the month under one rule: no
+optimization may change the produced workbook, proved byte-for-byte on the real
+corpus. Taking over an outside branch meant judging its parts separately — the
+style cache and the streamed package read were kept, and its one genuine tradeoff
+was dropped after its own benchmark priced the entire contract it weakened at 0.3%
+of the win. With nothing left to trade, the experimental toggle guarding it became
+pointless and went too, which made every comparison family faster instead of one.
+Profiling then found the larger half the original branch had missed, hiding behind
+a comment that said a gate was cheap; it was parsing every worksheet to the end,
+44 seconds on a statewide artifact, on every commit. That became a lesson in its
+own right. And when the phase breakdown finally said writing is 70% of a
+comparison with no hot spot left, the honest answer was not to shave it but to
+skip it: **Counts only** runs the entire comparison and stops before the writers —
+nine times faster, and structurally incapable of certifying anything.
+
+---
+
 ## Three threads that run through all of it
 
 1. **The field keeps rewriting the design.** Managed Edge killing the login
@@ -567,6 +643,13 @@ per the owner's re-scope: "fix it rather than remove it."
 3. **It's honest about dead ends.** The reverts aren't hidden — five Edge-login
    attempts were tried, reverted, parked as a known issue, and later beaten
    properly.
+4. **Measure before you believe — including your own comments.** The pattern
+   repeats at every scale: an "Edge sign-in is broken" report died under an
+   offline sweep that found 44 successes the same evening; an eleven-month data
+   gap that explained everything turned out to be worth under 2%; a gate whose
+   docstring called it cheap was costing 44 seconds a commit; a rule fitted to
+   one route was wrong for the other 251. The claims were all plausible, and the
+   census was always cheaper than the rework.
 
 *Generated from the git history. To regenerate the raw spine:*
 `git log --reverse --pretty=format:"%h|%ad|%s" --date=short`

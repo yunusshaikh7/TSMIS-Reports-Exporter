@@ -1,17 +1,42 @@
 # Clean Road — CA HIGHWAYS from the ArcGIS layers (coverage assessment)
 
-**Status: FEASIBLE — the overlay model is value-proven on route 001 (2026-07-22).**
-This is the design/coverage record for building our own "CA HIGHWAYS" clean-road
-file from the owner's TSMIS ArcGIS layer exports, to compare against the TSN
-extract (`CA HIGHWAYS <date>.xlsx`, the `THY_*` table). Intersections and Ramps
-follow later on the same pattern (their layer families are already identified).
+**Status: CA HIGHWAYS SHIPPED (v0.29.0) and refined through v0.39.3. CA
+INTERSECTIONS and CA RAMPS are the next large build — roadmap G1.**
 
-Everything below is **measured** against the 2026-07-20 layer export and the
-2025-09-08 TSN extract — no column mapping is assumed. The census scripts and
-exact numbers live locally beside the data in
+This is the design/coverage record for building our own clean-road files from the
+owner's TSMIS ArcGIS layer exports and comparing them against the TSN extract
+(`CA HIGHWAYS <date>.xlsx`, the `THY_*` table). The highways build is live; the
+other two are censused to schema level and not started.
+
+**Read in this order if you're starting G1** (the CA INTERSECTIONS / CA RAMPS
+builds):
+
+1. **[The consolidation model](#the-consolidation-model-proven)** and
+   **[the build-time rules](#app-integration--shipped-v0290-the-arcgis-tab)** —
+   the measured rules the highways build settled over six probe rounds
+   (`CODE- Label` domains, cross-county chain-walk, the ADT anchor, PM-continued
+   offsets, primary-layer effective dates). **Do not re-derive these.** They cost
+   days and several of them overturned a plausible first guess.
+2. **[The other two clean-road files](#the-other-two-clean-road-files-censused-2026-07-22--schema-level-mapping)**
+   — the layer→column mapping for both, already censused, with the two
+   derivations left deliberately open (`INX_LSC_DATE`'s eff-date class and
+   `RAM_PRIMARY_DIRECTION_CODE`).
+3. `docs/comparison-engine.md` §9j for how the highways comparison is wired, and
+   `scripts/tsn_load_clean_road.py`, whose Intersection and Ramp slots are
+   deliberately normalizer-less until these builds land.
+
+Everything below is **measured** — no column mapping is assumed. The original
+census ran against the 2026-07-20 layer export and the 2025-09-08 TSN extract;
+the library was refreshed on 2026-08-19 (40 layers, `_inbox/Cleanroad/All Layers
+8.19/`) and the rules re-measured against the real 2026-08-17 export. Census
+scripts and exact numbers live locally beside the data in
 `Downloads\TSMIS\_inbox\Cleanroad\_analysis\` (see its README; local-only, like
-all real data). Sibling doc for the eventual app integration:
-[`docs/roadmap.md`](../roadmap.md) "Clean Road Files" + "ArcGIS layer processing".
+all real data).
+
+> **The as-of does NOT follow the layer library.** `resolve_default_asof()` takes
+> it from the staged TSN extract, so a default build off fresh layers still
+> reconstructs the extract's date. A reconstruction is only meaningful when its
+> as-of matches whatever it is being compared against — set it explicitly.
 
 ---
 
@@ -309,9 +334,22 @@ five probe rounds — these supersede the open items above):**
   LRSFromDates) — an undated point is always live; equate points cut rows and
   flag THY_EQUATE_CODE=E; a break/resume point that coincides with an equate
   reads as the equate.
-- **Block effective dates**: the OLDEST member layer's InventoryItemStartDate
-  is the closest simple composite (~70%; the exact TSN rule remains an open
-  question — the comparison surfaces the residual honestly).
+- **Block effective dates**: each block's date is its **PRIMARY layer's own**
+  `InventoryItemStartDate` — the travel way IS the roadbed, the median layer IS
+  the median; surface, shoulders, special features, barrier and curb are
+  attributes hanging off it. Falls back to the NEWEST of the remaining members
+  only where the primary has no covering span (2.3% / 0.1% / 0.4%).
+  **This CORRECTS the original "oldest member layer" composite**, which was
+  fitted to route 001 alone and was wrong for the other 251: measured over
+  44–46k joined rows against the real export it took `LB Eff` 56.7%→79.0%,
+  `Med Eff` 55.5%→79.4%, `RB Eff` 57.4%→79.7% (v0.39.2, DA1), and the same rule
+  then won against the TSN extract too, so it is the default for BOTH builds
+  (v0.39.3, DA5). Every single-layer and pairwise alternative scored lower and
+  all three blocks ranked identically and independently — a rule, not a fit.
+  **Still open (DA5):** neither rule explains ~40% on the TSN side, where the
+  same columns cap near 60% against the extract but reach 79–80% against the
+  report. Something else differs between our reconstruction and TSN's table on
+  these columns; the comparison surfaces the residual honestly.
 
 Statewide acceptance numbers (the first full build + comparison) live in the
 canary bindings doc once blessed; the residual known-diff classes are the

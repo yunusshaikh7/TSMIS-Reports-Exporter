@@ -13,8 +13,10 @@ NOT implement.** This is one ongoing session; when it gets long I'll compact —
 3. Then wait for my next idea. Don't re-explain yourself — just confirm you're caught up.
 
 ## Standing facts (so your questions are smart)
-- The current GUI is a deliberate **stopgap** — a full GUI overhaul is being designed elsewhere; flag
-  UI ideas against it.
+- The current GUI was ruled a deliberate **stopgap** back in v0.13.0 (June 2026), with a full
+  overhaul to be designed elsewhere and handed over. **It never arrived**, and the app has grown
+  two tabs and four matrices since. Still flag UI ideas against it — but ask me rather than
+  assuming the ruling still stands.
 - The dev PC **cannot reach the TSMIS intranet** — live-export verification is owed on the work PC.
 - The app must run as a plain **unsigned exe on locked-down Caltrans work PCs** (no PowerShell/admin).
 - `compare_core` is **regression-locked**.

@@ -8,7 +8,15 @@ Last updated: 2026-07-22
 > is the completion state and new work branches from it. Offline gate **152/152**, ruff
 > clean, frozen self-test PASSED on the exact shipped exe, CI green.
 >
-> **UPDATE 2026-08-18 (v0.38.0): every finding is now CLOSED — 243 of 243.** The five
+> **UPDATE 2026-08-20: every finding is CLOSED — 245 of 245.** Two more were found and
+> fixed after this project shipped, both by the work that came next: **244** (v0.38.2 —
+> Highway Detail vs TSN was counting the paired-roadbed ditto convention as data;
+> statewide 174,837 → 160,347 differing cells, pairing untouched) and **245** (v0.39.1 —
+> the ArcGIS Highway Detail projection counted the HF-01 unavailable marker as data and
+> reported COMPLETE over a PARTIAL build). New findings still get an entry here even
+> though the project is closed; open WORK lives in [`docs/roadmap.md`](../../roadmap.md).
+>
+> **UPDATE 2026-08-18 (v0.38.0): 243 of 243 closed at that date.** The five
 > that were open here (133 · 142 · 186 · 192 + 045-HD) were the ⛔ Highway Detail
 > pre-release block. The vendor RELEASED Highway Detail on 2026-08-17, which retired the
 > freeze; v0.37.0 closed 192 (and found + fixed 243), and v0.38.0 closed 186 · 053 · 133
@@ -17,7 +25,8 @@ Last updated: 2026-07-22
 > **Still never infer an HD county answer** — the Excel export does not carry one, and the
 > owner ruled the Excel and PDF editions stay separate sources.
 >
-> **Owed, and only the owner can do it:** the work-PC acceptance run on v0.28.0.
+> **Owed, and only the owner can do it:** the work-PC acceptance run — now targeting
+> **v0.41.0** (roadmap B1), not v0.28.0.
 >
 > **This folder is now the PROJECT RECORD, not a worklist.** Read it to learn why a
 > comparison behaves the way it does. If you reopen a finding or open a new one, update

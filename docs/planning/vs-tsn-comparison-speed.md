@@ -1,7 +1,9 @@
 # Comparison speed — the record
 
-**Status: SHIPPED in v0.40.0, extended in v0.40.1.** This is the project
-record, not an open plan.
+**Status: SHIPPED in v0.40.0, extended in v0.40.1, concluded in v0.41.0.** This is
+the project record, not an open plan. **Comparison speed tuning is finished** — the
+measured breakdown below says why, and the one remaining order-of-magnitude lever was
+taken in v0.41.0 by not writing the workbook at all.
 
 Started on `codex/vs-tsn-comparison-speed` (2026-08-19, four commits), taken over
 and reshaped 2026-08-20. Read this before touching `compare_core._styled_cell` or
@@ -185,10 +187,35 @@ produces **different bytes** and is worth **~2%**, so it fails the acceptance
 bar and buys nothing, quite apart from adding a compiled dependency to the
 frozen work-PC bundle.
 
-So the tuning is finished. The only change left that is worth an order of
-magnitude is **not writing a workbook at all** — a matrix refresh that
-recomputes a cell's verdict and counts and skips serialization. That is a
-product decision, not a performance one: the matrix's green state is bound to a
-committed artifact generation, so a counts-only result cannot be recorded as a
-normal cached cell and would need its own clearly marked, non-certifying state.
-The roadmap carries that note under section E.
+So the tuning is finished. The only change left worth an order of magnitude was
+**not writing a workbook at all** — and that shipped as **v0.41.0**.
+
+## v0.41.0 — Counts only, and why it certifies nothing
+
+`mode="preview"` is the fourth comparison mode. It runs loaders, normalization,
+keys, pairing and `count_diffs` **identically** to a build, returns the typed
+outcome, and stops before the writers. Statewide Intersection Detail: **185.9 s →
+20.4 s (9.1x)**, counts identical including the per-column breakdown.
+
+The design constraint was named in this document before the feature existed, and
+it held: the matrix's green state is bound to a committed artifact generation, so
+a counts-only result cannot be recorded as a normal cached cell. Rather than
+document that as a rule, it is enforced **structurally**:
+
+- no workbook committed → no `artifact_generation`, by
+  `comparison_result_boundary`;
+- previews persist to their own `comparisons/_previews.json` — never
+  `_results.json`, never inside `_staleness`;
+- `_preview_for` surfaces one only while it still matches the inputs (fingerprint,
+  source identities, producer version, nothing touched since) **and** only when
+  the certified cell isn't already fresh;
+- a real build clears it;
+- the renderer uses `mx-preview`, and a zero-difference preview reads `match*`,
+  never a green tick.
+
+The numbers cannot disagree with a build's because both paths call the one
+`_headline_truth` / `_headline_verdict` pair. `build/check_comparison_preview.py`
+(30 assertions, red-tested by neutralizing the guard) holds both halves: that the
+counts are exact, and that it can never go green.
+
+Off by default; the log line says "counts only, no workbook".
