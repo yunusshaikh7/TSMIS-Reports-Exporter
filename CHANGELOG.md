@@ -3,12 +3,15 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
-## Unreleased
+## v0.41.1 — 2026-08-21
 
-**The interface stops doing the same work over and over.** No visible change —
-every control looks and behaves exactly as before — but the app spends a small
-fraction of the effort keeping it that way. Three fixes, all with the same
-acceptance bar: prove the result is identical, just cheaper.
+A performance and polish release: the interface does far less work to show you
+the same thing, and its text sizes are consistent for the first time.
+
+**The interface stops doing the same work over and over.** Nothing here looks or
+behaves differently — the app just spends a small fraction of the effort keeping
+it that way. Three fixes, all with the same acceptance bar: prove the result is
+identical, just cheaper.
 
 - **Matrix freshness reads each folder once instead of twice per file.** Working
   out how fresh a cell is meant listing its export folder and then asking the
