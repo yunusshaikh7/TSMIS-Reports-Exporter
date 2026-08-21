@@ -4,7 +4,7 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 (what already shipped, per release) is `CHANGELOG.md`; the narrative is
 [history.md](history.md). This file is what's *left*.
 
-> ### ▶ WHERE THINGS STAND (2026-08-20, after v0.41.0)
+> ### ▶ WHERE THINGS STAND (2026-08-21, after v0.41.2)
 >
 > **Correctness has nothing open.** All **245** comparison-audit findings are
 > closed — the last, CMP-AUD-245, in v0.39.1. The 13 integrated reports consolidate
@@ -21,6 +21,14 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 > of a comparison, spread across four writers with no hot spot left, and the only
 > lever beyond it changes the output. The record is
 > [planning/vs-tsn-comparison-speed.md](planning/vs-tsn-comparison-speed.md).
+>
+> **v0.41.2 made Counts only reachable.** Its checkbox was wired to the generic
+> settings endpoint, which drops keys outside `settings.DEFAULTS` — so the option
+> clicked, reported success, saved nothing and snapped back, and the mode shipped
+> in v0.41.0 could not be turned on at all. Same release: a counts-only run that
+> re-derives a stale cell's existing workbook counts now marks it **counts
+> confirmed** (an accent on the same uncertified state — it confirms the numbers,
+> never the file).
 >
 > **What's next, in order:**
 >
@@ -60,7 +68,7 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 
 ---
 
-## ▣ OPEN WORK INVENTORY (current as of v0.41.0, 2026-08-20)
+## ▣ OPEN WORK INVENTORY (current as of v0.41.2, 2026-08-21)
 
 **This is the definitive list of what is left.** Everything below is genuinely
 open; anything not here is either shipped (see `CHANGELOG.md`) or a historical
@@ -104,7 +112,7 @@ counts as migration drift, not defect — see C4 + D5.
 
 | # | Item | Notes |
 |---|---|---|
-| B1 | **The work-PC acceptance run — now against v0.41.0. THE TOP PRIORITY: everything since v0.32.0 is offline-verified only.** | Comparison + evidence output intentionally differ from v0.26.2/v0.27.x: re-run both sides, never reconcile old against new. TSN libraries rebuild once; PDF-sourced workbooks re-consolidate once. Then the carried v0.30–v0.32 items in [the backlog plan §4](planning/v0.30-owner-backlog-plan.md): Retry Edge sign-in, the PDF vs Excel Matrix, a fast-mode dual-format run, a pre-v0.32 partial resume, one Excel-row evidence run. **New for v0.37.0:** a Highway Summary export → consolidate → vs-TSN run, and one Highway Detail evidence generation (its evidence lane just opened — see D1). **New for v0.38.x:** re-consolidate Highway Detail (PDF) and confirm it reports COMPLETE with a clean PDF-vs-Excel cell; let the TSN Highway Detail library rebuild once (v4) and confirm the Report View's DCR + ADT columns are populated; and run a **both-editions Highway Summary** export to confirm one render saves both files in the right order. **New for v0.38.2:** drag a day COLUMN on each by-day matrix and confirm it moves on screen (it never did before); toggle a report chip on a matrix and confirm it responds instantly; and — the one worth watching on a STOCKED TSN library — confirm the matrices repaint quickly after the first render, now that the raw manifest memoizes instead of re-hashing every raw source each time. **New for v0.40.0–v0.41.0 (all comparison-speed work, offline-verified only):** rebuild a few cells and confirm the workbooks still open and read as before (output is byte-identical by construction, so anything else is a bug); and tick **Counts only** under Comparison output, refresh a matrix, and confirm the cells show `counts only — build to certify` in grey with NO workbooks written, that a zero-difference cell reads `match*` rather than a green tick, and that building one for real replaces the preview with a normal green result. |
+| B1 | **The work-PC acceptance run — now against v0.41.2. THE TOP PRIORITY: everything since v0.32.0 is offline-verified only.** | Comparison + evidence output intentionally differ from v0.26.2/v0.27.x: re-run both sides, never reconcile old against new. TSN libraries rebuild once; PDF-sourced workbooks re-consolidate once. Then the carried v0.30–v0.32 items in [the backlog plan §4](planning/v0.30-owner-backlog-plan.md): Retry Edge sign-in, the PDF vs Excel Matrix, a fast-mode dual-format run, a pre-v0.32 partial resume, one Excel-row evidence run. **New for v0.37.0:** a Highway Summary export → consolidate → vs-TSN run, and one Highway Detail evidence generation (its evidence lane just opened — see D1). **New for v0.38.x:** re-consolidate Highway Detail (PDF) and confirm it reports COMPLETE with a clean PDF-vs-Excel cell; let the TSN Highway Detail library rebuild once (v4) and confirm the Report View's DCR + ADT columns are populated; and run a **both-editions Highway Summary** export to confirm one render saves both files in the right order. **New for v0.38.2:** drag a day COLUMN on each by-day matrix and confirm it moves on screen (it never did before); toggle a report chip on a matrix and confirm it responds instantly; and — the one worth watching on a STOCKED TSN library — confirm the matrices repaint quickly after the first render, now that the raw manifest memoizes instead of re-hashing every raw source each time. **New for v0.40.0–v0.41.0 (all comparison-speed work, offline-verified only):** rebuild a few cells and confirm the workbooks still open and read as before (output is byte-identical by construction, so anything else is a bug); and tick **Counts only** under Comparison output, refresh a matrix, and confirm the cells show `counts only — build to certify` in grey with NO workbooks written, that a zero-difference cell reads `match*` rather than a green tick, and that building one for real replaces the preview with a normal green result. **New for v0.41.2 — and note the v0.41.0 line above was untestable until now**: the Counts only checkbox never persisted, so confirm FIRST that it stays ticked, mirrors onto the by-day matrix, and survives an app restart. Then run it over a STALE cell that already has a workbook and confirm the workbook is left on disk untouched and the cell reads **counts confirmed** with a green left edge when the numbers still agree (grey ground, still offering a build — never a green tick). |
 
 ### C. Waiting on the vendor / the site
 
