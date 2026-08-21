@@ -142,6 +142,53 @@ The GUI window uses a persistent **app-owned** user-data folder, `paths.WEBVIEW_
 
 The WebView2 profile (above) lives under the app's data tree. The packaged app writes ALL its data — `output/`, the auth token, logs, config, and that profile — **next to the `.exe`**, with a `%LOCALAPPDATA%\TSMIS Exporter` fallback when the folder is read-only (which also flips the updater into link-only mode). The full data-location model (`DATA_ROOT`/`OUTPUT_ROOT`/derived paths) is owned by [architecture.md](architecture.md); the IT/file-by-file view is in [it-and-security.md](it-and-security.md).
 
+## Accessibility posture (measured 2026-08-21)
+
+This is a Caltrans tool, so Section 508 / WCAG 2.1 AA is a question that gets
+asked. These are **measurements against the running UI**, not intentions — every
+figure below was taken in the `#mock` across the Export, Compare, Everything ▸
+matrix and Settings tabs, in both themes.
+
+| Check | Result |
+|---|---|
+| Text contrast vs WCAG AA (4.5:1 body, 3:1 large) | **0 failures**, light and dark |
+| Accessible names on checkboxes + radios | **117 / 117** — every one via a wrapping `<label>` |
+| Accessible names on buttons | **360 / 360** |
+| Focus indication | 18 `:focus-visible` rules; **0 of 200** sampled focusables lacked a matching focus rule |
+| `prefers-reduced-motion` | Global block neutralises `*, *::before, *::after`, plus a specific re-override for the `!important` theme cross-fade |
+| Positive `tabindex` (breaks natural order) | **0** |
+| Keyboard traps in hidden panes | **0 of 523** focusables in `display:none` subtrees are Tab-reachable |
+| Tab semantics | 4 tablists, each with exactly one `aria-selected="true"` |
+| Document `lang` / `title` | `en` / "TSMIS Exporter" |
+| Horizontal overflow at 910×512 (a 1366×768 work PC at 150% DPI) | **0 px** on all six tabs |
+| Pathological content (a 180-char OneDrive path + a 4× repeated error line, injected into six path/label surfaces) | **0 px** page overflow, **0** elements burst their container |
+
+**Not verified, and not claimed:**
+
+- **Real screen-reader behaviour.** Accessible names exist and the roles are
+  right, but nobody has driven this with NVDA or JAWS. Names being present is
+  necessary, not sufficient — announcement order and live-region behaviour during
+  a run are unmeasured.
+- **Keyboard traversal by hand.** The absence of positive `tabindex` and of
+  reachable focusables in hidden panes rules out the common traps; actually
+  tabbing the whole app has not been done.
+- **Non-text contrast** (borders, icon glyphs, focus rings against their
+  backgrounds) — the audit measured text only, which is the 1.4.3 criterion.
+  1.4.11 non-text contrast is untested.
+
+Two traps worth knowing before you re-run any of this:
+
+- **The `#mock` preview does not composite frames when the pane is hidden**, so
+  width and computed flex values there are unreliable — it reported `flex-grow: 0`
+  and 2px columns at 1280px while the same page measured correctly at 800px. Use
+  height / `scrollHeight`, computed colour, and element counts, which are stable;
+  do not conclude a layout bug from a width read alone.
+- **Crude probes lie in both directions here.** `read_page` renders the option
+  checkboxes as `checkbox "on"`, which looks exactly like a missing label and is
+  not — they are wrapped in `<label>`. Splitting the stylesheet on the first
+  `prefers-reduced-motion` finds the small matrix-only block and misses the global
+  one below it. Check the DOM or the source before believing either.
+
 ## The FIVE pywebview traps (all hit in the field)
 
 These are the load-bearing constraints. Each one cost a real field failure; do not regress them.

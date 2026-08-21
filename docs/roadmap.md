@@ -306,9 +306,29 @@ criteria: [work-pc-validation.md](work-pc-validation.md) §3.
 - [ ] **cancel-latency** [S] — poll `should_cancel` in `preflight` / `select_report` (the ~60 s county-enable
   wait) / `_recover` (mid-batch re-login) so Stop interrupts the after-sign-in / recovery windows (same opt-in
   `should_cancel` pattern; verify live — the waits are field-hardened). *(v0.17.1 follow-up.)*
-- [ ] **narrow-mode** [S] — (<980 CSS px, e.g. 1366×768 @150% DPI) matrix-tab polish: the card-hide /
-  height-fill / config-uncap rules live in `@media (min-width:980px)`, so a small/high-DPI laptop shows stray
-  idle cards + a cramped Matrix-options panel on the matrix sub-tabs. *(v0.17.1 follow-up.)*
+- [x] ~~**narrow-mode** [S] — (<980 CSS px, e.g. 1366×768 @150% DPI) matrix-tab polish~~ — **CLOSED
+  2026-08-21, already fixed; this entry had gone stale.** Measured in the `#mock` at exactly 910×512
+  (a 1366×768 work PC at 150% DPI): **the stray idle cards are gone** — preflight, completion and
+  progress are all hidden on the matrix sub-tab — the grid renders with all its cells, and there is
+  **zero horizontal overflow on any of the six tabs**. The rules the entry says are trapped in
+  `@media (min-width:980px)` were moved out into a "matrix mode at ANY width" section, which is what
+  hides the cards and tightens the cells regardless of window size.
+  **The "cramped Matrix-options panel" is now a deliberate decision, not a defect.** A
+  `@media (max-width: 979px)` block caps it at `46vh` (measured 235px of 561px content, scrolling
+  internally) and caps the log at `22vh` and the grid wrap at `62vh`. That is the right trade and the
+  CSS says why: below the breakpoint the columns STACK, so an uncapped ~530px options card would push
+  the grid you opened the tab for into a sliver at the top of a very long scroll. Capping it is what
+  keeps the grid worth looking at. Re-open only if the owner wants a different split, not as a bug.
+- [ ] **wide-layout column split — needs ONE look in a real window** [S] — a note from the v0.38.2
+  session says `body.matrix-wide .col-config { flex-grow: 3.4 }` computes to `1`, i.e. the matrix
+  column never actually widens. **Unverifiable in the `#mock`**: the preview pane does not composite
+  frames, so width and computed flex values there are unreliable (it reported `flex-grow: 0` and 2px
+  columns at 1280px while the same page measured correctly at 800px). By inspection the CSS is right
+  — only two rules match `.col-config`, `flex: 1 1 0` (grow 1) and the higher-specificity
+  `body.matrix-wide` grow 3.4, both inside the same matching media block, and nothing sets 0 — so
+  this is either already fine or a subtle cascade issue that only a real window will show. **Open the
+  app on a normal monitor, switch to the Everything ▸ Comparison-matrix sub-tab, and see whether the
+  left column visibly takes ~3.4x the right.** If it does, delete this item. Cost: ten seconds.
 - [x] **Manual Compare: consolidate-style day dropdowns** [M] — **DONE (v0.38.2).** Every FILE-kind
   recipe now offers an Export-day dropdown that fills BOTH sides: the same day's other edition for a
   PDF-vs-Excel self-check, the TSN library's current dataset for a vs-TSN one. It lists only days
