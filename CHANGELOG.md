@@ -31,6 +31,18 @@ acceptance bar: prove the result is identical, just cheaper.
   when it ends, with the dimming done by the stylesheet. The controls end up in
   exactly the same state — verified control-by-control, in every task mode.
 
+**Text sizes are consistent, and every one is a whole pixel.** The interface had
+grown **13 different font sizes**, six of them half-pixels — 9.5, 10.5, 11.5,
+12.5, 13.5. That is not a detail on a work PC: a 1366×768 screen runs at 150%
+scaling, where a half-pixel size falls between real pixels and Windows rounds it
+differently from one label to the next, which is what made the app look slightly
+unfinished. There are now six sizes, all whole numbers, and nothing can drift
+back — a build check refuses a new hand-written size.
+
+The half-pixels were never a finer scale: each was used for exactly the same kind
+of thing as its whole-number neighbour, so each pair became one size. Most text
+is unchanged; where it moved, it moved by half a pixel.
+
 ## v0.41.0 — 2026-08-20
 
 **Refresh a matrix without building the workbooks.** A new **Counts only** option

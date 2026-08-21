@@ -12,6 +12,36 @@ The packaged product is a **pywebview window using the Edge WebView2 backend**, 
 
 WebView2 is a safe dependency here: it ships with Windows 10/11 and evergreen Edge — the same Edge this tool already requires. `tkinter`/`_tkinter` are **excluded** from the bundle.
 
+### Design tokens — colour, radius, motion, and TYPE
+
+`app.css` opens with the token block. Colour and radius have been tokenised for a
+long time (62 custom properties; only two hardcoded hex values in the whole
+sheet). **Type joined them after an audit found 13 distinct font sizes across 101
+declarations, six of them half-pixels** (9.5 / 10.5 / 11.5 / 12.5 / 13.5). The
+six-step scale is `--text-2xs` 10 · `--text-xs` 11 · `--text-sm` 12 ·
+`--text-base` 13 · `--text-lg` 15 · `--text-xl` 17, and
+`build/check_type_scale.py` fails on a raw px font-size or a non-integer token.
+
+Two things worth knowing before touching it:
+
+- **Whole pixels are the point, not tidiness.** A 1366×768 work PC runs at 150%
+  DPI, where a `.5px` size lands between device pixels and Windows rounds it
+  inconsistently from one element to the next — which is what made the UI read as
+  slightly unfinished on exactly the machines this ships to.
+- **The half-pixels were never a finer scale.** Each sat in the same role as its
+  integer neighbour (12.5px on tabs and chips, right beside 12px on tabs and
+  chips), so each pair collapsed onto one token. `base` is 13px because that is
+  what `body` has always been.
+
+**Spacing is deliberately NOT tokenised**, and that is a measured decision rather
+than an omission: 48 of the 59 padding/margin/gap declarations already sit on a
+2px rhythm. The nine that do not (1 · 3 · 5 · 7 · 9 px) are each a density choice
+on a hand-tuned element — `.option-row` at 9px vertical is the height of all 98
+option rows; `.route-cell` at 5px is the density of the route grid — and the
+layout is built around real constraints (a 1366×768 laptop at 150% DPI is ~910
+CSS px, which the stylesheet's own comments design for). Rounding them onto a
+grid is a visual decision for the owner, not a cleanup to apply blind.
+
 **`webview.start(gui="edgechromium")` is forced** so a missing runtime fails loudly with a clear message box (`_fatal_box`, "The app window could not be created.") instead of silently degrading to the legacy MSHTML backend. Verified in `gui_api.run()`:
 
 ```python
