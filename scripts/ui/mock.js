@@ -282,6 +282,7 @@ function makeMockApi() {
   let mockCompareOverwrite = null;
   let mockAgBuilt = false;       // the ArcGIS tab's built-workbook state
   let mockAgReportBuilt = false; // ...and its projected-report state (needs the above)
+  let mockAgReportBuiltInx = false; // the Intersection Detail build (needs no source table)
   const push = (...evs) => dispatch(evs);
   const pushState = () => push({ t: "state", s: JSON.parse(JSON.stringify(st)) });
 
@@ -1929,35 +1930,59 @@ function makeMockApi() {
     // cannot exist before it. The as-of dates deliberately DIFFER from the
     // export day so the preview shows the vintage warning, which is the whole
     // point of that card.
-    arcgis_report_status: async () => ({
-      reports: [{ key: "highway_detail", label: "Highway Detail" }],
-      source: mockAgBuilt
+    arcgis_report_status: async (report) => {
+      const key = report || "highway_detail";
+      const reports = [{ key: "highway_detail", label: "Highway Detail" },
+                       { key: "intersection_detail", label: "Intersection Detail" }];
+      const out = {
+        reports, report: key,
+        out_dir: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports",
+      };
+      if (key === "intersection_detail") {
+        // A POINT report: single-pass build, so no source table at all.
+        out.built = mockAgReportBuiltInx
+          ? { exists: true, asof: "2026-08-28", build_version: "1",
+              rows: "16147", routes: "215", shells: "22697", retired: "70",
+              path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports\\intersection_detail_from_layers.xlsx" }
+          : { exists: false,
+              path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports\\intersection_detail_from_layers.xlsx" };
+        out.days = [{ day: "2026-08-28", subdir: "intersection_detail_pdf",
+                      path: "C:\\demo\\tsmis_intersection_detail_pdf_consolidated 2026-08-28 ssor-prod.xlsx" }];
+        return out;
+      }
+      out.source = mockAgBuilt
         ? { exists: true, asof: "2025-09-08", build_version: 1,
-            path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_cleanroad\\clean_highway_built.xlsx" }
+            path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports\\highway_detail_source_table.xlsx" }
         : { exists: false,
-            path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_cleanroad\\clean_highway_built.xlsx" },
-      built: mockAgReportBuilt
+            path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports\\highway_detail_source_table.xlsx" };
+      out.built = mockAgReportBuilt
         ? { exists: true, asof: "2025-09-08", build_version: "1",
             rows: "51227", merged_away: "6501", routes: "252",
             path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports\\highway_detail_from_layers.xlsx" }
         : { exists: false,
-            path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports\\highway_detail_from_layers.xlsx" },
-      days: [{ day: "2026-08-17", path: "C:\\demo\\highway_detail_consolidated 2026-08-17 ssor-prod.xlsx" },
-             { day: "2026-07-23", path: "C:\\demo\\highway_detail_consolidated 2026-07-23 ssor-prod.xlsx" }],
-      out_dir: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports",
-    }),
+            path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports\\highway_detail_from_layers.xlsx" };
+      out.days = [{ day: "2026-08-17", subdir: "highway_detail", path: "C:\\demo\\highway_detail_consolidated 2026-08-17 ssor-prod.xlsx" },
+                  { day: "2026-07-23", subdir: "highway_detail", path: "C:\\demo\\highway_detail_consolidated 2026-07-23 ssor-prod.xlsx" }];
+      return out;
+    },
     open_arcgis_reports_folder: async () => push({ t: "log", text: "(mock) would open the arcgis_reports output folder" }),
-    start_arcgis_report_build: async () => {
-      if (!mockAgBuilt) return { error: "Build the Clean Road Highway workbook first — the report is projected from it, not from the layers directly." };
+    start_arcgis_report_build: async (report, asof) => {
+      const inx = report === "intersection_detail";
+      const label = inx ? "Intersection Detail" : "Highway Detail";
+      if (!inx && !mockAgBuilt) return { error: "Build the Clean Road Highway workbook first — the report is projected from it, not from the layers directly." };
       st.task = "consolidate";
       st.auth_dot = "busy"; st.auth_text = "Building the report from the layers…";
       pushState();
-      push({ t: "log", text: "Starting ArcGIS report build: Highway Detail (ArcGIS)" },
-           { t: "run_started", mode: "consolidate", label: "Building Highway Detail from the ArcGIS layers…" });
-      setTimeout(() => push({ t: "log", text: "  projected 57,728 CA HIGHWAYS rows onto the report's 34 columns -> 51,227 records (6,501 merged away)" }), 1200);
+      push({ t: "log", text: `Starting ArcGIS report build: ${label} (ArcGIS)` },
+           { t: "run_started", mode: "consolidate", label: `Building ${label} from the ArcGIS layers${asof ? " as of " + asof : ""}…` });
+      setTimeout(() => push({ t: "log", text: inx
+        ? "  built 16,147 intersection records (215 routes); skipped 22,697 rows with no inventory block and 70 retired"
+        : "  projected 57,728 CA HIGHWAYS rows onto the report's 34 columns -> 51,227 records (6,501 merged away)" }), 1200);
       setTimeout(() => {
-        mockAgReportBuilt = true;
-        push({ t: "log", text: "Built 51,227 Highway Detail records (252 routes) from the ArcGIS layers as of 2025-09-08." },
+        if (inx) mockAgReportBuiltInx = true; else mockAgReportBuilt = true;
+        push({ t: "log", text: inx
+          ? "Built 16,147 Intersection Detail records (215 routes) from the ArcGIS layers as of 2026-08-28."
+          : "Built 51,227 Highway Detail records (252 routes) from the ArcGIS layers as of 2025-09-08." },
              { t: "run_ended" });
         st.task = null;
         st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
@@ -1965,17 +1990,20 @@ function makeMockApi() {
       }, 2000);
       return { ok: true };
     },
-    start_arcgis_report_compare: async (day, wantFormulas, wantValues) => {
-      if (!mockAgReportBuilt) return { error: "Build the Highway Detail report from the layers first — the comparison reads it as the ArcGIS side." };
-      if (!day) return { error: "Pick an export day that has a Highway Detail export." };
+    start_arcgis_report_compare: async (report, day, wantFormulas, wantValues) => {
+      const inx = report === "intersection_detail";
+      const label = inx ? "Intersection Detail" : "Highway Detail";
+      if (!(inx ? mockAgReportBuiltInx : mockAgReportBuilt))
+        return { error: `Build the ${label} report from the layers first — the comparison reads it as the ArcGIS side.` };
+      if (!day) return { error: `Pick an export day that has a consolidated ${label} workbook. If the day you want isn't listed, consolidate it first (Consolidate tab).` };
       if (!wantFormulas && !wantValues) return { error: "Tick at least one output (values and/or live formulas)." };
       st.task = "compare";
       st.auth_dot = "busy"; st.auth_text = "Comparing…";
       pushState();
-      push({ t: "log", text: `Starting comparison: Highway Detail — ArcGIS vs TSMIS ${day}` },
-           { t: "run_started", mode: "consolidate", label: "Comparing — Highway Detail…" });
+      push({ t: "log", text: `Starting comparison: ${label} — ArcGIS vs TSMIS ${day}` },
+           { t: "run_started", mode: "consolidate", label: `Comparing — ${label}…` });
       setTimeout(() => {
-        push({ t: "log", text: "Comparison written: ArcGIS_vs_TSMIS_HighwayDetail.xlsx (values + live formulas)" },
+        push({ t: "log", text: `Comparison written: ArcGIS_vs_TSMIS_${inx ? "IntersectionDetail" : "HighwayDetail"}.xlsx (values + live formulas)` },
              { t: "run_ended" });
         st.task = null;
         st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";

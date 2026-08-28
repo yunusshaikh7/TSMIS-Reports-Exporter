@@ -799,7 +799,22 @@
         <div id="agReports" class="hidden">
         <div class="card-section">
           <div class="section-head">
-            <span class="section-label">Source — the Clean Road build</span>
+            <span class="section-label">Report</span>
+            <span class="section-meta" id="agRepPickMeta">—</span>
+          </div>
+          <div class="dm-toolbar">
+            <span class="muted">Render and compare</span>
+            <span class="tb-select select-light"><select id="agRepReport" data-lock-when-busy></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+          </div>
+          <p class="hint">Each report is rendered from the same layer library and
+            diffed against the app's own export of it. Both sides are TSMIS, so
+            they should agree — a difference is either a gap in the
+            reconstruction or a finding about how the report is built.</p>
+        </div>
+
+        <div class="card-section hidden" id="agRepSourceSection">
+          <div class="section-head">
+            <span class="section-label">Source table</span>
             <span class="section-meta" id="agRepSourceMeta">—</span>
           </div>
           <p class="hint" id="agRepSource">—</p>
@@ -807,7 +822,7 @@
 
         <div class="card-section">
           <div class="section-head">
-            <span class="section-label">Highway Detail — build &amp; compare</span>
+            <span class="section-label" id="agRepHdLabel">Build &amp; compare</span>
             <span class="section-meta" id="agRepHdMeta">—</span>
           </div>
           <p class="hint" id="agRepHdBuilt">—</p>
@@ -853,8 +868,12 @@
           <p class="hint">Highway Detail went first because it <b>is</b> the CA HIGHWAYS
             table printed — 33 of its 34 columns are columns of the Clean Road build, so
             rendering it is a mapping plus one rule: adjacent stretches that agree on every
-            column the report prints are one record. The other reports follow the same
-            pattern.</p>
+            column the report prints are one record. Intersection Detail followed, and it
+            is a different shape: an intersection is a <b>place</b>, not a stretch, so
+            there is no segmentation — the rules that matter there are which approach leg
+            supplies the printed mainline and cross-street values, and whether a gap in a
+            span layer carries the previous value forward. Each report's own rules are
+            listed on its Provenance and Notes sheets.</p>
         </div>
         </div><!-- /agReports -->
       </div>

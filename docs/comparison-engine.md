@@ -1205,6 +1205,74 @@ dates (LB/Med/RB Eff) are the lowest-agreeing counted columns and are called out
 Notes as the composite "candidate rule" the Clean Road build flags in its own
 provenance.
 
+### 9l. Intersection Detail — ArcGIS build vs TSMIS (`compare_intersection_detail_arcgis.py`)
+
+The second report rendered from the layers, and the one that shows the recipe generalizes:
+a mapping table plus the report's own measured rules, not a second engine. Side A is OUR
+Intersection Detail, built by `arcgis_report_intersection_detail`; side B is the app's own
+consolidated Intersection Detail export for a chosen day (either edition — both consolidate
+to the same shape, which is what each report's PDF-vs-Excel self-check proves). Same
+sub-tab, same registry (`arcgis_reports.py`), same TSMIS-vs-TSMIS reading.
+
+**What is structurally different: this is a POINT report.** Highway Detail is the CA
+HIGHWAYS table printed, so it needs the span engine, a segmentation and a merge rule.
+An intersection is a *place*, not a stretch, and `IM Intersection Detail` already holds one
+row per intersection with the report's identity on it — so there is no segmentation, no
+merge pass, and no boundary question. The build is three passes: the row universe, the
+approach join, and a point overlay for the three columns the intersection row doesn't carry.
+
+Every rule was scored on the real 2026-08-28 statewide export over 15,154 one-to-one paired
+intersections, not fitted on a probe case (lessons.md #17):
+
+  * **ROW UNIVERSE.** The layer holds 38,914 rows, but 22,697 are IM-managed shells with the
+    whole inventory half null. The report's universe is the rows carrying a Main postmile that
+    are current (`LRS_DATE_RETIRE` and `InventoryItemEndDate` both empty): **16,147**, against
+    the export's 16,394.
+  * **WHICH LEG IS PRINTED.** The report prints one mainline and one cross-street value for
+    mast arm, channelization, flow, lanes and length; the layers carry ~4.3 approach legs per
+    intersection. `LEG_TYPE` decides it — **Major is the mainline, Minor is the cross street**,
+    scoring 99.4–100.0% on all twelve columns where the reverse assignment scores 61.7–95.9%.
+    Legs of one type that disagree with each other print the most frequent value, so the build
+    is deterministic rather than dependent on layer row order.
+  * **THE OVERLAY CARRY RULE**, and it splits by column, which is the interesting part. The
+    span layers do not tile a route completely, and what the report prints in a gap depends on
+    the KIND of attribute: `HG` 90.7%→**94.5%** and `R/U` 84.0%→**91.3%** with carry-forward,
+    but `City Code` **98.1%**→74.9% — i.e. carry-forward makes City 23 points *worse*. Highway
+    Group and Rural/Urban are continuous properties that persist until something changes them;
+    a city is containment, and outside the limits there is no city, so carrying one across a
+    gap invents one.
+
+**The position contract.** The consolidated export's header LABELS sit shifted against their
+values (the column labelled `INT Type` holds the geometry effective date), and every
+Intersection Detail comparator reads by position. This build therefore writes the export's own
+positions, and its Provenance sheet carries the printed label and what the column actually
+holds as separate columns — naming only the label would misdescribe half the sheet.
+
+**No context columns.** `Int St Eff-Date` is `InventoryItemStartDate` on the intersection row —
+**100.0%, exact on every paired row**. It was nearly declared sourceless, which is the DA2
+mistake exactly (Highway Detail's `RU Eff` was written off the same way and was sitting in
+`SHS Population.InventoryItemStartDate` all along). Search the layers before concluding a
+column has no source.
+
+**Deliberately unforgiving**, for the same reason as §9k: values compare VERBATIM, keeping only
+the date render equivalence and the owner-ruled same-source render artifacts (OOXML escapes,
+edge tab padding). The vs-TSN crosswalks (the control-type J–P→S fold, the boolean 1/0
+reconciliation, numeric padding) are NOT applied. There is also **no Report View** — its replica
+classifies Int St / ML / CS Eff-Date as "soft", which is a TSN convention; between two TSMIS
+renders those dates must be identical, so carrying that classification here would excuse a real
+finding (the same reasoning the PDF-vs-Excel self-check uses).
+
+**Measured baseline** (both sides 2026-08-28, so vintage is not a factor): 15,177 paired,
+950 only-ArcGIS, 1,197 only-TSMIS, **8,862 differing cells**. Thirty-three of thirty-six columns
+sit at or below 1.3%, twelve of them at 0.0%. The three that carry the residual are `ML Eff-Date`
+(11.8%), `R/U` (8.7%) and `HG` (5.6%) — and the ML/CS Eff-Date class is mostly the export
+printing a legacy default date where the layer holds a real one, which is a finding about the
+report rather than a gap in the build. That distinction is the whole reason this lane exists.
+
+Pinned by `build/check_arcgis_report_intersection.py` (synthetic library end-to-end: the row
+universe, both leg rules, the per-column carry rule, the position contract, the role gates, and
+the registry's required surface for every registered report).
+
 ---
 
 ## 10. Internal mechanics (quick reference)

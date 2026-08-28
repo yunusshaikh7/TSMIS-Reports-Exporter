@@ -109,54 +109,60 @@ class GuiArcgisMixin:
     # Reports vs layers (v0.39.0) — the same library rendered as a report
     # ------------------------------------------------------------------ #
     @_api_method
-    def arcgis_report_status(self):
-        """The Reports sub-tab's one status payload: the report's OWN source
-        table (with its as-of date), our built report, and the export days
-        available as the TSMIS side. Pure filesystem; no task lock.
+    def arcgis_report_status(self, report=None):
+        """The Reports sub-tab's one status payload for `report`: the report's
+        OWN source table (with its as-of date) where it builds one, our built
+        report, and the export days available as the TSMIS side. Pure
+        filesystem; no task lock.
 
-        `source` is this report's own build (v0.39.2), not the Clean Road
-        workbook — the report no longer reads that. The key name is unchanged so
-        the sub-tab's status card keeps working."""
-        import arcgis_report_highway_detail as ah
-        import consolidate_highway_detail as chd
-        import paths
+        `source` is the report's own intermediate build where it has one
+        (Highway Detail's CA HIGHWAYS source table, v0.39.2) — a point report
+        like Intersection Detail builds in a single pass and reports none, so
+        the key is absent rather than falsely empty."""
+        import arcgis_reports
 
-        src_path = ah.OUT_DIR / ah.SOURCE_TABLE
-        source = {"exists": src_path.is_file(), "path": str(src_path)}
-        if source["exists"]:
-            source.update(self._arcgis_built_marker(src_path))
-        built = {"exists": ah.OUT_PATH.is_file(), "path": str(ah.OUT_PATH)}
+        key = (report or "").strip() or arcgis_reports.DEFAULT_KEY
+        if not arcgis_reports.is_report(key):
+            return {"error": f"Unknown report {key!r}."}
+        _label, build_mod, _cmp, _exports = arcgis_reports.resolve(key)
+
+        out = {"reports": arcgis_reports.labels(), "report": key,
+               "days": arcgis_reports.export_days(key),
+               "out_dir": str(build_mod.OUT_DIR)}
+        source_table = getattr(build_mod, "SOURCE_TABLE", None)
+        if source_table:
+            src_path = build_mod.OUT_DIR / source_table
+            source = {"exists": src_path.is_file(), "path": str(src_path)}
+            if source["exists"]:
+                source.update(self._arcgis_built_marker(src_path))
+            out["source"] = source
+        built = {"exists": build_mod.OUT_PATH.is_file(),
+                 "path": str(build_mod.OUT_PATH)}
         if built["exists"]:
             try:
-                built.update(ah.report_facts(ah.OUT_PATH))
+                built.update(build_mod.report_facts(build_mod.OUT_PATH))
             except Exception as e:      # silent-ok: a status-card probe; unreadable facts read as unknown and the build/compare paths still gate hard
                 ui_log.info("arcgis report: marker unreadable (%s: %s)",
                             type(e).__name__, e)
-        days = []
-        for day in paths.list_output_days_for_report(chd.SUBDIR):
-            p = chd.out_path_for(day)
-            if p and Path(p).is_file():
-                days.append({"day": day, "path": str(p)})
-        return {
-            "reports": [{"key": "highway_detail", "label": "Highway Detail"}],
-            "source": source,
-            "built": built,
-            "days": days,
-            "out_dir": str(ah.OUT_DIR),
-        }
+        out["built"] = built
+        return out
 
     @_api_method
-    def start_arcgis_report_build(self, asof=None):
-        """Build Highway Detail FROM THE LAYERS (v0.39.2 — it no longer needs,
-        or reads, the Clean Road build). `asof` is the reconstruction date:
+    def start_arcgis_report_build(self, report=None, asof=None):
+        """Build `report` FROM THE LAYERS. `asof` is the reconstruction date:
         set it to the export day you mean to compare against, or the comparison
         measures network change instead of correctness. Empty resolves the same
         way the Clean Road build's does, from the staged TSN extract.
 
         The destination is app-owned (output/arcgis_reports) and a rebuild
         replaces it by design."""
-        import arcgis_report_highway_detail as ah
+        import arcgis_reports
         import clean_road_layers as crl
+
+        key = (report or "").strip() or arcgis_reports.DEFAULT_KEY
+        if not arcgis_reports.is_report(key):
+            return {"error": f"Unknown report {key!r}."}
+        label, build_mod, _cmp, _exports = arcgis_reports.resolve(key)
 
         missing = crl.inventory().get("missing") or []
         if missing:
@@ -168,52 +174,54 @@ class GuiArcgisMixin:
         if err:
             return err
         self.cancel_event.clear()
-        self._emit_log(f"Starting ArcGIS report build: {ah.REPORT_NAME}")
+        self._emit_log(f"Starting ArcGIS report build: {build_mod.REPORT_NAME}")
         self._set_dot("busy", "Building the report from the layers…")
         self._emit({"t": "run_started", "mode": "consolidate",
-                    "label": "Building Highway Detail from the ArcGIS layers"
+                    "label": f"Building {label} from the ArcGIS layers"
                              + (f" as of {asof}…" if asof else "…")})
         self._push_state()
-        ConsolidateWorker(functools.partial(ah.consolidate, asof=asof),
+        ConsolidateWorker(functools.partial(build_mod.consolidate, asof=asof),
                           self._gated_queue(), self.cancel_event,
                           lambda _p: True).start()
         return {"ok": True}
 
     @_api_method
-    def start_arcgis_report_compare(self, day=None, want_formulas=True,
-                                    want_values=True):
-        """Compare our ArcGIS-built Highway Detail against the consolidated
-        TSMIS export for `day`. The save dialog owns the destination."""
-        import arcgis_report_highway_detail as ah
-        import compare_highway_detail_arcgis as cmp_arc
-        import consolidate_highway_detail as chd
+    def start_arcgis_report_compare(self, report=None, day=None,
+                                    want_formulas=True, want_values=True):
+        """Compare our ArcGIS-built `report` against the consolidated TSMIS
+        export for `day`. The save dialog owns the destination."""
+        import arcgis_reports
         import paths
 
-        if not ah.OUT_PATH.is_file():
-            return {"error": "Build the Highway Detail report from the layers "
-                             "first — the comparison reads it as the ArcGIS side."}
+        key = (report or "").strip() or arcgis_reports.DEFAULT_KEY
+        if not arcgis_reports.is_report(key):
+            return {"error": f"Unknown report {key!r}."}
+        label, build_mod, cmp_arc, _exports = arcgis_reports.resolve(key)
+
+        if not build_mod.OUT_PATH.is_file():
+            return {"error": f"Build the {label} report from the layers first — "
+                             "the comparison reads it as the ArcGIS side."}
         day = (day or "").strip()
-        if day not in paths.list_output_days_for_report(chd.SUBDIR):
-            return {"error": "Pick an export day that has a Highway Detail export."}
-        tsmis = chd.out_path_for(day)
-        if not (tsmis and Path(tsmis).is_file()):
-            return {"error": f"{day} has no CONSOLIDATED Highway Detail workbook "
-                             "yet — consolidate that day first (Consolidate tab)."}
+        tsmis = arcgis_reports.export_path(key, day) if day else None
+        if tsmis is None:
+            return {"error": f"Pick an export day that has a consolidated "
+                             f"{label} workbook. If the day you want isn't "
+                             "listed, consolidate it first (Consolidate tab)."}
         mode = self._compare_mode(want_formulas, want_values)
         if mode is None:
             return {"error": "Tick at least one output (values and/or live "
                              "formulas)."}
 
         def build(out_path, events=None, confirm_overwrite=None, day=None):
-            return cmp_arc.compare(str(ah.OUT_PATH), str(tsmis), out_path,
+            return cmp_arc.compare(str(build_mod.OUT_PATH), str(tsmis), out_path,
                                    events=events,
                                    confirm_overwrite=confirm_overwrite, mode=mode)
 
         return self._begin_compare(
-            f"Highway Detail — ArcGIS vs TSMIS {day}", mode,
+            f"{label} — ArcGIS vs TSMIS {day}", mode,
             paths.arcgis_comparisons_dir(),
-            lambda: cmp_arc.suggest_name(ah.OUT_PATH), build,
-            source_paths=(ah.OUT_PATH, Path(tsmis)))
+            lambda: cmp_arc.suggest_name(build_mod.OUT_PATH), build,
+            source_paths=(build_mod.OUT_PATH, tsmis))
 
     @_api_method
     def open_arcgis_reports_folder(self):

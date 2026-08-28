@@ -66,7 +66,17 @@ _DYNAMIC_REPORT_MODULES = ("matrix", "day_matrix", "pdf_excel_matrix",
                            "compare_highway_sequence_pdf",
                            "evidence_ramp_detail",
                            "consolidate_tsmis_ramp_detail_pdf",
-                           "compare_ramp_detail_pdf")
+                           "compare_ramp_detail_pdf",
+                           # The ArcGIS "Reports vs layers" lane: every module
+                           # here is imported INSIDE a GUI endpoint, so nothing
+                           # else in the frozen bundle proves it resolves. The
+                           # registry pulls each report's build + comparator
+                           # behind it, and those pull the clean-road substrate.
+                           "arcgis_reports",
+                           "arcgis_report_highway_detail",
+                           "compare_highway_detail_arcgis",
+                           "arcgis_report_intersection_detail",
+                           "compare_intersection_detail_arcgis")
 
 
 def run(emit=None):
