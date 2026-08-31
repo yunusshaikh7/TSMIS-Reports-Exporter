@@ -1,8 +1,8 @@
 # `RB-5` — Implementation Record
 
-Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**.
+Status: **JOINTLY APPROVED**.
 
-Codex approved correction runtime 0d54799a108d944280ffb7a092260cae59778f76 on 2026-08-31; see [REVIEW.md](REVIEW.md). Both returns are closed with explicit limitations. Historical implementation facts follow.
+Codex approved correction runtime 0d54799a108d944280ffb7a092260cae59778f76 on 2026-08-31; see [REVIEW.md](REVIEW.md). Both returns are closed with explicit limitations. Separate Codex Review 2 approved the same runtime with RB5-R2-FU-001 carried under the two-denial ceiling. Historical implementation facts follow.
 
 > **`RB5-R1-001` is FIXED (2026-08-31).** The finding was correct and it
 > reproduced exactly: normalization bound the wrong duplicate occurrence, so

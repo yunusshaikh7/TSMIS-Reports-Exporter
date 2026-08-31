@@ -1,0 +1,6010 @@
+{
+  "bundle": "RB-5",
+  "reviewer": "Codex",
+  "review_number": 2,
+  "reviewer_is_implementer": false,
+  "base": "87e368c3e9a7eaf26395308e8ddea4aba7d303e5",
+  "runtime_head": "0d54799a108d944280ffb7a092260cae59778f76",
+  "entry_review_record_head": "03ad6b306313e9199acd159e0b6378e9a5ca3db2",
+  "started_utc": "2026-08-31T18:15:39.110000+00:00",
+  "signed_utc": "2026-08-31T18:32:36.909182+00:00",
+  "minutes_at_signature": 16.963,
+  "verdict": "APPROVED",
+  "policy": "Two-denial ceiling reached before this pass; RB5-R2-FU-001 is owner-ranked follow-up, not a third denial. Disclosed Clean Road formulas, validation and coverage limitations remain unclaimed.",
+  "bindings": {
+    "created_utc": "2026-08-31T18:20:11.055930+00:00",
+    "runtime_head": "03ad6b306313e9199acd159e0b6378e9a5ca3db2",
+    "review1_manifest": {
+      "path": "C:\\Users\\Yunus\\Projects\\wt-rb5\\docs\\planning\\post-comparison-perfection-output-audit\\hotfix-bundles\\RB-5\\witness\\review1-approval-verification.json",
+      "sha256": "1d54fbfd5a2875d1fd79c489bd7f2a2c8d1ffd711a12177530c43ca62229021e"
+    },
+    "bindings": [
+      {
+        "path": "C:\\Users\\Yunus\\Projects\\wt-rb5\\docs\\planning\\post-comparison-perfection-output-audit\\hotfix-bundles\\HF-06\\witness\\before-after-counts.json",
+        "expected_size": 4730,
+        "expected_sha256": "1d47c881665b99aef5b38537a378b885479be9a59666262a92ef2d5fe6cb7a31",
+        "exists": true,
+        "size": 4730,
+        "sha256": "1d47c881665b99aef5b38537a378b885479be9a59666262a92ef2d5fe6cb7a31",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Projects\\wt-rb5\\docs\\planning\\post-comparison-perfection-output-audit\\hotfix-bundles\\HF-06\\witness\\duplicate-occurrence-correction.json",
+        "expected_size": 5830,
+        "expected_sha256": "96ca7f4b35952b395fbcfcc09c90dd7ab5ca75af976b93f542a6b725b57d7573",
+        "exists": true,
+        "size": 5830,
+        "sha256": "96ca7f4b35952b395fbcfcc09c90dd7ab5ca75af976b93f542a6b725b57d7573",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Projects\\wt-rb5\\docs\\planning\\post-comparison-perfection-output-audit\\hotfix-bundles\\HF-06\\witness\\equate-relation-census.json",
+        "expected_size": 9108,
+        "expected_sha256": "b42a1dad0fc79b11f6736a9171148c7a8b2ac759948e5c7faf39fd23d21c651e",
+        "exists": true,
+        "size": 9108,
+        "sha256": "b42a1dad0fc79b11f6736a9171148c7a8b2ac759948e5c7faf39fd23d21c651e",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Projects\\wt-rb5\\docs\\planning\\post-comparison-perfection-output-audit\\hotfix-bundles\\HF-06\\witness\\installed-excel-recalc.json",
+        "expected_size": 2293,
+        "expected_sha256": "92d35570085d43feb099f7a1cddfd60fd07ddc984e312185b747878d5de9964b",
+        "exists": true,
+        "size": 2293,
+        "sha256": "92d35570085d43feb099f7a1cddfd60fd07ddc984e312185b747878d5de9964b",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Projects\\wt-rb5\\docs\\planning\\post-comparison-perfection-output-audit\\hotfix-bundles\\HF-09\\witness\\installed-excel-recalc.json",
+        "expected_size": 42636,
+        "expected_sha256": "593a4946fad3f5ade9fb8590c9132e6ee65c220e4e68449e0ac10dec9f49138a",
+        "exists": true,
+        "size": 42636,
+        "sha256": "593a4946fad3f5ade9fb8590c9132e6ee65c220e4e68449e0ac10dec9f49138a",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Projects\\wt-rb5\\docs\\planning\\post-comparison-perfection-output-audit\\hotfix-bundles\\HF-09\\witness\\representation-class-census.json",
+        "expected_size": 10978,
+        "expected_sha256": "5ac7e43dd6ad4f928d71525f692033dc6e138810ddf470ddd73aae148b13ada9",
+        "exists": true,
+        "size": 10978,
+        "sha256": "5ac7e43dd6ad4f928d71525f692033dc6e138810ddf470ddd73aae148b13ada9",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Projects\\wt-rb5\\docs\\planning\\post-comparison-perfection-output-audit\\hotfix-bundles\\RB-5\\witness\\review1-duplicate-occurrence.json",
+        "expected_size": 13130,
+        "expected_sha256": "3322aa5ed79789c4901499079763c37986fa2c238f04a3f1d01a3b7e2842064a",
+        "exists": true,
+        "size": 13130,
+        "sha256": "3322aa5ed79789c4901499079763c37986fa2c238f04a3f1d01a3b7e2842064a",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\hl_excel vs tsn (formulas).xlsx",
+        "expected_size": 256271826,
+        "expected_sha256": "bbee4b87d56553008e437fac4e62d8eddc2951184fce7f5169cfcf39ec5c1479",
+        "exists": true,
+        "size": 256271826,
+        "sha256": "bbee4b87d56553008e437fac4e62d8eddc2951184fce7f5169cfcf39ec5c1479",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\hl_excel vs tsn (formulas) [recalculated].xlsx",
+        "expected_size": 300003706,
+        "expected_sha256": "ec1d9c07b4468f6a379b50876639fdc27f0b11ec66124b346d1d76fdcbe61bf2",
+        "exists": true,
+        "size": 300003706,
+        "sha256": "ec1d9c07b4468f6a379b50876639fdc27f0b11ec66124b346d1d76fdcbe61bf2",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\hl_excel vs tsn.xlsx",
+        "expected_size": 99104342,
+        "expected_sha256": "c40315c80bc8f26096c749c788d2fec6ed52a75d067bbd2922fe3fffda43df39",
+        "exists": true,
+        "size": 99104342,
+        "sha256": "c40315c80bc8f26096c749c788d2fec6ed52a75d067bbd2922fe3fffda43df39",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\hl_pdf vs tsn (formulas).xlsx",
+        "expected_size": 258829965,
+        "expected_sha256": "afb7450f0d62d3886712ff281c63f14caea67115285114b9d50ac8b572164ac9",
+        "exists": true,
+        "size": 258829965,
+        "sha256": "afb7450f0d62d3886712ff281c63f14caea67115285114b9d50ac8b572164ac9",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\hl_pdf vs tsn (formulas) [recalculated].xlsx",
+        "expected_size": 303999285,
+        "expected_sha256": "a4a6b0feb553eea172fc2cdceaa3a05cec6e27d57b82522d8ec16764072ec739",
+        "exists": true,
+        "size": 303999285,
+        "sha256": "a4a6b0feb553eea172fc2cdceaa3a05cec6e27d57b82522d8ec16764072ec739",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\hl_pdf vs tsn.xlsx",
+        "expected_size": 98779734,
+        "expected_sha256": "5ae978eedb30894068d274d507c8705c8cc15b1328b617b3b89b4a09552168a8",
+        "exists": true,
+        "size": 98779734,
+        "sha256": "5ae978eedb30894068d274d507c8705c8cc15b1328b617b3b89b4a09552168a8",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\hsl_excel vs tsn (formulas).xlsx",
+        "expected_size": 58974673,
+        "expected_sha256": "c9d7ae85129fbf029e882d2368b6d67991cd10b693948aceb5dfe09f16053208",
+        "exists": true,
+        "size": 58974673,
+        "sha256": "c9d7ae85129fbf029e882d2368b6d67991cd10b693948aceb5dfe09f16053208",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\hsl_excel vs tsn (formulas) [recalculated].xlsx",
+        "expected_size": 76512975,
+        "expected_sha256": "141c762c59a8a24efd4e76dd5a9cda2bdbc91f21e1a7ffad1b8a0f73a513525c",
+        "exists": true,
+        "size": 76512975,
+        "sha256": "141c762c59a8a24efd4e76dd5a9cda2bdbc91f21e1a7ffad1b8a0f73a513525c",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\hsl_excel vs tsn.xlsx",
+        "expected_size": 36016059,
+        "expected_sha256": "df8868749119e6044d6d32030c31ea9ce15777b0813360d71c7df664f7b7ee85",
+        "exists": true,
+        "size": 36016059,
+        "sha256": "df8868749119e6044d6d32030c31ea9ce15777b0813360d71c7df664f7b7ee85",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\hsl_pdf vs tsn (formulas).xlsx",
+        "expected_size": 59373595,
+        "expected_sha256": "c5f20a7bcce3ea87549b274b86362fa82ce26381bc451dc8095918d2dd3d9e17",
+        "exists": true,
+        "size": 59373595,
+        "sha256": "c5f20a7bcce3ea87549b274b86362fa82ce26381bc451dc8095918d2dd3d9e17",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\hsl_pdf vs tsn (formulas) [recalculated].xlsx",
+        "expected_size": 76771237,
+        "expected_sha256": "5997f592f09877c1c02104e19c4d7bf136d743e5b5bb961b719fc25f1621ff65",
+        "exists": true,
+        "size": 76771237,
+        "sha256": "5997f592f09877c1c02104e19c4d7bf136d743e5b5bb961b719fc25f1621ff65",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\hsl_pdf vs tsn.xlsx",
+        "expected_size": 35975991,
+        "expected_sha256": "3146622dd611a6bf6122e6390e93c2e2f681ab8d1042d0bdf2b3c5c27449755d",
+        "exists": true,
+        "size": 35975991,
+        "sha256": "3146622dd611a6bf6122e6390e93c2e2f681ab8d1042d0bdf2b3c5c27449755d",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\id_excel vs tsn (formulas).xlsx",
+        "expected_size": 61089852,
+        "expected_sha256": "339a5cd420230400ac438d52fabb52995e21cb818d9d5911dc21d672de2787a1",
+        "exists": true,
+        "size": 61089852,
+        "sha256": "339a5cd420230400ac438d52fabb52995e21cb818d9d5911dc21d672de2787a1",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\id_excel vs tsn (formulas) [recalculated].xlsx",
+        "expected_size": 70697216,
+        "expected_sha256": "da269a15696d056f50365e7ef15bae951692cadcb6bc7b66e0b36a9b40c39522",
+        "exists": true,
+        "size": 70697216,
+        "sha256": "da269a15696d056f50365e7ef15bae951692cadcb6bc7b66e0b36a9b40c39522",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\id_excel vs tsn.xlsx",
+        "expected_size": 30638773,
+        "expected_sha256": "1e6ea0c241d4feeb5e250eee14dbacfc179f89ebc94f2939c1c1ce3c1b32b247",
+        "exists": true,
+        "size": 30638773,
+        "sha256": "1e6ea0c241d4feeb5e250eee14dbacfc179f89ebc94f2939c1c1ce3c1b32b247",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\id_pdf vs tsn (formulas).xlsx",
+        "expected_size": 61674896,
+        "expected_sha256": "e140e7cdacde0ff49b4ebfccdf9ec303886d732d7d35fe6f2d76e209add858e1",
+        "exists": true,
+        "size": 61674896,
+        "sha256": "e140e7cdacde0ff49b4ebfccdf9ec303886d732d7d35fe6f2d76e209add858e1",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\id_pdf vs tsn (formulas) [recalculated].xlsx",
+        "expected_size": 71233907,
+        "expected_sha256": "25184d80bc56cb647d8bc935beb3c455028e458662f46c1c2d551a19f96e5cfa",
+        "exists": true,
+        "size": 71233907,
+        "sha256": "25184d80bc56cb647d8bc935beb3c455028e458662f46c1c2d551a19f96e5cfa",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\id_pdf vs tsn.xlsx",
+        "expected_size": 30651747,
+        "expected_sha256": "1101c3ed8b13bdb43b26fd8160800201298576597e91c060eb4c83d5d1448385",
+        "exists": true,
+        "size": 30651747,
+        "sha256": "1101c3ed8b13bdb43b26fd8160800201298576597e91c060eb4c83d5d1448385",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\rd_pdf vs tsn (formulas).xlsx",
+        "expected_size": 20514829,
+        "expected_sha256": "29efb797a8a5e675749cc77bc5ea3f98b0ca4da601ce83a5862ff6cbd20e0944",
+        "exists": true,
+        "size": 20514829,
+        "sha256": "29efb797a8a5e675749cc77bc5ea3f98b0ca4da601ce83a5862ff6cbd20e0944",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\rd_pdf vs tsn (formulas) [recalculated].xlsx",
+        "expected_size": 26256873,
+        "expected_sha256": "6b506e4a27f9cd3dc90c4fee93f389dc4b17253dd8b04f5b618597f926df1380",
+        "exists": true,
+        "size": 26256873,
+        "sha256": "6b506e4a27f9cd3dc90c4fee93f389dc4b17253dd8b04f5b618597f926df1380",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\rd_pdf vs tsn.xlsx",
+        "expected_size": 11615210,
+        "expected_sha256": "cc6e1a2b834cafc165da93ce22ed023792506a246cb8606fabdfd0211b88df3f",
+        "exists": true,
+        "size": 11615210,
+        "sha256": "cc6e1a2b834cafc165da93ce22ed023792506a246cb8606fabdfd0211b88df3f",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\base\\_state\\.cmpv3-467d435fe6686552-000000-9027b1114ef1052c.comparison-payload.zlib",
+        "expected_size": 134427,
+        "expected_sha256": "9027b1114ef1052cb2f0866b83bf4b0bce82e3ef274f4597b672e4a3cc7d04fb",
+        "exists": true,
+        "size": 134427,
+        "sha256": "9027b1114ef1052cb2f0866b83bf4b0bce82e3ef274f4597b672e4a3cc7d04fb",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\base\\highway_sequence_pdf pdf-vs-excel.xlsx",
+        "expected_size": 34913272,
+        "expected_sha256": "9ace82b56d23ce9c64eb3328559f82cf79582a7f4f1f9a7bfa20fa2c8add3358",
+        "exists": true,
+        "size": 34913272,
+        "sha256": "9ace82b56d23ce9c64eb3328559f82cf79582a7f4f1f9a7bfa20fa2c8add3358",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\everything\\comparisons\\tsn\\_state\\.cmpv3-225b92d7bd5155a4-000000-dbb0fa82c972103c.comparison-payload.zlib",
+        "expected_size": 130137,
+        "expected_sha256": "dbb0fa82c972103cfa9f0103088e4ba3d90e55dc1b9e12843d71d5bdeb61e053",
+        "exists": true,
+        "size": 130137,
+        "sha256": "dbb0fa82c972103cfa9f0103088e4ba3d90e55dc1b9e12843d71d5bdeb61e053",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\everything\\comparisons\\tsn\\2026-07-23 ssor-prod_highway_sequence_pdf_vs_excel.xlsx",
+        "expected_size": 34860599,
+        "expected_sha256": "e77f3553d4445a44031689ce3dcffc06d5a6ae9dc00756414b390ee8f91a02c0",
+        "exists": true,
+        "size": 34860599,
+        "sha256": "e77f3553d4445a44031689ce3dcffc06d5a6ae9dc00756414b390ee8f91a02c0",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\head\\_state\\.cmpv3-225b92d7bd5155a4-000000-dbb0fa82c972103c.comparison-payload.zlib",
+        "expected_size": 130137,
+        "expected_sha256": "dbb0fa82c972103cfa9f0103088e4ba3d90e55dc1b9e12843d71d5bdeb61e053",
+        "exists": true,
+        "size": 130137,
+        "sha256": "dbb0fa82c972103cfa9f0103088e4ba3d90e55dc1b9e12843d71d5bdeb61e053",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\head\\highway_sequence_pdf pdf-vs-excel.xlsx",
+        "expected_size": 34860526,
+        "expected_sha256": "92ded7a078ec9f034b306ce100946e29ec59419667bc108f666b0c57b5c820c9",
+        "exists": true,
+        "size": 34860526,
+        "sha256": "92ded7a078ec9f034b306ce100946e29ec59419667bc108f666b0c57b5c820c9",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\head-r2\\_state\\.cmpv3-f6eecb9c58094aea-000000-a19894314d14a9fa.comparison-payload.zlib",
+        "expected_size": 131182,
+        "expected_sha256": "a19894314d14a9faf2ede88f7e68826509745089e6a094ae56e4230470e80d28",
+        "exists": true,
+        "size": 131182,
+        "sha256": "a19894314d14a9faf2ede88f7e68826509745089e6a094ae56e4230470e80d28",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\head-r2\\highway_sequence_pdf pdf-vs-excel.xlsx",
+        "expected_size": 34862613,
+        "expected_sha256": "b312b61c46b9654373aa4c373a1e476085bd6bd37768bc1e0b1c4ffad106aa6a",
+        "exists": true,
+        "size": 34862613,
+        "sha256": "b312b61c46b9654373aa4c373a1e476085bd6bd37768bc1e0b1c4ffad106aa6a",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\head-r3\\_state\\.cmpv3-225b92d7bd5155a4-000000-dbb0fa82c972103c.comparison-payload.zlib",
+        "expected_size": 130137,
+        "expected_sha256": "dbb0fa82c972103cfa9f0103088e4ba3d90e55dc1b9e12843d71d5bdeb61e053",
+        "exists": true,
+        "size": 130137,
+        "sha256": "dbb0fa82c972103cfa9f0103088e4ba3d90e55dc1b9e12843d71d5bdeb61e053",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\head-r3\\highway_sequence_pdf pdf-vs-excel.xlsx",
+        "expected_size": 34860672,
+        "expected_sha256": "e802b1c3b2561edca65e63bdb89dd4ebe6d08547ffb4afc1b52b364c2d5fb395",
+        "exists": true,
+        "size": 34860672,
+        "sha256": "e802b1c3b2561edca65e63bdb89dd4ebe6d08547ffb4afc1b52b364c2d5fb395",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\excel-recalc\\hsl-self (formulas).xlsx",
+        "expected_size": 72326874,
+        "expected_sha256": "0d5503720a71f545bda7f0cd91d674d66f4533f70117fddd42d9a5588da8d7e8",
+        "exists": true,
+        "size": 72326874,
+        "sha256": "0d5503720a71f545bda7f0cd91d674d66f4533f70117fddd42d9a5588da8d7e8",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\excel-recalc\\hsl-self (values).xlsx",
+        "expected_size": 34860565,
+        "expected_sha256": "b3fa29cdfc230bd26359074fb1ed8510423125bc94cc2badc97686dc2a9cebf9",
+        "exists": true,
+        "size": 34860565,
+        "sha256": "b3fa29cdfc230bd26359074fb1ed8510423125bc94cc2badc97686dc2a9cebf9",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\.codex\\worktrees\\76ed\\wt-rb5\\.review-rb5\\correction-probe\\original-witness-order (values).xlsx",
+        "expected_size": 25735,
+        "expected_sha256": "86af01913f76bdbeebe39bac677e4956248d97d2641c770a315faa4e2a93a8b4",
+        "exists": true,
+        "size": 25735,
+        "sha256": "86af01913f76bdbeebe39bac677e4956248d97d2641c770a315faa4e2a93a8b4",
+        "matches": true
+      },
+      {
+        "path": "C:\\Users\\Yunus\\.codex\\worktrees\\76ed\\wt-rb5\\.review-rb5\\correction-probe\\original-witness-order.xlsx",
+        "expected_size": 27744,
+        "expected_sha256": "81a121e3f558f8ccc7a9638df2239dc153da1bde052cc9d97409265403d4a6c7",
+        "exists": true,
+        "size": 27744,
+        "sha256": "81a121e3f558f8ccc7a9638df2239dc153da1bde052cc9d97409265403d4a6c7",
+        "matches": true
+      }
+    ],
+    "mismatches": [],
+    "hf09_cases_retained_review1": {
+      "hl_excel": {
+        "artifact_bindings_ok": true,
+        "headline_agree": true,
+        "per_field_agree": true,
+        "class_count": 1243,
+        "class_agree": true,
+        "self_checks_clean": true,
+        "cached_errors": 0,
+        "disk_recalc_headline_agree": true,
+        "disk_recalc_per_field_agree": true,
+        "typed_counts": {
+          "differing_cells": 84709,
+          "differing_rows": 38478,
+          "paired_rows": 49195,
+          "side_a_only_rows": 3626,
+          "side_b_only_rows": 10888
+        }
+      },
+      "hl_pdf": {
+        "artifact_bindings_ok": true,
+        "headline_agree": true,
+        "per_field_agree": true,
+        "class_count": 1243,
+        "class_agree": true,
+        "self_checks_clean": true,
+        "cached_errors": 0,
+        "disk_recalc_headline_agree": true,
+        "disk_recalc_per_field_agree": true,
+        "typed_counts": {
+          "differing_cells": 84202,
+          "differing_rows": 38931,
+          "paired_rows": 49829,
+          "side_a_only_rows": 2978,
+          "side_b_only_rows": 10254
+        }
+      },
+      "hsl_excel": {
+        "artifact_bindings_ok": true,
+        "headline_agree": true,
+        "per_field_agree": true,
+        "class_count": 12,
+        "class_agree": true,
+        "self_checks_clean": true,
+        "cached_errors": 0,
+        "disk_recalc_headline_agree": true,
+        "disk_recalc_per_field_agree": true,
+        "typed_counts": {
+          "differing_cells": 28450,
+          "differing_rows": 22554,
+          "paired_rows": 57050,
+          "side_a_only_rows": 3204,
+          "side_b_only_rows": 12754
+        }
+      },
+      "hsl_pdf": {
+        "artifact_bindings_ok": true,
+        "headline_agree": true,
+        "per_field_agree": true,
+        "class_count": 12,
+        "class_agree": true,
+        "self_checks_clean": true,
+        "cached_errors": 0,
+        "disk_recalc_headline_agree": true,
+        "disk_recalc_per_field_agree": true,
+        "typed_counts": {
+          "differing_cells": 27601,
+          "differing_rows": 22728,
+          "paired_rows": 57483,
+          "side_a_only_rows": 2771,
+          "side_b_only_rows": 12321
+        }
+      },
+      "id_excel": {
+        "artifact_bindings_ok": true,
+        "headline_agree": true,
+        "per_field_agree": true,
+        "class_count": 1,
+        "class_agree": true,
+        "self_checks_clean": true,
+        "cached_errors": 0,
+        "disk_recalc_headline_agree": true,
+        "disk_recalc_per_field_agree": true,
+        "typed_counts": {
+          "differing_cells": 5092,
+          "differing_rows": 2816,
+          "paired_rows": 16199,
+          "side_a_only_rows": 260,
+          "side_b_only_rows": 427
+        }
+      },
+      "id_pdf": {
+        "artifact_bindings_ok": true,
+        "headline_agree": true,
+        "per_field_agree": true,
+        "class_count": 1,
+        "class_agree": true,
+        "self_checks_clean": true,
+        "cached_errors": 0,
+        "disk_recalc_headline_agree": true,
+        "disk_recalc_per_field_agree": true,
+        "typed_counts": {
+          "differing_cells": 5092,
+          "differing_rows": 2816,
+          "paired_rows": 16199,
+          "side_a_only_rows": 260,
+          "side_b_only_rows": 427
+        }
+      },
+      "rd_pdf": {
+        "artifact_bindings_ok": true,
+        "headline_agree": true,
+        "per_field_agree": true,
+        "class_count": 3,
+        "class_agree": true,
+        "self_checks_clean": true,
+        "cached_errors": 0,
+        "disk_recalc_headline_agree": true,
+        "disk_recalc_per_field_agree": true,
+        "typed_counts": {
+          "differing_cells": 619,
+          "differing_rows": 468,
+          "paired_rows": 15204,
+          "side_a_only_rows": 9,
+          "side_b_only_rows": 206
+        }
+      },
+      "clean_road": {
+        "status": "BLOCKED - measured hardware limit, not a product result",
+        "acceptance_unclaimed": true
+      }
+    },
+    "hf09_typed_parity_retained_review1": {
+      "clean_road_highway vs tsn.xlsx.outcome.json": {
+        "base_head_equal": true,
+        "head": {
+          "counts": {
+            "asserted_cells": 2578656,
+            "context_cells": 1315890,
+            "differing_cells": 281393,
+            "differing_rows": 48942,
+            "known": true,
+            "paired_rows": 52629,
+            "per_field_counts": {
+              "0:THY_ID": 0,
+              "10:THY_COUNTY_CODE": 0,
+              "11:THY_ROUTE_NAME": 0,
+              "12:THY_ROUTE_SUFFIX_CODE": 0,
+              "13:THY_PM_PREFIX_CODE": 0,
+              "15:THY_END_PM_AMT": 6829,
+              "16:THY_PM_SUFFIX_CODE": 0,
+              "17:THY_LENGTH_MILES_AMT": 6829,
+              "18:THY_LEFT_ROAD_EFF_DATE": 21486,
+              "19:THY_LT_SURF_TYPE_CODE": 4758,
+              "1:THY_ELEMENT_ID": 0,
+              "20:THY_LT_LANES_AMT": 5925,
+              "21:THY_LT_SPEC_FEATURES_CODE": 4427,
+              "22:THY_LT_O_SHD_TOT_WIDTH_AMT": 6385,
+              "23:THY_LT_O_SHD_TRT_WIDTH_AMT": 6328,
+              "24:THY_LT_TRAV_WAY_WIDTH_AMT": 6788,
+              "25:THY_LT_I_SHD_TOT_WIDTH_AMT": 6363,
+              "26:THY_LT_I_SHD_TRT_WIDTH_AMT": 6425,
+              "27:THY_LT_SIG_CHG_IND": 0,
+              "28:THY_MEDIAN_EFF_DATE": 19982,
+              "29:THY_MEDIAN_TYPE_CODE": 6709,
+              "2:THY_BEGIN_OFFSET_AMT": 0,
+              "30:THY_CURB_LANDSCAPE_CODE": 2981,
+              "31:THY_MEDIAN_BARRIER_CODE": 5636,
+              "32:THY_MEDIAN_WIDTH_AMT": 8469,
+              "33:THY_MEDIAN_WIDTH_VAR_CODE": 3499,
+              "34:THY_MEDIAN_SIG_CHG_IND": 0,
+              "35:THY_RIGHT_ROAD_EFF_DATE": 21454,
+              "36:THY_RT_SURF_TYPE_CODE": 3969,
+              "37:THY_RT_LANES_AMT": 5576,
+              "38:THY_RT_SPEC_FEATURES_CODE": 4215,
+              "39:THY_RT_I_SHD_TOT_WIDTH_AMT": 5776,
+              "3:THY_END_OFFSET_AMT": 0,
+              "40:THY_RT_I_SHD_TRT_WIDTH_AMT": 5813,
+              "41:THY_RT_TRAV_WAY_WIDTH_AMT": 6464,
+              "42:THY_RT_O_SHD_TOT_WIDTH_AMT": 5442,
+              "43:THY_RT_O_SHD_TRT_WIDTH_AMT": 5358,
+              "44:THY_RT_SIG_CHG_IND": 0,
+              "45:THY_CITY_CODE": 1840,
+              "46:THY_HIGHWAY_GROUP_CODE": 2528,
+              "47:THY_HIGHWAY_ACCESS_CODE": 2735,
+              "48:THY_ACCESS_EFF_DATE": 7931,
+              "49:THY_ACCESS_SIG_CHG_IND": 0,
+              "4:THY_BEGIN_DATE": 0,
+              "50:THY_TERRAIN_CODE": 1650,
+              "51:THY_DESIGN_SPEED_AMT": 1999,
+              "52:THY_NON_ADD_CODE": 136,
+              "53:THY_PROFILE_CODE": 2104,
+              "54:THY_ADT_AMT": 35825,
+              "55:THY_CHANGE_PER_MILE_AMT": 23111,
+              "56:THY_LANDMARK_SHORT_DESC": 1652,
+              "57:THY_POPULATION_CODE": 2589,
+              "58:THY_POPULATION_GROUP_CODE": 0,
+              "59:THY_LAST_SIG_CHG_DATE": 0,
+              "5:THY_END_DATE": 0,
+              "60:THY_RECORD_DATE": 4,
+              "61:THY_FUNCTIONAL_CLASS_CODE": 0,
+              "62:THY_UPDATE_DATE": 0,
+              "63:THY_UPDATE_USER_NAME": 0,
+              "64:THY_MAINT_SVC_LVL_CODE": 0,
+              "65:THY_EQUATE_CODE": 437,
+              "66:THY_BREAK_DESC": 1410,
+              "67:THY_FEDERAL_AID_CODE": 0,
+              "68:THY_FA_ROUTE_PREFIX_CODE": 0,
+              "69:THY_FA_ROUTE_NAME": 0,
+              "6:THY_CREATE_DATE": 0,
+              "70:THY_TOLL_FOREST_CODE": 1271,
+              "71:THY_NATIONAL_LANDS_CODE": 0,
+              "72:THY_SCENIC_FREEWAY_CODE": 0,
+              "73:THY_EXTRACT_DATE": 0,
+              "74:THY_POPULATION_EFF_DATE": 0,
+              "7:THY_CREATE_USER_NAME": 0,
+              "8:THY_SEG_ORDER_ID": 92,
+              "9:THY_DISTRICT_CODE": 193
+            },
+            "side_a_only_rows": 5113,
+            "side_b_only_rows": 7454
+          },
+          "completion": "partial",
+          "verdict": "diff",
+          "status": "ok",
+          "pairing_quality": "exact",
+          "payload_digest_ok": true
+        }
+      },
+      "hl_excel vs tsn.xlsx.outcome.json": {
+        "base_head_equal": true,
+        "head": {
+          "counts": {
+            "asserted_cells": 1463383,
+            "context_cells": 12467,
+            "differing_cells": 84709,
+            "differing_rows": 38478,
+            "known": true,
+            "paired_rows": 49195,
+            "per_field_counts": {
+              "10:LB ST [LB T]": 2744,
+              "11:LB # Lns [LB Lns]": 837,
+              "12:LB SF [LB F]": 2912,
+              "13:LB OT-SH Total [LB OT]": 3693,
+              "14:LB OT-SH Treated [LB TR]": 3279,
+              "15:LB T-W Wid [LB T-W]": 2465,
+              "16:LB IN-SH Total [LB IN]": 962,
+              "17:LB IN-SH Treated [LB SH]": 1013,
+              "18:Med TY/CL/BA [Med TCB]": 4077,
+              "19:Med Wid/Var [Med Wid]": 992,
+              "1:Length (MI) [MI]": 7789,
+              "20:RB ST [RB T]": 570,
+              "21:RB # Lns [RB Lns]": 662,
+              "22:RB SF [RB F]": 2648,
+              "23:RB IN-SH Total [RB IN]": 794,
+              "24:RB IN-SH Treated [RB SH]": 816,
+              "25:RB T-W Wid [RB T-W]": 836,
+              "26:RB OT-SH Total [RB OT]": 775,
+              "27:RB OT-SH Treated [RB SH]": 728,
+              "28:Description": 2723,
+              "29:Date of Rec": 951,
+              "2:NA [N/A]": 96,
+              "30:Sig Chg. Date": 18051,
+              "3:Cnty Odom": 21949,
+              "4:City": 545,
+              "5:RU [R/U]": 301,
+              "6:SPD": 246,
+              "7:TER": 304,
+              "8:HG [H/G]": 587,
+              "9:AC [A/C]": 364
+            },
+            "side_a_only_rows": 3626,
+            "side_b_only_rows": 10888
+          },
+          "completion": "complete",
+          "verdict": "diff",
+          "status": "ok",
+          "pairing_quality": "exact",
+          "payload_digest_ok": true
+        }
+      },
+      "hl_pdf vs tsn.xlsx.outcome.json": {
+        "base_head_equal": true,
+        "head": {
+          "counts": {
+            "asserted_cells": 1482027,
+            "context_cells": 12843,
+            "differing_cells": 84202,
+            "differing_rows": 38931,
+            "known": true,
+            "paired_rows": 49829,
+            "per_field_counts": {
+              "10:LB ST [LB T]": 2608,
+              "11:LB # Lns [LB Lns]": 747,
+              "12:LB SF [LB F]": 2849,
+              "13:LB OT-SH Total [LB OT]": 3699,
+              "14:LB OT-SH Treated [LB TR]": 3233,
+              "15:LB T-W Wid [LB T-W]": 2417,
+              "16:LB IN-SH Total [LB IN]": 968,
+              "17:LB IN-SH Treated [LB SH]": 971,
+              "18:Med TY/CL/BA [Med TCB]": 4139,
+              "19:Med Wid/Var [Med Wid]": 995,
+              "1:Length (MI) [MI]": 7616,
+              "20:RB ST [RB T]": 580,
+              "21:RB # Lns [RB Lns]": 682,
+              "22:RB SF [RB F]": 2668,
+              "23:RB IN-SH Total [RB IN]": 791,
+              "24:RB IN-SH Treated [RB SH]": 812,
+              "25:RB T-W Wid [RB T-W]": 859,
+              "26:RB OT-SH Total [RB OT]": 777,
+              "27:RB OT-SH Treated [RB SH]": 729,
+              "28:Description": 2827,
+              "29:Date of Rec": 955,
+              "2:NA [N/A]": 96,
+              "30:Sig Chg. Date": 18250,
+              "3:Cnty Odom": 22425,
+              "4:City": 518,
+              "5:RU [R/U]": 98,
+              "6:SPD": 248,
+              "7:TER": 100,
+              "8:HG [H/G]": 384,
+              "9:AC [A/C]": 161
+            },
+            "side_a_only_rows": 2978,
+            "side_b_only_rows": 10254
+          },
+          "completion": "complete",
+          "verdict": "diff",
+          "status": "ok",
+          "pairing_quality": "exact",
+          "payload_digest_ok": true
+        }
+      },
+      "hsl_excel vs tsn.xlsx.outcome.json": {
+        "base_head_equal": true,
+        "head": {
+          "counts": {
+            "asserted_cells": 342300,
+            "context_cells": 0,
+            "differing_cells": 28450,
+            "differing_rows": 22554,
+            "known": true,
+            "paired_rows": 57050,
+            "per_field_counts": {
+              "0:County": 0,
+              "2:City": 15018,
+              "3:HG": 906,
+              "4:FT": 690,
+              "5:Distance To Next Point": 6953,
+              "6:Description": 4883
+            },
+            "side_a_only_rows": 3204,
+            "side_b_only_rows": 12754
+          },
+          "completion": "complete",
+          "verdict": "diff",
+          "status": "ok",
+          "pairing_quality": "exact",
+          "payload_digest_ok": true
+        }
+      },
+      "hsl_pdf vs tsn.xlsx.outcome.json": {
+        "base_head_equal": true,
+        "head": {
+          "counts": {
+            "asserted_cells": 344898,
+            "context_cells": 0,
+            "differing_cells": 27601,
+            "differing_rows": 22728,
+            "known": true,
+            "paired_rows": 57483,
+            "per_field_counts": {
+              "0:County": 0,
+              "2:City": 15130,
+              "3:HG": 459,
+              "4:FT": 82,
+              "5:Distance To Next Point": 7038,
+              "6:Description": 4892
+            },
+            "side_a_only_rows": 2771,
+            "side_b_only_rows": 12321
+          },
+          "completion": "complete",
+          "verdict": "diff",
+          "status": "ok",
+          "pairing_quality": "exact",
+          "payload_digest_ok": true
+        }
+      },
+      "id_excel vs tsn.xlsx.outcome.json": {
+        "base_head_equal": true,
+        "head": {
+          "counts": {
+            "asserted_cells": 550766,
+            "context_cells": 0,
+            "differing_cells": 5092,
+            "differing_rows": 2816,
+            "known": true,
+            "paired_rows": 16199,
+            "per_field_counts": {
+              "0:PR": 0,
+              "10:INT Type": 1,
+              "11:Control Type Eff-Date": 4,
+              "12:Control Type": 1,
+              "13:Lighting Eff-Date": 4,
+              "14:Lighting": 0,
+              "15:ML Eff-Date": 1969,
+              "16:ML Mastarm": 199,
+              "17:ML Left Chan": 204,
+              "18:ML Right Chan": 190,
+              "19:ML Traffic Flow": 189,
+              "1:Route Suffix": 0,
+              "20:ML Num Lanes": 186,
+              "21:Description": 4,
+              "22:Main Line Length": 230,
+              "23:CS Eff-Date": 509,
+              "24:CS Mastarm": 155,
+              "25:CS Left Chan": 153,
+              "26:CS Right Chan": 181,
+              "27:CS Traffic Flow": 155,
+              "28:CS Num Lanes": 151,
+              "29:Int St Eff-Date": 104,
+              "30:Intrte Route": 0,
+              "31:Intrte PM Prefix": 0,
+              "32:Intrte Postmile": 0,
+              "33:Intrte PM Suffix": 0,
+              "34:Xing Line Lgth": 176,
+              "3:District": 0,
+              "4:County": 0,
+              "5:Date of Record": 4,
+              "6:HG": 171,
+              "7:City Code": 110,
+              "8:R/U": 38,
+              "9:INT Type Eff-Date": 4
+            },
+            "side_a_only_rows": 260,
+            "side_b_only_rows": 427
+          },
+          "completion": "complete",
+          "verdict": "diff",
+          "status": "ok",
+          "pairing_quality": "exact",
+          "payload_digest_ok": true
+        }
+      },
+      "id_pdf vs tsn.xlsx.outcome.json": {
+        "base_head_equal": true,
+        "head": {
+          "counts": {
+            "asserted_cells": 550766,
+            "context_cells": 0,
+            "differing_cells": 5092,
+            "differing_rows": 2816,
+            "known": true,
+            "paired_rows": 16199,
+            "per_field_counts": {
+              "0:PR": 0,
+              "10:INT Type": 1,
+              "11:Control Type Eff-Date": 4,
+              "12:Control Type": 1,
+              "13:Lighting Eff-Date": 4,
+              "14:Lighting": 0,
+              "15:ML Eff-Date": 1969,
+              "16:ML Mastarm": 199,
+              "17:ML Left Chan": 204,
+              "18:ML Right Chan": 190,
+              "19:ML Traffic Flow": 189,
+              "1:Route Suffix": 0,
+              "20:ML Num Lanes": 186,
+              "21:Description": 4,
+              "22:Main Line Length": 230,
+              "23:CS Eff-Date": 509,
+              "24:CS Mastarm": 155,
+              "25:CS Left Chan": 153,
+              "26:CS Right Chan": 181,
+              "27:CS Traffic Flow": 155,
+              "28:CS Num Lanes": 151,
+              "29:Int St Eff-Date": 104,
+              "30:Intrte Route": 0,
+              "31:Intrte PM Prefix": 0,
+              "32:Intrte Postmile": 0,
+              "33:Intrte PM Suffix": 0,
+              "34:Xing Line Lgth": 176,
+              "3:District": 0,
+              "4:County": 0,
+              "5:Date of Record": 4,
+              "6:HG": 171,
+              "7:City Code": 110,
+              "8:R/U": 38,
+              "9:INT Type Eff-Date": 4
+            },
+            "side_a_only_rows": 260,
+            "side_b_only_rows": 427
+          },
+          "completion": "complete",
+          "verdict": "diff",
+          "status": "ok",
+          "pairing_quality": "exact",
+          "payload_digest_ok": true
+        }
+      },
+      "rd_pdf vs tsn.xlsx.outcome.json": {
+        "base_head_equal": true,
+        "head": {
+          "counts": {
+            "asserted_cells": 152040,
+            "context_cells": 30408,
+            "differing_cells": 619,
+            "differing_rows": 468,
+            "known": true,
+            "paired_rows": 15204,
+            "per_field_counts": {
+              "0:PR": 0,
+              "10:On/Off": 74,
+              "11:Ramp Type": 37,
+              "12:ADT": 0,
+              "2:District": 1,
+              "3:Date of Record": 15,
+              "4:HG": 69,
+              "5:Area 4": 36,
+              "6:City Code": 156,
+              "7:R/U": 68,
+              "8:Description": 163,
+              "9:Ramp Name": 0
+            },
+            "side_a_only_rows": 9,
+            "side_b_only_rows": 206
+          },
+          "completion": "complete",
+          "verdict": "diff",
+          "status": "ok",
+          "pairing_quality": "exact",
+          "payload_digest_ok": true
+        }
+      }
+    },
+    "hf06_retained_publications_retained_review1": {
+      "base\\_state\\highway_sequence_pdf pdf-vs-excel.xlsx.outcome.json": {
+        "outcome_sha256": "b0935350ed83efb1915d7011ab31b7dd6a2bd774b9eb73e33feef3c49dddb859",
+        "generation_id": "b02c8442-9aff-4ae5-b0de-9d84954ba65c",
+        "payload_hash_ok": true,
+        "counts": {
+          "asserted_cells": 421778,
+          "context_cells": 0,
+          "differing_cells": 3714,
+          "differing_rows": 1395,
+          "known": true,
+          "paired_rows": 60254,
+          "per_field_counts": {
+            "0:County": 0,
+            "2:PM Suffix": 547,
+            "3:City": 0,
+            "4:HG": 929,
+            "5:FT": 1119,
+            "6:Distance To Next Point": 0,
+            "7:Description": 1119
+          },
+          "side_a_only_rows": 0,
+          "side_b_only_rows": 0
+        },
+        "completion": "complete",
+        "verdict": "diff",
+        "pairing_quality": "exact",
+        "sources": []
+      },
+      "everything\\comparisons\\tsn\\_state\\2026-07-23 ssor-prod_highway_sequence_pdf_vs_excel.xlsx.outcome.json": {
+        "outcome_sha256": "80c01d4fd53912c5900e1fcfbacee5f373b43f84d0973f7ee926d542c4385d35",
+        "generation_id": "9759428e-1995-4a74-8395-e969c976c19f",
+        "payload_hash_ok": true,
+        "counts": {
+          "asserted_cells": 421778,
+          "context_cells": 0,
+          "differing_cells": 7,
+          "differing_rows": 7,
+          "known": true,
+          "paired_rows": 60254,
+          "per_field_counts": {
+            "0:County": 0,
+            "2:PM Suffix": 7,
+            "3:City": 0,
+            "4:HG": 0,
+            "5:FT": 0,
+            "6:Distance To Next Point": 0,
+            "7:Description": 0
+          },
+          "side_a_only_rows": 0,
+          "side_b_only_rows": 0
+        },
+        "completion": "complete",
+        "verdict": "diff",
+        "pairing_quality": "exact",
+        "sources": []
+      },
+      "head\\_state\\highway_sequence_pdf pdf-vs-excel.xlsx.outcome.json": {
+        "outcome_sha256": "659cf01568be33ad425f0fa5cf537142ca3846dc5b808cc3533718be4eecbee8",
+        "generation_id": "f887b048-319b-4f5f-8fe5-695bbee25724",
+        "payload_hash_ok": true,
+        "counts": {
+          "asserted_cells": 421778,
+          "context_cells": 0,
+          "differing_cells": 7,
+          "differing_rows": 7,
+          "known": true,
+          "paired_rows": 60254,
+          "per_field_counts": {
+            "0:County": 0,
+            "2:PM Suffix": 7,
+            "3:City": 0,
+            "4:HG": 0,
+            "5:FT": 0,
+            "6:Distance To Next Point": 0,
+            "7:Description": 0
+          },
+          "side_a_only_rows": 0,
+          "side_b_only_rows": 0
+        },
+        "completion": "complete",
+        "verdict": "diff",
+        "pairing_quality": "exact",
+        "sources": []
+      },
+      "head-r2\\_state\\highway_sequence_pdf pdf-vs-excel.xlsx.outcome.json": {
+        "outcome_sha256": "1cfd425f9a558aaa7be4400218d19500da2c6d1b1469f2f454821c00ecc57d30",
+        "generation_id": "be23bef1-8124-4afc-b50c-090a071fe157",
+        "payload_hash_ok": true,
+        "counts": {
+          "asserted_cells": 421778,
+          "context_cells": 0,
+          "differing_cells": 129,
+          "differing_rows": 129,
+          "known": true,
+          "paired_rows": 60254,
+          "per_field_counts": {
+            "0:County": 0,
+            "2:PM Suffix": 129,
+            "3:City": 0,
+            "4:HG": 0,
+            "5:FT": 0,
+            "6:Distance To Next Point": 0,
+            "7:Description": 0
+          },
+          "side_a_only_rows": 0,
+          "side_b_only_rows": 0
+        },
+        "completion": "complete",
+        "verdict": "diff",
+        "pairing_quality": "exact",
+        "sources": []
+      },
+      "head-r3\\_state\\highway_sequence_pdf pdf-vs-excel.xlsx.outcome.json": {
+        "outcome_sha256": "55c1932cfbae98a57476d4d4013ce6ece9c9b18262122e5b7f861e337ccc667a",
+        "generation_id": "a84d4094-4118-4ada-bfd6-80b55d6be55c",
+        "payload_hash_ok": true,
+        "counts": {
+          "asserted_cells": 421778,
+          "context_cells": 0,
+          "differing_cells": 7,
+          "differing_rows": 7,
+          "known": true,
+          "paired_rows": 60254,
+          "per_field_counts": {
+            "0:County": 0,
+            "2:PM Suffix": 7,
+            "3:City": 0,
+            "4:HG": 0,
+            "5:FT": 0,
+            "6:Distance To Next Point": 0,
+            "7:Description": 0
+          },
+          "side_a_only_rows": 0,
+          "side_b_only_rows": 0
+        },
+        "completion": "complete",
+        "verdict": "diff",
+        "pairing_quality": "exact",
+        "sources": []
+      }
+    },
+    "hf09_source_pairs_retained_review1": {
+      "clean_road_highway vs tsn.xlsx.provenance.json": {
+        "base_head_identical": true
+      },
+      "hl_excel vs tsn.xlsx.provenance.json": {
+        "base_head_identical": true
+      },
+      "hl_pdf vs tsn.xlsx.provenance.json": {
+        "base_head_identical": true
+      },
+      "hsl_excel vs tsn.xlsx.provenance.json": {
+        "base_head_identical": true
+      },
+      "hsl_pdf vs tsn.xlsx.provenance.json": {
+        "base_head_identical": true
+      },
+      "id_excel vs tsn.xlsx.provenance.json": {
+        "base_head_identical": true
+      },
+      "id_pdf vs tsn.xlsx.provenance.json": {
+        "base_head_identical": true
+      },
+      "rd_pdf vs tsn.xlsx.provenance.json": {
+        "base_head_identical": true
+      }
+    },
+    "seconds": 2.719
+  },
+  "semantic_verification": {
+    "created_utc": "2026-08-31T18:28:49.232954+00:00",
+    "seconds": 0.328,
+    "problems": [],
+    "hf06": {
+      "base": {
+        "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\base\\_state\\highway_sequence_pdf pdf-vs-excel.xlsx.outcome.json",
+        "outcome_sha256": "b0935350ed83efb1915d7011ab31b7dd6a2bd774b9eb73e33feef3c49dddb859",
+        "generation_id": "b02c8442-9aff-4ae5-b0de-9d84954ba65c",
+        "payload_decoded_sha256": "467d435fe66865523d24b08cbacaebdfd1404e24bc45cbec4a9fc6bc51e140b0",
+        "counts": {
+          "asserted_cells": 421778,
+          "context_cells": 0,
+          "differing_cells": 3714,
+          "differing_rows": 1395,
+          "known": true,
+          "paired_rows": 60254,
+          "per_field_counts": {
+            "0:County": 0,
+            "2:PM Suffix": 547,
+            "3:City": 0,
+            "4:HG": 929,
+            "5:FT": 1119,
+            "6:Distance To Next Point": 0,
+            "7:Description": 1119
+          },
+          "side_a_only_rows": 0,
+          "side_b_only_rows": 0
+        },
+        "status": "ok",
+        "completion": "complete",
+        "verdict": "diff",
+        "pairing_quality": "exact"
+      },
+      "corrected": {
+        "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\head-r3\\_state\\highway_sequence_pdf pdf-vs-excel.xlsx.outcome.json",
+        "outcome_sha256": "55c1932cfbae98a57476d4d4013ce6ece9c9b18262122e5b7f861e337ccc667a",
+        "generation_id": "a84d4094-4118-4ada-bfd6-80b55d6be55c",
+        "payload_decoded_sha256": "225b92d7bd5155a4e1459d4f5fa777b7558e6ab1df9565f33863a0bed8ac8bae",
+        "counts": {
+          "asserted_cells": 421778,
+          "context_cells": 0,
+          "differing_cells": 7,
+          "differing_rows": 7,
+          "known": true,
+          "paired_rows": 60254,
+          "per_field_counts": {
+            "0:County": 0,
+            "2:PM Suffix": 7,
+            "3:City": 0,
+            "4:HG": 0,
+            "5:FT": 0,
+            "6:Distance To Next Point": 0,
+            "7:Description": 0
+          },
+          "side_a_only_rows": 0,
+          "side_b_only_rows": 0
+        },
+        "status": "ok",
+        "completion": "complete",
+        "verdict": "diff",
+        "pairing_quality": "exact"
+      },
+      "prior_head": {
+        "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\head\\_state\\highway_sequence_pdf pdf-vs-excel.xlsx.outcome.json",
+        "outcome_sha256": "659cf01568be33ad425f0fa5cf537142ca3846dc5b808cc3533718be4eecbee8",
+        "generation_id": "f887b048-319b-4f5f-8fe5-695bbee25724",
+        "payload_decoded_sha256": "225b92d7bd5155a4e1459d4f5fa777b7558e6ab1df9565f33863a0bed8ac8bae",
+        "counts": {
+          "asserted_cells": 421778,
+          "context_cells": 0,
+          "differing_cells": 7,
+          "differing_rows": 7,
+          "known": true,
+          "paired_rows": 60254,
+          "per_field_counts": {
+            "0:County": 0,
+            "2:PM Suffix": 7,
+            "3:City": 0,
+            "4:HG": 0,
+            "5:FT": 0,
+            "6:Distance To Next Point": 0,
+            "7:Description": 0
+          },
+          "side_a_only_rows": 0,
+          "side_b_only_rows": 0
+        },
+        "status": "ok",
+        "completion": "complete",
+        "verdict": "diff",
+        "pairing_quality": "exact"
+      },
+      "everything": {
+        "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\everything\\comparisons\\tsn\\_state\\2026-07-23 ssor-prod_highway_sequence_pdf_vs_excel.xlsx.outcome.json",
+        "outcome_sha256": "80c01d4fd53912c5900e1fcfbacee5f373b43f84d0973f7ee926d542c4385d35",
+        "generation_id": "9759428e-1995-4a74-8395-e969c976c19f",
+        "payload_decoded_sha256": "225b92d7bd5155a4e1459d4f5fa777b7558e6ab1df9565f33863a0bed8ac8bae",
+        "counts": {
+          "asserted_cells": 421778,
+          "context_cells": 0,
+          "differing_cells": 7,
+          "differing_rows": 7,
+          "known": true,
+          "paired_rows": 60254,
+          "per_field_counts": {
+            "0:County": 0,
+            "2:PM Suffix": 7,
+            "3:City": 0,
+            "4:HG": 0,
+            "5:FT": 0,
+            "6:Distance To Next Point": 0,
+            "7:Description": 0
+          },
+          "side_a_only_rows": 0,
+          "side_b_only_rows": 0
+        },
+        "status": "ok",
+        "completion": "complete",
+        "verdict": "diff",
+        "pairing_quality": "exact"
+      },
+      "corrected_payload_unchanged": true,
+      "corrected_source_bindings": [
+        {
+          "path": "C:\\Users\\Yunus\\Projects\\wt-rb5\\output\\2026-07-23 ssor-prod\\consolidated\\tsmis_highway_sequence_pdf_consolidated 2026-07-23 ssor-prod.xlsx",
+          "expected_sha256": "b8cd4d2f9bc8aa687dffdb9e783e9c4dcb2f7a6a622dfee020bc0284288a23a3",
+          "sha256": "b8cd4d2f9bc8aa687dffdb9e783e9c4dcb2f7a6a622dfee020bc0284288a23a3",
+          "expected_size": 2368269,
+          "size": 2368269,
+          "matches": true
+        },
+        {
+          "path": "C:\\Users\\Yunus\\Projects\\wt-rb5\\output\\2026-07-23 ssor-prod\\consolidated\\highway_sequence_consolidated 2026-07-23 ssor-prod.xlsx",
+          "expected_sha256": "a970568ad931ace4b181b9e84a281e26ab2e7ef332a34dfebc8486479b700546",
+          "sha256": "a970568ad931ace4b181b9e84a281e26ab2e7ef332a34dfebc8486479b700546",
+          "expected_size": 2420653,
+          "size": 2420653,
+          "matches": true
+        }
+      ]
+    },
+    "hf09": [
+      {
+        "case": "hl_excel",
+        "label": "Highway Log vs TSN (Excel)",
+        "base": {
+          "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\base\\_state\\hl_excel vs tsn.xlsx.outcome.json",
+          "outcome_sha256": "edddf37ce819296a29f7736daf4ca9d6ac2ac98ce61532d5c9f7ed9509e40207",
+          "generation_id": "19ac831e-975a-47f6-a657-0213ebc561d4",
+          "payload_decoded_sha256": "99d2d19e696e49f18587b22e64dc346dedb98a1c135ef07d0009ca7a345e5fd5",
+          "counts": {
+            "asserted_cells": 1463383,
+            "context_cells": 12467,
+            "differing_cells": 84709,
+            "differing_rows": 38478,
+            "known": true,
+            "paired_rows": 49195,
+            "per_field_counts": {
+              "10:LB ST [LB T]": 2744,
+              "11:LB # Lns [LB Lns]": 837,
+              "12:LB SF [LB F]": 2912,
+              "13:LB OT-SH Total [LB OT]": 3693,
+              "14:LB OT-SH Treated [LB TR]": 3279,
+              "15:LB T-W Wid [LB T-W]": 2465,
+              "16:LB IN-SH Total [LB IN]": 962,
+              "17:LB IN-SH Treated [LB SH]": 1013,
+              "18:Med TY/CL/BA [Med TCB]": 4077,
+              "19:Med Wid/Var [Med Wid]": 992,
+              "1:Length (MI) [MI]": 7789,
+              "20:RB ST [RB T]": 570,
+              "21:RB # Lns [RB Lns]": 662,
+              "22:RB SF [RB F]": 2648,
+              "23:RB IN-SH Total [RB IN]": 794,
+              "24:RB IN-SH Treated [RB SH]": 816,
+              "25:RB T-W Wid [RB T-W]": 836,
+              "26:RB OT-SH Total [RB OT]": 775,
+              "27:RB OT-SH Treated [RB SH]": 728,
+              "28:Description": 2723,
+              "29:Date of Rec": 951,
+              "2:NA [N/A]": 96,
+              "30:Sig Chg. Date": 18051,
+              "3:Cnty Odom": 21949,
+              "4:City": 545,
+              "5:RU [R/U]": 301,
+              "6:SPD": 246,
+              "7:TER": 304,
+              "8:HG [H/G]": 587,
+              "9:AC [A/C]": 364
+            },
+            "side_a_only_rows": 3626,
+            "side_b_only_rows": 10888
+          },
+          "status": "ok",
+          "completion": "complete",
+          "verdict": "diff",
+          "pairing_quality": "exact"
+        },
+        "head": {
+          "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\_state\\hl_excel vs tsn.xlsx.outcome.json",
+          "outcome_sha256": "eafbf31be615f2bed4717009d0f656231b6c73e2fce4aaf2f88a305a8b3ba085",
+          "generation_id": "5f5b1395-2d90-479c-a23e-d9824b2ceceb",
+          "payload_decoded_sha256": "99d2d19e696e49f18587b22e64dc346dedb98a1c135ef07d0009ca7a345e5fd5",
+          "counts": {
+            "asserted_cells": 1463383,
+            "context_cells": 12467,
+            "differing_cells": 84709,
+            "differing_rows": 38478,
+            "known": true,
+            "paired_rows": 49195,
+            "per_field_counts": {
+              "10:LB ST [LB T]": 2744,
+              "11:LB # Lns [LB Lns]": 837,
+              "12:LB SF [LB F]": 2912,
+              "13:LB OT-SH Total [LB OT]": 3693,
+              "14:LB OT-SH Treated [LB TR]": 3279,
+              "15:LB T-W Wid [LB T-W]": 2465,
+              "16:LB IN-SH Total [LB IN]": 962,
+              "17:LB IN-SH Treated [LB SH]": 1013,
+              "18:Med TY/CL/BA [Med TCB]": 4077,
+              "19:Med Wid/Var [Med Wid]": 992,
+              "1:Length (MI) [MI]": 7789,
+              "20:RB ST [RB T]": 570,
+              "21:RB # Lns [RB Lns]": 662,
+              "22:RB SF [RB F]": 2648,
+              "23:RB IN-SH Total [RB IN]": 794,
+              "24:RB IN-SH Treated [RB SH]": 816,
+              "25:RB T-W Wid [RB T-W]": 836,
+              "26:RB OT-SH Total [RB OT]": 775,
+              "27:RB OT-SH Treated [RB SH]": 728,
+              "28:Description": 2723,
+              "29:Date of Rec": 951,
+              "2:NA [N/A]": 96,
+              "30:Sig Chg. Date": 18051,
+              "3:Cnty Odom": 21949,
+              "4:City": 545,
+              "5:RU [R/U]": 301,
+              "6:SPD": 246,
+              "7:TER": 304,
+              "8:HG [H/G]": 587,
+              "9:AC [A/C]": 364
+            },
+            "side_a_only_rows": 3626,
+            "side_b_only_rows": 10888
+          },
+          "status": "ok",
+          "completion": "complete",
+          "verdict": "diff",
+          "pairing_quality": "exact"
+        },
+        "typed_results_identical": true,
+        "base_head_sources_identical": true,
+        "formulas_status": "COMPLETE",
+        "recalc_internally_consistent": true,
+        "representation_count": 1243,
+        "self_checks_ok": 10
+      },
+      {
+        "case": "hl_pdf",
+        "label": "Highway Log vs TSN (PDF)",
+        "base": {
+          "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\base\\_state\\hl_pdf vs tsn.xlsx.outcome.json",
+          "outcome_sha256": "e56fd77edfe97bd4c4d81a6487b473fde735b64452abc5ceff23734e80bc3f86",
+          "generation_id": "8751f512-600c-42e8-8555-741fe19b7e0f",
+          "payload_decoded_sha256": "5717fc62c61494fa68695cc460220c999cb0f36d2fe9dfd63b9ad3eb1c71d9a7",
+          "counts": {
+            "asserted_cells": 1482027,
+            "context_cells": 12843,
+            "differing_cells": 84202,
+            "differing_rows": 38931,
+            "known": true,
+            "paired_rows": 49829,
+            "per_field_counts": {
+              "10:LB ST [LB T]": 2608,
+              "11:LB # Lns [LB Lns]": 747,
+              "12:LB SF [LB F]": 2849,
+              "13:LB OT-SH Total [LB OT]": 3699,
+              "14:LB OT-SH Treated [LB TR]": 3233,
+              "15:LB T-W Wid [LB T-W]": 2417,
+              "16:LB IN-SH Total [LB IN]": 968,
+              "17:LB IN-SH Treated [LB SH]": 971,
+              "18:Med TY/CL/BA [Med TCB]": 4139,
+              "19:Med Wid/Var [Med Wid]": 995,
+              "1:Length (MI) [MI]": 7616,
+              "20:RB ST [RB T]": 580,
+              "21:RB # Lns [RB Lns]": 682,
+              "22:RB SF [RB F]": 2668,
+              "23:RB IN-SH Total [RB IN]": 791,
+              "24:RB IN-SH Treated [RB SH]": 812,
+              "25:RB T-W Wid [RB T-W]": 859,
+              "26:RB OT-SH Total [RB OT]": 777,
+              "27:RB OT-SH Treated [RB SH]": 729,
+              "28:Description": 2827,
+              "29:Date of Rec": 955,
+              "2:NA [N/A]": 96,
+              "30:Sig Chg. Date": 18250,
+              "3:Cnty Odom": 22425,
+              "4:City": 518,
+              "5:RU [R/U]": 98,
+              "6:SPD": 248,
+              "7:TER": 100,
+              "8:HG [H/G]": 384,
+              "9:AC [A/C]": 161
+            },
+            "side_a_only_rows": 2978,
+            "side_b_only_rows": 10254
+          },
+          "status": "ok",
+          "completion": "complete",
+          "verdict": "diff",
+          "pairing_quality": "exact"
+        },
+        "head": {
+          "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\_state\\hl_pdf vs tsn.xlsx.outcome.json",
+          "outcome_sha256": "1fa5305ce53f5100d624825853685a7796c8c78619d2b5d270d0bb8c708f3b18",
+          "generation_id": "177d4b65-c21d-490c-9d2e-1ab3d8a133e5",
+          "payload_decoded_sha256": "5717fc62c61494fa68695cc460220c999cb0f36d2fe9dfd63b9ad3eb1c71d9a7",
+          "counts": {
+            "asserted_cells": 1482027,
+            "context_cells": 12843,
+            "differing_cells": 84202,
+            "differing_rows": 38931,
+            "known": true,
+            "paired_rows": 49829,
+            "per_field_counts": {
+              "10:LB ST [LB T]": 2608,
+              "11:LB # Lns [LB Lns]": 747,
+              "12:LB SF [LB F]": 2849,
+              "13:LB OT-SH Total [LB OT]": 3699,
+              "14:LB OT-SH Treated [LB TR]": 3233,
+              "15:LB T-W Wid [LB T-W]": 2417,
+              "16:LB IN-SH Total [LB IN]": 968,
+              "17:LB IN-SH Treated [LB SH]": 971,
+              "18:Med TY/CL/BA [Med TCB]": 4139,
+              "19:Med Wid/Var [Med Wid]": 995,
+              "1:Length (MI) [MI]": 7616,
+              "20:RB ST [RB T]": 580,
+              "21:RB # Lns [RB Lns]": 682,
+              "22:RB SF [RB F]": 2668,
+              "23:RB IN-SH Total [RB IN]": 791,
+              "24:RB IN-SH Treated [RB SH]": 812,
+              "25:RB T-W Wid [RB T-W]": 859,
+              "26:RB OT-SH Total [RB OT]": 777,
+              "27:RB OT-SH Treated [RB SH]": 729,
+              "28:Description": 2827,
+              "29:Date of Rec": 955,
+              "2:NA [N/A]": 96,
+              "30:Sig Chg. Date": 18250,
+              "3:Cnty Odom": 22425,
+              "4:City": 518,
+              "5:RU [R/U]": 98,
+              "6:SPD": 248,
+              "7:TER": 100,
+              "8:HG [H/G]": 384,
+              "9:AC [A/C]": 161
+            },
+            "side_a_only_rows": 2978,
+            "side_b_only_rows": 10254
+          },
+          "status": "ok",
+          "completion": "complete",
+          "verdict": "diff",
+          "pairing_quality": "exact"
+        },
+        "typed_results_identical": true,
+        "base_head_sources_identical": true,
+        "formulas_status": "COMPLETE",
+        "recalc_internally_consistent": true,
+        "representation_count": 1243,
+        "self_checks_ok": 10
+      },
+      {
+        "case": "hsl_excel",
+        "label": "Highway Sequence vs TSN (Excel)",
+        "base": {
+          "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\base\\_state\\hsl_excel vs tsn.xlsx.outcome.json",
+          "outcome_sha256": "ebdf0b5d1a8e820450fb02beac9179764d32f71da5587d4dca062e1504ece502",
+          "generation_id": "92d29d90-3a70-4f48-807b-68961cbf9ae2",
+          "payload_decoded_sha256": "61f63bd2ac54047107eaa5f9f80dd865076eaf84aff3147aaff6ffc396f83e1b",
+          "counts": {
+            "asserted_cells": 342300,
+            "context_cells": 0,
+            "differing_cells": 28450,
+            "differing_rows": 22554,
+            "known": true,
+            "paired_rows": 57050,
+            "per_field_counts": {
+              "0:County": 0,
+              "2:City": 15018,
+              "3:HG": 906,
+              "4:FT": 690,
+              "5:Distance To Next Point": 6953,
+              "6:Description": 4883
+            },
+            "side_a_only_rows": 3204,
+            "side_b_only_rows": 12754
+          },
+          "status": "ok",
+          "completion": "complete",
+          "verdict": "diff",
+          "pairing_quality": "exact"
+        },
+        "head": {
+          "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\_state\\hsl_excel vs tsn.xlsx.outcome.json",
+          "outcome_sha256": "3dd9ecd44208ebb042fbfbf0cc55b6e33c32e1a8ea7fdffc4136ffe21c932ed9",
+          "generation_id": "ea290c05-c721-4852-a46b-70575e92a27d",
+          "payload_decoded_sha256": "61f63bd2ac54047107eaa5f9f80dd865076eaf84aff3147aaff6ffc396f83e1b",
+          "counts": {
+            "asserted_cells": 342300,
+            "context_cells": 0,
+            "differing_cells": 28450,
+            "differing_rows": 22554,
+            "known": true,
+            "paired_rows": 57050,
+            "per_field_counts": {
+              "0:County": 0,
+              "2:City": 15018,
+              "3:HG": 906,
+              "4:FT": 690,
+              "5:Distance To Next Point": 6953,
+              "6:Description": 4883
+            },
+            "side_a_only_rows": 3204,
+            "side_b_only_rows": 12754
+          },
+          "status": "ok",
+          "completion": "complete",
+          "verdict": "diff",
+          "pairing_quality": "exact"
+        },
+        "typed_results_identical": true,
+        "base_head_sources_identical": true,
+        "formulas_status": "COMPLETE",
+        "recalc_internally_consistent": true,
+        "representation_count": 12,
+        "self_checks_ok": 10
+      },
+      {
+        "case": "hsl_pdf",
+        "label": "Highway Sequence vs TSN (PDF)",
+        "base": {
+          "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\base\\_state\\hsl_pdf vs tsn.xlsx.outcome.json",
+          "outcome_sha256": "3c824a857dd069f6a46e587358259e2ff2842878d243c5f9f8e1a0f3b4b0f118",
+          "generation_id": "6af2dea1-0c4f-4844-9d8e-6811752c00a0",
+          "payload_decoded_sha256": "a5af95055d9838170d283becd7cff0b1eada2443e9817f701d02350ec291501f",
+          "counts": {
+            "asserted_cells": 344898,
+            "context_cells": 0,
+            "differing_cells": 27601,
+            "differing_rows": 22728,
+            "known": true,
+            "paired_rows": 57483,
+            "per_field_counts": {
+              "0:County": 0,
+              "2:City": 15130,
+              "3:HG": 459,
+              "4:FT": 82,
+              "5:Distance To Next Point": 7038,
+              "6:Description": 4892
+            },
+            "side_a_only_rows": 2771,
+            "side_b_only_rows": 12321
+          },
+          "status": "ok",
+          "completion": "complete",
+          "verdict": "diff",
+          "pairing_quality": "exact"
+        },
+        "head": {
+          "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\_state\\hsl_pdf vs tsn.xlsx.outcome.json",
+          "outcome_sha256": "2e20e381db021dd79b703feab56a85ccb811ca61149beefae11dd4d1d0456d3f",
+          "generation_id": "6c0dda6b-c801-4551-a9a2-7bfe09037218",
+          "payload_decoded_sha256": "a5af95055d9838170d283becd7cff0b1eada2443e9817f701d02350ec291501f",
+          "counts": {
+            "asserted_cells": 344898,
+            "context_cells": 0,
+            "differing_cells": 27601,
+            "differing_rows": 22728,
+            "known": true,
+            "paired_rows": 57483,
+            "per_field_counts": {
+              "0:County": 0,
+              "2:City": 15130,
+              "3:HG": 459,
+              "4:FT": 82,
+              "5:Distance To Next Point": 7038,
+              "6:Description": 4892
+            },
+            "side_a_only_rows": 2771,
+            "side_b_only_rows": 12321
+          },
+          "status": "ok",
+          "completion": "complete",
+          "verdict": "diff",
+          "pairing_quality": "exact"
+        },
+        "typed_results_identical": true,
+        "base_head_sources_identical": true,
+        "formulas_status": "COMPLETE",
+        "recalc_internally_consistent": true,
+        "representation_count": 12,
+        "self_checks_ok": 10
+      },
+      {
+        "case": "id_excel",
+        "label": "Intersection Detail vs TSN (Excel)",
+        "base": {
+          "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\base\\_state\\id_excel vs tsn.xlsx.outcome.json",
+          "outcome_sha256": "a44a10a0f5b8bd9c4576c4097ad02c6d1b66399d0cb57dce64a9e23e7e32a73e",
+          "generation_id": "3705b304-4071-42e9-8eb6-c88861073f0b",
+          "payload_decoded_sha256": "7d9cee7c0eda14df5800092e58c1d89f1c75dd27e3dbaf340e1aca160d135fef",
+          "counts": {
+            "asserted_cells": 550766,
+            "context_cells": 0,
+            "differing_cells": 5092,
+            "differing_rows": 2816,
+            "known": true,
+            "paired_rows": 16199,
+            "per_field_counts": {
+              "0:PR": 0,
+              "10:INT Type": 1,
+              "11:Control Type Eff-Date": 4,
+              "12:Control Type": 1,
+              "13:Lighting Eff-Date": 4,
+              "14:Lighting": 0,
+              "15:ML Eff-Date": 1969,
+              "16:ML Mastarm": 199,
+              "17:ML Left Chan": 204,
+              "18:ML Right Chan": 190,
+              "19:ML Traffic Flow": 189,
+              "1:Route Suffix": 0,
+              "20:ML Num Lanes": 186,
+              "21:Description": 4,
+              "22:Main Line Length": 230,
+              "23:CS Eff-Date": 509,
+              "24:CS Mastarm": 155,
+              "25:CS Left Chan": 153,
+              "26:CS Right Chan": 181,
+              "27:CS Traffic Flow": 155,
+              "28:CS Num Lanes": 151,
+              "29:Int St Eff-Date": 104,
+              "30:Intrte Route": 0,
+              "31:Intrte PM Prefix": 0,
+              "32:Intrte Postmile": 0,
+              "33:Intrte PM Suffix": 0,
+              "34:Xing Line Lgth": 176,
+              "3:District": 0,
+              "4:County": 0,
+              "5:Date of Record": 4,
+              "6:HG": 171,
+              "7:City Code": 110,
+              "8:R/U": 38,
+              "9:INT Type Eff-Date": 4
+            },
+            "side_a_only_rows": 260,
+            "side_b_only_rows": 427
+          },
+          "status": "ok",
+          "completion": "complete",
+          "verdict": "diff",
+          "pairing_quality": "exact"
+        },
+        "head": {
+          "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\_state\\id_excel vs tsn.xlsx.outcome.json",
+          "outcome_sha256": "018af1c22690bb5c579c6b42ba63513dbcdd2eb294c0ca9aa4240862119e88be",
+          "generation_id": "31eb1c48-357e-45ec-a8b3-6ec29e8912e3",
+          "payload_decoded_sha256": "7d9cee7c0eda14df5800092e58c1d89f1c75dd27e3dbaf340e1aca160d135fef",
+          "counts": {
+            "asserted_cells": 550766,
+            "context_cells": 0,
+            "differing_cells": 5092,
+            "differing_rows": 2816,
+            "known": true,
+            "paired_rows": 16199,
+            "per_field_counts": {
+              "0:PR": 0,
+              "10:INT Type": 1,
+              "11:Control Type Eff-Date": 4,
+              "12:Control Type": 1,
+              "13:Lighting Eff-Date": 4,
+              "14:Lighting": 0,
+              "15:ML Eff-Date": 1969,
+              "16:ML Mastarm": 199,
+              "17:ML Left Chan": 204,
+              "18:ML Right Chan": 190,
+              "19:ML Traffic Flow": 189,
+              "1:Route Suffix": 0,
+              "20:ML Num Lanes": 186,
+              "21:Description": 4,
+              "22:Main Line Length": 230,
+              "23:CS Eff-Date": 509,
+              "24:CS Mastarm": 155,
+              "25:CS Left Chan": 153,
+              "26:CS Right Chan": 181,
+              "27:CS Traffic Flow": 155,
+              "28:CS Num Lanes": 151,
+              "29:Int St Eff-Date": 104,
+              "30:Intrte Route": 0,
+              "31:Intrte PM Prefix": 0,
+              "32:Intrte Postmile": 0,
+              "33:Intrte PM Suffix": 0,
+              "34:Xing Line Lgth": 176,
+              "3:District": 0,
+              "4:County": 0,
+              "5:Date of Record": 4,
+              "6:HG": 171,
+              "7:City Code": 110,
+              "8:R/U": 38,
+              "9:INT Type Eff-Date": 4
+            },
+            "side_a_only_rows": 260,
+            "side_b_only_rows": 427
+          },
+          "status": "ok",
+          "completion": "complete",
+          "verdict": "diff",
+          "pairing_quality": "exact"
+        },
+        "typed_results_identical": true,
+        "base_head_sources_identical": true,
+        "formulas_status": "COMPLETE",
+        "recalc_internally_consistent": true,
+        "representation_count": 1,
+        "self_checks_ok": 11
+      },
+      {
+        "case": "id_pdf",
+        "label": "Intersection Detail vs TSN (PDF)",
+        "base": {
+          "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\base\\_state\\id_pdf vs tsn.xlsx.outcome.json",
+          "outcome_sha256": "6925ac89bca835ac200a7fb82c4b7ab7e61a8a67acd7e3d21489ad456a86b7af",
+          "generation_id": "ba56195a-83eb-45a9-9f52-0ce3ffd84081",
+          "payload_decoded_sha256": "7d9cee7c0eda14df5800092e58c1d89f1c75dd27e3dbaf340e1aca160d135fef",
+          "counts": {
+            "asserted_cells": 550766,
+            "context_cells": 0,
+            "differing_cells": 5092,
+            "differing_rows": 2816,
+            "known": true,
+            "paired_rows": 16199,
+            "per_field_counts": {
+              "0:PR": 0,
+              "10:INT Type": 1,
+              "11:Control Type Eff-Date": 4,
+              "12:Control Type": 1,
+              "13:Lighting Eff-Date": 4,
+              "14:Lighting": 0,
+              "15:ML Eff-Date": 1969,
+              "16:ML Mastarm": 199,
+              "17:ML Left Chan": 204,
+              "18:ML Right Chan": 190,
+              "19:ML Traffic Flow": 189,
+              "1:Route Suffix": 0,
+              "20:ML Num Lanes": 186,
+              "21:Description": 4,
+              "22:Main Line Length": 230,
+              "23:CS Eff-Date": 509,
+              "24:CS Mastarm": 155,
+              "25:CS Left Chan": 153,
+              "26:CS Right Chan": 181,
+              "27:CS Traffic Flow": 155,
+              "28:CS Num Lanes": 151,
+              "29:Int St Eff-Date": 104,
+              "30:Intrte Route": 0,
+              "31:Intrte PM Prefix": 0,
+              "32:Intrte Postmile": 0,
+              "33:Intrte PM Suffix": 0,
+              "34:Xing Line Lgth": 176,
+              "3:District": 0,
+              "4:County": 0,
+              "5:Date of Record": 4,
+              "6:HG": 171,
+              "7:City Code": 110,
+              "8:R/U": 38,
+              "9:INT Type Eff-Date": 4
+            },
+            "side_a_only_rows": 260,
+            "side_b_only_rows": 427
+          },
+          "status": "ok",
+          "completion": "complete",
+          "verdict": "diff",
+          "pairing_quality": "exact"
+        },
+        "head": {
+          "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\_state\\id_pdf vs tsn.xlsx.outcome.json",
+          "outcome_sha256": "6dfa30a0838a6d455f51383c61aa8e4474ee281ca05855da40f41c251ec5f61e",
+          "generation_id": "ec47aa51-5236-4508-bc59-6041bb304204",
+          "payload_decoded_sha256": "7d9cee7c0eda14df5800092e58c1d89f1c75dd27e3dbaf340e1aca160d135fef",
+          "counts": {
+            "asserted_cells": 550766,
+            "context_cells": 0,
+            "differing_cells": 5092,
+            "differing_rows": 2816,
+            "known": true,
+            "paired_rows": 16199,
+            "per_field_counts": {
+              "0:PR": 0,
+              "10:INT Type": 1,
+              "11:Control Type Eff-Date": 4,
+              "12:Control Type": 1,
+              "13:Lighting Eff-Date": 4,
+              "14:Lighting": 0,
+              "15:ML Eff-Date": 1969,
+              "16:ML Mastarm": 199,
+              "17:ML Left Chan": 204,
+              "18:ML Right Chan": 190,
+              "19:ML Traffic Flow": 189,
+              "1:Route Suffix": 0,
+              "20:ML Num Lanes": 186,
+              "21:Description": 4,
+              "22:Main Line Length": 230,
+              "23:CS Eff-Date": 509,
+              "24:CS Mastarm": 155,
+              "25:CS Left Chan": 153,
+              "26:CS Right Chan": 181,
+              "27:CS Traffic Flow": 155,
+              "28:CS Num Lanes": 151,
+              "29:Int St Eff-Date": 104,
+              "30:Intrte Route": 0,
+              "31:Intrte PM Prefix": 0,
+              "32:Intrte Postmile": 0,
+              "33:Intrte PM Suffix": 0,
+              "34:Xing Line Lgth": 176,
+              "3:District": 0,
+              "4:County": 0,
+              "5:Date of Record": 4,
+              "6:HG": 171,
+              "7:City Code": 110,
+              "8:R/U": 38,
+              "9:INT Type Eff-Date": 4
+            },
+            "side_a_only_rows": 260,
+            "side_b_only_rows": 427
+          },
+          "status": "ok",
+          "completion": "complete",
+          "verdict": "diff",
+          "pairing_quality": "exact"
+        },
+        "typed_results_identical": true,
+        "base_head_sources_identical": true,
+        "formulas_status": "COMPLETE",
+        "recalc_internally_consistent": true,
+        "representation_count": 1,
+        "self_checks_ok": 11
+      },
+      {
+        "case": "rd_pdf",
+        "label": "Ramp Detail vs TSN (PDF)",
+        "base": {
+          "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\base\\_state\\rd_pdf vs tsn.xlsx.outcome.json",
+          "outcome_sha256": "0a87003a9a6867ade6b7ec427fce4829f1f7ccf80a1ed82c7a79fdfe92b5ba09",
+          "generation_id": "e19f8155-c235-4a80-9cfe-12b5172df8ac",
+          "payload_decoded_sha256": "c9fefd455f0d275445b6c5c77e9c313238c527d523de943d1828ce34f96d47de",
+          "counts": {
+            "asserted_cells": 152040,
+            "context_cells": 30408,
+            "differing_cells": 619,
+            "differing_rows": 468,
+            "known": true,
+            "paired_rows": 15204,
+            "per_field_counts": {
+              "0:PR": 0,
+              "10:On/Off": 74,
+              "11:Ramp Type": 37,
+              "12:ADT": 0,
+              "2:District": 1,
+              "3:Date of Record": 15,
+              "4:HG": 69,
+              "5:Area 4": 36,
+              "6:City Code": 156,
+              "7:R/U": 68,
+              "8:Description": 163,
+              "9:Ramp Name": 0
+            },
+            "side_a_only_rows": 9,
+            "side_b_only_rows": 206
+          },
+          "status": "ok",
+          "completion": "complete",
+          "verdict": "diff",
+          "pairing_quality": "exact"
+        },
+        "head": {
+          "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\_state\\rd_pdf vs tsn.xlsx.outcome.json",
+          "outcome_sha256": "a28ec5c85f6d407d66b1c7c3033f930f3fcbc600f6d5bad1bedcbde848a25649",
+          "generation_id": "eedaae2d-86c6-49ba-8545-8403703cfb0c",
+          "payload_decoded_sha256": "c9fefd455f0d275445b6c5c77e9c313238c527d523de943d1828ce34f96d47de",
+          "counts": {
+            "asserted_cells": 152040,
+            "context_cells": 30408,
+            "differing_cells": 619,
+            "differing_rows": 468,
+            "known": true,
+            "paired_rows": 15204,
+            "per_field_counts": {
+              "0:PR": 0,
+              "10:On/Off": 74,
+              "11:Ramp Type": 37,
+              "12:ADT": 0,
+              "2:District": 1,
+              "3:Date of Record": 15,
+              "4:HG": 69,
+              "5:Area 4": 36,
+              "6:City Code": 156,
+              "7:R/U": 68,
+              "8:Description": 163,
+              "9:Ramp Name": 0
+            },
+            "side_a_only_rows": 9,
+            "side_b_only_rows": 206
+          },
+          "status": "ok",
+          "completion": "complete",
+          "verdict": "diff",
+          "pairing_quality": "exact"
+        },
+        "typed_results_identical": true,
+        "base_head_sources_identical": true,
+        "formulas_status": "COMPLETE",
+        "recalc_internally_consistent": true,
+        "representation_count": 3,
+        "self_checks_ok": 10
+      },
+      {
+        "case": "clean_road",
+        "label": "Clean Road Highway vs TSN",
+        "base": {
+          "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\base\\_state\\clean_road_highway vs tsn.xlsx.outcome.json",
+          "outcome_sha256": "d8f0a55d7ccdad010010c62f7117ace8740bd8e81dcdbb450862419a10f6b263",
+          "generation_id": "90986afc-33be-4abf-802f-fa42e024b928",
+          "payload_decoded_sha256": "12432d1ac530ad6f0e820fee24a78dc5f3244b01166579704b9dc4fc7b46921a",
+          "counts": {
+            "asserted_cells": 2578656,
+            "context_cells": 1315890,
+            "differing_cells": 281393,
+            "differing_rows": 48942,
+            "known": true,
+            "paired_rows": 52629,
+            "per_field_counts": {
+              "0:THY_ID": 0,
+              "10:THY_COUNTY_CODE": 0,
+              "11:THY_ROUTE_NAME": 0,
+              "12:THY_ROUTE_SUFFIX_CODE": 0,
+              "13:THY_PM_PREFIX_CODE": 0,
+              "15:THY_END_PM_AMT": 6829,
+              "16:THY_PM_SUFFIX_CODE": 0,
+              "17:THY_LENGTH_MILES_AMT": 6829,
+              "18:THY_LEFT_ROAD_EFF_DATE": 21486,
+              "19:THY_LT_SURF_TYPE_CODE": 4758,
+              "1:THY_ELEMENT_ID": 0,
+              "20:THY_LT_LANES_AMT": 5925,
+              "21:THY_LT_SPEC_FEATURES_CODE": 4427,
+              "22:THY_LT_O_SHD_TOT_WIDTH_AMT": 6385,
+              "23:THY_LT_O_SHD_TRT_WIDTH_AMT": 6328,
+              "24:THY_LT_TRAV_WAY_WIDTH_AMT": 6788,
+              "25:THY_LT_I_SHD_TOT_WIDTH_AMT": 6363,
+              "26:THY_LT_I_SHD_TRT_WIDTH_AMT": 6425,
+              "27:THY_LT_SIG_CHG_IND": 0,
+              "28:THY_MEDIAN_EFF_DATE": 19982,
+              "29:THY_MEDIAN_TYPE_CODE": 6709,
+              "2:THY_BEGIN_OFFSET_AMT": 0,
+              "30:THY_CURB_LANDSCAPE_CODE": 2981,
+              "31:THY_MEDIAN_BARRIER_CODE": 5636,
+              "32:THY_MEDIAN_WIDTH_AMT": 8469,
+              "33:THY_MEDIAN_WIDTH_VAR_CODE": 3499,
+              "34:THY_MEDIAN_SIG_CHG_IND": 0,
+              "35:THY_RIGHT_ROAD_EFF_DATE": 21454,
+              "36:THY_RT_SURF_TYPE_CODE": 3969,
+              "37:THY_RT_LANES_AMT": 5576,
+              "38:THY_RT_SPEC_FEATURES_CODE": 4215,
+              "39:THY_RT_I_SHD_TOT_WIDTH_AMT": 5776,
+              "3:THY_END_OFFSET_AMT": 0,
+              "40:THY_RT_I_SHD_TRT_WIDTH_AMT": 5813,
+              "41:THY_RT_TRAV_WAY_WIDTH_AMT": 6464,
+              "42:THY_RT_O_SHD_TOT_WIDTH_AMT": 5442,
+              "43:THY_RT_O_SHD_TRT_WIDTH_AMT": 5358,
+              "44:THY_RT_SIG_CHG_IND": 0,
+              "45:THY_CITY_CODE": 1840,
+              "46:THY_HIGHWAY_GROUP_CODE": 2528,
+              "47:THY_HIGHWAY_ACCESS_CODE": 2735,
+              "48:THY_ACCESS_EFF_DATE": 7931,
+              "49:THY_ACCESS_SIG_CHG_IND": 0,
+              "4:THY_BEGIN_DATE": 0,
+              "50:THY_TERRAIN_CODE": 1650,
+              "51:THY_DESIGN_SPEED_AMT": 1999,
+              "52:THY_NON_ADD_CODE": 136,
+              "53:THY_PROFILE_CODE": 2104,
+              "54:THY_ADT_AMT": 35825,
+              "55:THY_CHANGE_PER_MILE_AMT": 23111,
+              "56:THY_LANDMARK_SHORT_DESC": 1652,
+              "57:THY_POPULATION_CODE": 2589,
+              "58:THY_POPULATION_GROUP_CODE": 0,
+              "59:THY_LAST_SIG_CHG_DATE": 0,
+              "5:THY_END_DATE": 0,
+              "60:THY_RECORD_DATE": 4,
+              "61:THY_FUNCTIONAL_CLASS_CODE": 0,
+              "62:THY_UPDATE_DATE": 0,
+              "63:THY_UPDATE_USER_NAME": 0,
+              "64:THY_MAINT_SVC_LVL_CODE": 0,
+              "65:THY_EQUATE_CODE": 437,
+              "66:THY_BREAK_DESC": 1410,
+              "67:THY_FEDERAL_AID_CODE": 0,
+              "68:THY_FA_ROUTE_PREFIX_CODE": 0,
+              "69:THY_FA_ROUTE_NAME": 0,
+              "6:THY_CREATE_DATE": 0,
+              "70:THY_TOLL_FOREST_CODE": 1271,
+              "71:THY_NATIONAL_LANDS_CODE": 0,
+              "72:THY_SCENIC_FREEWAY_CODE": 0,
+              "73:THY_EXTRACT_DATE": 0,
+              "74:THY_POPULATION_EFF_DATE": 0,
+              "7:THY_CREATE_USER_NAME": 0,
+              "8:THY_SEG_ORDER_ID": 92,
+              "9:THY_DISTRICT_CODE": 193
+            },
+            "side_a_only_rows": 5113,
+            "side_b_only_rows": 7454
+          },
+          "status": "ok",
+          "completion": "partial",
+          "verdict": "diff",
+          "pairing_quality": "exact"
+        },
+        "head": {
+          "outcome_path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\_state\\clean_road_highway vs tsn.xlsx.outcome.json",
+          "outcome_sha256": "5cb9dadb7a6113184149dc5fdbb9efb282415937015be003ef764965af663a60",
+          "generation_id": "f69c92f4-e400-40cc-add3-14a331b3f7ea",
+          "payload_decoded_sha256": "12432d1ac530ad6f0e820fee24a78dc5f3244b01166579704b9dc4fc7b46921a",
+          "counts": {
+            "asserted_cells": 2578656,
+            "context_cells": 1315890,
+            "differing_cells": 281393,
+            "differing_rows": 48942,
+            "known": true,
+            "paired_rows": 52629,
+            "per_field_counts": {
+              "0:THY_ID": 0,
+              "10:THY_COUNTY_CODE": 0,
+              "11:THY_ROUTE_NAME": 0,
+              "12:THY_ROUTE_SUFFIX_CODE": 0,
+              "13:THY_PM_PREFIX_CODE": 0,
+              "15:THY_END_PM_AMT": 6829,
+              "16:THY_PM_SUFFIX_CODE": 0,
+              "17:THY_LENGTH_MILES_AMT": 6829,
+              "18:THY_LEFT_ROAD_EFF_DATE": 21486,
+              "19:THY_LT_SURF_TYPE_CODE": 4758,
+              "1:THY_ELEMENT_ID": 0,
+              "20:THY_LT_LANES_AMT": 5925,
+              "21:THY_LT_SPEC_FEATURES_CODE": 4427,
+              "22:THY_LT_O_SHD_TOT_WIDTH_AMT": 6385,
+              "23:THY_LT_O_SHD_TRT_WIDTH_AMT": 6328,
+              "24:THY_LT_TRAV_WAY_WIDTH_AMT": 6788,
+              "25:THY_LT_I_SHD_TOT_WIDTH_AMT": 6363,
+              "26:THY_LT_I_SHD_TRT_WIDTH_AMT": 6425,
+              "27:THY_LT_SIG_CHG_IND": 0,
+              "28:THY_MEDIAN_EFF_DATE": 19982,
+              "29:THY_MEDIAN_TYPE_CODE": 6709,
+              "2:THY_BEGIN_OFFSET_AMT": 0,
+              "30:THY_CURB_LANDSCAPE_CODE": 2981,
+              "31:THY_MEDIAN_BARRIER_CODE": 5636,
+              "32:THY_MEDIAN_WIDTH_AMT": 8469,
+              "33:THY_MEDIAN_WIDTH_VAR_CODE": 3499,
+              "34:THY_MEDIAN_SIG_CHG_IND": 0,
+              "35:THY_RIGHT_ROAD_EFF_DATE": 21454,
+              "36:THY_RT_SURF_TYPE_CODE": 3969,
+              "37:THY_RT_LANES_AMT": 5576,
+              "38:THY_RT_SPEC_FEATURES_CODE": 4215,
+              "39:THY_RT_I_SHD_TOT_WIDTH_AMT": 5776,
+              "3:THY_END_OFFSET_AMT": 0,
+              "40:THY_RT_I_SHD_TRT_WIDTH_AMT": 5813,
+              "41:THY_RT_TRAV_WAY_WIDTH_AMT": 6464,
+              "42:THY_RT_O_SHD_TOT_WIDTH_AMT": 5442,
+              "43:THY_RT_O_SHD_TRT_WIDTH_AMT": 5358,
+              "44:THY_RT_SIG_CHG_IND": 0,
+              "45:THY_CITY_CODE": 1840,
+              "46:THY_HIGHWAY_GROUP_CODE": 2528,
+              "47:THY_HIGHWAY_ACCESS_CODE": 2735,
+              "48:THY_ACCESS_EFF_DATE": 7931,
+              "49:THY_ACCESS_SIG_CHG_IND": 0,
+              "4:THY_BEGIN_DATE": 0,
+              "50:THY_TERRAIN_CODE": 1650,
+              "51:THY_DESIGN_SPEED_AMT": 1999,
+              "52:THY_NON_ADD_CODE": 136,
+              "53:THY_PROFILE_CODE": 2104,
+              "54:THY_ADT_AMT": 35825,
+              "55:THY_CHANGE_PER_MILE_AMT": 23111,
+              "56:THY_LANDMARK_SHORT_DESC": 1652,
+              "57:THY_POPULATION_CODE": 2589,
+              "58:THY_POPULATION_GROUP_CODE": 0,
+              "59:THY_LAST_SIG_CHG_DATE": 0,
+              "5:THY_END_DATE": 0,
+              "60:THY_RECORD_DATE": 4,
+              "61:THY_FUNCTIONAL_CLASS_CODE": 0,
+              "62:THY_UPDATE_DATE": 0,
+              "63:THY_UPDATE_USER_NAME": 0,
+              "64:THY_MAINT_SVC_LVL_CODE": 0,
+              "65:THY_EQUATE_CODE": 437,
+              "66:THY_BREAK_DESC": 1410,
+              "67:THY_FEDERAL_AID_CODE": 0,
+              "68:THY_FA_ROUTE_PREFIX_CODE": 0,
+              "69:THY_FA_ROUTE_NAME": 0,
+              "6:THY_CREATE_DATE": 0,
+              "70:THY_TOLL_FOREST_CODE": 1271,
+              "71:THY_NATIONAL_LANDS_CODE": 0,
+              "72:THY_SCENIC_FREEWAY_CODE": 0,
+              "73:THY_EXTRACT_DATE": 0,
+              "74:THY_POPULATION_EFF_DATE": 0,
+              "7:THY_CREATE_USER_NAME": 0,
+              "8:THY_SEG_ORDER_ID": 92,
+              "9:THY_DISTRICT_CODE": 193
+            },
+            "side_a_only_rows": 5113,
+            "side_b_only_rows": 7454
+          },
+          "status": "ok",
+          "completion": "partial",
+          "verdict": "diff",
+          "pairing_quality": "exact"
+        },
+        "typed_results_identical": true,
+        "base_head_sources_identical": true,
+        "formulas_status": "BLOCKED - measured hardware limit, not a product result"
+      }
+    ],
+    "raw_source_spots": [
+      {
+        "route": "036",
+        "sources": [
+          {
+            "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-output-audit-claude-independent-2026-07-23\\raw-extract\\2026-07-23 ssor-prod\\highway_sequence\\highway_sequence_route_036.xlsx",
+            "size": 228469,
+            "sha256": "1925088aee8aea8bbc00f5f09baa00bf406a72209c3ade506257c723dbabbd3e"
+          },
+          {
+            "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-output-audit-claude-independent-2026-07-23\\raw-extract\\2026-07-23 ssor-prod\\highway_sequence_pdf\\highway_sequence_route_036.pdf",
+            "size": 205222,
+            "sha256": "fb249c2bb1cde2ee90b2c572e4896b35d19648548c480eb35d4f865a6b0d710f"
+          }
+        ],
+        "excel_rows": [
+          198,
+          199,
+          200
+        ],
+        "pdf_pages": [
+          9
+        ],
+        "conclusion": "Wrapped annotation and ordinary duplicate are distinct; E moves from Excel annotation row 198 to print target 027.232 on page 9."
+      },
+      {
+        "route": "215",
+        "sources": [
+          {
+            "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-output-audit-claude-independent-2026-07-23\\raw-extract\\2026-07-23 ssor-prod\\highway_sequence\\highway_sequence_route_215.xlsx",
+            "size": 140860,
+            "sha256": "7018b35e609c2c0aa53fab297b6d10cde26cbcd8faf1faf05c4228a797a778c9"
+          },
+          {
+            "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-output-audit-claude-independent-2026-07-23\\raw-extract\\2026-07-23 ssor-prod\\highway_sequence_pdf\\highway_sequence_route_215.pdf",
+            "size": 168172,
+            "sha256": "b1a74e6f88c930df34c5327b2d0aee2267707b7e00b3d16b6b96d3255f8cd283"
+          }
+        ],
+        "excel_rows": [
+          198,
+          200,
+          201
+        ],
+        "pdf_pages": [
+          9
+        ],
+        "conclusion": "Bare and wrapped labelled annotations share 043.679; distinct targets and E placement agree with disclosed oracle blind spot."
+      },
+      {
+        "route": "063",
+        "sources": [
+          {
+            "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-output-audit-claude-independent-2026-07-23\\raw-extract\\2026-07-23 ssor-prod\\highway_sequence\\highway_sequence_route_063.xlsx",
+            "size": 112399,
+            "sha256": "286b434f129971e8fffcf4ea81d6d690c584b20a8ca4151bc01f4472fa576d94"
+          },
+          {
+            "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-output-audit-claude-independent-2026-07-23\\raw-extract\\2026-07-23 ssor-prod\\highway_sequence_pdf\\highway_sequence_route_063.pdf",
+            "size": 157430,
+            "sha256": "7743e91ba70e9a5c5c0346a1ec7ea5a30554aa1ee2696246c51be6ad5dba49e5"
+          }
+        ],
+        "excel_rows": [
+          124,
+          151
+        ],
+        "pdf_pages": [
+          6,
+          7
+        ],
+        "conclusion": "Only the second L009.226 print occurrence on page 7 carries E; Excel row 151 and its annotation omit it. The genuine missing marker is not confused with row 124/page 6."
+      }
+    ],
+    "reviewer_harness_note": "The probe intentionally changed TARGET NEIGHBOR HG to Y, but its generic neighbor assertion still required U. Existing published read-back retains Y/R, target X/H, annotation-neighbor U/R, and E at the unresolved annotation. Four differences remain; both data-sheet twins agree. Reviewer expectation defect only; no retry.",
+    "probe_initial_flags": [
+      "unresolved-target"
+    ],
+    "probe_product_result": "All 27 product challenges consistent after inspecting the one flawed assertion; 16 permutations each zero, five changed target fields each visible, both missing-marker directions visible, missing/unresolved targets visible, per-call 0/1 disclosures isolated.",
+    "classifier_followup": {
+      "input_a": [
+        [
+          "001",
+          "1.000",
+          "PEÑA ROAD"
+        ]
+      ],
+      "input_b": [
+        [
+          "001",
+          "1.000",
+          "PEA ROAD"
+        ]
+      ],
+      "helper_classifies_representation_only": true,
+      "differing_cells": 1,
+      "summary_subset": [
+        [
+          null,
+          "— of which representation-only (punctuation / spacing / quoting / letter case; still counted as differences, classified at build time)",
+          1
+        ]
+      ],
+      "comparison": [
+        [
+          "Route",
+          "Location",
+          "#",
+          "TSMIS Row",
+          "TSN Row",
+          "Status",
+          "Diffs",
+          "Description",
+          "__CMP_E1_STATE_V1_C001_P0000_P0000",
+          "__CMP_E2_KEY_V1_TOKEN"
+        ],
+        [
+          "001",
+          "1.000",
+          1,
+          null,
+          null,
+          "Both",
+          1,
+          "PEÑA ROAD ≠ PEA ROAD",
+          "D",
+          "__CMP_E2_KEY_V1_00000001"
+        ]
+      ],
+      "impact": "A dropped non-ASCII letter is labelled representation-only, although it remains flagged and counted. Synthetic incidence only; no occurrence claimed in frozen corpus."
+    }
+  },
+  "focused_checks": [
+    {
+      "command": "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\build\\.venv\\Scripts\\python.exe -X utf8 build/check_compare_representation_class.py",
+      "exit_code": 0,
+      "seconds": 1.328,
+      "log": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\check_compare_representation_class.py.log",
+      "sha256": "9882892cfb38a78ae6c2d163b8d34b094aa6173affd14a8e04fe9e584bdf2621"
+    },
+    {
+      "command": "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\build\\.venv\\Scripts\\python.exe -X utf8 build/check_compare_highway_sequence.py",
+      "exit_code": 0,
+      "seconds": 2.063,
+      "log": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\check_compare_highway_sequence.py.log",
+      "sha256": "6c4a00aecb873f2459d7590342fd34a3047b23da74bfa8db58e60dc08149e053"
+    },
+    {
+      "command": "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\build\\.venv\\Scripts\\python.exe -X utf8 build/check_published_comparison.py",
+      "exit_code": 0,
+      "seconds": 4.968,
+      "log": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\check_published_comparison.py.log",
+      "sha256": "ca21616f2b5cd8c0da592ca569fd223c86c455b62d7a157a431505fc6b938cff"
+    }
+  ],
+  "review_scripts": [
+    {
+      "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\finalize_review.py",
+      "size": 19583,
+      "sha256": "6c1587dbf5c9b6c5b75b2aacba20f9114614e40302835872155e278a1f56554b"
+    },
+    {
+      "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\focused_checks.py",
+      "size": 974,
+      "sha256": "69880c67a8d178a52dcd6790c533749bcec4f5ad8811adcaa18bf8654ec8f1b3"
+    },
+    {
+      "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\independent_probes.py",
+      "size": 7196,
+      "sha256": "6bb03e12ecd2f9b6c0566d03afdef4dbb681ebc92a7bfffc1155ae154b3a0b34"
+    },
+    {
+      "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\inspect_records.py",
+      "size": 923,
+      "sha256": "2a68ad205d8afaead405ee4ce64f9f764b94992167cea96b023e7268be52c63a"
+    },
+    {
+      "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\source_spots.py",
+      "size": 2706,
+      "sha256": "f665b7817665474014e71eee2b93babfaf4f1f59ba5e005dbfe8f9ced33a118b"
+    },
+    {
+      "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\verify_retained.py",
+      "size": 2556,
+      "sha256": "7080f8ee6db071acf3a79568ec91780d089db007b43ac7225983d7d76659e994"
+    },
+    {
+      "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\verify_semantics.py",
+      "size": 6505,
+      "sha256": "d96b46d2c5f758b725e443745094182ebac1ac3075418320355eec5980d4438f"
+    }
+  ],
+  "synthetic_probes": [
+    {
+      "case": "orders-0000",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "match",
+      "completion": "complete",
+      "expect_zero": true,
+      "counts": {
+        "differing_cells": 0,
+        "differing_rows": 0,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-0000\\comparison (values).xlsx",
+          "size": 26318,
+          "sha256": "4987aef76c921fb0e45c167f9f965dd752f892fd845fb71f081e775bb98003a8"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-0000\\comparison.xlsx",
+          "size": 28719,
+          "sha256": "3d9899a794b1ccb0ddbe6665fe770e392d4f02139149e90fb8d552fdb866997c"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "orders-0001",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "match",
+      "completion": "complete",
+      "expect_zero": true,
+      "counts": {
+        "differing_cells": 0,
+        "differing_rows": 0,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-0001\\comparison (values).xlsx",
+          "size": 26310,
+          "sha256": "575c27e3a61f0e9e3defb2a5ef7c99af220c9e27ef13fd790302110b5d39db44"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-0001\\comparison.xlsx",
+          "size": 28711,
+          "sha256": "61bc58f1d0df9257936271e8c1f6c54ed850441857b494c40b7e398a556cb10e"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "orders-0010",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "match",
+      "completion": "complete",
+      "expect_zero": true,
+      "counts": {
+        "differing_cells": 0,
+        "differing_rows": 0,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-0010\\comparison (values).xlsx",
+          "size": 26322,
+          "sha256": "0e3312c7f3e9236170bbfd79eb07792c75b450821042194d58299972f71fe546"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-0010\\comparison.xlsx",
+          "size": 28714,
+          "sha256": "e383fa13d6572c001ef56dd638452f510d9da196caf808986f228ca77ae2769a"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "orders-0011",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "match",
+      "completion": "complete",
+      "expect_zero": true,
+      "counts": {
+        "differing_cells": 0,
+        "differing_rows": 0,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-0011\\comparison (values).xlsx",
+          "size": 26310,
+          "sha256": "fcd6009b12b93ea1385990129da0a70a85694b0c7099ef56329d28644f489ce0"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-0011\\comparison.xlsx",
+          "size": 28710,
+          "sha256": "84c97fa0d34cdf34a635ed9457fa11613f1ba3304dd5eeb12b7315e108bfa950"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "orders-0100",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "match",
+      "completion": "complete",
+      "expect_zero": true,
+      "counts": {
+        "differing_cells": 0,
+        "differing_rows": 0,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-0100\\comparison (values).xlsx",
+          "size": 26313,
+          "sha256": "eabab58335f375def88865317d3aca943afbfafc0e4c8a53897387e6e35ec86c"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-0100\\comparison.xlsx",
+          "size": 28712,
+          "sha256": "4e9b14731312a981a8c4eb26cc41be57f939676b3b657e7615aaeaef60373077"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "orders-0101",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "match",
+      "completion": "complete",
+      "expect_zero": true,
+      "counts": {
+        "differing_cells": 0,
+        "differing_rows": 0,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-0101\\comparison (values).xlsx",
+          "size": 26298,
+          "sha256": "1f02a46a75850c101fe0e63ddaadcf6221e6ac6acc47a9d282ad339d89b979fd"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-0101\\comparison.xlsx",
+          "size": 28702,
+          "sha256": "5346c5bddc5e9546922ab0b1d991c64c5a5e2cad73f7683ba7eeecbff45049e6"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "orders-0110",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "match",
+      "completion": "complete",
+      "expect_zero": true,
+      "counts": {
+        "differing_cells": 0,
+        "differing_rows": 0,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-0110\\comparison (values).xlsx",
+          "size": 26307,
+          "sha256": "ee229bf67d26a259efe1eed67e7be0ef38cd1618a37e42d8628a201d6e6ef192"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-0110\\comparison.xlsx",
+          "size": 28704,
+          "sha256": "66018237f423f47fcf5c754265699f5194363e8c11876a19def31c485f70eda8"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "orders-0111",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "match",
+      "completion": "complete",
+      "expect_zero": true,
+      "counts": {
+        "differing_cells": 0,
+        "differing_rows": 0,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-0111\\comparison (values).xlsx",
+          "size": 26302,
+          "sha256": "1f5acf620d6b0f65f9c7305966bfa20503615b8796cc23ba4ddc50a7daa28fd5"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-0111\\comparison.xlsx",
+          "size": 28702,
+          "sha256": "ee2203b5ac6d330e1d20bcef5be9a2db0502439779346936a68715e917695055"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "orders-1000",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "match",
+      "completion": "complete",
+      "expect_zero": true,
+      "counts": {
+        "differing_cells": 0,
+        "differing_rows": 0,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-1000\\comparison (values).xlsx",
+          "size": 26318,
+          "sha256": "00cb656ee39d2da9d1040ad6854dadec007f18bc30d92524ce8d31ce32025d8f"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-1000\\comparison.xlsx",
+          "size": 28714,
+          "sha256": "aba417a6d250ca0f9b38dd011554ab8707f8c1c4ef3ca12aa9ff261641581714"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "orders-1001",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "match",
+      "completion": "complete",
+      "expect_zero": true,
+      "counts": {
+        "differing_cells": 0,
+        "differing_rows": 0,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-1001\\comparison (values).xlsx",
+          "size": 26307,
+          "sha256": "77045ade26c5d1d9c038ee79589e5b79c218b1aabf74ec8b6aa2ff301796b38d"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-1001\\comparison.xlsx",
+          "size": 28706,
+          "sha256": "5ea88b0283f2fd52b0047d8e98f1fb1d1b9036e90b6e42b687706859e1f0c03b"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "orders-1010",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "match",
+      "completion": "complete",
+      "expect_zero": true,
+      "counts": {
+        "differing_cells": 0,
+        "differing_rows": 0,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-1010\\comparison (values).xlsx",
+          "size": 26316,
+          "sha256": "d661734923952ed1050e4b154b529caf0eb4e1d399f7c29fefe830730ff22f63"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-1010\\comparison.xlsx",
+          "size": 28717,
+          "sha256": "b922787b6ca2935f846a6d9873e621d9c9a68e363696c7d47607849b2ed6d52f"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "orders-1011",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "match",
+      "completion": "complete",
+      "expect_zero": true,
+      "counts": {
+        "differing_cells": 0,
+        "differing_rows": 0,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-1011\\comparison (values).xlsx",
+          "size": 26308,
+          "sha256": "4660a6e11c1303154117b01f94115f00f862eb56b76f42b052b3003e739acaf8"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-1011\\comparison.xlsx",
+          "size": 28710,
+          "sha256": "52e79c82362f4336d1684be2cedc34e046e577ebc2be740a6d2b019bb89d566e"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "orders-1100",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "match",
+      "completion": "complete",
+      "expect_zero": true,
+      "counts": {
+        "differing_cells": 0,
+        "differing_rows": 0,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-1100\\comparison (values).xlsx",
+          "size": 26312,
+          "sha256": "dc52a412a3163b046f2873322a8815b71d908968c06d5555c2a9c9602579d728"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-1100\\comparison.xlsx",
+          "size": 28709,
+          "sha256": "5db77d075c7c79ba72ea1535babec057e0121a76bb3d83ea1b85d5d85ee3db34"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "orders-1101",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "match",
+      "completion": "complete",
+      "expect_zero": true,
+      "counts": {
+        "differing_cells": 0,
+        "differing_rows": 0,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-1101\\comparison (values).xlsx",
+          "size": 26303,
+          "sha256": "8efd93ada72d6cc35205ae1c41199fc7eba1a5cf08607ba5b622a0066d0758a8"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-1101\\comparison.xlsx",
+          "size": 28702,
+          "sha256": "41d9876d0cc25efa162148caa9c2264a67deadb3b2798de7e0a6b43ba5890956"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "orders-1110",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "match",
+      "completion": "complete",
+      "expect_zero": true,
+      "counts": {
+        "differing_cells": 0,
+        "differing_rows": 0,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-1110\\comparison (values).xlsx",
+          "size": 26310,
+          "sha256": "22769f1b526db93647a95d15e2fe9c14c9f668b2a1f8bdc576d16568685f7cbe"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-1110\\comparison.xlsx",
+          "size": 28710,
+          "sha256": "5cca8c66459bf22bf83d0bcf4ffc1310318eb73b6a9e2be8757b1b62bcdf29d4"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "orders-1111",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "match",
+      "completion": "complete",
+      "expect_zero": true,
+      "counts": {
+        "differing_cells": 0,
+        "differing_rows": 0,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-1111\\comparison (values).xlsx",
+          "size": 26299,
+          "sha256": "eddd81d36de8b8e1412688db1771d5b0bb1e45c27f933243b91b97d94d937771"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\orders-1111\\comparison.xlsx",
+          "size": 28705,
+          "sha256": "f0e74a229fee43410ed97e87a802944366361b7ba9220de8a7cda8e92b5dffab"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "target-change-city",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "X",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "diff",
+      "completion": "complete",
+      "expect_zero": false,
+      "counts": {
+        "differing_cells": 3,
+        "differing_rows": 2,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 2,
+        "3:City": 1,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\target-change-city\\comparison (values).xlsx",
+          "size": 26369,
+          "sha256": "6fc983647f9cf9f20e10928926f24c9bbad6ed8631d2276c941703cae895ad3c"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\target-change-city\\comparison.xlsx",
+          "size": 28724,
+          "sha256": "20e651d42dd774bac53d52c757de6ae22a4fa55929e7d5187716beb251c6768c"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "target-change-hg",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "H",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "diff",
+      "completion": "complete",
+      "expect_zero": false,
+      "counts": {
+        "differing_cells": 3,
+        "differing_rows": 2,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 2,
+        "3:City": 0,
+        "4:HG": 1,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\target-change-hg\\comparison (values).xlsx",
+          "size": 26354,
+          "sha256": "02a586ee525c9de802410bfa1639cbbf22696a0b0056371f3e899aea9049ba5b"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\target-change-hg\\comparison.xlsx",
+          "size": 28713,
+          "sha256": "3ef610de6549ab21d401b285f3f31d44d0070e6765f7d3107e87e033e2e7d24b"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "target-change-ft",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "R",
+          "1.267",
+          "TARGET"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "diff",
+      "completion": "complete",
+      "expect_zero": false,
+      "counts": {
+        "differing_cells": 3,
+        "differing_rows": 2,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 2,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 1,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\target-change-ft\\comparison (values).xlsx",
+          "size": 26352,
+          "sha256": "4cf2db865e11e1f97fdf25e21636f5589db4729c95cc8dbf3483be1bdd3a1c2a"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\target-change-ft\\comparison.xlsx",
+          "size": 28711,
+          "sha256": "a6036f0a6067a67b1a8e2c1eca19221ceaa3f20b6588e90bfc6b02d7b100c5f7"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "target-change-distance",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "2.000",
+          "TARGET"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "diff",
+      "completion": "complete",
+      "expect_zero": false,
+      "counts": {
+        "differing_cells": 3,
+        "differing_rows": 2,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 2,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 1,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\target-change-distance\\comparison (values).xlsx",
+          "size": 26360,
+          "sha256": "c0d26529cb7be1a373566ac48707209ca55962e0fe821ab9b6b8d5d3be8fc52d"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\target-change-distance\\comparison.xlsx",
+          "size": 28714,
+          "sha256": "f7ce45c50ad7b3081103edfc4f775db5012513c819b6ef4776759dfd9f429d36"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "target-change-description",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "CHANGED TARGET"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "diff",
+      "completion": "complete",
+      "expect_zero": false,
+      "counts": {
+        "differing_cells": 3,
+        "differing_rows": 2,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 2,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 1
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\target-change-description\\comparison (values).xlsx",
+          "size": 26384,
+          "sha256": "ffc4eaaed70c7504aaed8aec19cc30e850bf0e577aab584cbc973f419bceaf22"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\target-change-description\\comparison.xlsx",
+          "size": 28734,
+          "sha256": "287cd5bfd2395d894c8abdccc8b844277545adeeab0bf479c3e9a826cbb8a540"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "missing-excel-E",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "diff",
+      "completion": "complete",
+      "expect_zero": false,
+      "counts": {
+        "differing_cells": 1,
+        "differing_rows": 1,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 1,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\missing-excel-E\\comparison (values).xlsx",
+          "size": 26342,
+          "sha256": "0a83421e6c8c3dff2d90874e4fe84137559a42fe87077ed6fc75d0d8f6416b2f"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\missing-excel-E\\comparison.xlsx",
+          "size": 28715,
+          "sha256": "6dde75194d3993d067878aee9fb5b07cfa626c9b7006aa1cdc73dcfca13c4acb"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "missing-print-E",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "diff",
+      "completion": "complete",
+      "expect_zero": false,
+      "counts": {
+        "differing_cells": 1,
+        "differing_rows": 1,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 1,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\missing-print-E\\comparison (values).xlsx",
+          "size": 26329,
+          "sha256": "76b44f6d80bd9dfafed344bd3ca10b78875e84465be75bc0674e7067f579325e"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\missing-print-E\\comparison.xlsx",
+          "size": 28705,
+          "sha256": "0a9f8628da54eb79244415faa38415200ac178f2c73aa56d770ce4e381cc23b6"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "missing-target",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "diff",
+      "completion": "complete",
+      "expect_zero": false,
+      "counts": {
+        "differing_cells": 1,
+        "differing_rows": 1,
+        "paired_rows": 3,
+        "side_a_only_rows": 1,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 1,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\missing-target\\comparison (values).xlsx",
+          "size": 26360,
+          "sha256": "4e3aea1a83129b9f2a489bdee78ecc71efad20261a3967db04c36efd3265d63c"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\missing-target\\comparison.xlsx",
+          "size": 28884,
+          "sha256": "092ca34c0e7eb307af2d28a084f059c90fa1a8169bb305e86682bb7e21f76db0"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "unresolved-target",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "X",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "Y",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "diff",
+      "completion": "complete",
+      "expect_zero": false,
+      "counts": {
+        "differing_cells": 4,
+        "differing_rows": 3,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 2,
+        "3:City": 0,
+        "4:HG": 2,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\unresolved-target\\comparison (values).xlsx",
+          "size": 26364,
+          "sha256": "0a09939534eaf5cc72b35cc2fe0c3a55e52c403c522e9ddbd21e4a0f68849dcc"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\unresolved-target\\comparison.xlsx",
+          "size": 28717,
+          "sha256": "776785205620df9334002b2d7d81dac01ef86294822193b7777de694961faa4f"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": false,
+      "challenge_pass": false
+    },
+    {
+      "case": "concurrent-equate",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "",
+          "",
+          "",
+          "EQUATES TO REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "E",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "E",
+          "D",
+          "H",
+          "",
+          "REVIEW LANDMARK"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "R",
+          "018.540",
+          "",
+          "U",
+          "R",
+          "0.100",
+          "ANNOTATION NEIGHBOR"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "D",
+          "H",
+          "1.267",
+          "TARGET"
+        ],
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "018.530",
+          "",
+          "U",
+          "R",
+          "0.250",
+          "TARGET NEIGHBOR"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "match",
+      "completion": "complete",
+      "expect_zero": true,
+      "counts": {
+        "differing_cells": 0,
+        "differing_rows": 0,
+        "paired_rows": 4,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\concurrent-equate\\comparison (values).xlsx",
+          "size": 26322,
+          "sha256": "a1cc4e71574d2502ed997e9f2d22f3be1731317423191a1894dfc0a5d51c274f"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\concurrent-equate\\comparison.xlsx",
+          "size": 28726,
+          "sha256": "a5c03c379d7be646e757f58356feac22ae74ae7b708859a359cfb1a7bf5b0835"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    },
+    {
+      "case": "concurrent-plain",
+      "print_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "001.000",
+          "",
+          "U",
+          "H",
+          "0.100",
+          "PLAIN"
+        ]
+      ],
+      "excel_input": [
+        [
+          "001",
+          "ORA",
+          "",
+          "",
+          "001.000",
+          "",
+          "U",
+          "H",
+          "0.100",
+          "PLAIN"
+        ]
+      ],
+      "status": "ok",
+      "verdict": "match",
+      "completion": "complete",
+      "expect_zero": true,
+      "counts": {
+        "differing_cells": 0,
+        "differing_rows": 0,
+        "paired_rows": 1,
+        "side_a_only_rows": 0,
+        "side_b_only_rows": 0
+      },
+      "per_field_counts": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "files": [
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\concurrent-plain\\comparison (values).xlsx",
+          "size": 24376,
+          "sha256": "75f6952264d0bf2a612514888b6125b0633ced9a69ee8720af731aa132f3bd7c"
+        },
+        {
+          "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\probes\\concurrent-plain\\comparison.xlsx",
+          "size": 25583,
+          "sha256": "228d6df4d779d2fb744456e12120d369cccdf98d6af4d05c856aa624f768f49a"
+        }
+      ],
+      "both_flavors_present": true,
+      "canonical_twin_parity": true,
+      "neighbor_flags_retained": true,
+      "challenge_pass": true
+    }
+  ],
+  "synthetic_probe_full_record": {
+    "path": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\independent-probes.json",
+    "sha256": "4c25f88fad839ed6af07e425cda788385d97f4bbadc43f80b744d970e5ce4c73"
+  },
+  "resources": {
+    "retained_hash_seconds": 2.719,
+    "synthetic_probe_seconds": 18.281,
+    "largest_probe_rows": 4,
+    "observed_shell_peak_bytes": 89407488,
+    "new_output_before_closeout_bytes": 2431544,
+    "no_excel_recalculation": true,
+    "no_statewide_generation_or_full_recount": true,
+    "no_acceptance_rerun": true,
+    "post_merge_smoke": "Pending; runs once on main after the signed joint approval."
+  }
+}

@@ -8,7 +8,7 @@ post-merge gate and frozen application self-test both passed;
 RB-4 is MERGED at `83a24896a5a970a3686df87934210f54cea43778`; its 158/158
 post-merge gate and frozen application self-test both passed;
 RB-5 on `hotfix/rb-5-difference-classification`, from base
-`87e368c3e9a7eaf26395308e8ddea4aba7d303e5`, is REVIEW 1 APPROVED — AWAITING REVIEW 2. Review 1 returned it twice and BOTH returns are answered:
+`87e368c3e9a7eaf26395308e8ddea4aba7d303e5`, is JOINTLY APPROVED. Review 1 returned it twice and BOTH returns are answered:
 `RB5-R1-EG-001` (the HF-09 formulas acceptance leg, supplied 2026-08-30) and
 `RB5-R1-001` (duplicate-order-sensitive equate normalization — a real defect,
 reproduced from the reviewer's own witness and FIXED 2026-08-31). Both allowed
@@ -40,7 +40,7 @@ first pass.
 
 ## Next action
 
-Run a separate **Codex Review 2** on `hotfix/rb-5-difference-classification`.
+**Codex Reviews 1 and 2 have separately APPROVED RB-5.** Complete its prescribed merge, post-merge smoke, push and bounded cleanup; then prepare RB-6 readiness. Review 2 records the Unicode classification follow-up under the two-denial ceiling.
 
 **`RB5-R1-001` is corrected.** The finding was right and reproduced exactly.
 Equate relations no longer carry a file-order occurrence ordinal: each render
@@ -67,7 +67,7 @@ acceptance outputs or retry the large Clean Road full rebuild in review.**
 Both allowed denials are used; remaining observations are owner-ranked follow-
 ups, not another denial cycle. After the bounded correction, the applicable
 pass is Review 2. Codex Review 1 approved correction runtime 0d54799;
-see the latest signed section in RB-5/REVIEW.md. Review 2 is pending.
+see the latest signed section in RB-5/REVIEW.md. Review 2 has now approved; see its signed section and verification witness.
 
 Historical context that still governs: `v0.35.0` separately made `HG`, `City`, and `Distance To
 Next Point` asserted in Highway Sequence vs-TSN; that owner-directed release is

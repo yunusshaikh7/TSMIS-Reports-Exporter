@@ -1,8 +1,8 @@
 # RB-5 — Adversarial Review Record
 
-Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
+Status: **JOINTLY APPROVED**
 
-Current decision: **APPROVED**, Codex Review 1 on corrected runtime 0d54799a108d944280ffb7a092260cae59778f76. Both returns are closed; historical signed records follow. The current approval is the final section.
+Current decision: **JOINTLY APPROVED**. Separate Codex Reviews 1 and 2 approve corrected runtime 0d54799a108d944280ffb7a092260cae59778f76. Review 2 carries RB5-R2-FU-001 under the two-denial ceiling; limitations and both signed records are retained below.
 
 ## Review 1 — Codex — DENIED — EVIDENCE GAP
 
@@ -590,3 +590,179 @@ pending**; this is not joint approval. Per first-approver protocol, commit and
 stop. No fetch, merge, push, branch/worktree cleanup or evidence deletion; no
 merge SHA. Preserve main, gh-pages and unrelated work. Next: **RB-5 Review 2**;
 **RB-6** remains queued and blocked until RB-5 merges.
+
+
+---
+
+## Review 2 — Codex — APPROVED
+
+| Field | Identity |
+|---|---|
+| Reviewer / pass / implementer | Codex / Review 2, separate fresh non-implementing reviewer / Claude |
+| Branch / implementation worktree | `hotfix/rb-5-difference-classification` / `C:\Users\Yunus\Projects\wt-rb5` |
+| Recorded main base | `87e368c3e9a7eaf26395308e8ddea4aba7d303e5` |
+| Corrected runtime | `0d54799a108d944280ffb7a092260cae59778f76` |
+| Entry and Review 1 record head | `03ad6b306313e9199acd159e0b6378e9a5ca3db2`; no runtime changes after the correction |
+| Review 2 record head | This commit; resolve the commit adding `witness/review2-verification.json` |
+| Started / signed UTC | `2026-08-31T18:15:39.110000+00:00` / `2026-08-31T18:32:36.909182+00:00` |
+| Elapsed at signed record creation | **16.96 minutes**, including record preparation; closeout timing is recorded below |
+| Verdict | **APPROVED; JOINTLY APPROVED**, with the explicit follow-up and limitations below |
+
+The fresh checkout was detached at the recorded old base. The actual local
+RB-5 branch was located before evaluating preconditions and was clean at entry.
+The current plan, bundle, implementation and signed Review 1 records all establish
+`REVIEW 1 APPROVED — AWAITING REVIEW 2`. The exact base/runtime, retained
+publications, corrected duplicate-order witness and seven completed HF-09
+recalculation cases exist. The disclosed Clean Road hardware-limited leg,
+validation limitation and deliberate coverage trade-offs are assessed under
+Prompt 05's practical-impact gate, not presented as completed acceptance.
+Both denials were already used. No third denial cycle is opened.
+
+### Independent challenge to Review 1
+
+Review 1 proved duplicate ANNOTATION order but did not exhaustively perturb
+TARGET duplicate groups; its additional permutation generator stopped on a
+filename assumption. It also did not test simultaneous disclosure counters or
+non-ASCII classification. Review 2 challenged these distinct mechanisms through
+small shipped-path outputs, not another acceptance run:
+
+- **16 combinations** independently reorder annotation and target groups in
+  both editions. Every combination reports **0 cells / 0 rows**, preserves
+  ordinary neighbor HG/FT, and publishes identical canonical data in both flavors.
+- Genuine target City, HG, FT, Distance and Description changes each remain
+  visible (**3 cells / 2 rows** each in the ambiguous duplicate case). Resolving
+  conservatively leaves two suffix differences as well as the real change;
+  no changed target value is erased or converted into agreement.
+- A missing E in either direction remains **1 cell / 1 row**. A missing target
+  remains **1 differing cell plus 1 print-only row**. Two unresolved targets
+  keep their injected HG values and retain **4 cells / 3 rows**.
+- Two concurrent calls through the shared adapter independently disclose
+  **1** and **0** relations. All **27** cases publish both flavors with equal
+  canonical data. This is data-sheet parity, not a fresh Excel recalculation.
+- A separate published classifier probe exposed **RB5-R2-FU-001** below.
+
+One initial probe flag was a reviewer assertion error: the unresolved-target
+case deliberately changed the neighbor HG to `Y`, while a generic assertion
+still required `U`. Inspection of the ALREADY-generated workbook proves `Y/R`
+retained on that neighbor, `X/H` on the target, `U/R` on the unchanged annotation
+neighbor, and E retained at the unresolved annotation. The original flag and
+explanation are preserved in the witness. The harness was **not rerun**.
+
+Raw-source re-derivation deliberately selected cases beyond Review 1's named
+001/032/580 spots. Direct openpyxl rows and independent pdfplumber text establish:
+route 036 rows 198–200 / PDF page 9 distinguish the wrapped annotation from its
+ordinary duplicate; route 215 rows 198/200/201 / page 9 distinguish the bare and
+wrapped annotations sharing one postmile; route 063 row 151 / page 7 proves a
+genuine missing E, distinct from the ordinary same-postmile row 124 / page 6.
+The two oracle blind spots are real wrapping limits; the new check does not
+promote that oracle into an exhaustive reader of all other fields. Raw extracts
+remain local only; committed evidence includes source identities and conclusions.
+
+### Evidence and acceptance matrix
+
+The complete 27-file branch change inventory is accounted for. Runtime and
+focused-test diffs were independently inspected; document changes record scope,
+results and prior reviews. Extra sibling adapters only clear inherited hooks or
+supply the documented Ramp Detail sibling opt-in. No equality operand, canary,
+provenance/publication substrate or evidence renderer changes. Only
+`compare_highway_sequence_pdf.py` changed between initial and corrected runtimes,
+so unaffected HF-09 acceptance evidence is reused by runtime equivalence.
+
+| Criteria | Exact evidence and result |
+|---|---|
+| HF-06.1–2: close the ruled class | Hash-bound base payload: 3,714 cells / 1,395 rows, per-field 547 suffix / 929 HG / 1,119 FT / 1,119 Description. Corrected `head-r3`: 7/7, 60,254 paired, zero one-sided, suffix 7 and other fields zero. **3,707** representation cells close. The seven genuine markers must remain; literal zero-total wording is a wording conflict, not suppression authority. |
+| HF-06.3: anti-suppression | Existing committed fixture inspected and Review 1 execution reused; Review 2's duplicate-target field perturbations, both E directions, missing/unresolved targets and all 16 order combinations independently challenge false agreement. |
+| HF-06.4: normalized disclosure | Shipped tiny outputs and concurrent calls disclose their own 0/1 counts in Summary/Notes. Retained statewide count 1,119 comes from implementation and Review 1's checked cache; complete native-scale visuals remain qualified below. |
+| HF-06.5: path / vs-TSN parity | Corrected decoded payload is identical to retained original direct and Everything payloads. By-day/formulas parity is retained in the HF-06 recalc witness. Both HSL vs-TSN base/head typed outcomes and every field count independently agree. |
+| HF-06.6–7: fences / canaries | Self-only loader; no shared equality/formula change or canary file changed. Scope opt-out and neighboring semantic checks pass. |
+| HF-06.8 / HF-09.7: regression | Base failures and full corrected gate retained, not repeated before merge. Three new focused executions pass; original defect is reproduced in retained base payload. Corrected full gate remains reported **170/171**, with the disclosed validation issue. |
+| HF-09.1–3: disclosure / flags / census | All eight base/head typed counts, every field, status/completion/verdict/pairing quality and recorded source pairs independently agree. Seven completed formulas records have equal per-field maps, disclosure counts, clean checks and zero reported cached errors. Existing census agrees. Unicode subset misclassification is explicitly carried as FU-001 under the denial ceiling. |
+| HF-09.4: equality / totals | Classification occurs only after a D cell is counted; no headline total or equality changes. The Unicode probe itself remains D and counted. No corrected differing-row claim. |
+| HF-09.5–6: quote/evidence/neighbors | Evidence and `_quote_note` code unchanged. Representation on/off check verifies published data, states, counts and outcome invariance; neighboring Highway Sequence and atomic-publication checks pass. |
+
+| HF-09 retained case | Cells / rows, unchanged | Representation count | Recalculation record |
+|---|---:|---:|---|
+| Highway Log Excel | 84,709 / 38,478 | 1,243 | 10 OK; 0 errors |
+| Highway Log PDF | 84,202 / 38,931 | 1,243 | 10 OK; 0 errors |
+| Highway Sequence Excel | 28,450 / 22,554 | 12 | 10 OK; 0 errors |
+| Highway Sequence PDF | 27,601 / 22,728 | 12 | 10 OK; 0 errors |
+| Intersection Detail Excel | 5,092 / 2,816 | 1 | 11 OK; 0 errors |
+| Intersection Detail PDF | 5,092 / 2,816 | 1 | 11 OK; 0 errors |
+| Ramp Detail PDF | 619 / 468 | 3 | 10 OK; 0 errors |
+| Clean Road | 281,393 / 48,942; partial on both legs | VALUES 2 | FORMULAS leg hardware-limited, **unclaimed** |
+
+| Review surface | Result / practical limitation |
+|---|---|
+| Values/formulas | All 21 completed HF-09 workbook sizes/digests match. Recalc record consistency independently checked; cached-error scans and large Excel recalculations were not repeated. HF-06 retained recalc: 7/7, identical fields, ten OK checks; corrected tiny twins agree. |
+| Visual | Summary/Notes text and counts checked in small output; native-scale acceptance renders were not identified by the prior review. No complete visual approval claimed and no cosmetic denial. |
+| Evidence eligibility / fidelity | Unchanged code and retained gate; no new corpus-wide image/absence audit. Atomic-publication integrity/refusal check passes. |
+| Provenance / stale cache / failure | All eight base/head source-pair records agree; current corrected self inputs also match their own source hashes and sizes. Earlier HSL VALUES versus FORMULAS source-byte mismatch stays qualified; results agree but identical bytes across those pairs are not asserted. Publication/freshness substrate unchanged. |
+| Source truth | Independent reader method and limitations inspected; three selected raw cases re-derived. No whole-corpus recount. |
+| Performance / rerun | Classifier runs inside the existing difference loop; matching resolves local groups against original rows. Tiny shipped-path suite: 18.281 s. No extra expensive work is introduced by the review. |
+
+### Practical-impact gate and follow-ups
+
+**RB5-R2-FU-001 — non-ASCII letters can be mislabeled as presentation**
+(`scripts/compare_core.py`, `_REPRESENTATION_STRIP_RE` / `representation_only`).
+The regex retains only ASCII letters/digits. A shipped-engine VALUES probe for
+`PEÑA ROAD` versus `PEA ROAD` reports a representation-only subset of **1**.
+**What would a user see differently?** A real dropped letter is described as
+presentation-only, which could lead a reader to discount it. The differing-cell
+total remains **1**, the displayed pair remains visible and its mask remains
+**D**. This is a concrete classification follow-up; frozen-corpus incidence is
+not established. Preserve Unicode letters when forming the class key and add
+this negative fixture in owner-authorized follow-up work. **Not a third denial:**
+Prompt 05 explicitly caps this bundle at two denials and directs remaining
+findings to owner-ranked follow-ups while the bundle proceeds. No runtime fix
+or new acceptance run is smuggled into this review.
+
+Other carried notes, each assessed before the verdict:
+
+- Genuine E residuals: hiding them would change user output incorrectly; keep
+  all seven. Wrapped-reader limits and measured 12/3/2 class counts are disclosed.
+- Clean Road's 452 MB formulas leg is unclaimed after the recorded hardware
+  failure; no new wrong output is established and no rebuild is attempted.
+- The staged-library duplicate archive-member validation issue is outside the
+  diff and separately disclosed. The recorded gate is not relabeled 171/171.
+- Missing complete native-scale/matrix/packaged acceptance coverage and prior
+  source-byte qualifications remain limits, not invented successful runs.
+- Review 1's acknowledged finalization overrun changes no application behavior;
+  it is not grounds to repeat acceptance or withhold this separate review.
+
+### Binding, commands, budget and signatures
+
+[Review 2 verification](witness/review2-verification.json) binds all new scripts,
+logs, small outputs, source spots, decoded typed results and reused evidence.
+**42 distinct retained file identities match**, including the 21 completed
+HF-09 workbooks, prior correction witnesses and the corrected self publication.
+The corrected self workbook is 34,860,672 bytes, SHA-256
+`e802b1c3b2561edca65e63bdb89dd4ebe6d08547ffb4afc1b52b364c2d5fb395`,
+generation `a84d4094-4118-4ada-bfd6-80b55d6be55c`; its decoded payload digest is
+`225b92d7bd5155a4e1459d4f5fa777b7558e6ab1df9565f33863a0bed8ac8bae`.
+The rejected 129-cell intermediate is not accepted evidence for the final result.
+
+New checks, once each with the existing build Python:
+`check_compare_representation_class.py` **PASS** (1.328 s),
+`check_compare_highway_sequence.py` **PASS** (2.063 s),
+`check_published_comparison.py` **PASS** (4.968 s). Other new commands were scoped
+Git/diff/file reads, streaming hashes (2.719 s), retained JSON/payload inspection,
+the 27 tiny shipped-path cases plus one classifier case, and three raw-source
+spots. No full gate ran during substantive review; it runs once after merge.
+
+The first sandbox launch failed before execution on `apply deny-read ACLs`;
+permitted normal-access execution worked. One Windows filename-glob search
+returned an invalid-pattern diagnostic; it was not retried. These and the
+single flawed probe assertion are reviewer issues, not product failures.
+Observed shell peak was 89,407,488 bytes; the largest new comparison has four
+rows. New review output is under 5 MB. No operation expected above five minutes,
+2 GB additional working memory or 500 MB output was started; no full rebuild,
+statewide generation, full raw recount or repeated acceptance occurred. Record
+creation is within 30 minutes and far shorter than the recorded implementation
+(seven Excel legs alone total over an hour). No budget exception requested.
+
+**APPROVED**, signed **Codex — Review 2, independent non-implementer**,
+`2026-08-31T18:32:36.909182+00:00`. Review 1's independent Codex approval at `03ad6b306313e9199acd159e0b6378e9a5ca3db2`
+and this separate Review 2 both approve runtime `0d54799a108d944280ffb7a092260cae59778f76`; implementer is
+Claude. **JOINTLY APPROVED.** Proceed with the prescribed fetch, no-force merge,
+once-only post-merge smoke, push and bounded cleanup. RB-6 becomes eligible only
+after RB-5's merge closeout. No RB-6 implementation is authorized here.
