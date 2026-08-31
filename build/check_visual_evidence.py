@@ -1659,6 +1659,21 @@ check("PM-less data rows accepted (END OF ROUTE / CITY END), furniture rejected"
       and not chslp._is_pmless_data({"pm": "", "prefix": "", "suffix": "",
                                      "desc": "", "hg": "D", "ft": "H",
                                      "county": "", "city": "", "dist": ""}))
+# The site prints HG independently of the PM-less marker rows: route 144 of the
+# 2026-08-31 statewide set prints "COUNTY END: SB" with HG blank, and the SAME
+# run's Excel export carries that row with HG blank too. Requiring HG dropped it
+# silently and escalated the whole consolidation to PARTIAL, so HG is optional
+# and FT carries the rule. FT stays required — a blank FT is furniture.
+check("a PM-less data row is accepted with HG blank (route 144 COUNTY END)",
+      chslp._is_pmless_data({"pm": "", "prefix": "", "suffix": "",
+                             "desc": "COUNTY END: SB", "hg": "", "ft": "H",
+                             "county": "SB", "city": "", "dist": "000.000"})
+      and not chslp._is_pmless_data({"pm": "", "prefix": "", "suffix": "",
+                                     "desc": "COUNTY END: SB", "hg": "", "ft": "",
+                                     "county": "SB", "city": "", "dist": "000.000"})
+      and not chslp._is_pmless_data({"pm": "", "prefix": "", "suffix": "",
+                                     "desc": "COUNTY END: SB", "hg": "ZZ", "ft": "H",
+                                     "county": "SB", "city": "", "dist": "000.000"}))
 check("the trailer heading pin (parsing hard-stops there)",
       chslp.TRAILER_HEADING == "Unresolved Intersections")
 # The evidence classifier is the word-object-keeping TWIN of the consolidator's:

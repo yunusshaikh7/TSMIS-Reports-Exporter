@@ -213,12 +213,20 @@ def _classify_words(line_words, b):
 
 def _is_pmless_data(vals):
     """A data row with an EMPTY postmile ("END OF ROUTE …", "CITY END: …"):
-    single-letter HG *and* FT in their windows, a description, and nothing in
-    the prefix/PM/suffix zones. The page furniture never matches (its words
-    span the windows or land mid-zone as multi-letter tokens)."""
+    a single-letter FT in its window, a description, and nothing in the
+    prefix/PM/suffix zones. HG is OPTIONAL — the 7.9 census saw every PM-less
+    row carrying one, but the site prints them independently and the 2026-08-31
+    statewide set has one that does not (route 144's "COUNTY END: SB", which the
+    Excel export of the same run carries with HG blank). Requiring HG dropped
+    that printed row silently, so the rule follows FT, which every censused
+    PM-less row does carry. The page furniture still never matches (its words
+    span the windows or land mid-zone as multi-letter tokens): re-censused over
+    756 statewide route PDFs (the 7.9, 7.23 and 8.31 export sets), relaxing HG
+    reclassifies exactly that ONE line and nothing else."""
     return (not vals["pm"] and not vals["prefix"] and not vals["suffix"]
             and vals["desc"]
-            and vals["hg"] in HG_SET and vals["ft"] in FT_SET)
+            and (not vals["hg"] or vals["hg"] in HG_SET)
+            and vals["ft"] in FT_SET)
 
 
 def join_desc_parts(parts):

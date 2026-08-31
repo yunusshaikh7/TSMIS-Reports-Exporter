@@ -412,6 +412,14 @@ def _fixed_columns(words: Sequence[Mapping[str, object]]) -> dict[str, str]:
 
 
 def _pmless(values: Mapping[str, str]) -> bool:
+    # Frozen at the rule this audit was run under, and a no-op on its bound 7.9
+    # corpus. The PRODUCT since made HG optional here: the site prints HG
+    # independently of the PM-less marker rows, and the 2026-08-31 statewide set
+    # has one row ("COUNTY END: SB", route 144) the same run's Excel export also
+    # carries with HG blank. Re-censused over the 7.9, 7.23 and 8.31 sets, that
+    # relaxation moves exactly that one line — none on this oracle's corpus — so
+    # a future audit on a NEWER corpus must relax this the same way before it can
+    # claim a parity residual. See consolidate_tsmis_highway_sequence_pdf.
     return (
         not values["PM"] and not values["PM Prefix"] and not values["PM Suffix"]
         and bool(values["Description"])

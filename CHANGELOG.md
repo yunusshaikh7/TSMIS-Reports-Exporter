@@ -3,6 +3,30 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.42.2 — 2026-08-31
+
+Stops a printed Highway Sequence row being dropped — and with it, a whole
+statewide consolidation reading as incomplete.
+
+- **A "COUNTY END" row printed without a Highway Group code is no longer
+  skipped.** The Highway Sequence (PDF) reader recognises a row that carries no
+  postmile — "END OF ROUTE …", "CITY END: …", "COUNTY END: …" — by the two
+  single-letter codes printed beside it, and required both, because every such
+  row in the sets it was censused on carried both. The site prints them
+  independently: the 2026-08-31 statewide pull has one ("COUNTY END: SB", route
+  144) with the Highway Group blank, and the same run's Excel export carries that
+  row with the Highway Group blank too. The reader dropped it, reported "1
+  unparsed line", and escalated the whole 252-route consolidation to **partial** —
+  which then made every comparison built on it read partial as well, over one
+  missing row out of 59,979.
+
+  The rule now follows the File Type code, which every censused postmile-less row
+  does carry, and treats the Highway Group as optional. Re-censused over **756
+  statewide route PDFs** (the 7.9, 7.23 and 8.31 export sets) it recovers exactly
+  that one row and reclassifies nothing else — no page furniture becomes data. The
+  8.31 consolidation now reports **complete** with 59,979 rows, matching its Excel
+  sibling row for row, and its vs-TSN comparison is complete on both editions.
+
 ## v0.42.1 — 2026-08-31
 
 The startup sign-in check now tells you whether it worked.
