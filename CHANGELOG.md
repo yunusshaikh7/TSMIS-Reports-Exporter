@@ -3,6 +3,48 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.42.0 — 2026-08-31
+
+Stops the Highway Sequence self-check reporting a by-design difference in how
+the two editions spell a postmile equation, and tells you how much of a vs-TSN
+total is punctuation rather than data.
+
+- **The Highway Sequence PDF-vs-Excel self check no longer counts the equate
+  convention as a disagreement.** A postmile equation is ONE fact the two
+  editions spell differently by design: the print writes an annotation line
+  "EQUATES TO <label>" with the flags, distance and suffix blank and the "E" on
+  the equated postmile, while the Excel export folds the label, the segment's
+  flags and often the "E" itself onto the realignment record. The check now
+  normalizes that relation before comparing, so on a statewide same-day pull it
+  reports **7 differing cells instead of 3,714** across the same 60,254
+  locations. The rule is pair-aware — it closes the moved "E" as well as the
+  flags and the label — and it fires only where the PRINT declared an equate,
+  only on that relation's two rows.
+
+  What it does NOT hide: the landmark label itself, the target row's own
+  HG / FT / Distance / Description, and an "E" that only one edition carries
+  anywhere in the relation. Statewide **seven of those remain**, and every one
+  is a real disagreement about whether the marker exists at all. Where a
+  postmile carries more than one row, each edition matches the relation to its
+  own row by content and leaves a group it cannot resolve completely alone, so
+  a neighbouring record that merely shares the postmile is never rewritten.
+  The Summary and Notes name the class and give the run's relation count.
+
+- **Comparisons now say how much of the difference total is presentation.**
+  Highway Log, Highway Sequence, Intersection Detail, Ramp Detail and Clean
+  Road vs TSN gain one Summary line: of the differing cells, how many carry the
+  same text once punctuation, spacing, quoting and letter case are set aside
+  ("NEVADA STATE LINE , END OF COUNTY" vs "NEVADA STATE LINE /END OF COUNTY").
+  On the statewide set that is 1,243 of Highway Log's cells and 12 of Highway
+  Sequence's.
+
+  **Nothing is suppressed and no total moves.** Every one of those cells keeps
+  its red difference state and stays inside every published count — the
+  workbook simply says more about a number it already reported. Known
+  limitation: the class key keeps only ASCII letters and digits, so a dropped
+  accented letter ("PEÑA ROAD" vs "PEA ROAD") can be described as
+  presentation-only. It stays flagged and counted; only the label is wrong.
+
 ## v0.41.2 — 2026-08-21
 
 Fixes the counts-only option, which could not be turned on, and teaches a

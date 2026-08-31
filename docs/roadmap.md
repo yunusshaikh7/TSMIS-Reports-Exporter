@@ -68,7 +68,7 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 
 ---
 
-## ▣ OPEN WORK INVENTORY (current as of v0.41.2, 2026-08-21)
+## ▣ OPEN WORK INVENTORY (current as of v0.42.0, 2026-08-31)
 
 **This is the definitive list of what is left.** Everything below is genuinely
 open; anything not here is either shipped (see `CHANGELOG.md`) or a historical
@@ -184,6 +184,7 @@ were being counted as differences. Post-fix, exactly four columns move (`LB #Ln`
 | E4 | **Clean-road sliver policy** | The 0.001-mi boundary-calibration class (rows keyed 9.256 vs 9.257) pairs one-sided today; a few hundred statewide. |
 | E5 | The smaller standing items | In the themed sections below: cancel-latency, narrow-mode matrix polish, console `run_cli_multi` coalescing, the shared whitespace-collapse helper, doc/comment line-ref drift. |
 | E6 | ~~Comparison speed — the two measured leftovers~~ — **CLOSED 2026-08-20 (v0.40.1)** | **(a) DONE.** Both sides were read twice: the loader read the consolidated TSMIS and the TSN workbook, then the Report View re-opened and re-parsed the same two files for its own columns. Those columns now ride the read the comparison already performs, with the projections factored so the capture and the standalone reader share ONE expression, and a fallback re-read whenever a caller doesn't thread the dict. **Interleaved 3 paired rounds on statewide Intersection Detail: 229.2s → 191.7s, 16.4% (1.20x), package digest identical across all six runs.** The re-reads themselves measured 14.0s (ID) and 27.9s (HD). Applies to the two Excel comparators and their two PDF flavors; guarded in `check_compare_{intersection,highway}_detail_tsn` (red-tested: removing the capture fails the gate). **(b) NOT TAKEN, now measured rather than asserted.** The one available lever was swapping openpyxl's pure-Python serializer for `lxml`: it produces **different bytes** (`8bbc51f8…` vs the canonical `4590abe3…`) and is worth **~2%** — it fails the byte-identity bar and buys nothing, besides adding a compiled dependency to the frozen work-PC bundle. An undistorted phase breakdown of the current 129s ID comparison shows why there is no hot spot left: `_write_data_sheet` 31.0s (24%), `_write_snapshot_sheet` 21.9s (17%), `_write_report_view` 20.5s (16%), `_write_comparison` 16.4s (13%), input loading 12.0s (9%), everything else 27.3s (21%). Writing is **70%** of the comparison, spread across four writers each serializing content the workbook must contain. The only remaining lever is writing LESS, which changes the output — see the note below. |
+| E8 | **The support bundle refuses to build when a TSN library carries BOTH sidecar shapes** (found 2026-08-31, during RB-5) | **The one item in E with a user-visible failure, and it disables the work-PC diagnostic escape hatch.** `evidence.collect` flattens `_state/` out of the archive name (`evidence.py:211-214`: `rel_path.parent.parent / rel_path.name`), so a library holding both the current `consolidated/_state/X.outcome.json` and the LEGACY sibling `consolidated/X.outcome.json` maps both to one member. The duplicate-member guard then correctly rejects the archive — and **no bundle is written at all**, so Settings ▸ collect-support-bundle silently yields nothing exactly when the user needs it. This is not a contrived shape: `consolidation_meta.read_path` / `legacy_meta_path` exist precisely because the sibling is the pre-organization location, so any long-lived library that gets rebuilt on a current build ends up with both — **the owner's own reference library under `Downloads\TSMIS\tsn_library\highway_log\consolidated\` already has it**. Fix the member naming (don't collapse `_state/` into its parent, or de-duplicate deterministically preferring the organized file); keep the guard. Reproduced via `check_validation`, which fails only when such a library is staged and passes with it moved aside. |
 
 > **Where comparison speed went next — SHIPPED in v0.41.0.** E6(b) closed with
 > "writing is 70% and every byte of it is required", which is only true while the
@@ -219,21 +220,21 @@ whole family is now closed.
 |---|---|---|
 | G1 | **CA INTERSECTIONS + CA RAMPS clean-road builds** (DEF-05) | On the v0.29.0 CA HIGHWAYS pattern; mappings already censused in [planning/cleanroad-highways.md](planning/cleanroad-highways.md). `tsn_load_clean_road` deliberately has no normalizer for these two slots until their builds land. |
 
-### H. The bounded output-audit program — RB-5 READY, RB-6 blocked behind it
+### H. The bounded output-audit program — RB-5 MERGED (v0.42.0), RB-6 is the last bundle
 
 **This group was missing from the inventory until 2026-08-20 and is the largest
 genuinely-open block of work in the repo.** The post-comparison output program
 (`planning/post-comparison-perfection-output-audit/`, entry point
 [START-HERE.md](planning/post-comparison-perfection-output-audit/START-HERE.md))
-ran Stages 1–3 to a jointly-approved plan and merged four of its six bundles.
-**RB-1 · RB-2 · RB-3 · RB-4 are merged; RB-5 and RB-6 are not**, and five work
-items are still unimplemented. Verified against the code on 2026-08-20 — none of
-the five has landed since the plan froze.
+ran Stages 1–3 to a jointly-approved plan and has merged five of its six bundles.
+**RB-1 · RB-2 · RB-3 · RB-4 · RB-5 are merged; only RB-6 remains**, carrying three
+work items. RB-5 merged 2026-08-31 after two independent Codex approvals and
+shipped in v0.42.0; H1 and H2 below are closed by it.
 
 | # | Item | Bundle | Verified state (2026-08-20) |
 |---|---|---|---|
-| H1 | **HF-06 — Highway Sequence self-check equation classification** (PCOA-FINAL-011, P1) | RB-5 | **Open.** The two editions represent an equation differently BY DESIGN — the print writes a source line plus a target line, the Excel export folds marker/classification/suffix/description onto the source record. `compare_highway_sequence_pdf._NOTES_PDF_VS_EXCEL` already describes the class in prose, but `_SS_SCHEMA` (`compare_highway_sequence_pdf.py:158`) still asserts every column and declares no `context_fields`, so 1,119 equation relations surface as **3,714 differing cells across 1,395 rows**. Self-check only; vs-TSN counts must not move. |
-| H2 | **HF-09 — representation-only difference classification** (PCOA-FINAL-013, P2) | RB-5 | **Open.** No occurrence of the class anywhere in `scripts/`. The differences are REAL literal differences between two sources — the defect is that unqualified headline totals don't distinguish an exactly-measured punctuation/case/quote class (HL 1,243 × 2 formats, HSL 11 × 2, RD-PDF 2, ID 1 × 2, Clean Road 5) from substantive data change. **Explicitly a disclosure change: no equality, normalization or count may move.** |
+| H1 | ~~**HF-06 — Highway Sequence self-check equation classification**~~ (PCOA-FINAL-011, P1) | RB-5 | **CLOSED — v0.42.0.** The self check normalizes the by-design equate relation before comparing: statewide **3,714 → 7** differing cells over the same 60,254 locations, the seven survivors being genuine one-sided `E` markers that must keep reporting. Pair-aware, so the moved suffix closes too; fires only where the print declared an equate; a duplicate postmile group it cannot resolve by content is left alone. HSL vs-TSN counts unmoved. |
+| H2 | ~~**HF-09 — representation-only difference classification**~~ (PCOA-FINAL-013, P2) | RB-5 | **CLOSED — v0.42.0.** Five families gain one Summary line saying how much of the differing-cell total is punctuation/spacing/quoting/case rather than data (HL 1,243, HSL 12, ID 1, RD-PDF 3, plus Clean Road). Disclosure only — every cell keeps its `D` state and every published total is unchanged, proved base-vs-head per family. Follow-up **RB5-R2-FU-001**: the class key keeps only ASCII, so a dropped accented letter can be *labelled* presentation-only; it stays flagged and counted. |
 | H3 | **HF-07 — missing-side fast fail and export coverage truth** (PCOA-FINAL-015 / -018, P2) | RB-6 | **Open.** The folder-comparison preflight on the statewide PDF families, plus surfacing the catalog's export-only truth for `ramp_summary_excel`, `intersection_summary_pdf` and `highway_summary`. |
 | H4 | **HF-08 — TSN normalization identity determinism** (PCOA-FINAL-017, P2) | RB-6 | **Open.** A force rebuild over unchanged raw produced different bytes, so pressing *Rebuild* invalidates every bound vs-TSN comparison. Its root cause is recorded as an **unestablished hypothesis** — establishing it is the first task, not the fix. |
 | H5 | **HF-11 — source-side escalation and must-not-regress guards** (PCOA-FINAL-020 / -021 / -022) | RB-6 | **Open.** The program closeout. |
