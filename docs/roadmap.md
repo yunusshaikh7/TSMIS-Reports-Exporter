@@ -178,8 +178,8 @@ were being counted as differences. Post-fix, exactly four columns move (`LB #Ln`
 
 | # | Item | Notes |
 |---|---|---|
-| E1 | **5 grandfathered silent-swallow baseline entries no longer match** | `check_silent_swallows` reports them as prunable; the gate is green. |
-| E2 | **33 ruff F401s in `build/check_*.py`** | Pre-existing; CI lints `scripts` only, so non-blocking. `--fix` handles all 33. |
+| E1 | ~~**5 grandfathered silent-swallow baseline entries no longer match**~~ | **CLOSED - 2026-08-31.** The count had drifted to **7** (the roadmap said 5): `day_matrix._folder_newest_mtime` x2 went with the v0.40.x consolidation onto `artifact_store.newest_report_file_mtime`, plus entries in `artifact_store`, `auth_nav`, `edge_device` and `owned_dir` whose enclosing def moved. Pruned with `check_silent_swallows.py --write-baseline` while the scan reported **0 NEW** swallows, so nothing new was grandfathered: the diff is **7 removals, 0 additions**, 113 entries retained. The check now reports 0 stale. |
+| E2 | ~~**33 ruff F401s in `build/check_*.py`**~~ | **CLOSED - already done (v0.38.2); the line was stale.** Verified 2026-08-31: `ruff check --select F401 build` reports **All checks passed**, and `pyproject.toml` selects F401 with per-file ignores only for `scripts/common.py`, `scripts/gui_worker.py` and `scripts/matrix.py` - none for `build/`. So the rule is live there and finds nothing. |
 | E3 | **gh-pages landing-page regen** | Owed since v0.17.0; website only ([website.md](website.md)). |
 | E4 | **Clean-road sliver policy** | The 0.001-mi boundary-calibration class (rows keyed 9.256 vs 9.257) pairs one-sided today; a few hundred statewide. |
 | E5 | The smaller standing items | In the themed sections below: cancel-latency, narrow-mode matrix polish, console `run_cli_multi` coalescing, the shared whitespace-collapse helper, doc/comment line-ref drift. |
