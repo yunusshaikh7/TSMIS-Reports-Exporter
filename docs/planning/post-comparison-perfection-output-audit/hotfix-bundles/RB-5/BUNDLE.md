@@ -1,15 +1,14 @@
 # `RB-5` — Bundle Contract
 
-Status: **DENIED — RETURN TO IMPLEMENTATION**
+Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
 
 > This RB-level contract carries work items **HF-06 and HF-09** and transcribes
 > both complete frozen work-item sections from
 > [IMPLEMENTATION-PLAN.md](../../IMPLEMENTATION-PLAN.md). The plan is
 > authoritative; where this record and the plan disagree, the plan wins.
-> Original readiness froze scope only. Implementation exists; Codex Review 1
-> returned `RB5-R1-EG-001`, whose supplied evidence has now been inspected.
-> Resumed Review 1 returns solely `RB5-R1-001` (duplicate-order-sensitive equate
-> normalization), denial **2 of 2**; see [REVIEW.md](REVIEW.md). Scope is unchanged.
+> Codex Review 1 approved corrected runtime 0d54799 on 2026-08-31. Both returns
+> are closed with explicit limitations; Review 2 remains required. See
+> [REVIEW.md](REVIEW.md). Scope is unchanged.
 
 | Field | Value |
 |---|---|
@@ -132,7 +131,7 @@ The single run must:
 | Implementer | Claude |
 | Review 1 | **Codex** (owns the 60,254-row equation witness and the route-001 raw adjudication) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-5: DENIED — RETURN TO IMPLEMENTATION** |
+| Status | **Inherits RB-5: REVIEW 1 APPROVED — AWAITING REVIEW 2** |
 
 **Exact scope.** The Highway Sequence PDF-vs-Excel **self** check only, on all
 three paths that agree today (Direct self, Everything SELF, PDF-vs-Excel by-day
@@ -295,7 +294,7 @@ before/after count table.
 | Implementer | Claude |
 | Review 1 | **Codex** (owns the four semantic-classification witnesses) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-5: DENIED — RETURN TO IMPLEMENTATION** |
+| Status | **Inherits RB-5: REVIEW 1 APPROVED — AWAITING REVIEW 2** |
 
 **Exact scope.** The measured representation-only Description/landmark class in
 Direct, By Day and Everything vs TSN plus the Clean Road comparison: Highway Log

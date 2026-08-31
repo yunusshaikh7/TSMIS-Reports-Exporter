@@ -8,8 +8,7 @@ post-merge gate and frozen application self-test both passed;
 RB-4 is MERGED at `83a24896a5a970a3686df87934210f54cea43778`; its 158/158
 post-merge gate and frozen application self-test both passed;
 RB-5 on `hotfix/rb-5-difference-classification`, from base
-`87e368c3e9a7eaf26395308e8ddea4aba7d303e5`, is IMPLEMENTED — AWAITING
-ADVERSARIAL REVIEW. Review 1 returned it twice and BOTH returns are answered:
+`87e368c3e9a7eaf26395308e8ddea4aba7d303e5`, is REVIEW 1 APPROVED — AWAITING REVIEW 2. Review 1 returned it twice and BOTH returns are answered:
 `RB5-R1-EG-001` (the HF-09 formulas acceptance leg, supplied 2026-08-30) and
 `RB5-R1-001` (duplicate-order-sensitive equate normalization — a real defect,
 reproduced from the reviewer's own witness and FIXED 2026-08-31). Both allowed
@@ -41,7 +40,7 @@ first pass.
 
 ## Next action
 
-Resume **Codex Review 1** on `hotfix/rb-5-difference-classification`.
+Run a separate **Codex Review 2** on `hotfix/rb-5-difference-classification`.
 
 **`RB5-R1-001` is corrected.** The finding was right and reproduced exactly.
 Equate relations no longer carry a file-order occurrence ordinal: each render
@@ -67,7 +66,8 @@ explicitly unclaimed hardware-limited leg, not a blocker. **Do not rerun those
 acceptance outputs or retry the large Clean Road full rebuild in review.**
 Both allowed denials are used; remaining observations are owner-ranked follow-
 ups, not another denial cycle. After the bounded correction, the applicable
-pass remains Review 1; Review 2 is still separate. Neither approval exists.
+pass is Review 2. Codex Review 1 approved correction runtime 0d54799;
+see the latest signed section in RB-5/REVIEW.md. Review 2 is pending.
 
 Historical context that still governs: `v0.35.0` separately made `HG`, `City`, and `Distance To
 Next Point` asserted in Highway Sequence vs-TSN; that owner-directed release is
@@ -153,8 +153,8 @@ did not create a branch, modify product code, or begin an acceptance run.
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-5 IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (returned twice; both answered) | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-4 COMPLETE; RB-5 Review 1 returned twice, both answered — resumes on the corrected head** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-5 REVIEW 1 APPROVED — AWAITING REVIEW 2** (returned twice; both answered) | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-4 COMPLETE; RB-5 Review 1 APPROVED, Review 2 pending** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

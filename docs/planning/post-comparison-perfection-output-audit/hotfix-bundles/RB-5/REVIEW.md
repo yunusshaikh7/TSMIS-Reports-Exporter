@@ -1,10 +1,8 @@
 # RB-5 — Adversarial Review Record
 
-Status: **DENIED — RETURN TO IMPLEMENTATION**
+Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
 
-Current decision: **RB5-R1-001**, resumed Review 1 — denial **2 of 2**.
-The earlier evidence-gap return is preserved below as history; the latest
-signed substantive review is at the end of this record.
+Current decision: **APPROVED**, Codex Review 1 on corrected runtime 0d54799a108d944280ffb7a092260cae59778f76. Both returns are closed; historical signed records follow. The current approval is the final section.
 
 ## Review 1 — Codex — DENIED — EVIDENCE GAP
 
@@ -422,3 +420,173 @@ preserved. **RB-5** is actionable; **RB-6** remains next in order and blocked
 until RB-5 merges.
 
 Signed: **Codex — independent non-implementing reviewer, resumed Review 1**.
+
+---
+
+## Review 1 correction closure — Codex — APPROVED
+
+| Field | Identity |
+|---|---|
+| Reviewer / pass / implementer | Codex / resumed Review 1, independent non-implementer / Claude |
+| Branch / worktree | `hotfix/rb-5-difference-classification` / `C:\Users\Yunus\Projects\wt-rb5` |
+| Base | `87e368c3e9a7eaf26395308e8ddea4aba7d303e5` |
+| Runtime / entry head | `0d54799a108d944280ffb7a092260cae59778f76` |
+| Prior review-record head | `e656dc1c2a3931dfdec9de044dd0908f24a1b46f` |
+| Current review-record head | This documentation/witness commit; resolve with `git log -1 --format=%H -- docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/RB-5/REVIEW.md` |
+| Started / substantive work stopped | 2026-08-31T17:40:01.299Z / 2026-08-31T17:56:37.039Z — 16.60 minutes |
+| Signed | 2026-08-31T18:11:40.418005+00:00 |
+| Verdict | **APPROVED — REVIEW 1 APPROVED — AWAITING REVIEW 2** |
+
+The supplied checkout was detached at the old base. Review located the actual
+implementation branch before evaluating preconditions; it was clean at entry.
+The plan and implementation record establish the implemented status. Prior
+denial headings were historical wording. Neither approval existed, so this is
+Review 1. The exact branch/base/runtime and retained outputs exist. Disclosed
+hardware and coverage limits are treated under Prompt 05's practical-impact
+gate, not silently represented as complete acceptance. Both denials are used;
+remaining observations are owner-ranked follow-ups.
+
+**RB5-R1-001 is CLOSED.** The complete product diff, both new checks, correction
+diff, status changes and retained witnesses were inspected. Correspondence now
+uses postmile/content rather than per-file occurrence order. Target signatures
+are resolved before suffix fallback, against original rows. The focused shipped-
+adapter test passes both duplicate orders, published ordinary HG/FT retention,
+relabelled duplicates, ambiguous annotation refusal, real label/target-HG/
+target-FT/one-sided-E changes, delayed/county-boundary cases and scope fences.
+The repaired same-source-shape assertions were inspected.
+
+The independent challenge targeted wrong-row mutation before duplicate pairing.
+An additional generator produced the prior synthetic witness's first tiny pair,
+then stopped on an incorrect assumed FORMULAS filename. It was **not retried**;
+planned permutations were not executed. Read-only inspection of its existing
+outputs confirms three `EEEEEEE` masks, zero differences, ordinary HG=`U` /
+FT=`R`, and identical canonical Excel data rows in both flavors. FORMULAS uses
+`original-witness-order.xlsx`. No Excel recalculation was performed. Swapped-
+order proof is the passing committed test and retained correction witness.
+
+Final retained `HF-06/rb5-a1/head-r3` generation
+`a84d4094-4118-4ada-bfd6-80b55d6be55c` independently verifies **60,254 paired,
+zero one-sided, 7 cells / 7 rows; PM Suffix 7, every other field 0**. Its
+workbook and compressed/decoded payload hashes match; the typed payload identity
+is unchanged from the original 7-cell head. The retained 129-cell `head-r2`
+intermediate agrees with its disclosed rejection and is not accepted.
+
+**RB5-R1-EG-001 is CLOSED for seven completed cases**, with Clean Road formulas
+explicitly unclaimed. All **21** completed-case workbook sizes/SHA-256 match:
+seven VALUES, seven generated FORMULAS and seven recalculated copies. Their
+per-field maps, class counts, self-checks and separate recalculation records
+agree. The correction changes the self path; unaffected HF-09 evidence is reused.
+
+### Acceptance and result matrices
+
+| Criteria | Evidence / disposition |
+|---|---|
+| HF-06.1–2 | Retained base 3,714 cells / 1,395 rows to final 7/7; 3,707 representation cells close in all four columns. Duplicate-order return closed. Literal zero-total wording conflicts with required genuine one-sided-E preservation: NOTE, not suppression authority. |
+| HF-06.3 | Passing genuine-label, target HG/FT, both one-sided-E, boundary/delayed and unresolved-annotation fixtures. No exhaustive duplicate-target perturbation suite claimed. |
+| HF-06.4 | Focused Summary/Notes disclosure test and retained Summary cache state 1,119; per-call counter inspected. Native-scale coverage qualified below. |
+| HF-06.5 | Original three-path parity retained in implementation/self Excel witness; Everything payload independently verifies 7/7 and final direct remains 7/7. Both vs-TSN editions' typed/per-field outcomes independently unchanged. |
+| HF-06.6–7 | Rule confined to self loader; no shared equality/formula operand change. Off-control preserves cells, masks, snapshots, counts and typed outcome. No canary file moved. |
+| HF-06.8 / HF-09.7 | Five focused checks pass. Base failures retained in implementation/prior witnesses and missing mechanisms confirmed in diff; no new base rerun. Corrected gate is recorded 170/171 with the disclosed validation issue, not asserted 171/171. |
+| HF-09.1–3 | Additive Summary subset follows already-counted D cells. On/off check retains published cells/masks. All eight retained base/head typed payloads, every field count, status/completion/verdict/pairing quality agree. Independent census and completed formulas counts agree, with disclosed reader/source limitations. |
+| HF-09.4 | No equality change, suppressed cell or corrected differing-row claim; equality-policy check passes. |
+| HF-09.5–6 | Quote clarifier inspected and unchanged; evidence files unchanged. Self/environment fences and neighboring cell/state/count/outcome controls pass. Extra adapters are documented fences/inherited Ramp Detail sibling; no unrelated scope. |
+
+| HF-09 case | Differing cells / rows, unchanged | Class F = V | Recalc |
+|---|---:|---:|---|
+| Highway Log Excel | 84,709 / 38,478 | 1,243 | 10 OK; 0 errors |
+| Highway Log PDF | 84,202 / 38,931 | 1,243 | 10 OK; 0 errors |
+| Highway Sequence Excel | 28,450 / 22,554 | 12 | 10 OK; 0 errors |
+| Highway Sequence PDF | 27,601 / 22,728 | 12 | 10 OK; 0 errors |
+| Intersection Detail Excel | 5,092 / 2,816 | 1 | 11 OK; 0 errors |
+| Intersection Detail PDF | 5,092 / 2,816 | 1 | 11 OK; 0 errors |
+| Ramp Detail PDF | 619 / 468 | 3 | 10 OK; 0 errors |
+| Clean Road | 281,393 / 48,942; partial both legs | VALUES 2; F unclaimed | Hardware-limited |
+
+All eight base/head VALUES provenance pairs bind identical source hashes/sizes.
+HF-06's retained recalc reports 7/7, equal fields and ten OK checks. Reading its
+Summary caches confirms total 7, relation count 1,119 and no Summary error cells.
+No new full-workbook cached-error scan or recalculation is claimed.
+
+| Surface | Verification / limits |
+|---|---|
+| Source truth | Independent reader method inspected: raw openpyxl plus separate pdfplumber grammar, 1,117/1,119 annotations, 39 boundaries, two delayed targets and two wrapped blind spots. Complete selected raw PDF page text and XLSX rows checked without app parser. Route 001 page 6 / rows 121–122 confirms normalization; route 032 page 10 / rows 218–219 and route 580 page 8 / row 74 confirm genuine missing-E directions. |
+| Visual | Summary/self Notes text tested/read. No native-scale acceptance renders found in named roots; no complete visual approval claimed. Optional image access failed at sandbox ACL setup; raw text worked. |
+| Evidence | Quote clarifier and evidence files unchanged; self evidence loader consumes canonicalized pair. Retained implementation gate covers eligibility; no new all-image/absence scan. Publication authentication/tamper-refusal check passed. |
+| Provenance / stale cache / failure | Eight source pairs agree. Publication check rejects inconsistent/missing outputs; freshness check retains regeneration guards. Publication substrate/guard path unchanged; no new full transaction suite. |
+| Performance | Classification uses existing difference loop; self matching uses local groups/copies. No whole-corpus framework or benchmark. Focused equate test 6.63 seconds. |
+
+### Practical-impact gate and limitations
+
+**What would a user see differently?** Genuine one-sided markers remain visible;
+suppressing them would be wrong. Reader blind spots and disclosed 12/3/2 census
+deltas establish no new wrong output. HF-09's separate census classifies published
+values; it is not a second raw parser. Clean Road's unfinished formulas leg stays
+unclaimed, not a product-failure diagnosis or permission to retry Excel.
+
+The recorded validation failure concerns support-bundle duplicate member names
+with staged TSN data, outside the RB-5 diff. Implementation records that it passes
+without that staging. It remains a separate follow-up; no full-gate log was
+independently located. Recorded full gate, ruff, compileall and self-test results
+are not fresh reviewer executions.
+
+The earlier HSL VALUES/FORMULAS source-byte mismatch remains qualified despite
+matching results; no new wrong output was demonstrated. Native-scale visuals,
+dedicated HF-09 Notes count coverage, all extra matrix legs and packaged build
+coverage are not independently established here. The useful count/explanation
+is proved in Summary; these gaps establish no wrong count or silent failure.
+Preserve them as follow-ups, not assertions that every strict criterion passed.
+
+Route 580's raw record is row 74, not the cited 77; head labels and old status
+wording change no application behavior. Annotation normalization precedes target
+resolution, so “left untouched” overstates the whole-relation behavior when a
+target is unresolved. No new wrong-row mutation or false match was established;
+a later bounded challenge may examine this boundary without reopening the return.
+
+### Evidence binding, commands and resources
+
+The [approval verification witness](witness/review1-approval-verification.json)
+retains exact artifact paths, sizes, SHA-256 identities, generations, typed
+results and local-check references. Seven committed witnesses were independently
+digested. **31 previously recorded size/hash expectations matched** (21 HF-09
+workbooks plus five HF-06 workbook/payload pairs); eleven other hashes are observed
+identities, not comparisons to earlier claims. No raw TSMIS rows/images are newly
+committed.
+
+Final HF-06 workbook: 34,860,672 bytes,
+`e802b1c3b2561edca65e63bdb89dd4ebe6d08547ffb4afc1b52b364c2d5fb395`.
+Correction witness: 5,830 bytes,
+`96ca7f4b35952b395fbcfcc09c90dd7ab5ca75af976b93f542a6b725b57d7573`.
+HF-09 Excel witness: 42,636 bytes,
+`593a4946fad3f5ade9fb8590c9132e6ee65c220e4e68449e0ac10dec9f49138a`.
+
+Once each with existing build Python: `check_compare_highway_sequence_equate.py`
+(6.63 s), `check_compare_representation_class.py` (1.06 s),
+`check_compare_equality_policy.py` (4.04 s), `check_published_comparison.py`
+(3.83 s), `check_compare_build_freshness.py` without Excel (0.72 s): **all PASS**.
+Other work was scoped Git/file reads, streaming hashes, retained payload/cache
+inspection, raw source spots and the one interrupted tiny generator.
+Logs: `C:\Users\Yunus\.codex\worktrees\76ed\wt-rb5\.review-rb5`.
+
+Sandbox process/file/image access failed with `apply deny-read ACLs`; permitted
+native access worked. The wrong-filename generator was not retried. Two
+finalization orchestration parse errors occurred before commands or mutations.
+These are reviewer issues, not product failures.
+
+Substantive review stopped at 16.60 minutes. Record finalization reached the
+first commit at 31.66 minutes, exceeding the 30-minute ceiling by 1.66 minutes.
+This is a reviewer budget deviation, not a product failure; no further
+substantive review was performed. The earlier within-budget statement was
+corrected at 2026-08-31T18:12:43.526541+00:00 (32.70 minutes from start).
+The review remained shorter than the overall recorded implementation effort.
+Retained verification took 17.70 s, peak 79,552,512 bytes; observed shell peak
+100,954,112 bytes. Pre-finalization output was 214,171 bytes; records keep total
+new output below 1 MB. No operation expected above five minutes, 2 GB additional
+memory or 500 MB output was started. No Excel, statewide generation, raw recount,
+frozen build, full gate, new task or budget exception.
+
+**APPROVED**, signed **Codex — independent non-implementing reviewer, Review 1**,
+2026-08-31T18:11:40.418005+00:00. Both returns are closed with the stated notes. **Review 2 remains
+pending**; this is not joint approval. Per first-approver protocol, commit and
+stop. No fetch, merge, push, branch/worktree cleanup or evidence deletion; no
+merge SHA. Preserve main, gh-pages and unrelated work. Next: **RB-5 Review 2**;
+**RB-6** remains queued and blocked until RB-5 merges.
