@@ -1018,7 +1018,13 @@ def test_helper_readiness_marker_access_retries():
     proc = TerminableProc()
     orig_timeout = updater._HELPER_READY_TIMEOUT_S
     orig_interval = updater._HELPER_READY_INTERVAL_S
-    updater._HELPER_READY_TIMEOUT_S = 0.01
+    # The window must be long enough that the bounded loop is GUARANTEED to poll
+    # more than once, since that retry is exactly what this test asserts. At the
+    # original 0.01s a loaded CI runner could spend the whole budget inside the
+    # first read and exit after ONE - which failed the v0.42.1 release job while
+    # the same suite passed twice on the same commit. 0.5s against a 0.001s
+    # interval leaves ~500x headroom and still bounds the test to half a second.
+    updater._HELPER_READY_TIMEOUT_S = 0.5
     updater._HELPER_READY_INTERVAL_S = 0.001
     err = None
     try:
