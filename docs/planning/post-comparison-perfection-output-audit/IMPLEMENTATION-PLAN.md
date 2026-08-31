@@ -181,7 +181,7 @@ Two layers, because the owner wants **fewer branches, reviews and releases**
 | 2 | **RB-2** | HF-02 + HF-03 | The deliverable looks right and describes itself truthfully — **56 of the 68 denials** | None (RB-1 for the Clean Road witness) | `hotfix/rb-2-deliverable-presentation` | **MERGED** — `d679f388e0b12ff595751af9edd816674615b7a5` |
 | 3 | **RB-3** | HF-04 | Ramp Detail — restores 9 comparison placements that produce nothing today | None | `hotfix/rb-3-ramp-detail-layout` | **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc` |
 | 4 | **RB-4** | HF-05 + HF-10 | Evidence, end to end — **AMENDED by the owner 2026-08-05 and 2026-08-09**: print crops on the four `_pdf` report families only; anchorless blanks from the print's own cell geometry are disclosed limitations | None | `hotfix/rb-4-evidence` | **MERGED** — `83a24896a5a970a3686df87934210f54cea43778` |
-| 5 | **RB-5** | HF-06 + HF-09 | Difference classification — the two opposite rulings applied to the right classes | RB-1, RB-2 | `hotfix/rb-5-difference-classification` | **JOINTLY APPROVED** (returned twice — `RB5-R1-EG-001` evidence, `RB5-R1-001` defect; both answered) |
+| 5 | **RB-5** | HF-06 + HF-09 | Difference classification — the two opposite rulings applied to the right classes | RB-1, RB-2 | `hotfix/rb-5-difference-classification` | **MERGED** — `f11f9d2546b7775e432a22d5174f895f01210c35` |
 | 6 | **RB-6** | HF-07 + HF-08 + HF-11 | Engine hygiene, coverage truth, and the closeout guards | RB-2, RB-3, RB-5 | `hotfix/rb-6-hygiene-and-guards` | BLOCKED |
 
 ### Prompt and record identity
@@ -482,7 +482,7 @@ mapping also proves one primary implementation/review bundle per finding:
 | **RB-2** | HF-02, HF-03 | 002, 003, 008, 009, 014, 016, 019 | 7 | **MERGED** — `d679f388e0b12ff595751af9edd816674615b7a5` |
 | **RB-3** | HF-04 | 001, 012 | 2 | **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc` |
 | **RB-4** | HF-05, HF-10 | 004, 005, 006, 007 | 4 | **MERGED** — `83a24896a5a970a3686df87934210f54cea43778` |
-| **RB-5** | HF-06, HF-09 | 011, 013 | 2 | **JOINTLY APPROVED** |
+| **RB-5** | HF-06, HF-09 | 011, 013 | 2 | **MERGED** — `f11f9d2546b7775e432a22d5174f895f01210c35` |
 | **RB-6** | HF-07, HF-08, HF-11 | 015, 017, 018, 020, 021, 022 | 6 | BLOCKED |
 | **Total** | 11 work items | 22 unique findings | **22** | |
 
@@ -1338,7 +1338,7 @@ truncation census and the target-geometry measurements.
 | Implementer | Claude |
 | Review 1 | **Codex** (owns the 60,254-row equation witness and the route-001 raw adjudication) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-5: JOINTLY APPROVED** |
+| Status | **Inherits RB-5: MERGED |
 
 **Exact scope.** The Highway Sequence PDF-vs-Excel **self** check only, on all
 three paths that agree today (Direct self, Everything SELF, PDF-vs-Excel by-day
@@ -1700,7 +1700,7 @@ eight datasets and the content-invariance proof.
 | Implementer | Claude |
 | Review 1 | **Codex** (owns the four semantic-classification witnesses) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-5: JOINTLY APPROVED** |
+| Status | **Inherits RB-5: MERGED |
 
 **Exact scope.** The measured representation-only Description/landmark class in
 Direct, By Day and Everything vs TSN plus the Clean Road comparison: Highway Log
@@ -2222,3 +2222,5 @@ applicable pass after correction, and RB-6 remains blocked on RB-5.
 **Stage 5 correction closure — 2026-08-31:** Codex Review 1 APPROVED runtime 0d54799a108d944280ffb7a092260cae59778f76. Both returns are closed; five focused checks pass and retained results/hashes agree. Explicit hardware, validation and coverage limits remain in [RB-5/REVIEW.md](hotfix-bundles/RB-5/REVIEW.md). Review 2 is next; no merge, push or cleanup. RB-6 remains blocked. Two prior denials remain historical; remaining observations are owner-ranked follow-ups.
 
 **Stage 5 Review 2 — 2026-08-31:** separate Codex non-implementing Review 2 APPROVED the corrected runtime. Both sign-offs now exist; RB-5 is JOINTLY APPROVED with RB5-R2-FU-001 carried under the two-denial ceiling. Merge and post-merge closeout follow; RB-6 remains blocked until then. See the signed RB-5 review and verification witness.
+
+**RB-5 merge — 2026-08-31:** merged as `f11f9d2546b7775e432a22d5174f895f01210c35` after separate Codex Reviews 1 and 2; post-merge gate 171/171 and packaged application self-test PASS. Runtime remains `0d54799`. Unicode classification follow-up RB5-R2-FU-001 and disclosed limitations are retained; no acceptance run repeated. Cleanup and RB-6 readiness follow.

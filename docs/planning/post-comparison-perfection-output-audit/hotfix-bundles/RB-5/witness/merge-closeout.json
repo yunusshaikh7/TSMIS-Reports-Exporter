@@ -1,0 +1,52 @@
+{
+  "merge_sha": "f11f9d2546b7775e432a22d5174f895f01210c35",
+  "review1_record_head": "03ad6b306313e9199acd159e0b6378e9a5ca3db2",
+  "review2_approval_commit": "1aeb48344b8478775c5f7034fa8a44d9f0a8e5a3",
+  "runtime_head": "0d54799a108d944280ffb7a092260cae59778f76",
+  "base_and_fetched_remote_main": "87e368c3e9a7eaf26395308e8ddea4aba7d303e5",
+  "gate": {
+    "kind": "gate",
+    "command": [
+      "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\build\\.venv\\Scripts\\python.exe",
+      "-X",
+      "utf8",
+      "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\build\\run_checks.py",
+      "-j",
+      "4",
+      "-k"
+    ],
+    "head": "f11f9d2546b7775e432a22d5174f895f01210c35",
+    "exit_code": 0,
+    "seconds": 123.531,
+    "peak_process_tree_working_set_bytes": 1399373824,
+    "stopped_reason": null,
+    "log": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\postmerge-gate.log",
+    "log_sha256": "4c070542d28d139be054e02c87b62f1d2c4c74b45f3876424ffdb96fdafd1267"
+  },
+  "packaged_smoke": {
+    "kind": "build",
+    "command": [
+      "C:\\Users\\Yunus\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\powershell\\pwsh.exe",
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\packaged_smoke.ps1"
+    ],
+    "head": "f11f9d2546b7775e432a22d5174f895f01210c35",
+    "exit_code": 0,
+    "seconds": 72.75,
+    "peak_process_tree_working_set_bytes": 868896768,
+    "stopped_reason": null,
+    "log": "C:\\Users\\Yunus\\.codex\\worktrees\\8407\\wt-rb5\\.review-rb5-r2\\postmerge-build.log",
+    "log_sha256": "99f06aba49d736c213bdf8f1654c3b012a4da316b5de8acea185ab12214ff2d2"
+  },
+  "new_output_sizes": {
+    "dist": 179432048,
+    "build\\pyi-work": 35182966,
+    ".review-rb5-r2": 2488443
+  },
+  "recorded_utc": "2026-08-31T18:40:41.079391+00:00",
+  "minutes_since_review_start": 25.033,
+  "push_and_cleanup": "Pending at this merge-record commit; final closeout below will record actual results."
+}

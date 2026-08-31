@@ -1,18 +1,6 @@
 # Post-Comparison Output Program — Start Here
 
-Workflow state: **Stages 1A, 1B, 2, and 3 complete and jointly approved;
-RB-1 / Clean Road is MERGED at `560ea5e501fdd76003985753ba7fc9ff0a551320`;
-RB-2 is MERGED at `d679f388e0b12ff595751af9edd816674615b7a5`;
-RB-3 is MERGED at `61fcac611de255c56759551a95ccd2e552287bfc`; its 158/158
-post-merge gate and frozen application self-test both passed;
-RB-4 is MERGED at `83a24896a5a970a3686df87934210f54cea43778`; its 158/158
-post-merge gate and frozen application self-test both passed;
-RB-5 on `hotfix/rb-5-difference-classification`, from base
-`87e368c3e9a7eaf26395308e8ddea4aba7d303e5`, is JOINTLY APPROVED. Review 1 returned it twice and BOTH returns are answered:
-`RB5-R1-EG-001` (the HF-09 formulas acceptance leg, supplied 2026-08-30) and
-`RB5-R1-001` (duplicate-order-sensitive equate normalization — a real defect,
-reproduced from the reviewer's own witness and FIXED 2026-08-31). Both allowed
-denials are now used**
+Workflow state: **Stages 1A, 1B, 2 and 3 complete; RB-1 through RB-5 are MERGED. RB-5 merged at `f11f9d2546b7775e432a22d5174f895f01210c35` after both Codex approvals; its 171/171 post-merge gate and packaged application self-test passed. RB-6 readiness is next.**
 
 Last updated: 2026-08-31
 
@@ -40,34 +28,19 @@ first pass.
 
 ## Next action
 
-**Codex Reviews 1 and 2 have separately APPROVED RB-5.** Complete its prescribed merge, post-merge smoke, push and bounded cleanup; then prepare RB-6 readiness. Review 2 records the Unicode classification follow-up under the two-denial ceiling.
+Finish RB-5's bounded branch/worktree cleanup, preserving retained inputs and
+audit artifacts, then prepare **RB-6 / HF-07 + HF-08 + HF-11** readiness from
+updated main. No next-bundle implementation or expensive acceptance run belongs
+in this review.
 
-**`RB5-R1-001` is corrected.** The finding was right and reproduced exactly.
-Equate relations no longer carry a file-order occurrence ordinal: each render
-resolves its own row inside the postmile group by CONTENT, and refuses a group
-it cannot resolve. The reviewer's own three-row witness now reports **zero
-differences in BOTH orders**, the ordinary row keeps its HG/FT in the published
-data sheet, and the frozen statewide self check is **unchanged at 7 differing
-cells**. A duplicate-order fixture locks it in
-`build/check_compare_highway_sequence_equate.py`; the record is under "Review 1
-return 2" in [RB-5/IMPLEMENTATION.md](hotfix-bundles/RB-5/IMPLEMENTATION.md)
-with witness `hotfix-bundles/HF-06/witness/duplicate-occurrence-correction.json`.
-
-The gate reads 170/171. The one failure, `check_validation`, is NOT an RB-5
-regression: the locally staged TSN library makes `evidence.collect` reject a
-support bundle over a duplicate archive member name. It passes at the base
-worktree and passes in the implementation worktree with that library moved
-aside; it is raised as a separate follow-up.
-
-The previous `RB5-R1-EG-001` acceptance item is answered for review: seven HF-09
-formulas cases pass their retained recalculation/parity checks, and their 21
-workbook identities were independently verified. Clean Road remains an
-explicitly unclaimed hardware-limited leg, not a blocker. **Do not rerun those
-acceptance outputs or retry the large Clean Road full rebuild in review.**
-Both allowed denials are used; remaining observations are owner-ranked follow-
-ups, not another denial cycle. After the bounded correction, the applicable
-pass is Review 2. Codex Review 1 approved correction runtime 0d54799;
-see the latest signed section in RB-5/REVIEW.md. Review 2 has now approved; see its signed section and verification witness.
+RB-5's two separate Codex approvals and exact verification are in
+[RB-5/REVIEW.md](hotfix-bundles/RB-5/REVIEW.md). Both old returns are closed.
+Review 2 found the Unicode subset-label issue **RB5-R2-FU-001**, carried as an
+owner-ranked follow-up under the two-denial ceiling: a dropped non-ASCII letter
+can be called representation-only, but remains flagged and counted. Clean Road
+FORMULAS hardware coverage remains unclaimed; no large Excel retry was made.
+The fresh post-merge gate passed validation without the acceptance library
+staging; the staged-library duplicate-member limitation remains separately noted.
 
 Historical context that still governs: `v0.35.0` separately made `HG`, `City`, and `Distance To
 Next Point` asserted in Highway Sequence vs-TSN; that owner-directed release is
@@ -153,8 +126,8 @@ did not create a branch, modify product code, or begin an acceptance run.
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-5 REVIEW 1 APPROVED — AWAITING REVIEW 2** (returned twice; both answered) | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-4 COMPLETE; RB-5 Review 1 APPROVED, Review 2 pending** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-5 MERGED; RB-6 readiness next** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-5 COMPLETE — both approvals, merge and smoke passed** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

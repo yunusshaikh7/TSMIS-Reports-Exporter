@@ -1,6 +1,6 @@
 # `RB-5` — Implementation Record
 
-Status: **JOINTLY APPROVED**.
+Status: **MERGED**.
 
 Codex approved correction runtime 0d54799a108d944280ffb7a092260cae59778f76 on 2026-08-31; see [REVIEW.md](REVIEW.md). Both returns are closed with explicit limitations. Separate Codex Review 2 approved the same runtime with RB5-R2-FU-001 carried under the two-denial ceiling. Historical implementation facts follow.
 
@@ -679,3 +679,18 @@ Highway Sequence PDF-vs-Excel self check immediately re-publishes the 3,707
 equate-spelling cells (3,714 total, 1,395 rows) and loses the Summary/Notes
 disclosure. HF-09's revert removes only the count line and the notes bullet —
 no verdict, count or cell state can change, because none ever depended on it.
+
+
+## Post-merge smoke — 2026-08-31
+
+RB-5 merged without force as `f11f9d2546b7775e432a22d5174f895f01210c35` after both separate Codex approvals.
+Fetched remote main and local main both equaled base `87e368c3e9a7eaf26395308e8ddea4aba7d303e5`; the user's feature checkout was untouched.
+The merged runtime is identical to reviewed `0d54799`.
+
+- `build/run_checks.py -j 4 -k`: **171 passed, 0 failed**, 123.531 seconds; measured process-tree peak 1,399,373,824 bytes. This is the once-only full post-merge gate, including `check_validation`, on the clean main worktree without the acceptance TSN staging. It does not erase the separately documented staged-library defect.
+- `build/build.ps1 -SelfTest`: **PASS**, 72.750 seconds; measured process-tree peak 868,896,768 bytes. The real windowed packaged application passed its self-test. Existing pinned build environment reused; no Excel recalculation or acceptance regeneration.
+- New retained build/review output measured 217,103,457 bytes, below 500 MB. Both operations individually stayed below five minutes and 2 GB, with a process-tree resource guard.
+
+Exact logs and hashes: [merge closeout](witness/merge-closeout.json) and [full post-merge gate](witness/postmerge-gate.log).
+Review plus this record finalization: **25.03 minutes** at `2026-08-31T18:40:41.079391+00:00`.
+The plan now records MERGED with the exact merge SHA. Push, bounded cleanup and RB-6 readiness are recorded in the final closeout, not pre-claimed here.
