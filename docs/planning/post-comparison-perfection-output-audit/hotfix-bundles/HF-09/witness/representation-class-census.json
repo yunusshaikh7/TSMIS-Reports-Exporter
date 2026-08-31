@@ -1,0 +1,319 @@
+{
+  "work_item": "HF-09",
+  "finding": "PCOA-FINAL-013",
+  "ruling": "DISCLOSURE ONLY (owner, 2026-07-26) - every one of these cells stays counted and flagged; the bundle adds a count line and nothing else",
+  "predicate": {
+    "product": "compare_core.representation_only - fold letter case, drop every non-alphanumeric character, then compare",
+    "census": "a SEPARATE re-implementation in the acceptance tooling (unicodedata + str.isalnum), never imported from the product, applied to the two sides read back out of each committed VALUES workbook's own published Comparison sheet",
+    "note": "two equal cells are never in the class, and an empty fold (blank vs punctuation) is refused on both sides"
+  },
+  "inputs": {
+    "pull": "2026-07-23 ssor-prod (the frozen archive)",
+    "tsn_library": "rebuilt from the corpus raw sources through the shipped tsn_library.build_consolidated: highway_sequence 69,804 rows, highway_log 60,083, intersection_detail, ramp_detail"
+  },
+  "families": {
+    "highway_log_vs_tsn_excel": {
+      "column": "Description",
+      "base_counts": {
+        "differing_cells": 84709,
+        "differing_rows": 38478,
+        "paired_rows": 49195,
+        "side_a_only_rows": 3626,
+        "side_b_only_rows": 10888
+      },
+      "head_counts": {
+        "differing_cells": 84709,
+        "differing_rows": 38478,
+        "paired_rows": 49195,
+        "side_a_only_rows": 3626,
+        "side_b_only_rows": 10888
+      },
+      "counts_identical": true,
+      "per_field_identical": true,
+      "disclosed": 1243,
+      "independent_census": 1243,
+      "agrees": true,
+      "finding_expected": 1243,
+      "examples": [
+        [
+          "JCT 5 CAMINO L RMBLS UC, BEG IN LIEU FAP 28",
+          "JCT 5 CAMINO L RMBLS UC/BEG IN LIEU FAP 28"
+        ],
+        [
+          "BALBOA BV LT , SUPERIOR AV RT",
+          "BALBOA BV LT /SUPERIOR AV RT"
+        ],
+        [
+          "JCT 105 , IMPERIAL HWY",
+          "JCT 105 /IMPERIAL HWY"
+        ]
+      ]
+    },
+    "highway_sequence_vs_tsn_excel": {
+      "column": "Description",
+      "base_counts": {
+        "differing_cells": 28450,
+        "differing_rows": 22554,
+        "paired_rows": 57050,
+        "side_a_only_rows": 3204,
+        "side_b_only_rows": 12754
+      },
+      "head_counts": {
+        "differing_cells": 28450,
+        "differing_rows": 22554,
+        "paired_rows": 57050,
+        "side_a_only_rows": 3204,
+        "side_b_only_rows": 12754
+      },
+      "counts_identical": true,
+      "per_field_identical": true,
+      "disclosed": 12,
+      "independent_census": 12,
+      "agrees": true,
+      "finding_expected": 11,
+      "delta_explained": "the shared predicate also folds an intra-word spacing pair the audit's classifier did not count - 'EB ON FR NB RTE 55' vs 'EBON FR NB RTE 55'. Every one of the 12 is listed below so the reviewer can adjudicate the twelfth; the finding permits the count to be RESTATED as measured on the frozen inputs.",
+      "pairs": [
+        [
+          "CITRUS AVE OC 54-1293",
+          "Citrus Ave OC 54-1293"
+        ],
+        [
+          "W CONN UC BR 54-782L BB",
+          "W CONN UC Br 54-782L BB"
+        ],
+        [
+          "W CONN UC BR 54-782L EB",
+          "W CONN UC Br 54-782L EB"
+        ],
+        [
+          "DITCH GULCH BB 05-0093",
+          "Ditch Gulch BB 05-0093"
+        ],
+        [
+          "''F'' ST",
+          "\"F\" ST"
+        ],
+        [
+          "EB ON FR NB RTE 55",
+          "EBON FR NB RTE 55"
+        ],
+        [
+          "DR MLK JRBLVD OC29-0329",
+          "Dr MLK JrBlvd OC29-0329"
+        ],
+        [
+          "E MAIN ST OC BR29-0327",
+          "E MAIN St OC BR29-0327"
+        ],
+        [
+          "SEG, NB OFF, LT,SF AIRPRT",
+          "SEG,NB OFF,LT,SF AIRPRT"
+        ],
+        [
+          "NB OFF TO S. GEYSERVILLE",
+          "NB OFF TO S.GEYSERVILLE"
+        ],
+        [
+          "SLO SB CO LINE",
+          "SLO/SB CO LINE"
+        ],
+        [
+          "MACDONALD ST.-LT/JAMES AVE-RT",
+          "MACDONALD ST.-Lt/James Ave-Rt"
+        ]
+      ]
+    },
+    "highway_sequence_vs_tsn_pdf": {
+      "column": "Description",
+      "base_counts": {
+        "differing_cells": 27601,
+        "differing_rows": 22728,
+        "paired_rows": 57483,
+        "side_a_only_rows": 2771,
+        "side_b_only_rows": 12321
+      },
+      "head_counts": {
+        "differing_cells": 27601,
+        "differing_rows": 22728,
+        "paired_rows": 57483,
+        "side_a_only_rows": 2771,
+        "side_b_only_rows": 12321
+      },
+      "counts_identical": true,
+      "per_field_identical": true,
+      "disclosed": 12,
+      "independent_census": 12,
+      "agrees": true,
+      "finding_expected": 11,
+      "note": "the same twelve pairs as the Excel edition - the class is a property of the two SOURCES, not of the TSMIS render, which is what the finding's 'x2 formats' says"
+    },
+    "intersection_detail_vs_tsn_excel": {
+      "column": "Description",
+      "base_counts": {
+        "differing_cells": 5092,
+        "differing_rows": 2816,
+        "paired_rows": 16199,
+        "side_a_only_rows": 260,
+        "side_b_only_rows": 427
+      },
+      "head_counts": {
+        "differing_cells": 5092,
+        "differing_rows": 2816,
+        "paired_rows": 16199,
+        "side_a_only_rows": 260,
+        "side_b_only_rows": 427
+      },
+      "counts_identical": true,
+      "per_field_identical": true,
+      "disclosed": 1,
+      "independent_census": 1,
+      "agrees": true,
+      "finding_expected": 1,
+      "pairs": [
+        [
+          "''F'' ST",
+          "\"F\" ST"
+        ]
+      ],
+      "note": "the KER 046 @ 50.904 pair the product already annotates through the evidence _quote_note - still flagged, still counted, now also named"
+    },
+    "intersection_detail_vs_tsn_pdf": {
+      "column": "Description",
+      "base_counts": {
+        "differing_cells": 5092,
+        "differing_rows": 2816,
+        "paired_rows": 16199,
+        "side_a_only_rows": 260,
+        "side_b_only_rows": 427
+      },
+      "head_counts": {
+        "differing_cells": 5092,
+        "differing_rows": 2816,
+        "paired_rows": 16199,
+        "side_a_only_rows": 260,
+        "side_b_only_rows": 427
+      },
+      "counts_identical": true,
+      "per_field_identical": true,
+      "disclosed": 1,
+      "independent_census": 1,
+      "agrees": true,
+      "finding_expected": 1,
+      "pairs": [
+        [
+          "''F'' ST",
+          "\"F\" ST"
+        ]
+      ]
+    },
+    "ramp_detail_vs_tsn_pdf": {
+      "column": "Description",
+      "base_counts": {
+        "differing_cells": 619,
+        "differing_rows": 468,
+        "paired_rows": 15204,
+        "side_a_only_rows": 9,
+        "side_b_only_rows": 206
+      },
+      "head_counts": {
+        "differing_cells": 619,
+        "differing_rows": 468,
+        "paired_rows": 15204,
+        "side_a_only_rows": 9,
+        "side_b_only_rows": 206
+      },
+      "counts_identical": true,
+      "per_field_identical": true,
+      "disclosed": 3,
+      "independent_census": 3,
+      "agrees": true,
+      "finding_expected": 2,
+      "delta_explained": "the same one rule as Highway Sequence: the shared predicate also folds a space that splits or joins a word. The finding's own pair is the third.",
+      "pairs": [
+        [
+          "EB ON FR NB RTE 55",
+          "EBON FR NB RTE 55"
+        ],
+        [
+          "SEG, NB OFF, LT,SF AIRPRT",
+          "SEG,NB OFF,LT,SF AIRPRT"
+        ],
+        [
+          "NB OFF TO S. GEYSERVILLE",
+          "NB OFF TO S.GEYSERVILLE"
+        ]
+      ]
+    },
+    "clean_road_highway_vs_tsn": {
+      "column": "THY_LANDMARK_SHORT_DESC",
+      "base_counts": {
+        "differing_cells": 281393,
+        "differing_rows": 48942,
+        "paired_rows": 52629,
+        "side_a_only_rows": 5113,
+        "side_b_only_rows": 7454
+      },
+      "head_counts": {
+        "differing_cells": 281393,
+        "differing_rows": 48942,
+        "paired_rows": 52629,
+        "side_a_only_rows": 5113,
+        "side_b_only_rows": 7454
+      },
+      "counts_identical": true,
+      "per_field_identical": true,
+      "typed_completion": "partial on BOTH legs identically - the pre-existing HF-01 unavailable-anchor disclosure, untouched by RB-5",
+      "disclosed": 2,
+      "independent_census": 2,
+      "agrees": true,
+      "finding_expected": 5,
+      "delta_explained": "the ArcGIS SIDE moved, not the classifier. The audit measured against the 2026-07-22 Clean Road build; that build is REFUSED by today's header gate (it predates THY_POPULATION_EFF_DATE, v0.39.1), so this run used a fresh build under the v0.39.1-v0.39.3 rules - a different row set and a different class membership. RB-5 moved nothing: base and head measure the same 281,393 cells on the same build.",
+      "pairs": [
+        [
+          "'-VIA BIG BEAR BLVD-",
+          "-VIA BIG BEAR BLVD-"
+        ],
+        [
+          "SLO SB CO LINE",
+          "SLO/SB CO LINE"
+        ]
+      ],
+      "note": "both are the finding's own named examples - the landmark leading apostrophe and the SLO/SB separator pair"
+    },
+    "highway_log_vs_tsn_pdf": {
+      "column": "Description",
+      "base_counts": {
+        "differing_cells": 84202,
+        "differing_rows": 38931,
+        "paired_rows": 49829,
+        "side_a_only_rows": 2978,
+        "side_b_only_rows": 10254
+      },
+      "head_counts": {
+        "differing_cells": 84202,
+        "differing_rows": 38931,
+        "paired_rows": 49829,
+        "side_a_only_rows": 2978,
+        "side_b_only_rows": 10254
+      },
+      "counts_identical": true,
+      "per_field_identical": true,
+      "disclosed": 1243,
+      "independent_census": 1243,
+      "agrees": true,
+      "finding_expected": 1243,
+      "note": "the SAME 1,243 as the Excel edition - exactly what PCOA-FINAL-013 asserts: the identical 1,243-cell set appears in both fresh export formats, which is why it cannot be a PDF-extraction artifact"
+    }
+  },
+  "summary": {
+    "families_measured": 8,
+    "every_family_counts_identical_base_vs_head": true,
+    "every_family_disclosed_equals_independent_census": true,
+    "deltas_from_the_finding": {
+      "highway_sequence": "12 vs 11 (both editions)",
+      "ramp_detail_pdf": "3 vs 2",
+      "clean_road": "2 vs 5",
+      "why": "the first two are ONE predicate rule - the shared fold also removes a space that splits or joins a word. Clean Road's is a different SIDE: the audit measured the 2026-07-22 ArcGIS build, which today's header gate refuses, so this run used a fresh build with a different row set. Highway Log (1,243 x2) and Intersection Detail (1 x2) match the finding exactly."
+    }
+  }
+}

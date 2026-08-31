@@ -78,8 +78,13 @@ class _HighwayLogFileCompare:
                                one_sided_note_extra=one_sided_note_extra,
                                trim_note_extra=trim_note_extra)
         if same_source:
+            # HF-09 scope fence: the representation-only disclosure is the
+            # vs-TSN class the audit measured. Both sides here are TSMIS
+            # renders of ONE report, where the owner ruled the OPPOSITE way
+            # (normalize, not disclose), so the label stays off.
             self._schema = replace(
                 self._schema, header=_SS_HEADER,
+                representation_fields=(),
                 data_widths=dict(_hl._SCHEMA.data_widths,
                                  **{"Location (raw)": 12}),
                 cmp_widths=dict(_hl._SCHEMA.cmp_widths,

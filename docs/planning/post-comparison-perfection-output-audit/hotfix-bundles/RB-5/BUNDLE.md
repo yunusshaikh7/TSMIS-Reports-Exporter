@@ -1,13 +1,15 @@
 # `RB-5` — Bundle Contract
 
-Status: **READY**
+Status: **JOINTLY APPROVED**
 
 > This RB-level contract carries work items **HF-06 and HF-09** and transcribes
 > both complete frozen work-item sections from
 > [IMPLEMENTATION-PLAN.md](../../IMPLEMENTATION-PLAN.md). The plan is
-> authoritative; where this record and the plan disagree, the plan wins. This
-> readiness step freezes scope only. No RB-5 branch, product change, generation,
-> recalculation, or acceptance run has started.
+> authoritative; where this record and the plan disagree, the plan wins.
+> Codex Review 1 approved corrected runtime 0d54799 on 2026-08-31. Both returns
+> are closed with explicit limitations; separate Review 2 now approves with a
+> recorded owner-ranked follow-up. See
+> [REVIEW.md](REVIEW.md). Scope is unchanged.
 
 | Field | Value |
 |---|---|
@@ -16,7 +18,7 @@ Status: **READY**
 | Theme | Difference classification — normalize the ruled Highway Sequence self-equation class while disclosing, but never suppressing, the ruled representation-only class |
 | Branch | `hotfix/rb-5-difference-classification` |
 | Readiness source `main` | `1e9446bb7f1f9771b7698482d63980840ee5ec28` — RB-4 merged as `83a24896a5a970a3686df87934210f54cea43778`, its 158/158 post-merge gate and frozen application self-test passed, and its merge closeout was committed before this readiness preparation |
-| Base `main` commit | **PENDING — Stage 4 must fetch, verify a clean `main` identical to `origin/main`, create the branch, and record the exact base before changing code** |
+| Base `main` commit | **`87e368c3e9a7eaf26395308e8ddea4aba7d303e5`** — fetched 2026-08-30; `main` verified clean and identical to `origin/main` (the `v0.41.2` roadmap closeout). `hotfix/rb-5-difference-classification` was created from it in worktree `C:\Users\Yunus\Projects\wt-rb5`, with a second DETACHED pre-fix worktree at the same SHA (`C:\Users\Yunus\Projects\wt-rb5-base`) supplying the base leg of every before/after measurement. The user's own checkout was never switched or cleaned. |
 | Canonical finding IDs | **PCOA-FINAL-011, -013** |
 | Implementer | **Claude** (owner decision 2026-07-26) |
 | First reviewer | **Codex** — independent non-implementer; owns the 60,254-row equation witness, route-001 adjudication, and four semantic-classification witnesses |
@@ -130,7 +132,7 @@ The single run must:
 | Implementer | Claude |
 | Review 1 | **Codex** (owns the 60,254-row equation witness and the route-001 raw adjudication) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-5: READY** |
+| Status | **Inherits RB-5: JOINTLY APPROVED** |
 
 **Exact scope.** The Highway Sequence PDF-vs-Excel **self** check only, on all
 three paths that agree today (Direct self, Everything SELF, PDF-vs-Excel by-day
@@ -293,7 +295,7 @@ before/after count table.
 | Implementer | Claude |
 | Review 1 | **Codex** (owns the four semantic-classification witnesses) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-5: READY** |
+| Status | **Inherits RB-5: JOINTLY APPROVED** |
 
 **Exact scope.** The measured representation-only Description/landmark class in
 Direct, By Day and Everything vs TSN plus the Clean Road comparison: Highway Log

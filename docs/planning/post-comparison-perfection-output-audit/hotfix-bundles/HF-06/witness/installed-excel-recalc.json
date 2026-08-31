@@ -1,0 +1,69 @@
+{
+  "formulas": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\excel-recalc\\hsl-self (formulas).xlsx",
+  "values": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\excel-recalc\\hsl-self (values).xlsx",
+  "excel_recalculated": true,
+  "excel_error": "",
+  "headline": {
+    "TSMIS (PDF) data rows": {
+      "formulas": 60254,
+      "values": 60254
+    },
+    "TSMIS (Excel) data rows": {
+      "formulas": 60254,
+      "values": 60254
+    },
+    "Union of locations compared": {
+      "formulas": 60254,
+      "values": 60254
+    },
+    "Locations in both renders": {
+      "formulas": 60254,
+      "values": 60254
+    },
+    "Matched rows with \u2265 1 field difference": {
+      "formulas": 7,
+      "values": 7
+    },
+    "Matched rows fully identical": {
+      "formulas": 60247,
+      "values": 60247
+    },
+    "Total differing cells": {
+      "formulas": 7,
+      "values": 7
+    }
+  },
+  "headline_agree": true,
+  "self_checks": {
+    "Every Comparison row has a status (Both + TSMIS (PDF) only + TSMIS (Excel) only)": "OK",
+    "Every row with TSMIS (PDF) data found its TSMIS (PDF) sheet row": "OK",
+    "Every row with TSMIS (Excel) data found its TSMIS (Excel) sheet row": "OK",
+    "'Only in TSMIS (PDF)' sheet rows = TSMIS (PDF)-only rows in the Comparison": "OK",
+    "'Only in TSMIS (Excel)' sheet rows = TSMIS (Excel)-only rows in the Comparison": "OK",
+    "Per-field difference counts add up to the total differing cells": "OK",
+    "Build-time source identity and duplicate pairing snapshot is current": "OK",
+    "Routes sheet TSMIS (PDF) row counts add up to the TSMIS (PDF) sheet": "OK",
+    "Routes sheet TSMIS (Excel) row counts add up to the TSMIS (Excel) sheet": "OK",
+    "Routes sheet 'Locations compared' adds up to the Comparison": "OK"
+  },
+  "self_checks_clean": true,
+  "per_field": {
+    "County": 0,
+    "PM Suffix": 7,
+    "City": 0,
+    "HG": 0,
+    "FT": 0,
+    "Distance To Next Point": 0,
+    "Description": 0
+  },
+  "per_field_values": {
+    "County": 0,
+    "PM Suffix": 7,
+    "City": 0,
+    "HG": 0,
+    "FT": 0,
+    "Distance To Next Point": 0,
+    "Description": 0
+  },
+  "per_field_agree": true
+}

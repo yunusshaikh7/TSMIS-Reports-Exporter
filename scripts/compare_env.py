@@ -1384,8 +1384,11 @@ class EnvCompare:
 # key_normalizer is cleared: cross-env compares two TSMIS exports (SAME roadbed
 # encoding — both suffix the Location), so the roadbed-unifying key is unnecessary
 # and would only perturb the validated cross-env output. It is a TSMIS-vs-TSN tool.
+# HF-09 scope fence: the representation-only disclosure belongs to the
+# vs-TSN comparisons the audit measured; cross-environment compares two
+# TSMIS pulls of the same report, so the label stays off here.
 _HL_BASE = replace(_hl._SCHEMA, one_sided_note_extra="", trim_note_extra="",
-                   key_normalizer=None)
+                   key_normalizer=None, representation_fields=())
 
 RAMP_SUMMARY = EnvCompare(
     "ramp_summary", "Ramp Summary", "ramp_summary",

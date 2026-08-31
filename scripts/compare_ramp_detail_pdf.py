@@ -277,6 +277,12 @@ class _RampDetailFileCompare:
                          source_file_a=("tsar_ramp_detail", _rd.TSMIS_SHEET, "pdf"),
                          source_file_b=(("tsar_ramp_detail", _rd.TSMIS_SHEET, "xlsx")
                                         if same_source else ()))
+        if same_source:
+            # HF-09 scope fence: the representation-only disclosure is the
+            # vs-TSN class the audit measured. Both sides here are TSMIS
+            # renders of ONE report, where the owner ruled the OPPOSITE way
+            # (normalize, not disclose), so the label stays off.
+            schema = replace(schema, representation_fields=())
         if context_fields is not None:
             schema = replace(schema, context_fields=context_fields)
         if one_sided_note_extra is not None:

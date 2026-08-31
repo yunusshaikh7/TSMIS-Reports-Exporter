@@ -191,6 +191,14 @@ _SCHEMA = CompareSchema(
     # unchanged (re-proven on the real corpus 2026-07-23).
     context_header_fill="808080",
     legend_writer=_write_notes_sheet,
+    # HF-09 / PCOA-FINAL-013: say how many of the differing landmark cells
+    # are the measured representation-only class (the two sources print
+    # the same characters once punctuation, spacing, quoting and letter
+    # case are set aside). DISCLOSURE ONLY, owner ruling 2026-07-26 -
+    # every one of those cells stays flagged and stays inside every
+    # published total; the Summary just says how much of the total is
+    # presentation rather than data.
+    representation_fields=('THY_LANDMARK_SHORT_DESC',),
 )
 
 _ROUTE_RE = re.compile(r"^(\d+)([A-Z]?)$")

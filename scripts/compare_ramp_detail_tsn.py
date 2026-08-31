@@ -149,6 +149,14 @@ _SCHEMA = CompareSchema(
     context_fields=CONTEXT_FIELDS,
     legend_writer=_write_notes_sheet,
     source_file_a=("tsar_ramp_detail", TSMIS_SHEET, "xlsx"),   # Source Files sheet
+    # HF-09 / PCOA-FINAL-013: say how many of the differing Description cells
+    # are the measured representation-only class (the two sources print
+    # the same characters once punctuation, spacing, quoting and letter
+    # case are set aside). DISCLOSURE ONLY, owner ruling 2026-07-26 -
+    # every one of those cells stays flagged and stays inside every
+    # published total; the Summary just says how much of the total is
+    # presentation rather than data.
+    representation_fields=('Description',),
 )
 
 _ROUTE_FROM_LOCATION = re.compile(r"^\s*\d{2}-[A-Za-z]{2,3}-(\w+)\s*$")  # "01-DN-101" -> "101"

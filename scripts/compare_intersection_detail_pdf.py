@@ -95,6 +95,12 @@ class _IntDetailFileCompare:
             source_file_a=("intersection_detail", _id.TSMIS_SHEET, "pdf"),
             source_file_b=(("intersection_detail", _id.TSMIS_SHEET, "xlsx")
                            if excel_side_b else ()))
+        if excel_side_b:
+            # HF-09 scope fence: the representation-only disclosure is the
+            # vs-TSN class the audit measured. Both sides here are TSMIS
+            # renders of ONE report, where the owner ruled the OPPOSITE way
+            # (normalize, not disclose), so the label stays off.
+            schema = replace(schema, representation_fields=())
         if one_sided_note_extra is not None:
             schema = replace(schema, one_sided_note_extra=one_sided_note_extra)
         if drop_notes:

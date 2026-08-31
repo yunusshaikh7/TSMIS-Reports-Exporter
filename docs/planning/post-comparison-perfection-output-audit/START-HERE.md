@@ -7,11 +7,14 @@ RB-3 is MERGED at `61fcac611de255c56759551a95ccd2e552287bfc`; its 158/158
 post-merge gate and frozen application self-test both passed;
 RB-4 is MERGED at `83a24896a5a970a3686df87934210f54cea43778`; its 158/158
 post-merge gate and frozen application self-test both passed;
-RB-5's readiness contract was prepared from `main` at
-`1e9446bb7f1f9771b7698482d63980840ee5ec28`; no RB-5 branch, RB-5 product change,
-generation, or acceptance run has begun**
+RB-5 on `hotfix/rb-5-difference-classification`, from base
+`87e368c3e9a7eaf26395308e8ddea4aba7d303e5`, is JOINTLY APPROVED. Review 1 returned it twice and BOTH returns are answered:
+`RB5-R1-EG-001` (the HF-09 formulas acceptance leg, supplied 2026-08-30) and
+`RB5-R1-001` (duplicate-order-sensitive equate normalization — a real defect,
+reproduced from the reviewer's own witness and FIXED 2026-08-31). Both allowed
+denials are now used**
 
-Last updated: 2026-08-21
+Last updated: 2026-08-31
 
 > **`main` has moved a long way since this program last ran.** The readiness
 > contract above was prepared against `v0.34.0`-era `main`, and the state line
@@ -37,12 +40,36 @@ first pass.
 
 ## Next action
 
-Invoke
-[`PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
-in a fresh task with `<BUNDLE_ID> = RB-5` and `<IMPLEMENTER> = Claude`.
-Create `hotfix/rb-5-difference-classification` only after Prompt 04 verifies and
-records the exact clean pushed `main` base. The readiness commit is provenance,
-not the branch point. `v0.35.0` separately made `HG`, `City`, and `Distance To
+**Codex Reviews 1 and 2 have separately APPROVED RB-5.** Complete its prescribed merge, post-merge smoke, push and bounded cleanup; then prepare RB-6 readiness. Review 2 records the Unicode classification follow-up under the two-denial ceiling.
+
+**`RB5-R1-001` is corrected.** The finding was right and reproduced exactly.
+Equate relations no longer carry a file-order occurrence ordinal: each render
+resolves its own row inside the postmile group by CONTENT, and refuses a group
+it cannot resolve. The reviewer's own three-row witness now reports **zero
+differences in BOTH orders**, the ordinary row keeps its HG/FT in the published
+data sheet, and the frozen statewide self check is **unchanged at 7 differing
+cells**. A duplicate-order fixture locks it in
+`build/check_compare_highway_sequence_equate.py`; the record is under "Review 1
+return 2" in [RB-5/IMPLEMENTATION.md](hotfix-bundles/RB-5/IMPLEMENTATION.md)
+with witness `hotfix-bundles/HF-06/witness/duplicate-occurrence-correction.json`.
+
+The gate reads 170/171. The one failure, `check_validation`, is NOT an RB-5
+regression: the locally staged TSN library makes `evidence.collect` reject a
+support bundle over a duplicate archive member name. It passes at the base
+worktree and passes in the implementation worktree with that library moved
+aside; it is raised as a separate follow-up.
+
+The previous `RB5-R1-EG-001` acceptance item is answered for review: seven HF-09
+formulas cases pass their retained recalculation/parity checks, and their 21
+workbook identities were independently verified. Clean Road remains an
+explicitly unclaimed hardware-limited leg, not a blocker. **Do not rerun those
+acceptance outputs or retry the large Clean Road full rebuild in review.**
+Both allowed denials are used; remaining observations are owner-ranked follow-
+ups, not another denial cycle. After the bounded correction, the applicable
+pass is Review 2. Codex Review 1 approved correction runtime 0d54799;
+see the latest signed section in RB-5/REVIEW.md. Review 2 has now approved; see its signed section and verification witness.
+
+Historical context that still governs: `v0.35.0` separately made `HG`, `City`, and `Distance To
 Next Point` asserted in Highway Sequence vs-TSN; that owner-directed release is
 the pre-existing baseline, not RB-5 work. RB-5 must preserve it. In every RB-5
 criterion that says Highway Sequence vs-TSN counts are unchanged, "unchanged"
@@ -126,8 +153,8 @@ did not create a branch, modify product code, or begin an acceptance run.
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-5 READY — IMPLEMENTATION NOT STARTED** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-4 COMPLETE; RB-5 NOT STARTED** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-5 REVIEW 1 APPROVED — AWAITING REVIEW 2** (returned twice; both answered) | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-4 COMPLETE; RB-5 Review 1 APPROVED, Review 2 pending** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.
