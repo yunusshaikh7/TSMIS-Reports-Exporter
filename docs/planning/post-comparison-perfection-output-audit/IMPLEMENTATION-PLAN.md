@@ -181,7 +181,7 @@ Two layers, because the owner wants **fewer branches, reviews and releases**
 | 2 | **RB-2** | HF-02 + HF-03 | The deliverable looks right and describes itself truthfully — **56 of the 68 denials** | None (RB-1 for the Clean Road witness) | `hotfix/rb-2-deliverable-presentation` | **MERGED** — `d679f388e0b12ff595751af9edd816674615b7a5` |
 | 3 | **RB-3** | HF-04 | Ramp Detail — restores 9 comparison placements that produce nothing today | None | `hotfix/rb-3-ramp-detail-layout` | **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc` |
 | 4 | **RB-4** | HF-05 + HF-10 | Evidence, end to end — **AMENDED by the owner 2026-08-05 and 2026-08-09**: print crops on the four `_pdf` report families only; anchorless blanks from the print's own cell geometry are disclosed limitations | None | `hotfix/rb-4-evidence` | **MERGED** — `83a24896a5a970a3686df87934210f54cea43778` |
-| 5 | **RB-5** | HF-06 + HF-09 | Difference classification — the two opposite rulings applied to the right classes | RB-1, RB-2 | `hotfix/rb-5-difference-classification` | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| 5 | **RB-5** | HF-06 + HF-09 | Difference classification — the two opposite rulings applied to the right classes | RB-1, RB-2 | `hotfix/rb-5-difference-classification` | **DENIED — RETURN TO IMPLEMENTATION** |
 | 6 | **RB-6** | HF-07 + HF-08 + HF-11 | Engine hygiene, coverage truth, and the closeout guards | RB-2, RB-3, RB-5 | `hotfix/rb-6-hygiene-and-guards` | BLOCKED |
 
 ### Prompt and record identity
@@ -482,7 +482,7 @@ mapping also proves one primary implementation/review bundle per finding:
 | **RB-2** | HF-02, HF-03 | 002, 003, 008, 009, 014, 016, 019 | 7 | **MERGED** — `d679f388e0b12ff595751af9edd816674615b7a5` |
 | **RB-3** | HF-04 | 001, 012 | 2 | **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc` |
 | **RB-4** | HF-05, HF-10 | 004, 005, 006, 007 | 4 | **MERGED** — `83a24896a5a970a3686df87934210f54cea43778` |
-| **RB-5** | HF-06, HF-09 | 011, 013 | 2 | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| **RB-5** | HF-06, HF-09 | 011, 013 | 2 | **DENIED — RETURN TO IMPLEMENTATION** |
 | **RB-6** | HF-07, HF-08, HF-11 | 015, 017, 018, 020, 021, 022 | 6 | BLOCKED |
 | **Total** | 11 work items | 22 unique findings | **22** | |
 
@@ -1338,7 +1338,7 @@ truncation census and the target-geometry measurements.
 | Implementer | Claude |
 | Review 1 | **Codex** (owns the 60,254-row equation witness and the route-001 raw adjudication) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-5: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| Status | **Inherits RB-5: DENIED — RETURN TO IMPLEMENTATION** |
 
 **Exact scope.** The Highway Sequence PDF-vs-Excel **self** check only, on all
 three paths that agree today (Direct self, Everything SELF, PDF-vs-Excel by-day
@@ -1700,7 +1700,7 @@ eight datasets and the content-invariance proof.
 | Implementer | Claude |
 | Review 1 | **Codex** (owns the four semantic-classification witnesses) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-5: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| Status | **Inherits RB-5: DENIED — RETURN TO IMPLEMENTATION** |
 
 **Exact scope.** The measured representation-only Description/landmark class in
 Direct, By Day and Everything vs TSN plus the Clean Road comparison: Highway Log
@@ -2187,8 +2187,18 @@ must not be reverted or absorbed into RB-5.
 base `87e368c3e9a7eaf26395308e8ddea4aba7d303e5` (`main` == `origin/main`,
 the `v0.41.2` roadmap closeout), with a second DETACHED worktree at the
 same SHA supplying the pre-fix leg of every before/after measurement. The
-bundle is now `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW`; the record, the residual adjudication and
+bundle entered `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW` at handoff; the record, the residual adjudication and
 the `RB5-A1` results are in
 [`hotfix-bundles/RB-5/IMPLEMENTATION.md`](hotfix-bundles/RB-5/IMPLEMENTATION.md).
 The `v0.35.0` Highway Sequence vs-TSN policy was neither reverted nor
 reclassified, and the HF-06 ruling was applied to the SELF check only.
+
+**Stage 5, Review 1 — 2026-08-30:** Codex returned RB-5 as
+`DENIED — RETURN TO IMPLEMENTATION` with verdict **DENIED — EVIDENCE GAP**,
+solely `RB5-R1-EG-001`: supply the retained HF-09 formulas-twin
+recalculation/parity acceptance result for the eight RB5-A1 comparisons.
+The existing publication outcomes are VALUES-only; the retained Excel
+recalculation covers HF-06 self only. This is a precondition return, not a
+completed code review or a proven runtime defect. The signed record is
+[`RB-5/REVIEW.md`](hotfix-bundles/RB-5/REVIEW.md). The next applicable pass
+remains Review 1; no merge or cleanup occurred, and RB-6 remains blocked.

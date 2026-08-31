@@ -1,13 +1,13 @@
 # `RB-5` — Bundle Contract
 
-Status: **READY**
+Status: **DENIED — RETURN TO IMPLEMENTATION**
 
 > This RB-level contract carries work items **HF-06 and HF-09** and transcribes
 > both complete frozen work-item sections from
 > [IMPLEMENTATION-PLAN.md](../../IMPLEMENTATION-PLAN.md). The plan is
-> authoritative; where this record and the plan disagree, the plan wins. This
-> readiness step freezes scope only. No RB-5 branch, product change, generation,
-> recalculation, or acceptance run has started.
+> authoritative; where this record and the plan disagree, the plan wins.
+> Original readiness froze scope only. Implementation exists; Codex Review 1
+> returned `RB5-R1-EG-001`; see [REVIEW.md](REVIEW.md). Scope is unchanged.
 
 | Field | Value |
 |---|---|
@@ -130,7 +130,7 @@ The single run must:
 | Implementer | Claude |
 | Review 1 | **Codex** (owns the 60,254-row equation witness and the route-001 raw adjudication) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-5: READY** |
+| Status | **Inherits RB-5: DENIED — RETURN TO IMPLEMENTATION** |
 
 **Exact scope.** The Highway Sequence PDF-vs-Excel **self** check only, on all
 three paths that agree today (Direct self, Everything SELF, PDF-vs-Excel by-day
@@ -293,7 +293,7 @@ before/after count table.
 | Implementer | Claude |
 | Review 1 | **Codex** (owns the four semantic-classification witnesses) |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-5: READY** |
+| Status | **Inherits RB-5: DENIED — RETURN TO IMPLEMENTATION** |
 
 **Exact scope.** The measured representation-only Description/landmark class in
 Direct, By Day and Everything vs TSN plus the Clean Road comparison: Highway Log

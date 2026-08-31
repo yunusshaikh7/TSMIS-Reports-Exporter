@@ -1,6 +1,11 @@
 # `RB-5` — Implementation Record
 
-Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW**
+Status: **DENIED — RETURN TO IMPLEMENTATION**
+
+> Codex Review 1 (2026-08-30): **DENIED — EVIDENCE GAP**, solely
+> `RB5-R1-EG-001` — the retained HF-09 formulas-twin recalculation/parity
+> acceptance result. See [REVIEW.md](REVIEW.md). The implementation claims
+> below are preserved; no product defect was established by this precondition return.
 
 | Field | Value |
 |---|---|
