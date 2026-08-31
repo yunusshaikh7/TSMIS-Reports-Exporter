@@ -3,6 +3,55 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.43.0 — 2026-08-31
+
+The ArcGIS "Reports vs layers" tab renders a second report — Intersection
+Detail — and the recipe behind it is now a registry rather than a special case.
+
+- **Intersection Detail can be built from the ArcGIS layers and diffed against
+  your own export of it.** Highway Detail, the first report on this lane, IS the
+  CA HIGHWAYS table printed, so it needs the span engine, a segmentation and a
+  merge rule. An intersection is a place, not a stretch: `IM Intersection Detail`
+  already holds one row per intersection, so all of that drops out and what is
+  left is a mapping table plus three rules. It also needs no CA INTERSECTIONS
+  clean-road build first, which the roadmap had assumed was a prerequisite.
+
+  Every rule was **scored on the real 2026-08-28 statewide export over 15,154
+  one-to-one paired intersections**, not fitted on a probe case. The row universe:
+  the layer holds 38,914 rows but 22,697 are IM-managed shells with the whole
+  inventory half null, so the report's universe is the 16,147 current rows
+  carrying a Main postmile (against the export's 16,394). Which leg is printed:
+  `LEG_TYPE` decides it — Major is the mainline, Minor the cross street — at
+  99.4–100.0% on all twelve columns, where the reverse assignment scores
+  61.7–95.9%. And the overlay carry rule splits **by column**: Highway Group
+  (90.7 → 94.5%) and Rural/Urban (84.0 → 91.3%) improve when carried forward
+  across a gap in a span layer, but City drops (98.1 → 74.9%) — highway group and
+  rural/urban persist until something changes them, whereas a city is
+  containment, so carrying one across a gap invents one.
+
+  `Int St Eff-Date` is `InventoryItemStartDate` on the intersection row — 100.0%,
+  exact on every paired row. It was nearly declared sourceless, which is exactly
+  the mistake Highway Detail's `RU Eff` was: written off the same way while
+  sitting in `SHS Population` all along. **Every printed column has a source.**
+
+  Same-date statewide baseline: 15,177 paired, 8,862 differing cells, 33 of 36
+  columns at or below 1.3%. The residual sits in `ML Eff-Date` (11.8%), `R/U`
+  (8.7%) and `HG` (5.6%), and the ML class is mostly the export printing a legacy
+  default date where the layer holds a real one — a finding about the report
+  rather than a gap in the build, which is the distinction this lane exists to
+  draw.
+
+- **Adding a report to this lane no longer means editing endpoints.**
+  `arcgis_reports.py` is a registry: one row per report carrying the label, the
+  build, the comparator and the export consolidators that can supply the TSMIS
+  side. The GUI endpoints, the sub-tab picker and the checks all derive from it.
+  Either consolidation edition can be the TSMIS side, since both consolidate to
+  the same shape.
+
+- **The frozen app now proves the whole ArcGIS lane imports.** Those modules are
+  imported inside GUI endpoints, so nothing else in the shipped exe exercised
+  them — Highway Detail's two had been unproven since v0.39.0.
+
 ## v0.42.2 — 2026-08-31
 
 Stops a printed Highway Sequence row being dropped — and with it, a whole
