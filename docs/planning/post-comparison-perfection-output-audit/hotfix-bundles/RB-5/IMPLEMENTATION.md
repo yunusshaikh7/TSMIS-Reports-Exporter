@@ -7,7 +7,7 @@ Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW**
 | Implementer | Claude (owner decision 2026-07-26) |
 | Branch | `hotfix/rb-5-difference-classification` (worktree `C:\Users\Yunus\Projects\wt-rb5`; the user's own checkout was never switched or cleaned) |
 | Base `main` commit | `87e368c3e9a7eaf26395308e8ddea4aba7d303e5` — fetched 2026-08-30, verified clean and identical to `origin/main` (the `v0.41.2` roadmap closeout). A second DETACHED worktree at the same SHA (`C:\Users\Yunus\Projects\wt-rb5-base`) supplied the base leg of every before/after measurement |
-| Head commit | *(recorded at commit — see "Commits")* |
+| Head commit | `444e8d9` — the single implementation commit on `hotfix/rb-5-difference-classification` |
 | Work items | HF-06 (PCOA-FINAL-011, P1) + HF-09 (PCOA-FINAL-013, P2) |
 | Acceptance run | `RB5-A1` |
 | Generated-output root | `C:\Users\Yunus\Downloads\TSMIS\_scratch\post-comparison-hotfixes\HF-06\rb5-a1\` and `…\HF-09\rb5-a1\`; committed machine-readable witnesses in `../HF-06/witness/` and `../HF-09/witness/` |
