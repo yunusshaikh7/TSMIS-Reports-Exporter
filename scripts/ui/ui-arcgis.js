@@ -136,10 +136,12 @@ function setArcgisSub(which) {
 }
 
 // ---- "Reports vs layers" -------------------------------------------------- //
+let agRepKey = "";             // the picked report ("" = the server's default)
+
 async function renderArcgisReports() {
   let st;
   try {
-    st = await api.arcgis_report_status();
+    st = await api.arcgis_report_status(agRepKey);
   } catch (e) {
     $("agRepSource").textContent = "Status unavailable: " + e;
     return;
@@ -149,15 +151,41 @@ async function renderArcgisReports() {
     return;
   }
   AGR = st;
+  agRepKey = st.report || agRepKey;
   const src = st.source || {}, built = st.built || {};
+  const reports = st.reports || [];
+  const label = (reports.find((r) => r.key === st.report) || {}).label || "the report";
 
-  $("agRepSourceMeta").textContent = src.exists
-    ? (src.asof ? "as of " + src.asof : "built") : "not built yet";
-  $("agRepSource").textContent = src.exists
-    ? `This report's own source table, built from the layers it prints.`
-      + `   ·   ${src.path}`
-    : "Not built yet — Build makes it from the ArcGIS layers. This report has "
-      + "its own build and does not read the Clean Road workbook.";
+  // Report picker
+  const rsel = $("agRepReport");
+  if (rsel && rsel.options.length !== reports.length) {
+    rsel.textContent = "";
+    reports.forEach((r) => {
+      const o = document.createElement("option");
+      o.value = r.key; o.textContent = r.label;
+      rsel.appendChild(o);
+    });
+  }
+  if (rsel && st.report) rsel.value = st.report;
+  $("agRepPickMeta").textContent = reports.length === 1
+    ? "1 report" : `${reports.length} reports`;
+  $("agRepHdLabel").textContent = `${label} — build & compare`;
+
+  // Only some reports build an intermediate source table: a SPAN report needs
+  // one (Highway Detail's CA HIGHWAYS table), a POINT report builds in a single
+  // pass. The server omits `source` entirely for the latter, so hide the card
+  // rather than showing an empty one.
+  const hasSource = Object.prototype.hasOwnProperty.call(st, "source");
+  $("agRepSourceSection").classList.toggle("hidden", !hasSource);
+  if (hasSource) {
+    $("agRepSourceMeta").textContent = src.exists
+      ? (src.asof ? "as of " + src.asof : "built") : "not built yet";
+    $("agRepSource").textContent = src.exists
+      ? `This report's own source table, built from the layers it prints.`
+        + `   ·   ${src.path}`
+      : "Not built yet — Build makes it from the ArcGIS layers. This report has "
+        + "its own build and does not read the Clean Road workbook.";
+  }
 
   $("agRepHdMeta").textContent = built.exists
     ? `${Number(built.rows || 0).toLocaleString()} records`
@@ -166,9 +194,12 @@ async function renderArcgisReports() {
   $("agRepHdBuilt").textContent = built.exists
     ? `Built: ${built.path}`
       + (built.merged_away
-         ? `   ·   ${Number(built.merged_away).toLocaleString()} CA HIGHWAYS rows merged `
-           + `(they split only on columns Highway Detail doesn't print)` : "")
-    : "Not built yet — Build renders the layers as Highway Detail's own 34 columns.";
+         ? `   ·   ${Number(built.merged_away).toLocaleString()} source rows merged `
+           + `(they split only on columns ${label} doesn't print)` : "")
+      + (built.shells
+         ? `   ·   ${Number(built.shells).toLocaleString()} layer rows skipped `
+           + `(no inventory block)` : "")
+    : `Not built yet — Build renders the layers as ${label}'s own columns.`;
 
   // The as-of box defaults to the export day, because a same-date pair is the
   // only kind that measures correctness rather than network change.
@@ -182,7 +213,7 @@ async function renderArcgisReports() {
   sel.textContent = "";
   if (!days.length) {
     const o = document.createElement("option");
-    o.value = ""; o.textContent = "no consolidated Highway Detail export";
+    o.value = ""; o.textContent = `no consolidated ${label} export`;
     sel.appendChild(o);
   } else {
     days.forEach((d) => {
@@ -207,18 +238,18 @@ async function renderArcgisReports() {
   } else {
     vint.textContent = `⚠ The layers were rebuilt as of ${asof} but this export is `
       + `from ${day}. Across that gap the comparison measures network CHANGE, not `
-      + `correctness. To compare like for like, rebuild the Clean Road workbook `
-      + `with its as-of date set to ${day}, then build this report again.`;
+      + `correctness. To compare like for like, set the as-of date to ${day} and `
+      + `build this report again.`;
     vint.classList.add("warn");
   }
 
   const blockers = [];
-  if (!src.exists) blockers.push("build the Clean Road Highway workbook");
-  if (!built.exists) blockers.push("build the Highway Detail report from the layers");
-  if (!days.length) blockers.push("consolidate a Highway Detail export to compare against");
+  if (hasSource && !src.exists) blockers.push("build the source table");
+  if (!built.exists) blockers.push(`build the ${label} report from the layers`);
+  if (!days.length) blockers.push(`consolidate a ${label} export to compare against`);
   $("agRepCompareHint").textContent = blockers.length
     ? "To compare: " + blockers.join("; ") + "."
-    : "Compares our layer-built Highway Detail against the TSMIS export of the "
+    : `Compares our layer-built ${label} against the TSMIS export of the `
       + "chosen day. Both sides are TSMIS, so they should agree — every column is "
       + "indexed back to its source in the Notes.";
   syncArcgisLock();
@@ -235,14 +266,21 @@ function bindArcgis() {
     const d = $("agRepDay") && $("agRepDay").value;
     if (d) $("agRepAsof").value = d;
   };
+  $("agRepReport").onchange = () => {
+    agRepKey = $("agRepReport").value;
+    const asofBox = $("agRepAsof");
+    if (asofBox) asofBox.value = "";       // each report carries its own as-of
+    renderArcgisReports();
+  };
   $("btnAgRepBuild").onclick = async () => {
     const box = $("agRepAsof");
-    const r = await api.start_arcgis_report_build(box ? box.value.trim() : "");
+    const r = await api.start_arcgis_report_build(
+      agRepKey, box ? box.value.trim() : "");
     if (r && r.error) showMessage("error", "Can't build", r.error);
   };
   $("btnAgRepCompare").onclick = async () => {
     const r = await api.start_arcgis_report_compare(
-      $("agRepDay").value, $("agRepWantFormulas").checked,
+      agRepKey, $("agRepDay").value, $("agRepWantFormulas").checked,
       $("agRepWantValues").checked);
     if (!r) return;
     if (r.error) { showMessage("error", "Can't compare", r.error); return; }

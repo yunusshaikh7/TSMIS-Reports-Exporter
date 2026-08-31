@@ -91,8 +91,11 @@ APP_MODULES = [
     "city_codes",                        # the derived TASAS city-code table (v0.29.1)
     "consolidate_clean_highway",         # the ArcGIS CA HIGHWAYS overlay build
     "compare_clean_highway_tsn",         # the ArcGIS-vs-TSN clean-road comparison
+    "arcgis_reports",                    # the "Reports vs layers" registry
     "arcgis_report_highway_detail",      # CA HIGHWAYS projected onto the HD report (v0.39.0)
     "compare_highway_detail_arcgis",     # the ArcGIS-vs-TSMIS Highway Detail comparison
+    "arcgis_report_intersection_detail",  # the IM layers rendered as Intersection Detail
+    "compare_intersection_detail_arcgis",  # the ArcGIS-vs-TSMIS Intersection Detail comparison
     "gui_arcgis_api",                    # the ArcGIS tab endpoints
     "export_multi",
     "highway_log_columns", "intersection_detail_columns",   # the corrected/canonical column headers

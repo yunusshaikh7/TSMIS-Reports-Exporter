@@ -118,7 +118,22 @@ deliberately normalizer-less until their builds land on the same pattern.
 
 **Reports vs layers (v0.39.0) renders a TSMIS REPORT from those same layers and diffs
 it against our own export of it** — TSMIS vs TSMIS, so the two sides SHOULD agree.
-**Highway Detail is the first** (`arcgis_report_highway_detail` +
+**`arcgis_reports.py` is the registry**: one row per report (label + build + comparator +
+the export consolidators that can supply the TSMIS side), and the GUI endpoints, the
+sub-tab's picker and the checks all derive from it — adding a report needs no endpoint edit.
+**Intersection Detail is the second** (`arcgis_report_intersection_detail` +
+`compare_intersection_detail_arcgis`) and it is a POINT report, so it has NO segmentation
+and no merge rule: `IM Intersection Detail` already holds one row per intersection. Its
+three measured rules — the row universe (16,147 of 38,914 layer rows; the rest are
+IM-managed shells with no inventory block), the leg rule (**Major = mainline, Minor = cross
+street**, 99.4–100% vs 61.7–95.9% reversed), and the per-column overlay carry rule (HG/R-U
+carry forward across a gap, City does NOT — carry makes City 23 points worse) — are in
+[docs/comparison-engine.md](docs/comparison-engine.md) §9l and locked by
+`check_arcgis_report_intersection`. **Every printed column has a source; `Int St Eff-Date`
+is `InventoryItemStartDate` at 100.0%** — it was nearly written off as sourceless, which is
+the DA2 mistake exactly, so SEARCH THE LAYERS before declaring a column unsourced.
+Same-date statewide baseline: 15,177 paired, 8,862 differing cells, 33 of 36 columns ≤1.3%.
+**Highway Detail was the first** (`arcgis_report_highway_detail` +
 `compare_highway_detail_arcgis`). It does NOT re-derive from the layers: Highway Detail
 IS the CA HIGHWAYS table printed (33 of its 34 columns are THY columns), so it PROJECTS
 the Clean Road build — one measured build behind every report rendered this way, and
@@ -488,9 +503,15 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   matrix_state.py matrix_build.py day_matrix.py summary_layout.py   matrix reads / builds + by-day + summary
   tsn_library.py tsn_load_*.py   the canonical TSN library (versioned normalization, D2) + its loaders
   arcgis_layers.py           the manually-stocked ArcGIS layer drop-zone (staging only, no parser)
+  arcgis_reports.py          the "Reports vs layers" REGISTRY — one row per report
+                             (label + build + comparator + the export consolidators that
+                             can supply the TSMIS side); endpoints/picker/checks derive
   arcgis_report_highway_detail.py   the CA HIGHWAYS build PROJECTED onto a report's own
                              shape (Highway Detail first, v0.39.0) — the mapping + the
                              merge/description rules that make it a build, not a rename
+  arcgis_report_intersection_detail.py   the IM layers rendered as Intersection Detail —
+                             a POINT report, so no segmentation: the row universe, the
+                             Major/Minor leg rule, and the per-column overlay carry rule
   highway_log_columns.py intersection_detail_columns.py highway_detail_columns.py   the per-report column labels
   highway_summary_columns.py the Highway Summary layout SoT: sections/codes + the ONE
                              strict miles reader the consolidator, the cross-env loader
