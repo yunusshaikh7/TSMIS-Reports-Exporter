@@ -1046,7 +1046,12 @@ def make_notes_writer(title, lines, *, tab_color="ED7D31", col_width=110):
         ws.column_dimensions["A"].width = col_width
         ws.append([cell(title, title_font, fill)])
         for line in lines:
-            ws.append([cell(line, body, align=wrap)])
+            # A CALLABLE line is resolved HERE, while the workbook is being
+            # written, so a note may state a fact only knowable once both
+            # sides were loaded (how many equate relations this run
+            # normalized). A plain string is unchanged.
+            text = line() if callable(line) else line
+            ws.append([cell(text, body, align=wrap)])
         return ws
 
     return _write

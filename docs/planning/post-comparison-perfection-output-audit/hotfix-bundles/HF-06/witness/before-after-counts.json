@@ -1,0 +1,92 @@
+{
+  "work_item": "HF-06",
+  "finding": "PCOA-FINAL-011",
+  "comparison": "Highway Sequence - TSMIS (PDF) vs TSMIS (Excel), the same-day self check",
+  "inputs": {
+    "pull": "2026-07-23 ssor-prod (the frozen archive, both editions)",
+    "pdf_side": "tsmis_highway_sequence_pdf_consolidated 2026-07-23 ssor-prod.xlsx",
+    "excel_side": "highway_sequence_consolidated 2026-07-23 ssor-prod.xlsx",
+    "consolidated_through": "the shipped consolidate() entry points; 252 routes / 60,254 rows each side"
+  },
+  "base": {
+    "commit": "87e368c3e9a7eaf26395308e8ddea4aba7d303e5",
+    "paired_rows": 60254,
+    "side_a_only_rows": 0,
+    "side_b_only_rows": 0,
+    "differing_rows": 1395,
+    "differing_cells": 3714,
+    "per_field": {
+      "County": 0,
+      "PM Suffix": 547,
+      "City": 0,
+      "HG": 929,
+      "FT": 1119,
+      "Distance To Next Point": 0,
+      "Description": 1119
+    },
+    "note": "reproduces PCOA-FINAL-011's published totals AND its per-field split exactly, so the defect signature is bound to this recorded base"
+  },
+  "head": {
+    "branch": "hotfix/rb-5-difference-classification",
+    "paired_rows": 60254,
+    "side_a_only_rows": 0,
+    "side_b_only_rows": 0,
+    "differing_rows": 7,
+    "differing_cells": 7,
+    "per_field": {
+      "County": 0,
+      "PM Suffix": 7,
+      "City": 0,
+      "HG": 0,
+      "FT": 0,
+      "Distance To Next Point": 0,
+      "Description": 0
+    },
+    "equate_relations_normalized": 1119
+  },
+  "class_closed": {
+    "cells": 3707,
+    "rows": 1395,
+    "by_column": {"FT": 1119, "Description": 1119, "HG": 929, "PM Suffix": 540}
+  },
+  "residual": {
+    "cells": 7,
+    "column": "PM Suffix",
+    "why_not_zero": "every survivor is a one-sided equate MARKER - the two renders disagree about whether the 'E' exists at all, not about where it sits. HF-06 acceptance criterion 3(d) requires exactly this case to keep reporting, so suppressing them would satisfy criterion 1 by failing criterion 3.",
+    "rows": [
+      {"route": "005", "county": "SHA", "pm": "R030.222", "print": "E", "export": "", "class": "the print marks the equated postmile; the export marks nothing anywhere in the relation"},
+      {"route": "032", "county": "BUT", "pm": "R009.571", "print": "E", "export": "", "class": "same - adjudicated against both raw sources by hand"},
+      {"route": "063", "county": "TUL", "pm": "L009.226", "print": "E", "export": "", "class": "same"},
+      {"route": "101", "county": "LA", "pm": "011.725", "print": "E", "export": "", "class": "same"},
+      {"route": "273", "county": "SHA", "pm": "016.184", "print": "E", "export": "", "class": "same"},
+      {"route": "178", "county": "KER", "pm": "R001.694", "print": "E", "export": "", "class": "an 'E' with no EQUATES TO annotation binding it to any relation"},
+      {"route": "580", "county": "ALA", "pm": "L001.101", "print": "", "export": "E", "class": "the reverse - the export marks the annotation row, the print marks nothing anywhere in the relation; adjudicated against both raw sources by hand"}
+    ]
+  },
+  "hand_adjudication": [
+    {
+      "case": "032 BUT R009.571",
+      "print_page_10_line": "BUT CHC R 009.571 E L H 000.000 END LT INDEP ALIGN",
+      "print_annotation_line": "BUT CHC 009.081 EQUATES TO BEGIN LT INDEP ALIGN",
+      "raw_xlsx_row_219": "['BUT','CHC','R','009.571','','L','H','000.000','END LT INDEP ALIGN']",
+      "raw_xlsx_annotation": "['BUT','CHC','','009.081','','L','H','','BEGIN LT INDEP ALIGN']",
+      "verdict": "the export omits the equate marker for this relation entirely - a genuine one-sided source marker, not a parser artifact"
+    },
+    {
+      "case": "580 ALA L001.101",
+      "print_page_8_line": "ALA LVMR L 001.101 EQUATES TO END RT INDEP ALIGN",
+      "print_next_line": "ALA LVMR R 000.927 D H 000.549 BEGIN R REALIGNMENT (no 'E' anywhere in the relation)",
+      "raw_xlsx_row_77": "['ALA','LVMR','L','001.101','E','D','H','','END RT INDEP ALIGN']",
+      "verdict": "the export marks the annotation row; the print marks nothing - the reverse direction, equally genuine"
+    }
+  ],
+  "owner_adjudication_case": {
+    "case": "route 001 ORA R018.540 / 018.530 - the cells the 2026-07-26 NORMALIZE ruling was made on",
+    "print_annotation": "R018.540, suffix blank, HG blank, FT blank, Distance blank, 'EQUATES TO END R REALIGNMENT'",
+    "print_target": "018.530, suffix 'E', HG 'D', FT 'H', Distance '001.267'",
+    "export_annotation": "R018.540, suffix 'E', HG 'D', FT 'H', Distance blank, 'END R REALIGNMENT'",
+    "export_target": "018.530, suffix blank, HG 'D', FT 'H', Distance '001.267'",
+    "base_cells": 5,
+    "head_cells": 0
+  }
+}

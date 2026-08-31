@@ -71,6 +71,14 @@ _SCHEMA = CompareSchema(
     ditto_resolver=hlc.display_fills,    # tint + hover the resolved value on each ditto cell
     key_normalizer=hlc.roadbed_canonical_location,  # unify roadbed encoding (TSMIS suffix vs TSN dittoed block)
     source_file_a=("highway_log", SHEET_NAME, "xlsx"),   # Source Files sheet
+    # HF-09 / PCOA-FINAL-013: say how many of the differing Description cells
+    # are the measured representation-only class (the two sources print
+    # the same characters once punctuation, spacing, quoting and letter
+    # case are set aside). DISCLOSURE ONLY, owner ruling 2026-07-26 -
+    # every one of those cells stays flagged and stays inside every
+    # published total; the Summary just says how much of the total is
+    # presentation rather than data.
+    representation_fields=('Description',),
 )
 
 

@@ -298,6 +298,24 @@ class CompareSchema:
     # read these + compose the companion sheet — no per-report writer needed.
     source_file_a: tuple = ()
     source_file_b: tuple = ()
+    # Optional REPRESENTATION-CLASS disclosure (opt-in, HF-09 / PCOA-FINAL-013):
+    # field NAMES whose DIFFERING cells are additionally classified as
+    # "representation-only" — the two sides carry the same characters once
+    # punctuation, spacing, quoting and letter case are set aside
+    # ("NEVADA STATE LINE , END OF COUNTY" vs "NEVADA STATE LINE /END OF
+    # COUNTY"). The owner ruled 2026-07-26 that these stay COUNTED and
+    # FLAGGED, so this is a LABEL and nothing else: no cell state, verdict,
+    # equality operand, count or formula depends on it, and the class is
+    # reported alongside — never instead of — the headline totals. Default ()
+    # -> is_representation_field is always False and every existing
+    # comparison (including the regression-locked canaries) is byte-identical.
+    representation_fields: tuple = ()
+    # Optional DISCLOSURE lines (opt-in, HF-06 / HF-09): extra Summary note
+    # bullets. Each item is a string, or a zero-argument callable resolved when
+    # the Summary is written — for facts only knowable once both sides are
+    # loaded (how many Highway Sequence equate relations this run normalized).
+    # Purely additive text; default () -> byte-identical.
+    disclosure_notes: tuple = ()
 
     @property
     def n_fields(self):
@@ -321,6 +339,11 @@ class CompareSchema:
     def is_context(self, field_idx):
         """True for a non-asserting CONTEXT field (shown, never counted as a diff)."""
         return self.header[field_idx] in self.context_fields
+
+    def is_representation_field(self, field_idx):
+        """True for a field whose differing cells are ALSO classified for the
+        HF-09 representation-only disclosure. Never affects the verdict."""
+        return self.header[field_idx] in self.representation_fields
 
     def sheet_names(self, has_route):
         names = ["Summary", "Spot Check", "Comparison"]
@@ -647,6 +670,38 @@ def _is_plus_run(v):
     # must not turn a non-marker value into a Highway Log ditto marker.
     s = _xl_trim(v)
     return bool(s) and set(s) == {"+"}
+
+
+_REPRESENTATION_STRIP_RE = re.compile(r"[^0-9A-Za-z]+")
+
+
+def representation_only(a, b):
+    """True when two DIFFERING cell texts carry the same characters once
+    presentation is set aside — the measured HF-09 / PCOA-FINAL-013 class.
+
+    The rule is one line and deliberately blunt: fold letter case and drop
+    every non-alphanumeric character, then compare. That single test covers
+    each class the audit measured on the frozen corpus — separator style
+    ("NEVADA STATE LINE , END OF COUNTY" vs "NEVADA STATE LINE /END OF
+    COUNTY"; "SLO SB CO LINE" vs "SLO/SB CO LINE"), spacing ("NB OFF TO S.
+    GEYSERVILLE" vs "NB OFF TO S.GEYSERVILLE"), letter case ("CITRUS AVE OC
+    54-1293" vs "Citrus Ave OC 54-1293"), quoting ("''F'' ST" vs '"F" ST') and
+    a landmark's leading apostrophe — without a per-case table.
+
+    This is a LABEL applied to cells that are already counted as differences.
+    It is NOT an equality rule: no caller may use it to decide a verdict, and
+    a cell it returns True for keeps its red `D` state and stays inside every
+    published total (owner ruling 2026-07-26, DISCLOSURE ONLY).
+
+    Two cells that are already equal are not in the class; the caller only
+    offers differing pairs, and the empty-vs-empty fold is refused here too so
+    a blank-vs-punctuation pair is never called representational.
+    """
+    if a == b:
+        return False
+    folded_a = _REPRESENTATION_STRIP_RE.sub("", a).casefold()
+    folded_b = _REPRESENTATION_STRIP_RE.sub("", b).casefold()
+    return bool(folded_a) and folded_a == folded_b
 
 
 def _medwid_norm(t):
@@ -1272,6 +1327,7 @@ def count_diffs(sc, rows_t, rows_n, keys_t, keys_n, union, has_route,
         by_n[k] = rows_n[i]
     both = t_only = n_only = diff_rows = identical = diff_cells = 0
     asserted_cells = context_cells = 0
+    representation_cells = 0             # HF-09: a LABEL on differing cells
     first_diff_row = None
     field_diffs = {f: 0 for f in sc.field_indices}
     state_masks = {}
@@ -1323,6 +1379,12 @@ def count_diffs(sc, rows_t, rows_n, keys_t, keys_n, union, has_route,
             if cell.asserting and not cell.equal:
                 row_diffs += 1
                 field_diffs[f] += 1
+                # HF-09: classify — never decide. The cell is already counted
+                # above; this only says how much of the total is presentation.
+                if (sc.is_representation_field(f)
+                        and representation_only(cell.normalized_a,
+                                                cell.normalized_b)):
+                    representation_cells += 1
         state_masks[k] = "".join(state_codes)
         diff_cells += row_diffs
         if rs is not None:
@@ -1341,6 +1403,7 @@ def count_diffs(sc, rows_t, rows_n, keys_t, keys_n, union, has_route,
             "diff_cells": diff_cells, "first_diff_row": first_diff_row,
             "field_diffs": field_diffs, "route": route,
             "asserted_cells": asserted_cells, "context_cells": context_cells,
+            "representation_cells": representation_cells,
             "state_masks": state_masks}
 
 
@@ -3718,7 +3781,8 @@ def _build_snapshot_freshness_expr(lay, source_row_counts):
 
 
 def _write_summary(wb, name_a, name_b, n_union, lay, vals=None, warnings=(),
-                   pairing_diagnostics=(), source_row_counts=()):
+                   pairing_diagnostics=(), source_row_counts=(),
+                   representation_cells=0):
     """`vals` None = live-formula stats; else the values model and every
     stat is its literal number. The SELF-CHECK rows stay LIVE in both
     flavors — in the values workbook they recount the literal sheets, so
@@ -3923,6 +3987,16 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None, warnings=(),
          f'Comparison!{df}2:{df}{last},0)', c and c["identical"])
     stat("Total differing cells", f"=SUM(Comparison!{df}2:{df}{last})",
          c and c["diff_cells"])
+    if sc.representation_fields:
+        # HF-09 / PCOA-FINAL-013: how much of the total above is presentation
+        # rather than data. A BUILD-TIME classification, so the same literal
+        # is written in both flavors (there is no live-formula twin: the rule
+        # folds case and punctuation, which Excel cannot express per cell).
+        # It is stated as a SUBSET of the total, never in place of it — every
+        # one of these cells keeps its red `D` state and stays counted.
+        stat("— of which representation-only (punctuation / spacing / quoting "
+             "/ letter case; still counted as differences, classified at "
+             "build time)", representation_cells, representation_cells)
     row[0] += 1
 
     banner("DIFFERENCES BY FIELD")
@@ -4052,6 +4126,24 @@ def _write_summary(wb, name_a, name_b, n_union, lay, vals=None, warnings=(),
         # the substrate's digest-before-read contract.
         note = sc.unavailable_rule[1]
         notes.append(f"• ⚠ {note() if callable(note) else note}")
+    if sc.representation_fields:
+        fields = ", ".join(sc.representation_fields)
+        notes.append(
+            f"• Representation-only differences ({fields}) are COUNTED and "
+            "flagged like any other difference — the two sources really do "
+            "print different characters. The count above says how many of the "
+            "differing cells carry the same text once punctuation, spacing, "
+            "quoting and letter case are set aside "
+            "(\"NEVADA STATE LINE , END OF COUNTY\" vs \"NEVADA STATE LINE "
+            "/END OF COUNTY\"), so a reader can tell how much of the total is "
+            "presentation. Nothing is suppressed or normalized (owner ruling "
+            "2026-07-26).")
+    for note in sc.disclosure_notes:
+        # Opt-in disclosure text; a callable is resolved here so a comparator
+        # can state a fact only knowable once both sides were loaded.
+        text = note() if callable(note) else note
+        if text:
+            notes.append(f"• {text}")
     if warnings:
         shown = warnings[:20]
         notes.append(
@@ -4272,6 +4364,21 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
             "unavailable_rule must be a (token, Summary note) pair — a "
             "non-empty token string, and a note that is either a non-empty "
             "string or a callable returning one")
+    if sc.representation_fields and (
+            not isinstance(sc.representation_fields, tuple)
+            or not all(isinstance(name, str) and name in sc.header
+                       for name in sc.representation_fields)):
+        raise ValueError(
+            "representation_fields must be a tuple of field names that exist "
+            "in this comparison's header")
+    if sc.disclosure_notes and (
+            not isinstance(sc.disclosure_notes, tuple)
+            or not all(callable(note)
+                       or (isinstance(note, str) and note.strip())
+                       for note in sc.disclosure_notes)):
+        raise ValueError(
+            "disclosure_notes must be a tuple of non-empty strings or "
+            "zero-argument callables returning one")
     warnings = [str(w) for w in warnings]
     structured_warnings = list(warnings)
     failure_items = tuple(str(item) for item in (failures or ()))
@@ -4707,7 +4814,8 @@ def run_compare(sc, rows_t, rows_n, has_route, out_path, *, events=None,
         _write_summary(
             wb, name_a, name_b, len(union), lay, vals=vals,
             warnings=warnings, pairing_diagnostics=pairing_diagnostics,
-            source_row_counts=(len(rows_t), len(rows_n)))
+            source_row_counts=(len(rows_t), len(rows_n)),
+            representation_cells=counts["representation_cells"])
         _write_spot_check(wb, lay, len(union), spot_row, union[spot_row - 2],
                           manual_calc=(has_route and m == "formulas"))
         if _write_comparison(

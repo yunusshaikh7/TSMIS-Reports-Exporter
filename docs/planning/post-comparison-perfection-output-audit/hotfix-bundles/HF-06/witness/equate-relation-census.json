@@ -1,0 +1,308 @@
+{
+  "work_item": "HF-06",
+  "finding": "PCOA-FINAL-011",
+  "what_this_is": "An APP-FREE re-derivation of the Highway Sequence equate relations from the raw frozen 2026-07-23 inputs. The Excel side is read straight out of the 252 per-route .xlsx with openpyxl; the print side from the 252 per-route .pdf through pdfplumber's own extract_text() under a line grammar written for this oracle - NOT the application's header-anchored column windows. Rows pair on (route, county, prefixed postmile, occurrence), the identity the comparison itself uses.",
+  "corpus": {
+    "routes": 252,
+    "excel_rows": 60254,
+    "print_rows": 60252,
+    "print_only_count": 2,
+    "excel_only_count": 4
+  },
+  "relation_census": {
+    "print_annotations": 1117,
+    "product_annotations": 1119,
+    "annotation_lines_structurally_blank": 1117,
+    "print_equate_suffixes": 1124,
+    "excel_equate_suffixes": 1119,
+    "relations": 1117,
+    "target_gap_distribution": {
+      "1": 1110,
+      "8": 1,
+      "9": 1,
+      "none": 5
+    },
+    "cross_county_relations": 39,
+    "label_pairing": {
+      "print 'EQUATES TO <label>' == export '<label>'": 691,
+      "print bare 'EQUATES TO' == export 'PM EQUATION'": 426
+    },
+    "suffix_seat": {
+      "('print:target', 'export:annotation')": 268,
+      "('print:target', 'export:target')": 839,
+      "no target line in the print": 5,
+      "('print:target', 'export:none')": 5
+    },
+    "paired_rows": 60250
+  },
+  "what_this_independently_establishes": [
+    "the print declares 1,117 of the product's 1,119 equate annotations",
+    "EVERY one of those 1,117 annotation lines has its suffix, HG, FT and Distance cells blank - the print convention is exact, not approximate",
+    "the label pairing is complete with ZERO unexplained cases: 691 print 'EQUATES TO <label>' against the export's bare '<label>', and 426 bare 'EQUATES TO' against the export's 'PM EQUATION'",
+    "39 relations cross a county/route boundary - the exact number the implementation plan cites",
+    "the equate suffix totals match the product's parser exactly: 1,124 in the print, 1,119 in the export",
+    "the print always seats the relation's suffix on the TARGET row; the export seats it on the annotation 268 times, on the target 839, and nowhere 5"
+  ],
+  "suffix_residual_after_canonicalization": {
+    "count": 11,
+    "product_residual": 7,
+    "difference_explained": "the four extra cells belong to the TWO relations this oracle's minimal grammar cannot see - both are annotations whose printed Description WRAPS onto continuation lines, which the shipped parser rejoins by design and the oracle deliberately does not (route 036 TRI R028.650 with its target 027.232, and route 215 RIV 043.679 with its target R043.614). Remove those four and the independent reader's residual set is the product's seven rows, EXACTLY.",
+    "rows": [
+      {
+        "route": "005",
+        "county": "SHA",
+        "pm": "R030.222",
+        "print": "E",
+        "export": "",
+        "oracle_blind_spot": false
+      },
+      {
+        "route": "032",
+        "county": "BUT",
+        "pm": "R009.571",
+        "print": "E",
+        "export": "",
+        "oracle_blind_spot": false
+      },
+      {
+        "route": "036",
+        "county": "TRI",
+        "pm": "R028.650",
+        "print": "",
+        "export": "E",
+        "oracle_blind_spot": true
+      },
+      {
+        "route": "036",
+        "county": "TRI",
+        "pm": "027.232",
+        "print": "E",
+        "export": "",
+        "oracle_blind_spot": true
+      },
+      {
+        "route": "063",
+        "county": "TUL",
+        "pm": "L009.226",
+        "print": "E",
+        "export": "",
+        "oracle_blind_spot": false
+      },
+      {
+        "route": "101",
+        "county": "LA.",
+        "pm": "011.725",
+        "print": "E",
+        "export": "",
+        "oracle_blind_spot": false
+      },
+      {
+        "route": "178",
+        "county": "KER",
+        "pm": "R001.694",
+        "print": "E",
+        "export": "",
+        "oracle_blind_spot": false
+      },
+      {
+        "route": "215",
+        "county": "RIV",
+        "pm": "043.679",
+        "print": "",
+        "export": "E",
+        "oracle_blind_spot": true
+      },
+      {
+        "route": "215",
+        "county": "RIV",
+        "pm": "R043.614",
+        "print": "E",
+        "export": "",
+        "oracle_blind_spot": true
+      },
+      {
+        "route": "273",
+        "county": "SHA",
+        "pm": "016.184",
+        "print": "E",
+        "export": "",
+        "oracle_blind_spot": false
+      },
+      {
+        "route": "580",
+        "county": "ALA",
+        "pm": "L001.101",
+        "print": "",
+        "export": "E",
+        "oracle_blind_spot": false
+      }
+    ]
+  },
+  "other_residual_columns": {
+    "counts": {
+      "dist": 545,
+      "desc": 739,
+      "hg": 291,
+      "ft": 328,
+      "suffix": 11
+    },
+    "note": "these are the ORACLE's own grammar limits, not product results, and are recorded so they cannot be mistaken for findings: this minimal reader does not model the TSN pointer marker '*P*' in the Distance column, does not rejoin a wrapped Description, and assigns HG/FT positionally where the print leaves HG blank. The product's own residual is 7 cells, ALL in PM Suffix, and the suffix census above is the leg this oracle is authoritative for. The full per-row dump is retained at \u2026\\_scratch\\post-comparison-hotfixes\\HF-06\\rb5-a1\\equate-relation-census-FULL.json"
+  },
+  "route_001_case": {
+    "print_annotation": {
+      "route": "001",
+      "county": "ORA",
+      "city": "",
+      "prefix": "R",
+      "pm": "018.540",
+      "suffix": "",
+      "hg": "",
+      "ft": "",
+      "dist": "",
+      "desc": "EQUATES TO END R REALIGNMENT"
+    },
+    "print_target": {
+      "route": "001",
+      "county": "ORA",
+      "city": "",
+      "prefix": "",
+      "pm": "018.530",
+      "suffix": "E",
+      "hg": "D",
+      "ft": "H",
+      "dist": "001.267",
+      "desc": ""
+    },
+    "excel_annotation": {
+      "route": "001",
+      "county": "ORA",
+      "city": "",
+      "prefix": "R",
+      "pm": "018.540",
+      "suffix": "E",
+      "hg": "D",
+      "ft": "H",
+      "dist": "",
+      "desc": "END R REALIGNMENT"
+    },
+    "excel_target": {
+      "route": "001",
+      "county": "ORA",
+      "city": "",
+      "prefix": "",
+      "pm": "018.530",
+      "suffix": "",
+      "hg": "D",
+      "ft": "H",
+      "dist": "001.267",
+      "desc": ""
+    },
+    "canonical_print_annotation": {
+      "route": "001",
+      "county": "ORA",
+      "city": "",
+      "prefix": "R",
+      "pm": "018.540",
+      "suffix": "",
+      "hg": "",
+      "ft": "",
+      "dist": "",
+      "desc": "END R REALIGNMENT"
+    },
+    "canonical_excel_annotation": {
+      "route": "001",
+      "county": "ORA",
+      "city": "",
+      "prefix": "R",
+      "pm": "018.540",
+      "suffix": "",
+      "hg": "",
+      "ft": "",
+      "dist": "",
+      "desc": "END R REALIGNMENT"
+    }
+  },
+  "print_only_rows": [
+    {
+      "route": "047",
+      "county": "LA",
+      "city": "D",
+      "prefix": "H",
+      "pm": "000.000",
+      "suffix": "",
+      "hg": "",
+      "ft": "",
+      "dist": "",
+      "desc": "END OF ROUTE 047",
+      "_id": "('047', 'LA', 'H000.000', 1)"
+    },
+    {
+      "route": "144",
+      "county": "SB",
+      "city": "SB",
+      "prefix": "H",
+      "pm": "000.000",
+      "suffix": "",
+      "hg": "",
+      "ft": "",
+      "dist": "",
+      "desc": "COUNTY END: SB",
+      "_id": "('144', 'SB', 'H000.000', 1)"
+    }
+  ],
+  "excel_only_rows": [
+    {
+      "route": "043",
+      "county": "",
+      "city": "",
+      "prefix": "",
+      "pm": "",
+      "suffix": "",
+      "hg": "D",
+      "ft": "H",
+      "dist": "000.000",
+      "desc": "END OF ROUTE 043",
+      "_id": "('043', '', '', 1)"
+    },
+    {
+      "route": "047",
+      "county": "",
+      "city": "LA",
+      "prefix": "",
+      "pm": "",
+      "suffix": "",
+      "hg": "D",
+      "ft": "H",
+      "dist": "000.000",
+      "desc": "END OF ROUTE 047",
+      "_id": "('047', '', '', 1)"
+    },
+    {
+      "route": "059",
+      "county": "",
+      "city": "",
+      "prefix": "",
+      "pm": "",
+      "suffix": "",
+      "hg": "U",
+      "ft": "H",
+      "dist": "000.000",
+      "desc": "END OF ROUTE 059",
+      "_id": "('059', '', '', 1)"
+    },
+    {
+      "route": "144",
+      "county": "SB",
+      "city": "SB",
+      "prefix": "",
+      "pm": "",
+      "suffix": "",
+      "hg": "U",
+      "ft": "H",
+      "dist": "000.000",
+      "desc": "COUNTY END: SB",
+      "_id": "('144', 'SB', '', 1)"
+    }
+  ],
+  "one_sided_note": "all six are the five postmile-less END-marker rows, where this oracle's key places the HG letter in the prefix slot - a grammar artifact of the oracle, not a row either source is missing"
+}
