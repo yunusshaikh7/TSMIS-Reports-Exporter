@@ -1,0 +1,78 @@
+{
+  "worktree_removed": true,
+  "local_branch_removed": true,
+  "remote_branch_removed": true,
+  "artifacts_restored": true,
+  "artifact_only_directory": "C:\\Users\\Yunus\\Projects\\wt-rb5",
+  "artifact_directory_has_git": false,
+  "preserved_inventory": [
+    {
+      "path": "C:\\Users\\Yunus\\Projects\\wt-rb5\\output",
+      "files": 2573,
+      "bytes": 383162308.0,
+      "inventory_matches": true
+    },
+    {
+      "path": "C:\\Users\\Yunus\\Projects\\wt-rb5\\tsn_library",
+      "files": 53,
+      "bytes": 81146499.0,
+      "inventory_matches": true
+    },
+    {
+      "path": "C:\\Users\\Yunus\\Projects\\wt-rb5\\arcgis_layers",
+      "files": 42,
+      "bytes": 363223700.0,
+      "inventory_matches": true
+    },
+    {
+      "path": "C:\\Users\\Yunus\\Projects\\wt-rb5\\config.json",
+      "files": 1,
+      "bytes": 2.0,
+      "inventory_matches": true
+    },
+    {
+      "path": "C:\\Users\\Yunus\\Projects\\wt-rb5\\compare_timings.json",
+      "files": 1,
+      "bytes": 946.0,
+      "inventory_matches": true
+    }
+  ],
+  "protected_branches_after": [
+    "refs/heads/backup/codex-vs-tsn-speed 0d93bbb041d21354481b9c1373a72fd0d447ad62",
+    "refs/heads/feat/arcgis-intersection-detail 59ed7ba63f2cbfbb841d95959812962a6b805395",
+    "refs/heads/gh-pages 48f252a65aa9a09d541ebd7813b5fb2fb3b59e01"
+  ],
+  "worktrees_after": [
+    "worktree C:/Users/Yunus/Projects/TSMIS-Reports-Exporter",
+    "HEAD 59ed7ba63f2cbfbb841d95959812962a6b805395",
+    "branch refs/heads/feat/arcgis-intersection-detail",
+    "",
+    "worktree C:/Users/Yunus/.codex/worktrees/76ed/wt-rb5",
+    "HEAD 87e368c3e9a7eaf26395308e8ddea4aba7d303e5",
+    "detached",
+    "",
+    "worktree C:/Users/Yunus/.codex/worktrees/8407/wt-rb5",
+    "HEAD a0787e7710b326945797c7c51f56acb7081d0f20",
+    "branch refs/heads/main",
+    "",
+    "worktree C:/Users/Yunus/.codex/worktrees/8ec9/wt-rb5",
+    "HEAD 87e368c3e9a7eaf26395308e8ddea4aba7d303e5",
+    "detached",
+    "",
+    "worktree C:/Users/Yunus/.codex/worktrees/fb87/wt-rb5",
+    "HEAD 87e368c3e9a7eaf26395308e8ddea4aba7d303e5",
+    "detached",
+    "",
+    "worktree C:/Users/Yunus/Projects/wt-rb5-base",
+    "HEAD 87e368c3e9a7eaf26395308e8ddea4aba7d303e5",
+    "detached",
+    ""
+  ],
+  "cleanup_note": "Worktree removal unregistered and removed the tracked checkout but reported Permission denied deleting the empty root. It was not retried; original artifact paths were restored with matching before/after counts and sizes. Branch -d refused because its remote tracking branch lacked the local review commits despite their being merged to main. It was not retried or forced: after explicit main-ancestor proof and deletion of the merged remote branch, update-ref compare-and-deleted only the exact approved local SHA.",
+  "finished": "2026-08-31T11:45:34.7873285-07:00",
+  "recorded_utc": "2026-08-31T18:45:35.043861+00:00",
+  "minutes_since_review_start": 29.932,
+  "next_bundle": "RB-6",
+  "next_status": "READY",
+  "readiness_source_main": "a0787e7710b326945797c7c51f56acb7081d0f20"
+}

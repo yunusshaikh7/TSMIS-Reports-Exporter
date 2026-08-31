@@ -1,6 +1,6 @@
 # Post-Comparison Output Program — Start Here
 
-Workflow state: **Stages 1A, 1B, 2 and 3 complete; RB-1 through RB-5 are MERGED. RB-5 merged at `f11f9d2546b7775e432a22d5174f895f01210c35` after both Codex approvals; its 171/171 post-merge gate and packaged application self-test passed. RB-6 readiness is next.**
+Workflow state: **Stages 1A, 1B, 2 and 3 complete; RB-1 through RB-5 are MERGED. RB-5 merged at `f11f9d2546b7775e432a22d5174f895f01210c35` after both Codex approvals; its 171/171 post-merge gate and packaged application self-test passed. RB-6 is READY; implementation has not started.**
 
 Last updated: 2026-08-31
 
@@ -28,10 +28,7 @@ first pass.
 
 ## Next action
 
-Finish RB-5's bounded branch/worktree cleanup, preserving retained inputs and
-audit artifacts, then prepare **RB-6 / HF-07 + HF-08 + HF-11** readiness from
-updated main. No next-bundle implementation or expensive acceptance run belongs
-in this review.
+Invoke `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` in a fresh implementation task with `<BUNDLE_ID> = RB-6` and `<IMPLEMENTER> = Claude`. Read [RB-6/BUNDLE.md](hotfix-bundles/RB-6/BUNDLE.md), fetch and record the latest clean pushed main, then create the specified branch. This review prepared readiness only; it did not start RB-6 implementation or acceptance.
 
 RB-5's two separate Codex approvals and exact verification are in
 [RB-5/REVIEW.md](hotfix-bundles/RB-5/REVIEW.md). Both old returns are closed.
@@ -126,7 +123,7 @@ did not create a branch, modify product code, or begin an acceptance run.
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-5 MERGED; RB-6 readiness next** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 4 | Implement one bounded RB bundle | **RB-5 MERGED; RB-6 READY — implementation not started** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
 | 5 | Adversarially review and approve that bundle | **RB-5 COMPLETE — both approvals, merge and smoke passed** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.

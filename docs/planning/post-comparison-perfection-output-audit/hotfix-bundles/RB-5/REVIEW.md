@@ -781,3 +781,30 @@ The merged runtime is identical to reviewed `0d54799`.
 Exact logs and hashes: [merge closeout](witness/merge-closeout.json) and [full post-merge gate](witness/postmerge-gate.log).
 Review plus this record finalization: **25.03 minutes** at `2026-08-31T18:40:41.079391+00:00`.
 The plan now records MERGED with the exact merge SHA. Push, bounded cleanup and RB-6 readiness are recorded in the final closeout, not pre-claimed here.
+
+
+## Final cleanup and readiness — 2026-08-31
+
+Main's merge and passing smoke closeout were pushed before cleanup. The fully
+merged local and remote `hotfix/rb-5-difference-classification` branches were
+removed. Only the implementation worktree registration at
+`C:\Users\Yunus\Projects\wt-rb5` was removed. Its retained `output/`,
+`tsn_library/`, `arcgis_layers/`, `config.json` and `compare_timings.json` were
+moved temporarily, then restored byte-preserving at their ORIGINAL paths in a
+plain artifact-only folder; no `.git` remains there. Main, gh-pages, the user's
+feature branch/checkouts, unrelated review worktrees, pre-fix evidence worktree,
+audit roots and review documents are preserved. The detailed preservation and
+branch checks are in [cleanup verification](witness/cleanup-verification.json).
+
+**Next eligible bundle: RB-6 — READY**, full HF-07/HF-08/HF-11 contract prepared
+from pushed main `a0787e7710b326945797c7c51f56acb7081d0f20`. No RB-6 branch, implementation, rebuild or
+acceptance run started. `report_catalog.TSN` was observed to contain 11 entries;
+an optional identifier-print expression assumed `.id` and stopped with an
+AttributeError after printing that count. It was not retried and is not a
+product failure.
+
+Review and record finalization reached **29.93 minutes** at
+`2026-08-31T18:45:35.043861+00:00`, within the 30-minute ceiling. Final record commit and
+normal push follow immediately. Verdict remains **APPROVED**, both separate
+Codex non-implementer sign-offs retained, runtime `f11f9d2546b7775e432a22d5174f895f01210c35` merged;
+RB5-R2-FU-001 remains an owner-ranked follow-up under the two-denial ceiling.

@@ -48,5 +48,6 @@
   },
   "recorded_utc": "2026-08-31T18:40:41.079391+00:00",
   "minutes_since_review_start": 25.033,
-  "push_and_cleanup": "Pending at this merge-record commit; final closeout below will record actual results."
+  "push_and_cleanup": "Merge/smoke closeout pushed; merged hotfix branches and implementation worktree removed, original artifact paths preserved; RB-6 READY.",
+  "finalization_minutes": 29.932
 }
