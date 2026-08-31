@@ -1,0 +1,507 @@
+{
+  "finding": "RB5-R1-001",
+  "reviewer": "Codex",
+  "review_number": 1,
+  "data_classification": "entirely synthetic; no raw TSMIS records",
+  "branch": "hotfix/rb-5-difference-classification",
+  "base": "87e368c3e9a7eaf26395308e8ddea4aba7d303e5",
+  "runtime_head": "444e8d9fecee3f8335f244fa940e168161bfb878",
+  "entry_head": "3d5d83b687c7917947c3fe4974036d189c2a3c09",
+  "created_utc": "2026-08-31T07:44:41.728778+00:00",
+  "input_header": [
+    "Route",
+    "County",
+    "City",
+    "",
+    "PM",
+    "",
+    "HG",
+    "FT",
+    "Distance To Next Point",
+    "Description"
+  ],
+  "print_rows": [
+    [
+      "001",
+      "ORA",
+      "",
+      "R",
+      "018.540",
+      "",
+      "",
+      "",
+      "",
+      "EQUATES TO SYNTHETIC LANDMARK"
+    ],
+    [
+      "001",
+      "ORA",
+      "",
+      "R",
+      "018.540",
+      "",
+      "U",
+      "R",
+      "000.100",
+      "SYNTHETIC ORDINARY SIGN"
+    ],
+    [
+      "001",
+      "ORA",
+      "",
+      "",
+      "018.530",
+      "E",
+      "D",
+      "H",
+      "001.267",
+      ""
+    ]
+  ],
+  "excel_rows_original_order": [
+    [
+      "001",
+      "ORA",
+      "",
+      "R",
+      "018.540",
+      "E",
+      "D",
+      "H",
+      "",
+      "SYNTHETIC LANDMARK"
+    ],
+    [
+      "001",
+      "ORA",
+      "",
+      "R",
+      "018.540",
+      "",
+      "U",
+      "R",
+      "000.100",
+      "SYNTHETIC ORDINARY SIGN"
+    ],
+    [
+      "001",
+      "ORA",
+      "",
+      "",
+      "018.530",
+      "",
+      "D",
+      "H",
+      "001.267",
+      ""
+    ]
+  ],
+  "excel_permutation_zero_based": [
+    1,
+    0,
+    2
+  ],
+  "expected_head_for_both_orders": {
+    "differing_cells": 0,
+    "differing_rows": 0,
+    "paired_rows": 3,
+    "side_a_only_rows": 0,
+    "side_b_only_rows": 0,
+    "ordinary_HG": "U",
+    "ordinary_FT": "R"
+  },
+  "base_results": [
+    {
+      "case": "ordered",
+      "status": "ok",
+      "differing_cells": 5,
+      "differing_rows": 2,
+      "paired_rows": 3,
+      "per_field": {
+        "0:County": 0,
+        "2:PM Suffix": 2,
+        "3:City": 0,
+        "4:HG": 1,
+        "5:FT": 1,
+        "6:Distance To Next Point": 0,
+        "7:Description": 1
+      },
+      "verdict": "diff"
+    },
+    {
+      "case": "reordered",
+      "status": "ok",
+      "differing_cells": 5,
+      "differing_rows": 2,
+      "paired_rows": 3,
+      "per_field": {
+        "0:County": 0,
+        "2:PM Suffix": 2,
+        "3:City": 0,
+        "4:HG": 1,
+        "5:FT": 1,
+        "6:Distance To Next Point": 0,
+        "7:Description": 1
+      },
+      "verdict": "diff"
+    }
+  ],
+  "head_results": [
+    {
+      "case": "ordered",
+      "status": "ok",
+      "differing_cells": 0,
+      "differing_rows": 0,
+      "paired_rows": 3,
+      "per_field": {
+        "0:County": 0,
+        "2:PM Suffix": 0,
+        "3:City": 0,
+        "4:HG": 0,
+        "5:FT": 0,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "verdict": "match"
+    },
+    {
+      "case": "reordered",
+      "status": "ok",
+      "differing_cells": 6,
+      "differing_rows": 3,
+      "paired_rows": 3,
+      "per_field": {
+        "0:County": 0,
+        "2:PM Suffix": 2,
+        "3:City": 0,
+        "4:HG": 2,
+        "5:FT": 2,
+        "6:Distance To Next Point": 0,
+        "7:Description": 0
+      },
+      "verdict": "diff"
+    }
+  ],
+  "published_head_comparison_rows": {
+    "ordered": [
+      [
+        "Route",
+        "PM",
+        "#",
+        "TSMIS (PDF) Row",
+        "TSMIS (Excel) Row",
+        "Status",
+        "Diffs",
+        "County",
+        "PM Suffix",
+        "City",
+        "HG",
+        "FT",
+        "Distance To Next Point",
+        "Description",
+        "__CMP_E1_STATE_V1_C001_P0000_P0006",
+        "__CMP_E2_KEY_V1_TOKEN"
+      ],
+      [
+        "001",
+        "001 / ORA / R018.540",
+        1,
+        "",
+        "",
+        "Both",
+        0,
+        "ORA",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "SYNTHETIC LANDMARK",
+        "EEEEEEE",
+        "__CMP_E2_KEY_V1_00000001"
+      ],
+      [
+        "001",
+        "001 / ORA / R018.540",
+        2,
+        "",
+        "",
+        "Both",
+        0,
+        "ORA",
+        "",
+        "",
+        "U",
+        "R",
+        "000.100",
+        "SYNTHETIC ORDINARY SIGN",
+        "EEEEEEE",
+        "__CMP_E2_KEY_V1_00000002"
+      ],
+      [
+        "001",
+        "001 / ORA / 018.530",
+        1,
+        "",
+        "",
+        "Both",
+        0,
+        "ORA",
+        "E",
+        "",
+        "D",
+        "H",
+        "001.267",
+        "",
+        "EEEEEEE",
+        "__CMP_E2_KEY_V1_00000003"
+      ]
+    ],
+    "reordered": [
+      [
+        "Route",
+        "PM",
+        "#",
+        "TSMIS (PDF) Row",
+        "TSMIS (Excel) Row",
+        "Status",
+        "Diffs",
+        "County",
+        "PM Suffix",
+        "City",
+        "HG",
+        "FT",
+        "Distance To Next Point",
+        "Description",
+        "__CMP_E1_STATE_V1_C001_P0000_P0006",
+        "__CMP_E2_KEY_V1_TOKEN"
+      ],
+      [
+        "001",
+        "001 / ORA / R018.540",
+        2,
+        "",
+        "",
+        "Both",
+        2,
+        "ORA",
+        "",
+        "",
+        "U ≠ (blank)",
+        "R ≠ (blank)",
+        "000.100",
+        "SYNTHETIC ORDINARY SIGN",
+        "EEEDDEE",
+        "__CMP_E2_KEY_V1_00000001"
+      ],
+      [
+        "001",
+        "001 / ORA / R018.540",
+        1,
+        "",
+        "",
+        "Both",
+        3,
+        "ORA",
+        "(blank) ≠ E",
+        "",
+        "(blank) ≠ D",
+        "(blank) ≠ H",
+        "",
+        "SYNTHETIC LANDMARK",
+        "EDEDDEE",
+        "__CMP_E2_KEY_V1_00000002"
+      ],
+      [
+        "001",
+        "001 / ORA / 018.530",
+        1,
+        "",
+        "",
+        "Both",
+        1,
+        "ORA",
+        "E ≠ (blank)",
+        "",
+        "D",
+        "H",
+        "001.267",
+        "",
+        "EDEEEEE",
+        "__CMP_E2_KEY_V1_00000003"
+      ]
+    ]
+  },
+  "reproduction": {
+    "python": "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\build\\.venv\\Scripts\\python.exe",
+    "entrypoint": "compare_highway_sequence_pdf.TSMIS_PDF_VS_EXCEL.compare",
+    "head_mode": "both",
+    "base_mode": "values",
+    "steps": [
+      "Import scripts from the selected base or head worktree.",
+      "Write input_header and print_rows to sheet Highway Locations (compare_highway_sequence_tsn.TSMIS_SHEET), and mark only that workbook with pdf_table_lib.write_pdf_source_marker.",
+      "Write input_header and excel_rows_original_order to the other workbook with no PDF marker.",
+      "Run the shipped adapter with Events and confirm_overwrite=lambda _: True, using a fresh synthetic output path.",
+      "Run a separate case using only excel_permutation_zero_based; leave the print rows unchanged.",
+      "Read the typed comparison outcome, VALUES Comparison state masks and the ordinary row in TSMIS (Excel). No Excel recalculation is required to reproduce the defect."
+    ]
+  },
+  "retained_root": "C:\\Users\\Yunus\\.codex\\worktrees\\8ec9\\wt-rb5\\.review-rb5\\duplicate-probe",
+  "artifacts": [
+    {
+      "relative_path": "_state/.cmpv3-0ab749f3c742cd4f-000000-989b5ba84451213f.comparison-payload.zlib",
+      "bytes": 516,
+      "sha256": "989b5ba84451213fc0c4c97b033cdbd3129285234309f6a6a6482e4e874bc5cb"
+    },
+    {
+      "relative_path": "_state/.cmpv3-b601c0e287ba52b5-000000-49af9fa9fa17a5b7.comparison-payload.zlib",
+      "bytes": 498,
+      "sha256": "49af9fa9fa17a5b70fc59cc244f731f822fa07b0a919ec97bbe3ea8e5cd40ec2"
+    },
+    {
+      "relative_path": "_state/.cmpv3-bc12af4426a5d2ce-000000-ee3a1f772438b54d.comparison-payload.zlib",
+      "bytes": 508,
+      "sha256": "ee3a1f772438b54d12b68b74ca31ebc45ec082c0b4a323e2e95c087d2c131e3f"
+    },
+    {
+      "relative_path": "_state/.cmpv3-c19bddbfffc94a58-000000-24204ff066aedb10.comparison-payload.zlib",
+      "bytes": 521,
+      "sha256": "24204ff066aedb105d2cbed3f7e4cad70423d9b2d856ee1e2c74d3720e2802c6"
+    },
+    {
+      "relative_path": "_state/.tsmis-comparison-publication.lock",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "relative_path": "_state/ordered-base-comparison.xlsx.outcome.json",
+      "bytes": 1903,
+      "sha256": "48f038c011cf97474481594ecc9e12a47c4e1931fe0cdd86e878f833b4f4f52c"
+    },
+    {
+      "relative_path": "_state/ordered-base-comparison.xlsx.provenance.json",
+      "bytes": 984,
+      "sha256": "49598af2fa487907c49b10dc68d1c1c71f8b70e02bc927dac2b483efbffc6de3"
+    },
+    {
+      "relative_path": "_state/ordered-comparison (values).xlsx.outcome.json",
+      "bytes": 2462,
+      "sha256": "3b264c3dcca2c327416ff32130c6c95618a8ef3008014396a81ad0ee576e8c48"
+    },
+    {
+      "relative_path": "_state/ordered-comparison.xlsx.outcome.json",
+      "bytes": 2439,
+      "sha256": "344bbc3988de31dd176904cfc8134298cb3ab199c05e544ab73525271e832ea1"
+    },
+    {
+      "relative_path": "_state/ordered-comparison.xlsx.provenance.json",
+      "bytes": 1064,
+      "sha256": "74b7ce5a2ff9e7844703d08ea2d25ff9c9f9790459c6508fdbd0196218a9333b"
+    },
+    {
+      "relative_path": "_state/reordered-base-comparison.xlsx.outcome.json",
+      "bytes": 1914,
+      "sha256": "bf31baafa5e3f9c2cd422aa6bfb015be470fe8fbd3cdd45aff3f06fe1b6d2b13"
+    },
+    {
+      "relative_path": "_state/reordered-base-comparison.xlsx.provenance.json",
+      "bytes": 992,
+      "sha256": "2ec8128be8651d6428f6bf69b136cadffdbb81dc5b652e95e32f738a45308b18"
+    },
+    {
+      "relative_path": "_state/reordered-comparison (values).xlsx.outcome.json",
+      "bytes": 2479,
+      "sha256": "03a1b5fa9640d259be3418470192ba28b8bfc6cffbd91d5cd5e937beae28a3f5"
+    },
+    {
+      "relative_path": "_state/reordered-comparison.xlsx.outcome.json",
+      "bytes": 2457,
+      "sha256": "0c43b9b105000e1a8f44fb0442c2d9dddfd0f4a4786d09a45548d61f9b7ce685"
+    },
+    {
+      "relative_path": "_state/reordered-comparison.xlsx.provenance.json",
+      "bytes": 1072,
+      "sha256": "dc2e78b25b3ce1fc7c63cc1674fd92ee29ae26feea325db5ba1e6300171d8ed8"
+    },
+    {
+      "relative_path": "base-result.json",
+      "bytes": 705,
+      "sha256": "2e5555f626605dcf2d5187fcf431214b287341da1319c079b76acc99932f6626"
+    },
+    {
+      "relative_path": "ordered-base-comparison.xlsx",
+      "bytes": 24866,
+      "sha256": "4a15ed836906b95f640090bf55c2b386766782891aaf36900f84563016fb092a"
+    },
+    {
+      "relative_path": "ordered-comparison (values).xlsx",
+      "bytes": 25609,
+      "sha256": "76c171a15cafc26df0bca2661a50173d516166a1af02f11bdb54f3cfab008102"
+    },
+    {
+      "relative_path": "ordered-comparison.xlsx",
+      "bytes": 27617,
+      "sha256": "122556527cfad7c665017fd725d03fce7d0e3026be06763a259266323681a0ad"
+    },
+    {
+      "relative_path": "ordered-excel.xlsx",
+      "bytes": 5111,
+      "sha256": "58f77423e01d46992c1d937385c313f2a391b9498eb6d1edd64636447dd34877"
+    },
+    {
+      "relative_path": "ordered-print.xlsx",
+      "bytes": 5626,
+      "sha256": "ce92b92e1d9f722d26690265c745edac315117b9eacb133d5536dad014f82000"
+    },
+    {
+      "relative_path": "reordered-base-comparison.xlsx",
+      "bytes": 24867,
+      "sha256": "0840f1aa3b844ff134d9913c76215e8be4aaf74c1673b92c65757a8f7bb97c6c"
+    },
+    {
+      "relative_path": "reordered-comparison (values).xlsx",
+      "bytes": 25639,
+      "sha256": "5ca168a5231104e5cb2224977f8bf411d375071847c062fcdeac32c1eb4cb905"
+    },
+    {
+      "relative_path": "reordered-comparison.xlsx",
+      "bytes": 27610,
+      "sha256": "5c09b8895e7a8ac06d7446273a596eba05f5af6ecee1325cba68e976eab680a4"
+    },
+    {
+      "relative_path": "reordered-excel.xlsx",
+      "bytes": 5110,
+      "sha256": "e37e826e93e3cdde9deb4c153ece1209a405d60d5b88392d0f7e019034239210"
+    },
+    {
+      "relative_path": "reordered-print.xlsx",
+      "bytes": 5625,
+      "sha256": "de46f1eed9f6774763d09bc78e7735bfa45f78d31a12b3d0309b8466677b4be6"
+    },
+    {
+      "relative_path": "result.json",
+      "bytes": 706,
+      "sha256": "78baa95e796d271ea7feeede35de5c74952a11fe073bbb63b3ca44a66eb2b6d2"
+    }
+  ],
+  "focused_checks": [
+    {
+      "name": "check_compare_equality_policy.py.log",
+      "bytes": 6483,
+      "sha256": "fbc6dd66208ba23edde0fa7d1035aa4b6940cf6718b05ab04f8026b5cb3a3fc3"
+    },
+    {
+      "name": "check_compare_highway_sequence_equate.py.log",
+      "bytes": 1812,
+      "sha256": "44440b3a28d616e586594b53780a760345e245a5a25aba4a77e28edebcdd35d8"
+    },
+    {
+      "name": "check_compare_representation_class.py.log",
+      "bytes": 3670,
+      "sha256": "9882892cfb38a78ae6c2d163b8d34b094aa6173affd14a8e04fe9e584bdf2621"
+    }
+  ],
+  "practical_impact": "Changing duplicate row order alone publishes six false differences and clears the unrelated ordinary source row HG/FT; the base is order invariant.",
+  "scope_of_claim": "Proved on these three-row synthetic inputs. No prevalence on the frozen statewide pull is asserted. Both head flavors were generated; only the values workbook was read for literal discrepancy state, and no formulas recalculation was attempted.",
+  "input_sheet": "Highway Locations"
+}

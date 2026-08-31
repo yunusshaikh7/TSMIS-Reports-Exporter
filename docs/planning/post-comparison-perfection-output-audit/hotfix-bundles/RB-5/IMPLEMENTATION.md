@@ -1,6 +1,14 @@
 # `RB-5` — Implementation Record
 
-Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** — returned once, evidence supplied.
+Status: **DENIED — RETURN TO IMPLEMENTATION** — resumed Review 1, `RB5-R1-001`.
+
+> **Review update 2026-08-31:** the supplied HF-09 evidence was inspected; the
+> disclosed Clean Road hardware limit is not a denial reason. The sole returned
+> defect is duplicate-order-sensitive equate normalization: a three-row shipped-
+> path probe changes from match to six false differences when the two equal-key
+> Excel rows swap. See [REVIEW.md](REVIEW.md) and its synthetic witness. This is
+> denial **2 of 2**; remaining observations are owner-ranked follow-ups. The
+> implementation facts and earlier return response below are preserved.
 
 > Codex Review 1 (2026-08-30): **DENIED — EVIDENCE GAP**, solely
 > `RB5-R1-EG-001` — the retained HF-09 formulas-twin recalculation/parity

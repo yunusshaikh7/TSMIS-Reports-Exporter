@@ -7,7 +7,9 @@ Status: **DENIED — RETURN TO IMPLEMENTATION**
 > [IMPLEMENTATION-PLAN.md](../../IMPLEMENTATION-PLAN.md). The plan is
 > authoritative; where this record and the plan disagree, the plan wins.
 > Original readiness froze scope only. Implementation exists; Codex Review 1
-> returned `RB5-R1-EG-001`; see [REVIEW.md](REVIEW.md). Scope is unchanged.
+> returned `RB5-R1-EG-001`, whose supplied evidence has now been inspected.
+> Resumed Review 1 returns solely `RB5-R1-001` (duplicate-order-sensitive equate
+> normalization), denial **2 of 2**; see [REVIEW.md](REVIEW.md). Scope is unchanged.
 
 | Field | Value |
 |---|---|
