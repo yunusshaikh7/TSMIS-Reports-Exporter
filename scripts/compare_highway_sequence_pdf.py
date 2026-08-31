@@ -107,7 +107,11 @@ _NOTES_PDF_VS_EXCEL = (
     "Description, and an \"E\" that only ONE render carries anywhere in the "
     "relation — statewide seven of those remain, and every one is a real "
     "disagreement about whether the marker exists at all. The rule fires only "
-    "where the PRINT declared an equate, and only on that relation's two rows.",
+    "where the PRINT declared an equate, and only on that relation's two rows. "
+    "Where a postmile carries MORE THAN ONE row, each render matches the "
+    "relation to its own row by content; a group it cannot resolve that way is "
+    "left completely alone, so a neighbouring record that merely shares the "
+    "postmile is never rewritten.",
     "EVERY column is compared here (no context columns): both sides are the same "
     "system, so an HG/City/Distance disagreement is a real render difference, not "
     "a listing artifact. Descriptions are compared verbatim on both sides (no "
@@ -230,21 +234,98 @@ def _is_print_annotation(row):
             and not _cell(row[_SS_DIST]))
 
 
+def _is_annotation_for(row, label):
+    """True when `row` is EITHER render's annotation line for a relation whose
+    print label is `label`.
+
+    This is the CONTENT test that says which row of a duplicate postmile group
+    a relation actually owns (RB5-R1-001). The print writes its own marker
+    ("EQUATES TO <label>"); the Excel export writes the label alone - or
+    "PM EQUATION" for a label-less equation - and leaves Distance blank there.
+    """
+    description = _cell(row[_SS_DESC])
+    if _is_print_annotation(row):
+        return _equate_label(description) == label
+    return (not _cell(row[_SS_DIST])
+            and description == (label or EQUATE_GENERIC_LABEL))
+
+
+def _resolve_annotation(rows, group, label, print_group_size):
+    """This render's row index for the relation's annotation line, or None
+    when that correspondence is not unambiguous.
+
+    RB5-R1-001: occurrence ordinals are assigned in each file's OWN order and
+    are not a cross-source correspondence - the engine pairs duplicate keys by
+    similarity afterwards, so an ordinal can address a different physical row
+    on each side. A postmile carrying exactly one row on both sides IS that
+    row (which keeps a genuinely relabelled annotation canonicalized, so a
+    real label change still reports as exactly one difference); anything else
+    is resolved by CONTENT, and a group with no single matching candidate is
+    left alone entirely.
+    """
+    if len(group) == 1 and print_group_size == 1:
+        return group[0]
+    candidates = [index for index in group
+                  if _is_annotation_for(rows[index], label)]
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def _target_signature(row):
+    """A target row's identity apart from the suffix that moves between the
+    two renders - the cells that make it THIS segment rather than another row
+    listed at the same postmile."""
+    return tuple(_cell(row[column])
+                 for column in (_SS_CITY, _SS_HG, _SS_FT, _SS_DIST, _SS_DESC))
+
+
+def _resolve_target(rows, group, print_group_size, signature):
+    """This render's row index for the relation's equated postmile, or None
+    when a duplicate group gives no single answer.
+
+    A postmile carrying one row on both sides IS that row. Otherwise the
+    corresponding occurrence is found the way the engine finds one - by the
+    row's own content (`signature`, taken from the print's target row) - and
+    only then by which row carries an equate suffix, since a render that
+    already seats the marker here has named the row itself. Two candidates,
+    or none, means the correspondence is unknown and the relation is left
+    alone (RB5-R1-001).
+    """
+    if len(group) == 1 and print_group_size == 1:
+        return group[0]
+    matched = [index for index in group
+               if _target_signature(rows[index]) == signature]
+    if len(matched) == 1:
+        return matched[0]
+    suffixed = [index for index in group if _cell(rows[index][_SS_SUFFIX])]
+    return suffixed[0] if len(suffixed) == 1 else None
+
+
+def _postmile_groups(rows):
+    """`{(route, physical key): [row index, ...]}` - the duplicate groups the
+    engine itself later pairs by similarity. The occurrence ordinal is
+    deliberately dropped: it orders rows WITHIN one file and says nothing
+    about which row of the OTHER file corresponds (RB5-R1-001)."""
+    groups = {}
+    for index, identity in enumerate(keys_for(rows, True, SS_KEY_FIELD)):
+        groups.setdefault(identity[:2], []).append(index)
+    return groups
+
+
 def _equate_relations(rows_print):
-    """Every equate relation the PRINT declares, as (annotation identity,
-    target identity or None).
+    """Every equate relation the PRINT declares, as (annotation postmile,
+    label, target postmile or None, and the print's group size at each).
 
     Only the print carries the marker, so the print declares the relation and
-    both renders are canonicalized at those ROW IDENTITIES - the engine's own
-    (route, physical key, occurrence) triple, not a row number, so the
-    location survives a genuinely one-sided row on either side. The target is
-    the next row of the same route carrying an equate suffix, searched forward
-    and stopping at the next annotation: the equated postmile is normally the
-    very next line (1,112 of 1,119 statewide) but a left/right alignment
-    branch can delay it (two relations, by 8 and 9 rows), and five relations
-    print no suffix at all.
+    each render then resolves it against its OWN rows, by postmile and content
+    - never by a file-order ordinal (RB5-R1-001). The target is the next row
+    of the same route carrying an equate suffix, searched forward and stopping
+    at the next annotation: the equated postmile is normally the very next
+    line (1,112 of 1,119 statewide) but a left/right alignment branch can
+    delay it (two relations, by 8 and 9 rows), and five relations print no
+    suffix at all.
     """
     identities = keys_for(rows_print, True, SS_KEY_FIELD)
+    groups = _postmile_groups(rows_print)
     relations = []
     for i, row in enumerate(rows_print):
         if not _is_print_annotation(row):
@@ -258,8 +339,15 @@ def _equate_relations(rows_print):
                 break
             if _is_print_annotation(rows_print[j]):
                 break
-        relations.append((identities[i],
-                          None if target is None else identities[target]))
+        annotation_pm = identities[i][:2]
+        target_pm = None if target is None else identities[target][:2]
+        relations.append((
+            annotation_pm,
+            _equate_label(_cell(row[_SS_DESC])),
+            target_pm,
+            len(groups[annotation_pm]),
+            1 if target_pm is None else len(groups[target_pm]),
+            () if target is None else _target_signature(rows_print[target])))
     return relations
 
 
@@ -281,27 +369,37 @@ def _canonicalize_equates(rows, relations):
          suffix anywhere in the relation still ends up with none, so a marker
          only ONE render carries is still reported as a difference.
 
-    A relation whose target this render does not have, or whose two rows BOTH
-    carry a suffix, keeps its suffix cells untouched - the honest reading when
-    the canonical seat is unknown.
+    Every row is located through `_resolve_annotation` / `_resolve_target`,
+    which refuse a duplicate postmile group they cannot resolve by content
+    (RB5-R1-001). A relation this render does not carry, cannot resolve, or
+    whose two rows BOTH carry a suffix is left untouched - the honest reading
+    when the canonical row or seat is unknown. Refusing can only leave a
+    difference visible; it can never invent agreement.
     """
-    position = {identity: i
-                for i, identity in enumerate(keys_for(rows, True, SS_KEY_FIELD))}
+    groups = _postmile_groups(rows)
     out = [list(row) for row in rows]
-    for annotation_id, target_id in relations:
-        index = position.get(annotation_id)
+    # Every index is resolved against the ORIGINAL rows, never the partly
+    # canonicalized copy, so one relation's rewrite can never move where the
+    # next relation believes its rows are.
+    for (annotation_pm, label, target_pm,
+         print_ann, print_tgt, signature) in relations:
+        index = _resolve_annotation(
+            rows, groups.get(annotation_pm, ()), label, print_ann)
         if index is None:
-            continue                                   # not in this render
+            continue                                   # absent or ambiguous
         annotation = out[index]
         description = _cell(annotation[_SS_DESC])
-        label = _equate_label(description)
-        if label is not None:                          # the print's marker
-            annotation[_SS_DESC] = label
+        own_label = _equate_label(description)
+        if own_label is not None:                      # the print's marker
+            annotation[_SS_DESC] = own_label
         elif description == EQUATE_GENERIC_LABEL:      # the export's marker
             annotation[_SS_DESC] = ""
         for column in _EQUATE_ANNOTATION_FLAGS:
             annotation[column] = ""
-        target_index = None if target_id is None else position.get(target_id)
+        if target_pm is None:
+            continue
+        target_index = _resolve_target(
+            rows, groups.get(target_pm, ()), print_tgt, signature)
         if target_index is None:
             continue
         target = out[target_index]

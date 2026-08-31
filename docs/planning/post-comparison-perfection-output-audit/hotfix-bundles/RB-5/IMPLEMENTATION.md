@@ -1,6 +1,15 @@
 # `RB-5` — Implementation Record
 
-Status: **DENIED — RETURN TO IMPLEMENTATION** — resumed Review 1, `RB5-R1-001`.
+Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** — returned twice; both returns answered.
+
+> **`RB5-R1-001` is FIXED (2026-08-31).** The finding was correct and it
+> reproduced exactly: normalization bound the wrong duplicate occurrence, so
+> reordering two rows sharing a postmile published six false differences and
+> blanked a neighbouring record's HG/FT. Relations now resolve to the
+> corresponding source row by postmile and CONTENT, never by a file-order
+> ordinal. Both orders report zero, the frozen statewide result is unchanged
+> at 7 differing cells, and a duplicate-order fixture locks it. See
+> "Review 1 return 2" below.
 
 > **Review update 2026-08-31:** the supplied HF-09 evidence was inspected; the
 > disclosed Clean Road hardware limit is not a denial reason. The sole returned
@@ -561,6 +570,105 @@ Retained: the eight formulas workbooks and their per-case generation records in
 `…\_scratch\post-comparison-hotfixes\HF-09\rb5-a1\head-formulas\`, the seven
 recalculation results in `…\rb5-a1\excel-recalc\`, and the committed witness
 `../HF-09/witness/installed-excel-recalc.json`.
+
+---
+
+## Review 1 return 2 — `RB5-R1-001` (2026-08-31)
+
+Codex resumed Review 1 and returned the bundle a second time on one **real
+product defect**. **The finding is correct, it reproduced exactly, and it is
+fixed.**
+
+**What the user would have seen:** reordering two otherwise unchanged source
+rows that share a postmile turned a matching self check into **six false
+differences**, and blanked the neighbouring record's HG/FT in the published
+Excel-side data sheet.
+
+### Root cause
+
+The relation carried the engine's `(route, physical key, occurrence)` identity,
+and each render then looked its rows up by that triple. **Occurrence ordinals
+are assigned in each file's OWN order** by `keys_for`; they are not a
+cross-source correspondence, because the engine pairs duplicate keys by
+similarity only AFTER the loader has run. So when a postmile carried two rows,
+the print's ordinal could address a different physical row on the Excel side —
+the canonicalizer then cleared the ORDINARY row's HG/FT and left the real
+annotation untouched, and the engine's later similarity pairing could not
+recover source values that had already been overwritten.
+
+The existing fixtures missed it because none of them permuted a duplicate group
+containing an equate annotation.
+
+### The correction
+
+`scripts/compare_highway_sequence_pdf.py` — the relation now carries the
+annotation postmile, its label, the target postmile, the print's group size at
+each, and the print target's content signature. **No ordinal.** Each render
+resolves its own row inside that postmile group:
+
+* **Annotation** — a postmile carrying exactly one row on both sides IS that
+  row, so a genuinely relabelled annotation is still canonicalized and still
+  reports exactly one difference. Otherwise the row is matched by CONTENT (the
+  print's `EQUATES TO <label>`, or the export's bare label / `PM EQUATION` with
+  a blank Distance), and a group with no single candidate is left alone.
+* **Target** — matched by the print target's own content signature (City, HG,
+  FT, Distance, Description), then by which row carries an equate suffix.
+* **Ordering** — every index resolves against the ORIGINAL rows, never the
+  partly canonicalized copy, so one relation's rewrite cannot move where the
+  next relation believes its rows are.
+
+Refusing to resolve can only leave a difference visible; it can never invent
+agreement.
+
+### Evidence
+
+| | Source order | Duplicates swapped |
+|---|---|---|
+| Reviewed head | 0 cells — `match` | **6 cells / 3 rows — `diff`**, masks `EEEDDEE` `EDEDDEE` `EDEEEEE` |
+| Corrected head | 0 cells — `match` | **0 cells / 0 rows — `match`** |
+
+The pre-fix column reproduces the reviewer's witness exactly, through the
+shipped `TSMIS_PDF_VS_EXCEL.compare` on the reviewer's own three synthetic rows.
+
+**The frozen statewide result is unchanged.** Because the correction changes
+which row a duplicate group resolves to, the real corpus was re-measured rather
+than assumed: 60,254 rows each side, **7 differing cells / 7 differing rows,
+`PM Suffix` 7 and every other column 0** — identical to the reviewed head, and
+still the same seven one-sided equate markers.
+
+One intermediate attempt resolved the target only by which row carries a
+suffix. That was too strict for real duplicate groups and measured **129**
+`PM Suffix` cells; it is recorded here because it is why the target is resolved
+by content signature first. It was never a merge candidate.
+
+### Regression cases
+
+`build/check_compare_highway_sequence_equate.py` gains the duplicate-order
+group: zero differences in BOTH orders, the ordinary row's HG/FT still present
+in the **published** Excel data sheet in both orders, a relabelled annotation
+inside the duplicate group still reporting, and an unresolvable group left
+untouched rather than guessed at.
+
+While adding them I found **two pre-existing assertions that passed
+vacuously** — they fed the canonicalizer CONSOLIDATED rows where it consumes
+the SAME-SOURCE shape, so they could never have failed. They now use a
+shape-correct `ss_row()` helper and test what they claim.
+
+### Gate
+
+`build/run_checks.py -j 3 -k` → **170 passed, 1 failed of 171**. Ruff clean,
+compileall clean.
+
+The single failure is `check_validation`, and it is **not an RB-5 regression**:
+`evidence.collect` refuses to build a support bundle when the locally staged
+TSN library holds both `consolidated/X.outcome.json` and
+`_state/X.outcome.json`, which flatten to one archive member name. Proven
+environmental — the same check passes at the recorded base worktree, which has
+no staged library, and passes in THIS worktree with the staged library moved
+aside. The duplicate-member guard is correct and should stay; the member-naming
+bug is raised separately and is not touched here.
+
+Witness: [`../HF-06/witness/duplicate-occurrence-correction.json`](../HF-06/witness/duplicate-occurrence-correction.json).
 
 ## Rollback
 

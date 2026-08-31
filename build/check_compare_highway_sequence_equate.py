@@ -67,6 +67,26 @@ def row(county, prefix, pm, suffix="", hg="", ft="", dist="", desc="",
     return out
 
 
+def ss_row(county, pm, suffix="", city="", hg="", ft="", dist="", desc="",
+           route="001"):
+    """One row in the SAME-SOURCE shape `canonicalize_equate_pair` consumes
+    (Route, County, key, PM Suffix, City, HG, FT, Distance, Description) - NOT
+    the consolidated export shape `row()` builds. Feeding the canonicalizer a
+    consolidated row makes every assertion about it vacuous."""
+    return [route, county, pm, suffix, city, hg, ft, dist, desc]
+
+
+def excel_side_rows(path):
+    """The published `TSMIS (Excel)` data sheet, as the reader sees it."""
+    wb = load_workbook(path, read_only=True, data_only=True)
+    try:
+        sheet = wb[hslp.TSMIS_PDF_VS_EXCEL.file_b_label]
+        return [["" if v is None else str(v) for v in line]
+                for line in sheet.iter_rows(values_only=True)]
+    finally:
+        wb.close()
+
+
 def write_wb(path, rows, marked=False):
     wb = Workbook()
     ws = wb.active
@@ -251,12 +271,86 @@ try:
           and "EQUATES TO" in cells[0], f"{result.status}: {cells}")
 
     # ... and the pure canonicalizer is a no-op where the print declares none.
-    plain = [row("ORA", "R", "018.540", hg="D", ft="H", desc="A LANDMARK")]
+    # (Same-source shape: a consolidated row here would make this vacuous.)
+    plain = [ss_row("ORA", "R018.540", hg="D", ft="H", desc="A LANDMARK")]
     left, right, relations = hslp.canonicalize_equate_pair(
         [list(r) for r in plain], [list(r) for r in plain])
     check("(f) canonicalize_equate_pair is a NO-OP with no print annotation",
           relations == 0 and left == plain and right == plain,
           f"relations={relations}")
+
+    # (g) RB5-R1-001: a DUPLICATE postmile group containing an equate
+    # annotation. Occurrence ordinals are assigned in each file's own order,
+    # so they are not a cross-source correspondence - reordering the two Excel
+    # rows once made the rule rewrite the ORDINARY row, clear its HG/FT and
+    # publish six false differences. Both orders must report zero, and the
+    # ordinary row must keep its own flags.
+    dup_print = [
+        row("ORA", "R", "018.540", desc="EQUATES TO SYNTHETIC LANDMARK"),
+        row("ORA", "R", "018.540", hg="U", ft="R", dist="000.100",
+            desc="SYNTHETIC ORDINARY SIGN"),
+        row("ORA", "", "018.530", suffix="E", hg="D", ft="H", dist="001.267"),
+    ]
+    dup_excel = [
+        row("ORA", "R", "018.540", suffix="E", hg="D", ft="H",
+            desc="SYNTHETIC LANDMARK"),
+        row("ORA", "R", "018.540", hg="U", ft="R", dist="000.100",
+            desc="SYNTHETIC ORDINARY SIGN"),
+        row("ORA", "", "018.530", hg="D", ft="H", dist="001.267"),
+    ]
+    swapped = [dup_excel[1], dup_excel[0], dup_excel[2]]
+    for tag, excel_rows, order in (("g1", dup_excel, "source order"),
+                                   ("g2", swapped, "duplicates swapped")):
+        result, cells = compare(tmp, dup_print, excel_rows, tag)
+        check(f"(g) a duplicate postmile group around an equate reports ZERO "
+              f"differences - {order}",
+              result.status == "ok" and counts(result) == (0, 0, 0, 0),
+              f"{result.status}: {counts(result) if result.status == 'ok' else ()}"
+              f" cells={cells}")
+
+    # ... and the ordinary row that merely SHARES the postmile keeps its own
+    # HG/FT in the PUBLISHED Excel-side data sheet, in either order. This is
+    # the user-visible half of the defect: the rule blanked real source values.
+    for tag, excel_rows, order in (("g3", dup_excel, "source order"),
+                                   ("g4", swapped, "duplicates swapped")):
+        result, _ = compare(tmp, dup_print, excel_rows, tag)
+        published = excel_side_rows(tmp / f"{tag}_cmp.xlsx")
+        ordinary = [r for r in published if "SYNTHETIC ORDINARY SIGN" in r]
+        check(f"(g) ... and the ordinary row keeps its HG/FT in the published "
+              f"Excel sheet - {order}",
+              result.status == "ok" and len(ordinary) == 1
+              and "U" in ordinary[0] and "R" in ordinary[0],
+              f"{result.status}: {ordinary}")
+
+    # ... and a REAL divergence inside that duplicate group still reports.
+    louder = [list(r) for r in swapped]
+    louder[1][DESC] = "SYNTHETIC RELABELLED"          # the annotation's label
+    result, cells = compare(tmp, dup_print, louder, "g5")
+    check("(g) ... while a relabelled annotation in the duplicate group still "
+          "reports a difference",
+          result.status == "ok" and counts(result)[0] >= 1
+          and any("SYNTHETIC" in c for c in cells),
+          f"{result.status}: {counts(result) if result.status == 'ok' else ()}"
+          f" cells={cells}")
+
+    # ... and an unresolvable duplicate group is left ALONE rather than guessed
+    # at: two identical-looking annotation candidates cannot be told apart.
+    twin_print = [
+        ss_row("ORA", "R018.540", desc="EQUATES TO TWIN"),
+        ss_row("ORA", "R018.540", desc="EQUATES TO TWIN"),
+        ss_row("ORA", "018.530", suffix="E", hg="D", ft="H"),
+    ]
+    twin_excel = [
+        ss_row("ORA", "R018.540", hg="D", ft="H", desc="TWIN"),
+        ss_row("ORA", "R018.540", hg="D", ft="H", desc="TWIN"),
+        ss_row("ORA", "018.530", hg="D", ft="H"),
+    ]
+    _, right, relations = hslp.canonicalize_equate_pair(
+        [list(r) for r in twin_print], [list(r) for r in twin_excel])
+    check("(g) ... and an unresolvable duplicate group is left untouched, "
+          "never guessed at",
+          relations == 2 and right == twin_excel,
+          f"relations={relations} right={right}")
 
     # ... and the vs-TSN flavor never canonicalizes: it is a different loader,
     # and its equate disclosure is the pre-existing one.

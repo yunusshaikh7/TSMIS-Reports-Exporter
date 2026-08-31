@@ -1,0 +1,64 @@
+{
+  "work_item": "HF-06",
+  "review_item": "RB5-R1-001",
+  "reviewer_claim": "normalization binds the wrong duplicate occurrence: swapping two source rows that share a postmile turns a matching self check into six false differences and blanks the ordinary row's HG/FT",
+  "verdict": "CONFIRMED, reproduced, and fixed",
+  "root_cause": {
+    "was": "the relation carried the engine's (route, physical key, occurrence) identity, and each side looked its rows up by that triple. Occurrence ordinals are assigned in each file's OWN order by keys_for, so they are not a cross-source correspondence - the engine pairs duplicate keys by similarity only AFTER the loader has run. Reordering the two Excel rows made the lookup select the ordinary row, clear its HG/FT, and leave the real annotation untouched.",
+    "why_the_old_fixtures_missed_it": "no fixture permuted a duplicate group containing an equate annotation; every relation in the frozen corpus that the old code resolved happened to sit at an ordinal that matched."
+  },
+  "fix": {
+    "file": "scripts/compare_highway_sequence_pdf.py",
+    "shape": "the relation now carries (annotation postmile, label, target postmile, the print's group size at each, and the print target's content signature) - no ordinal. Each render resolves its OWN row inside that postmile group.",
+    "annotation_resolution": "a postmile carrying exactly one row on both sides IS that row (so a genuinely relabelled annotation is still canonicalized and still reports exactly one difference); otherwise the row is matched by CONTENT - the print's 'EQUATES TO <label>' or the export's bare label / 'PM EQUATION' with a blank Distance - and a group with no single candidate is left completely alone.",
+    "target_resolution": "matched by the print target's own content signature (City, HG, FT, Distance, Description), then by which row carries an equate suffix; two candidates or none means the correspondence is unknown and the relation is untouched.",
+    "ordering": "every index is resolved against the ORIGINAL rows, never the partly canonicalized copy, so one relation's rewrite cannot move where the next relation believes its rows are.",
+    "direction_of_failure": "refusing to resolve can only leave a difference visible; it can never invent agreement."
+  },
+  "reproduction": {
+    "inputs": "the reviewer's three synthetic rows, verbatim, from witness/review1-duplicate-occurrence.json",
+    "path": "the shipped TSMIS_PDF_VS_EXCEL.compare, both orders, values flavor",
+    "before_fix": {
+      "source_order": {"differing_cells": 0, "differing_rows": 0, "verdict": "match",
+                       "masks": ["EEEEEEE", "EEEEEEE", "EEEEEEE"]},
+      "duplicates_swapped": {"differing_cells": 6, "differing_rows": 3, "verdict": "diff",
+                             "masks": ["EEEDDEE", "EDEDDEE", "EDEEEEE"],
+                             "matches_reviewer_witness": true}
+    },
+    "after_fix": {
+      "source_order": {"differing_cells": 0, "differing_rows": 0, "verdict": "match",
+                       "masks": ["EEEEEEE", "EEEEEEE", "EEEEEEE"]},
+      "duplicates_swapped": {"differing_cells": 0, "differing_rows": 0, "verdict": "match",
+                             "masks": ["EEEEEEE", "EEEEEEE", "EEEEEEE"]}
+    }
+  },
+  "real_corpus_invariance": {
+    "why_it_matters": "the correction changes which row a duplicate group resolves to, so the frozen statewide result had to be re-measured, not assumed.",
+    "inputs": "the frozen 2026-07-23 pull, 60,254 rows each side (PDF sha256 b8cd4d2f9bc8..., Excel sha256 a970568ad931...)",
+    "reviewed_head": {"differing_cells": 7, "differing_rows": 7, "paired_rows": 60254,
+                      "per_field": {"PM Suffix": 7, "County": 0, "City": 0, "HG": 0,
+                                    "FT": 0, "Distance To Next Point": 0, "Description": 0}},
+    "corrected_head": {"differing_cells": 7, "differing_rows": 7, "paired_rows": 60254,
+                       "per_field": {"PM Suffix": 7, "County": 0, "City": 0, "HG": 0,
+                                     "FT": 0, "Distance To Next Point": 0, "Description": 0}},
+    "identical": true,
+    "note": "an intermediate attempt that resolved the target ONLY by which row carries a suffix was too strict for real duplicate groups and measured 129 PM Suffix cells. That is recorded because it is why the target is resolved by content signature first; it was never a candidate for merge."
+  },
+  "regression_cases_added": {
+    "file": "build/check_compare_highway_sequence_equate.py",
+    "cases": [
+      "(g) a duplicate postmile group around an equate reports ZERO differences - source order",
+      "(g) a duplicate postmile group around an equate reports ZERO differences - duplicates swapped",
+      "(g) the ordinary row keeps its HG/FT in the PUBLISHED Excel data sheet - both orders",
+      "(g) a relabelled annotation inside the duplicate group still reports a difference",
+      "(g) an unresolvable duplicate group is left untouched, never guessed at"
+    ],
+    "also_repaired": "two pre-existing assertions fed the canonicalizer CONSOLIDATED rows where it consumes the SAME-SOURCE shape, so they passed vacuously. They now use a shape-correct ss_row() helper and test what they claim."
+  },
+  "gate": {
+    "full_repository_gate": "170 passed, 1 failed of 171",
+    "the_one_failure": "check_validation - NOT an RB-5 regression. evidence.collect refuses to build a support bundle when the locally staged TSN library holds both consolidated/X.outcome.json and _state/X.outcome.json, which flatten to one archive member name. Proven environmental: the same check passes at the recorded base worktree (no staged library) and passes in THIS worktree with the staged library moved aside. Raised separately.",
+    "ruff": "All checks passed",
+    "compileall": "clean"
+  }
+}
