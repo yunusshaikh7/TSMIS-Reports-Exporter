@@ -1,11 +1,22 @@
 # `RB-5` — Implementation Record
 
-Status: **DENIED — RETURN TO IMPLEMENTATION**
+Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** — returned once, evidence supplied.
 
 > Codex Review 1 (2026-08-30): **DENIED — EVIDENCE GAP**, solely
 > `RB5-R1-EG-001` — the retained HF-09 formulas-twin recalculation/parity
-> acceptance result. See [REVIEW.md](REVIEW.md). The implementation claims
-> below are preserved; no product defect was established by this precondition return.
+> acceptance result. See [REVIEW.md](REVIEW.md). No product defect was
+> established by that precondition return, and no product file changed to
+> close it.
+>
+> **Supplied 2026-08-30** — see "Review 1 return" below. Formulas twins were
+> generated for all eight cases and recalculated in installed Excel:
+> **seven complete, all passing** (headline and per-field parity, the
+> representation-class count equal in both flavors, every SELF-CHECK `OK`,
+> **zero** cached error cells). The eighth — Clean Road, a 452 MB /
+> ~4.9M-formula workbook — is **BLOCKED on a measured hardware limit**: the
+> host bugchecked mid-recalculation (`0x10E`, a fault this machine already
+> had on 2026-07-30) and a retry at 1.44 GB free RAM was not taken without
+> approval. Nothing about that twin is claimed.
 
 | Field | Value |
 |---|---|
@@ -452,6 +463,96 @@ the pre-existing HF-01 unavailable-anchor disclosure (the shipped
   clear.
 
 ---
+
+---
+
+## Review 1 return — `RB5-R1-EG-001` (2026-08-30)
+
+Review 1 stopped at a precondition and returned the bundle for **exactly one**
+item: the HF-09 installed-Excel values/formulas acceptance witness for the eight
+RB5-A1 family/edition comparisons. **The return was correct.** My HF-09
+acceptance generated only the VALUES flavor — all eight head publications record
+`requested_mode = "values"` with a single `values` member — and the
+installed-Excel recalculation I had run covers the Highway Sequence **self**
+check (HF-06), which cannot speak for the distinct vs-TSN and Clean Road
+outputs. **No product defect was alleged, none was found, and no product file
+changed to close this.**
+
+### Method
+
+A FORMULAS twin was generated for each of the eight cases through the SAME
+shipped adapter as its values twin, then recalculated in installed Excel 16.0
+and compared against the retained VALUES twin.
+
+Two deliberate choices keep Review 1's own evidence intact:
+
+* each formulas twin was written into a SEPARATE `head-formulas/` folder, so the
+  eight retained VALUES workbooks and their sidecars keep the exact bytes and
+  SHA-256 identities Review 1 hashed — **nothing was regenerated**;
+* Excel recalculated a WORKING COPY of each formulas twin, so the committed
+  generation's own bytes stay as published. Both the as-generated and the
+  post-recalculation SHA-256 are recorded.
+
+Cached errors were counted by **Excel itself**, per worksheet, via
+`UsedRange.SpecialCells(xlCellTypeFormulas, xlErrors)` — an authoritative answer
+rather than a text scan.
+
+### Result — seven of eight complete, all passing
+
+| Case | Formulas twin | Excel recalc | Headline parity | Per-field parity | Representation class (F = V) | SELF-CHECK | Cached error cells |
+|---|---:|---:|---|---|---|---|---:|
+| Highway Log vs TSN (Excel) | 244 MB | 29 min | 75 ✓ | 30 ✓ | 1243 = 1243 | 10 OK | **0** |
+| Highway Log vs TSN (PDF) | 247 MB | 25 min | 75 ✓ | 30 ✓ | 1243 = 1243 | 10 OK | **0** |
+| Highway Sequence vs TSN (Excel) | 56 MB | 4 min | 27 ✓ | 6 ✓ | 12 = 12 | 10 OK | **0** |
+| Highway Sequence vs TSN (PDF) | 57 MB | 4 min | 27 ✓ | 6 ✓ | 12 = 12 | 10 OK | **0** |
+| Intersection Detail vs TSN (Excel) | 58 MB | 5 min | 83 ✓ | 34 ✓ | 1 = 1 | 11 OK | **0** |
+| Intersection Detail vs TSN (PDF) | 59 MB | 5 min | 83 ✓ | 34 ✓ | 1 = 1 | 11 OK | **0** |
+| Ramp Detail vs TSN (PDF) | 20 MB | 1 min | 39 ✓ | 12 ✓ | 3 = 3 | 10 OK | **0** |
+| Clean Road Highway vs TSN | 452 MB | — | — | — | — | — | **BLOCKED** |
+
+The runtime is the one Review 1 inspected: the RB-5 product files are identical
+at `444e8d9`, `6df43b2` and `91448fa` — the latter two commits are documentation
+only, so every result above is bound to one runtime.
+
+**One clarification, so it is not read as a second gap.** The witness records
+`self_checks_values_twin` as empty for every case. The SELF-CHECK rows are LIVE
+formulas in BOTH flavors by design (see `_write_summary`'s contract), so only the
+recalculated formulas twin carries cached verdicts; a values twin that has never
+been opened in Excel has nothing cached there. That is documented behaviour, not
+a missing result.
+
+### The eighth case is BLOCKED on hardware, and is not claimed
+
+Clean Road's formulas twin is **473,646,751 bytes** — roughly 65,196 rows across
+75 fields, about 4.9M formulas. Excel had it open and recalculating from 19:35;
+at **19:58:30 on 2026-08-30 the host bugchecked and rebooted**, killing the run.
+
+* Bugcheck **`0x0000010E VIDEO_MEMORY_MANAGEMENT_INTERNAL`** (subcode `0x2D`),
+  dump `C:\WINDOWS\Minidump\083026-31890-01.dmp`.
+* **This is not a fault in this work.** The identical bugcheck code and subcode
+  (`0x10E` / `0x2D`) hit this host on **2026-07-30**, alongside a `0x116
+  VIDEO_TDR_ERROR` the same evening, none of it during this program. It is a
+  recurring graphics-driver fault that memory pressure exposes, on a host with
+  mismatched hybrid-GPU drivers (AMD integrated dated 2025-03, NVIDIA dated
+  2026-07).
+* **It was not retried.** Free physical memory measured **1.44 GB of 15.4 GB**
+  with 19.27 GB committed. Opening a 452 MB / ~4.9M-formula workbook in that
+  state would most likely reproduce the crash on the owner's daily-driver
+  machine, and Prompt 05 requires approval before an operation that exceeds the
+  owner's resource limits.
+* **How to close it:** re-run the recalculation for this one case on an
+  otherwise idle host — roughly 30–60 minutes, no other large process. The
+  formulas twin is already generated and retained, so only the Excel leg remains.
+
+**Nothing about this case's formulas twin is asserted.** Its VALUES twin, its
+typed counts, and its base-vs-head count invariance (281,393 cells / 48,942 rows
+/ 52,629 paired / 5,113 / 7,454, identical on all 75 per-field counts) are
+separately evidenced above and are unaffected.
+
+Retained: the eight formulas workbooks and their per-case generation records in
+`…\_scratch\post-comparison-hotfixes\HF-09\rb5-a1\head-formulas\`, the seven
+recalculation results in `…\rb5-a1\excel-recalc\`, and the committed witness
+`../HF-09/witness/installed-excel-recalc.json`.
 
 ## Rollback
 

@@ -1,0 +1,1016 @@
+{
+  "work_item": "HF-09",
+  "review_item": "RB5-R1-EG-001",
+  "purpose": "the installed-Excel values/formulas acceptance result for the eight RB5-A1 family/edition comparisons Review 1 asked for",
+  "runtime": {
+    "product_head": "444e8d9",
+    "note": "the RB-5 product files are identical at 444e8d9, 6df43b2 and 91448fa - the latter two commits are documentation only, so every result here is bound to one runtime"
+  },
+  "method": {
+    "formulas_twins": "generated through the SAME shipped adapter as each values twin, mode='formulas', written into a separate head-formulas/ folder so the eight retained VALUES workbooks and their sidecars keep the exact bytes and SHA-256 identities Review 1 hashed - nothing was regenerated",
+    "recalculation": "installed Excel 16.0, CalculateFullRebuild() then Save, performed on a WORKING COPY so the committed generation's own bytes stay as published; both the as-generated and post-recalculation SHA-256 are recorded",
+    "cached_errors": "counted by Excel itself, per worksheet, via UsedRange.SpecialCells(xlCellTypeFormulas, xlErrors)",
+    "self_checks_values_twin": "empty for every case BY DESIGN: the SELF-CHECK rows are live formulas in BOTH flavors, so only the recalculated formulas twin carries cached verdicts. A values twin never opened in Excel has nothing cached there. This is the documented _write_summary contract, not a missing result."
+  },
+  "summary": {
+    "cases_total": 8,
+    "cases_complete": 7,
+    "cases_blocked": 1,
+    "all_complete_cases_pass": true,
+    "headline_parity": "every complete case: recalculated formulas == values twin",
+    "per_field_parity": "every complete case: all columns equal",
+    "representation_disclosure": "present and equal in both flavors in every complete case",
+    "self_checks": "every complete case: all rows OK",
+    "cached_error_cells": 0
+  },
+  "cases": {
+    "hl_excel": {
+      "label": "Highway Log vs TSN (Excel)",
+      "generation": {
+        "generation_id": "97d96835-de5a-4828-ad57-5d6eadc9f7f6",
+        "requested_mode": "formulas",
+        "side_a": "C:\\Users\\Yunus\\Projects\\wt-rb5\\output\\2026-07-23 ssor-prod\\consolidated\\highway_log_consolidated 2026-07-23 ssor-prod.xlsx",
+        "side_b": "C:\\Users\\Yunus\\Projects\\wt-rb5\\tsn_library\\highway_log\\consolidated\\tsn_highway_log_consolidated.xlsx",
+        "typed_counts": {
+          "differing_cells": 84709,
+          "differing_rows": 38478,
+          "paired_rows": 49195,
+          "side_a_only_rows": 3626,
+          "side_b_only_rows": 10888
+        }
+      },
+      "status": "COMPLETE",
+      "formulas": {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\hl_excel vs tsn (formulas).xlsx",
+        "size": 256271826,
+        "sha256_as_generated": "bbee4b87d56553008e437fac4e62d8eddc2951184fce7f5169cfcf39ec5c1479",
+        "recalculated_copy": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\hl_excel vs tsn (formulas) [recalculated].xlsx",
+        "sha256_after_recalc": "ec1d9c07b4468f6a379b50876639fdc27f0b11ec66124b346d1d76fdcbe61bf2",
+        "size_after_recalc": 300003706
+      },
+      "values": {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\hl_excel vs tsn.xlsx",
+        "size": 99104342,
+        "sha256": "c40315c80bc8f26096c749c788d2fec6ed52a75d067bbd2922fe3fffda43df39"
+      },
+      "excel": {
+        "recalculated": true,
+        "version": "16.0",
+        "seconds": 1721.3,
+        "error": ""
+      },
+      "headline_agree": true,
+      "headline_labels_compared": 75,
+      "per_field_agree": true,
+      "per_field_columns_compared": 30,
+      "per_field": {
+        "formulas": {
+          "Length (MI) [MI]": 7789,
+          "NA [N/A]": 96,
+          "Cnty Odom": 21949,
+          "City": 545,
+          "RU [R/U]": 301,
+          "SPD": 246,
+          "TER": 304,
+          "HG [H/G]": 587,
+          "AC [A/C]": 364,
+          "LB ST [LB T]": 2744,
+          "LB # Lns [LB Lns]": 837,
+          "LB SF [LB F]": 2912,
+          "LB OT-SH Total [LB OT]": 3693,
+          "LB OT-SH Treated [LB TR]": 3279,
+          "LB T-W Wid [LB T-W]": 2465,
+          "LB IN-SH Total [LB IN]": 962,
+          "LB IN-SH Treated [LB SH]": 1013,
+          "Med TY/CL/BA [Med TCB]": 4077,
+          "Med Wid/Var [Med Wid]": 992,
+          "RB ST [RB T]": 570,
+          "RB # Lns [RB Lns]": 662,
+          "RB SF [RB F]": 2648,
+          "RB IN-SH Total [RB IN]": 794,
+          "RB IN-SH Treated [RB SH]": 816,
+          "RB T-W Wid [RB T-W]": 836,
+          "RB OT-SH Total [RB OT]": 775,
+          "RB OT-SH Treated [RB SH]": 728,
+          "Description": 2723,
+          "Date of Rec": 951,
+          "Sig Chg. Date": 18051
+        },
+        "values": {
+          "Length (MI) [MI]": 7789,
+          "NA [N/A]": 96,
+          "Cnty Odom": 21949,
+          "City": 545,
+          "RU [R/U]": 301,
+          "SPD": 246,
+          "TER": 304,
+          "HG [H/G]": 587,
+          "AC [A/C]": 364,
+          "LB ST [LB T]": 2744,
+          "LB # Lns [LB Lns]": 837,
+          "LB SF [LB F]": 2912,
+          "LB OT-SH Total [LB OT]": 3693,
+          "LB OT-SH Treated [LB TR]": 3279,
+          "LB T-W Wid [LB T-W]": 2465,
+          "LB IN-SH Total [LB IN]": 962,
+          "LB IN-SH Treated [LB SH]": 1013,
+          "Med TY/CL/BA [Med TCB]": 4077,
+          "Med Wid/Var [Med Wid]": 992,
+          "RB ST [RB T]": 570,
+          "RB # Lns [RB Lns]": 662,
+          "RB SF [RB F]": 2648,
+          "RB IN-SH Total [RB IN]": 794,
+          "RB IN-SH Treated [RB SH]": 816,
+          "RB T-W Wid [RB T-W]": 836,
+          "RB OT-SH Total [RB OT]": 775,
+          "RB OT-SH Treated [RB SH]": 728,
+          "Description": 2723,
+          "Date of Rec": 951,
+          "Sig Chg. Date": 18051
+        }
+      },
+      "representation_disclosure": {
+        "formulas": {
+          "label": "\u2014 of which representation-only (punctuation / spacing / quoting / letter case; still counted as differences, classified at build time)",
+          "count": 1243
+        },
+        "values": {
+          "label": "\u2014 of which representation-only (punctuation / spacing / quoting / letter case; still counted as differences, classified at build time)",
+          "count": 1243
+        }
+      },
+      "representation_disclosure_agree": true,
+      "representation_note_present": {
+        "formulas": true,
+        "values": true
+      },
+      "self_checks": {
+        "Every Comparison row has a status (Both + TSMIS only + TSN only)": "OK",
+        "Every row with TSMIS data found its TSMIS sheet row": "OK",
+        "Every row with TSN data found its TSN sheet row": "OK",
+        "'Only in TSMIS' sheet rows = TSMIS-only rows in the Comparison": "OK",
+        "'Only in TSN' sheet rows = TSN-only rows in the Comparison": "OK",
+        "Per-field difference counts add up to the total differing cells": "OK",
+        "Build-time source identity and duplicate pairing snapshot is current": "OK",
+        "Routes sheet TSMIS row counts add up to the TSMIS sheet": "OK",
+        "Routes sheet TSN row counts add up to the TSN sheet": "OK",
+        "Routes sheet 'Locations compared' adds up to the Comparison": "OK"
+      },
+      "self_checks_clean": true,
+      "cached_error_cells": {
+        "Summary": 0,
+        "Spot Check": 0,
+        "Comparison": 0,
+        "Routes": 0,
+        "Only in TSMIS": 0,
+        "Only in TSN": 0,
+        "TSMIS": 0,
+        "TSN": 0,
+        "Legend": 0,
+        "Notes": 0,
+        "Source Files": 0,
+        "__CMP_E2_SNAPSHOT_A": 0,
+        "__CMP_E2_SNAPSHOT_B": 0,
+        "Provenance": 0
+      },
+      "cached_error_cells_total": 0,
+      "verdict": true
+    },
+    "hl_pdf": {
+      "label": "Highway Log vs TSN (PDF)",
+      "generation": {
+        "generation_id": "5ae32306-ec9f-4005-8b74-e156d0dc1633",
+        "requested_mode": "formulas",
+        "side_a": "C:\\Users\\Yunus\\Projects\\wt-rb5\\output\\2026-07-23 ssor-prod\\consolidated\\tsmis_highway_log_pdf_consolidated 2026-07-23 ssor-prod.xlsx",
+        "side_b": "C:\\Users\\Yunus\\Projects\\wt-rb5\\tsn_library\\highway_log\\consolidated\\tsn_highway_log_consolidated.xlsx",
+        "typed_counts": {
+          "differing_cells": 84202,
+          "differing_rows": 38931,
+          "paired_rows": 49829,
+          "side_a_only_rows": 2978,
+          "side_b_only_rows": 10254
+        }
+      },
+      "status": "COMPLETE",
+      "formulas": {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\hl_pdf vs tsn (formulas).xlsx",
+        "size": 258829965,
+        "sha256_as_generated": "afb7450f0d62d3886712ff281c63f14caea67115285114b9d50ac8b572164ac9",
+        "recalculated_copy": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\hl_pdf vs tsn (formulas) [recalculated].xlsx",
+        "sha256_after_recalc": "a4a6b0feb553eea172fc2cdceaa3a05cec6e27d57b82522d8ec16764072ec739",
+        "size_after_recalc": 303999285
+      },
+      "values": {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\hl_pdf vs tsn.xlsx",
+        "size": 98779734,
+        "sha256": "5ae978eedb30894068d274d507c8705c8cc15b1328b617b3b89b4a09552168a8"
+      },
+      "excel": {
+        "recalculated": true,
+        "version": "16.0",
+        "seconds": 1501.6,
+        "error": ""
+      },
+      "headline_agree": true,
+      "headline_labels_compared": 75,
+      "per_field_agree": true,
+      "per_field_columns_compared": 30,
+      "per_field": {
+        "formulas": {
+          "Length (MI) [MI]": 7616,
+          "NA [N/A]": 96,
+          "Cnty Odom": 22425,
+          "City": 518,
+          "RU [R/U]": 98,
+          "SPD": 248,
+          "TER": 100,
+          "HG [H/G]": 384,
+          "AC [A/C]": 161,
+          "LB ST [LB T]": 2608,
+          "LB # Lns [LB Lns]": 747,
+          "LB SF [LB F]": 2849,
+          "LB OT-SH Total [LB OT]": 3699,
+          "LB OT-SH Treated [LB TR]": 3233,
+          "LB T-W Wid [LB T-W]": 2417,
+          "LB IN-SH Total [LB IN]": 968,
+          "LB IN-SH Treated [LB SH]": 971,
+          "Med TY/CL/BA [Med TCB]": 4139,
+          "Med Wid/Var [Med Wid]": 995,
+          "RB ST [RB T]": 580,
+          "RB # Lns [RB Lns]": 682,
+          "RB SF [RB F]": 2668,
+          "RB IN-SH Total [RB IN]": 791,
+          "RB IN-SH Treated [RB SH]": 812,
+          "RB T-W Wid [RB T-W]": 859,
+          "RB OT-SH Total [RB OT]": 777,
+          "RB OT-SH Treated [RB SH]": 729,
+          "Description": 2827,
+          "Date of Rec": 955,
+          "Sig Chg. Date": 18250
+        },
+        "values": {
+          "Length (MI) [MI]": 7616,
+          "NA [N/A]": 96,
+          "Cnty Odom": 22425,
+          "City": 518,
+          "RU [R/U]": 98,
+          "SPD": 248,
+          "TER": 100,
+          "HG [H/G]": 384,
+          "AC [A/C]": 161,
+          "LB ST [LB T]": 2608,
+          "LB # Lns [LB Lns]": 747,
+          "LB SF [LB F]": 2849,
+          "LB OT-SH Total [LB OT]": 3699,
+          "LB OT-SH Treated [LB TR]": 3233,
+          "LB T-W Wid [LB T-W]": 2417,
+          "LB IN-SH Total [LB IN]": 968,
+          "LB IN-SH Treated [LB SH]": 971,
+          "Med TY/CL/BA [Med TCB]": 4139,
+          "Med Wid/Var [Med Wid]": 995,
+          "RB ST [RB T]": 580,
+          "RB # Lns [RB Lns]": 682,
+          "RB SF [RB F]": 2668,
+          "RB IN-SH Total [RB IN]": 791,
+          "RB IN-SH Treated [RB SH]": 812,
+          "RB T-W Wid [RB T-W]": 859,
+          "RB OT-SH Total [RB OT]": 777,
+          "RB OT-SH Treated [RB SH]": 729,
+          "Description": 2827,
+          "Date of Rec": 955,
+          "Sig Chg. Date": 18250
+        }
+      },
+      "representation_disclosure": {
+        "formulas": {
+          "label": "\u2014 of which representation-only (punctuation / spacing / quoting / letter case; still counted as differences, classified at build time)",
+          "count": 1243
+        },
+        "values": {
+          "label": "\u2014 of which representation-only (punctuation / spacing / quoting / letter case; still counted as differences, classified at build time)",
+          "count": 1243
+        }
+      },
+      "representation_disclosure_agree": true,
+      "representation_note_present": {
+        "formulas": true,
+        "values": true
+      },
+      "self_checks": {
+        "Every Comparison row has a status (Both + TSMIS (PDF) only + TSN (PDF) only)": "OK",
+        "Every row with TSMIS (PDF) data found its TSMIS (PDF) sheet row": "OK",
+        "Every row with TSN (PDF) data found its TSN (PDF) sheet row": "OK",
+        "'Only in TSMIS (PDF)' sheet rows = TSMIS (PDF)-only rows in the Comparison": "OK",
+        "'Only in TSN (PDF)' sheet rows = TSN (PDF)-only rows in the Comparison": "OK",
+        "Per-field difference counts add up to the total differing cells": "OK",
+        "Build-time source identity and duplicate pairing snapshot is current": "OK",
+        "Routes sheet TSMIS (PDF) row counts add up to the TSMIS (PDF) sheet": "OK",
+        "Routes sheet TSN (PDF) row counts add up to the TSN (PDF) sheet": "OK",
+        "Routes sheet 'Locations compared' adds up to the Comparison": "OK"
+      },
+      "self_checks_clean": true,
+      "cached_error_cells": {
+        "Summary": 0,
+        "Spot Check": 0,
+        "Comparison": 0,
+        "Routes": 0,
+        "Only in TSMIS (PDF)": 0,
+        "Only in TSN (PDF)": 0,
+        "TSMIS (PDF)": 0,
+        "TSN (PDF)": 0,
+        "Legend": 0,
+        "Notes": 0,
+        "Source Files": 0,
+        "__CMP_E2_SNAPSHOT_A": 0,
+        "__CMP_E2_SNAPSHOT_B": 0,
+        "Provenance": 0
+      },
+      "cached_error_cells_total": 0,
+      "verdict": true
+    },
+    "hsl_excel": {
+      "label": "Highway Sequence vs TSN (Excel)",
+      "generation": {
+        "generation_id": "1b920d9a-0980-4c56-824d-a41f7618db4c",
+        "requested_mode": "formulas",
+        "side_a": "C:\\Users\\Yunus\\Projects\\wt-rb5\\output\\2026-07-23 ssor-prod\\consolidated\\highway_sequence_consolidated 2026-07-23 ssor-prod.xlsx",
+        "side_b": "C:\\Users\\Yunus\\Projects\\wt-rb5\\tsn_library\\highway_sequence\\consolidated\\tsn_highway_sequence_normalized.xlsx",
+        "typed_counts": {
+          "differing_cells": 28450,
+          "differing_rows": 22554,
+          "paired_rows": 57050,
+          "side_a_only_rows": 3204,
+          "side_b_only_rows": 12754
+        }
+      },
+      "status": "COMPLETE",
+      "formulas": {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\hsl_excel vs tsn (formulas).xlsx",
+        "size": 58974673,
+        "sha256_as_generated": "c9d7ae85129fbf029e882d2368b6d67991cd10b693948aceb5dfe09f16053208",
+        "recalculated_copy": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\hsl_excel vs tsn (formulas) [recalculated].xlsx",
+        "sha256_after_recalc": "141c762c59a8a24efd4e76dd5a9cda2bdbc91f21e1a7ffad1b8a0f73a513525c",
+        "size_after_recalc": 76512975
+      },
+      "values": {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\hsl_excel vs tsn.xlsx",
+        "size": 36016059,
+        "sha256": "df8868749119e6044d6d32030c31ea9ce15777b0813360d71c7df664f7b7ee85"
+      },
+      "excel": {
+        "recalculated": true,
+        "version": "16.0",
+        "seconds": 213.3,
+        "error": ""
+      },
+      "headline_agree": true,
+      "headline_labels_compared": 27,
+      "per_field_agree": true,
+      "per_field_columns_compared": 6,
+      "per_field": {
+        "formulas": {
+          "County": 0,
+          "City": 15018,
+          "HG": 906,
+          "FT": 690,
+          "Distance To Next Point": 6953,
+          "Description": 4883
+        },
+        "values": {
+          "County": 0,
+          "City": 15018,
+          "HG": 906,
+          "FT": 690,
+          "Distance To Next Point": 6953,
+          "Description": 4883
+        }
+      },
+      "representation_disclosure": {
+        "formulas": {
+          "label": "\u2014 of which representation-only (punctuation / spacing / quoting / letter case; still counted as differences, classified at build time)",
+          "count": 12
+        },
+        "values": {
+          "label": "\u2014 of which representation-only (punctuation / spacing / quoting / letter case; still counted as differences, classified at build time)",
+          "count": 12
+        }
+      },
+      "representation_disclosure_agree": true,
+      "representation_note_present": {
+        "formulas": true,
+        "values": true
+      },
+      "self_checks": {
+        "Every Comparison row has a status (Both + TSMIS only + TSN only)": "OK",
+        "Every row with TSMIS data found its TSMIS sheet row": "OK",
+        "Every row with TSN data found its TSN sheet row": "OK",
+        "'Only in TSMIS' sheet rows = TSMIS-only rows in the Comparison": "OK",
+        "'Only in TSN' sheet rows = TSN-only rows in the Comparison": "OK",
+        "Per-field difference counts add up to the total differing cells": "OK",
+        "Build-time source identity and duplicate pairing snapshot is current": "OK",
+        "Routes sheet TSMIS row counts add up to the TSMIS sheet": "OK",
+        "Routes sheet TSN row counts add up to the TSN sheet": "OK",
+        "Routes sheet 'Locations compared' adds up to the Comparison": "OK"
+      },
+      "self_checks_clean": true,
+      "cached_error_cells": {
+        "Summary": 0,
+        "Spot Check": 0,
+        "Comparison": 0,
+        "Routes": 0,
+        "Only in TSMIS": 0,
+        "Only in TSN": 0,
+        "TSMIS": 0,
+        "TSN": 0,
+        "Notes": 0,
+        "Source Files": 0,
+        "__CMP_E2_SNAPSHOT_A": 0,
+        "__CMP_E2_SNAPSHOT_B": 0,
+        "Provenance": 0
+      },
+      "cached_error_cells_total": 0,
+      "verdict": true
+    },
+    "hsl_pdf": {
+      "label": "Highway Sequence vs TSN (PDF)",
+      "generation": {
+        "generation_id": "3634089a-4cea-40b5-818a-84f37cead513",
+        "requested_mode": "formulas",
+        "side_a": "C:\\Users\\Yunus\\Projects\\wt-rb5\\output\\2026-07-23 ssor-prod\\consolidated\\tsmis_highway_sequence_pdf_consolidated 2026-07-23 ssor-prod.xlsx",
+        "side_b": "C:\\Users\\Yunus\\Projects\\wt-rb5\\tsn_library\\highway_sequence\\consolidated\\tsn_highway_sequence_normalized.xlsx",
+        "typed_counts": {
+          "differing_cells": 27601,
+          "differing_rows": 22728,
+          "paired_rows": 57483,
+          "side_a_only_rows": 2771,
+          "side_b_only_rows": 12321
+        }
+      },
+      "status": "COMPLETE",
+      "formulas": {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\hsl_pdf vs tsn (formulas).xlsx",
+        "size": 59373595,
+        "sha256_as_generated": "c5f20a7bcce3ea87549b274b86362fa82ce26381bc451dc8095918d2dd3d9e17",
+        "recalculated_copy": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\hsl_pdf vs tsn (formulas) [recalculated].xlsx",
+        "sha256_after_recalc": "5997f592f09877c1c02104e19c4d7bf136d743e5b5bb961b719fc25f1621ff65",
+        "size_after_recalc": 76771237
+      },
+      "values": {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\hsl_pdf vs tsn.xlsx",
+        "size": 35975991,
+        "sha256": "3146622dd611a6bf6122e6390e93c2e2f681ab8d1042d0bdf2b3c5c27449755d"
+      },
+      "excel": {
+        "recalculated": true,
+        "version": "16.0",
+        "seconds": 215.4,
+        "error": ""
+      },
+      "headline_agree": true,
+      "headline_labels_compared": 27,
+      "per_field_agree": true,
+      "per_field_columns_compared": 6,
+      "per_field": {
+        "formulas": {
+          "County": 0,
+          "City": 15130,
+          "HG": 459,
+          "FT": 82,
+          "Distance To Next Point": 7038,
+          "Description": 4892
+        },
+        "values": {
+          "County": 0,
+          "City": 15130,
+          "HG": 459,
+          "FT": 82,
+          "Distance To Next Point": 7038,
+          "Description": 4892
+        }
+      },
+      "representation_disclosure": {
+        "formulas": {
+          "label": "\u2014 of which representation-only (punctuation / spacing / quoting / letter case; still counted as differences, classified at build time)",
+          "count": 12
+        },
+        "values": {
+          "label": "\u2014 of which representation-only (punctuation / spacing / quoting / letter case; still counted as differences, classified at build time)",
+          "count": 12
+        }
+      },
+      "representation_disclosure_agree": true,
+      "representation_note_present": {
+        "formulas": true,
+        "values": true
+      },
+      "self_checks": {
+        "Every Comparison row has a status (Both + TSMIS (PDF) only + TSN only)": "OK",
+        "Every row with TSMIS (PDF) data found its TSMIS (PDF) sheet row": "OK",
+        "Every row with TSN data found its TSN sheet row": "OK",
+        "'Only in TSMIS (PDF)' sheet rows = TSMIS (PDF)-only rows in the Comparison": "OK",
+        "'Only in TSN' sheet rows = TSN-only rows in the Comparison": "OK",
+        "Per-field difference counts add up to the total differing cells": "OK",
+        "Build-time source identity and duplicate pairing snapshot is current": "OK",
+        "Routes sheet TSMIS (PDF) row counts add up to the TSMIS (PDF) sheet": "OK",
+        "Routes sheet TSN row counts add up to the TSN sheet": "OK",
+        "Routes sheet 'Locations compared' adds up to the Comparison": "OK"
+      },
+      "self_checks_clean": true,
+      "cached_error_cells": {
+        "Summary": 0,
+        "Spot Check": 0,
+        "Comparison": 0,
+        "Routes": 0,
+        "Only in TSMIS (PDF)": 0,
+        "Only in TSN": 0,
+        "TSMIS (PDF)": 0,
+        "TSN": 0,
+        "Notes": 0,
+        "Source Files": 0,
+        "__CMP_E2_SNAPSHOT_A": 0,
+        "__CMP_E2_SNAPSHOT_B": 0,
+        "Provenance": 0
+      },
+      "cached_error_cells_total": 0,
+      "verdict": true
+    },
+    "id_excel": {
+      "label": "Intersection Detail vs TSN (Excel)",
+      "generation": {
+        "generation_id": "956620fd-96c5-420e-b8ee-5339ad478a59",
+        "requested_mode": "formulas",
+        "side_a": "C:\\Users\\Yunus\\Projects\\wt-rb5\\output\\2026-07-23 ssor-prod\\consolidated\\tsar_intersection_detail_consolidated 2026-07-23 ssor-prod.xlsx",
+        "side_b": "C:\\Users\\Yunus\\Projects\\wt-rb5\\tsn_library\\intersection_detail\\consolidated\\tsn_intersection_detail_normalized.xlsx",
+        "typed_counts": {
+          "differing_cells": 5092,
+          "differing_rows": 2816,
+          "paired_rows": 16199,
+          "side_a_only_rows": 260,
+          "side_b_only_rows": 427
+        }
+      },
+      "status": "COMPLETE",
+      "formulas": {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\id_excel vs tsn (formulas).xlsx",
+        "size": 61089852,
+        "sha256_as_generated": "339a5cd420230400ac438d52fabb52995e21cb818d9d5911dc21d672de2787a1",
+        "recalculated_copy": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\id_excel vs tsn (formulas) [recalculated].xlsx",
+        "sha256_after_recalc": "da269a15696d056f50365e7ef15bae951692cadcb6bc7b66e0b36a9b40c39522",
+        "size_after_recalc": 70697216
+      },
+      "values": {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\id_excel vs tsn.xlsx",
+        "size": 30638773,
+        "sha256": "1e6ea0c241d4feeb5e250eee14dbacfc179f89ebc94f2939c1c1ce3c1b32b247"
+      },
+      "excel": {
+        "recalculated": true,
+        "version": "16.0",
+        "seconds": 301.2,
+        "error": ""
+      },
+      "headline_agree": true,
+      "headline_labels_compared": 83,
+      "per_field_agree": true,
+      "per_field_columns_compared": 34,
+      "per_field": {
+        "formulas": {
+          "PR": 0,
+          "Route Suffix": 0,
+          "District": 0,
+          "County": 0,
+          "Date of Record": 4,
+          "HG": 171,
+          "City Code": 110,
+          "R/U": 38,
+          "INT Type Eff-Date": 4,
+          "INT Type": 1,
+          "Control Type Eff-Date": 4,
+          "Control Type": 1,
+          "Lighting Eff-Date": 4,
+          "Lighting": 0,
+          "ML Eff-Date": 1969,
+          "ML Mastarm": 199,
+          "ML Left Chan": 204,
+          "ML Right Chan": 190,
+          "ML Traffic Flow": 189,
+          "ML Num Lanes": 186,
+          "Description": 4,
+          "Main Line Length": 230,
+          "CS Eff-Date": 509,
+          "CS Mastarm": 155,
+          "CS Left Chan": 153,
+          "CS Right Chan": 181,
+          "CS Traffic Flow": 155,
+          "CS Num Lanes": 151,
+          "Int St Eff-Date": 104,
+          "Intrte Route": 0,
+          "Intrte PM Prefix": 0,
+          "Intrte Postmile": 0,
+          "Intrte PM Suffix": 0,
+          "Xing Line Lgth": 176
+        },
+        "values": {
+          "PR": 0,
+          "Route Suffix": 0,
+          "District": 0,
+          "County": 0,
+          "Date of Record": 4,
+          "HG": 171,
+          "City Code": 110,
+          "R/U": 38,
+          "INT Type Eff-Date": 4,
+          "INT Type": 1,
+          "Control Type Eff-Date": 4,
+          "Control Type": 1,
+          "Lighting Eff-Date": 4,
+          "Lighting": 0,
+          "ML Eff-Date": 1969,
+          "ML Mastarm": 199,
+          "ML Left Chan": 204,
+          "ML Right Chan": 190,
+          "ML Traffic Flow": 189,
+          "ML Num Lanes": 186,
+          "Description": 4,
+          "Main Line Length": 230,
+          "CS Eff-Date": 509,
+          "CS Mastarm": 155,
+          "CS Left Chan": 153,
+          "CS Right Chan": 181,
+          "CS Traffic Flow": 155,
+          "CS Num Lanes": 151,
+          "Int St Eff-Date": 104,
+          "Intrte Route": 0,
+          "Intrte PM Prefix": 0,
+          "Intrte Postmile": 0,
+          "Intrte PM Suffix": 0,
+          "Xing Line Lgth": 176
+        }
+      },
+      "representation_disclosure": {
+        "formulas": {
+          "label": "\u2014 of which representation-only (punctuation / spacing / quoting / letter case; still counted as differences, classified at build time)",
+          "count": 1
+        },
+        "values": {
+          "label": "\u2014 of which representation-only (punctuation / spacing / quoting / letter case; still counted as differences, classified at build time)",
+          "count": 1
+        }
+      },
+      "representation_disclosure_agree": true,
+      "representation_note_present": {
+        "formulas": true,
+        "values": true
+      },
+      "self_checks": {
+        "Every Comparison row has a status (Both + TSMIS only + TSN only)": "OK",
+        "Every row with TSMIS data found its TSMIS sheet row": "OK",
+        "Every row with TSN data found its TSN sheet row": "OK",
+        "'Only in TSMIS' sheet rows = TSMIS-only rows in the Comparison": "OK",
+        "'Only in TSN' sheet rows = TSN-only rows in the Comparison": "OK",
+        "Per-field difference counts add up to the total differing cells": "OK",
+        "Build-time source identity and duplicate pairing snapshot is current": "OK",
+        "Report View Diffs agree with the Comparison": "OK",
+        "Routes sheet TSMIS row counts add up to the TSMIS sheet": "OK",
+        "Routes sheet TSN row counts add up to the TSN sheet": "OK",
+        "Routes sheet 'Intersections compared' adds up to the Comparison": "OK"
+      },
+      "self_checks_clean": true,
+      "cached_error_cells": {
+        "Summary": 0,
+        "Spot Check": 0,
+        "Comparison": 0,
+        "Routes": 0,
+        "Only in TSMIS": 0,
+        "Only in TSN": 0,
+        "TSMIS": 0,
+        "TSN": 0,
+        "Notes": 0,
+        "Report View": 0,
+        "Source Files": 0,
+        "__CMP_E2_SNAPSHOT_A": 0,
+        "__CMP_E2_SNAPSHOT_B": 0,
+        "Provenance": 0
+      },
+      "cached_error_cells_total": 0,
+      "verdict": true
+    },
+    "id_pdf": {
+      "label": "Intersection Detail vs TSN (PDF)",
+      "generation": {
+        "generation_id": "2c0852a6-f44d-4afe-a77d-b46acdd266cc",
+        "requested_mode": "formulas",
+        "side_a": "C:\\Users\\Yunus\\Projects\\wt-rb5\\output\\2026-07-23 ssor-prod\\consolidated\\tsmis_intersection_detail_pdf_consolidated 2026-07-23 ssor-prod.xlsx",
+        "side_b": "C:\\Users\\Yunus\\Projects\\wt-rb5\\tsn_library\\intersection_detail\\consolidated\\tsn_intersection_detail_normalized.xlsx",
+        "typed_counts": {
+          "differing_cells": 5092,
+          "differing_rows": 2816,
+          "paired_rows": 16199,
+          "side_a_only_rows": 260,
+          "side_b_only_rows": 427
+        }
+      },
+      "status": "COMPLETE",
+      "formulas": {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\id_pdf vs tsn (formulas).xlsx",
+        "size": 61674896,
+        "sha256_as_generated": "e140e7cdacde0ff49b4ebfccdf9ec303886d732d7d35fe6f2d76e209add858e1",
+        "recalculated_copy": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\id_pdf vs tsn (formulas) [recalculated].xlsx",
+        "sha256_after_recalc": "25184d80bc56cb647d8bc935beb3c455028e458662f46c1c2d551a19f96e5cfa",
+        "size_after_recalc": 71233907
+      },
+      "values": {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\id_pdf vs tsn.xlsx",
+        "size": 30651747,
+        "sha256": "1101c3ed8b13bdb43b26fd8160800201298576597e91c060eb4c83d5d1448385"
+      },
+      "excel": {
+        "recalculated": true,
+        "version": "16.0",
+        "seconds": 297.9,
+        "error": ""
+      },
+      "headline_agree": true,
+      "headline_labels_compared": 83,
+      "per_field_agree": true,
+      "per_field_columns_compared": 34,
+      "per_field": {
+        "formulas": {
+          "PR": 0,
+          "Route Suffix": 0,
+          "District": 0,
+          "County": 0,
+          "Date of Record": 4,
+          "HG": 171,
+          "City Code": 110,
+          "R/U": 38,
+          "INT Type Eff-Date": 4,
+          "INT Type": 1,
+          "Control Type Eff-Date": 4,
+          "Control Type": 1,
+          "Lighting Eff-Date": 4,
+          "Lighting": 0,
+          "ML Eff-Date": 1969,
+          "ML Mastarm": 199,
+          "ML Left Chan": 204,
+          "ML Right Chan": 190,
+          "ML Traffic Flow": 189,
+          "ML Num Lanes": 186,
+          "Description": 4,
+          "Main Line Length": 230,
+          "CS Eff-Date": 509,
+          "CS Mastarm": 155,
+          "CS Left Chan": 153,
+          "CS Right Chan": 181,
+          "CS Traffic Flow": 155,
+          "CS Num Lanes": 151,
+          "Int St Eff-Date": 104,
+          "Intrte Route": 0,
+          "Intrte PM Prefix": 0,
+          "Intrte Postmile": 0,
+          "Intrte PM Suffix": 0,
+          "Xing Line Lgth": 176
+        },
+        "values": {
+          "PR": 0,
+          "Route Suffix": 0,
+          "District": 0,
+          "County": 0,
+          "Date of Record": 4,
+          "HG": 171,
+          "City Code": 110,
+          "R/U": 38,
+          "INT Type Eff-Date": 4,
+          "INT Type": 1,
+          "Control Type Eff-Date": 4,
+          "Control Type": 1,
+          "Lighting Eff-Date": 4,
+          "Lighting": 0,
+          "ML Eff-Date": 1969,
+          "ML Mastarm": 199,
+          "ML Left Chan": 204,
+          "ML Right Chan": 190,
+          "ML Traffic Flow": 189,
+          "ML Num Lanes": 186,
+          "Description": 4,
+          "Main Line Length": 230,
+          "CS Eff-Date": 509,
+          "CS Mastarm": 155,
+          "CS Left Chan": 153,
+          "CS Right Chan": 181,
+          "CS Traffic Flow": 155,
+          "CS Num Lanes": 151,
+          "Int St Eff-Date": 104,
+          "Intrte Route": 0,
+          "Intrte PM Prefix": 0,
+          "Intrte Postmile": 0,
+          "Intrte PM Suffix": 0,
+          "Xing Line Lgth": 176
+        }
+      },
+      "representation_disclosure": {
+        "formulas": {
+          "label": "\u2014 of which representation-only (punctuation / spacing / quoting / letter case; still counted as differences, classified at build time)",
+          "count": 1
+        },
+        "values": {
+          "label": "\u2014 of which representation-only (punctuation / spacing / quoting / letter case; still counted as differences, classified at build time)",
+          "count": 1
+        }
+      },
+      "representation_disclosure_agree": true,
+      "representation_note_present": {
+        "formulas": true,
+        "values": true
+      },
+      "self_checks": {
+        "Every Comparison row has a status (Both + TSMIS (PDF) only + TSN only)": "OK",
+        "Every row with TSMIS (PDF) data found its TSMIS (PDF) sheet row": "OK",
+        "Every row with TSN data found its TSN sheet row": "OK",
+        "'Only in TSMIS (PDF)' sheet rows = TSMIS (PDF)-only rows in the Comparison": "OK",
+        "'Only in TSN' sheet rows = TSN-only rows in the Comparison": "OK",
+        "Per-field difference counts add up to the total differing cells": "OK",
+        "Build-time source identity and duplicate pairing snapshot is current": "OK",
+        "Report View Diffs agree with the Comparison": "OK",
+        "Routes sheet TSMIS (PDF) row counts add up to the TSMIS (PDF) sheet": "OK",
+        "Routes sheet TSN row counts add up to the TSN sheet": "OK",
+        "Routes sheet 'Intersections compared' adds up to the Comparison": "OK"
+      },
+      "self_checks_clean": true,
+      "cached_error_cells": {
+        "Summary": 0,
+        "Spot Check": 0,
+        "Comparison": 0,
+        "Routes": 0,
+        "Only in TSMIS (PDF)": 0,
+        "Only in TSN": 0,
+        "TSMIS (PDF)": 0,
+        "TSN": 0,
+        "Notes": 0,
+        "Report View": 0,
+        "Source Files": 0,
+        "__CMP_E2_SNAPSHOT_A": 0,
+        "__CMP_E2_SNAPSHOT_B": 0,
+        "Provenance": 0
+      },
+      "cached_error_cells_total": 0,
+      "verdict": true
+    },
+    "rd_pdf": {
+      "label": "Ramp Detail vs TSN (PDF)",
+      "generation": {
+        "generation_id": "60a09b7a-5562-4ab5-84d7-5d4f4799bb8c",
+        "requested_mode": "formulas",
+        "side_a": "C:\\Users\\Yunus\\Projects\\wt-rb5\\output\\2026-07-23 ssor-prod\\consolidated\\tsmis_ramp_detail_pdf_consolidated 2026-07-23 ssor-prod.xlsx",
+        "side_b": "C:\\Users\\Yunus\\Projects\\wt-rb5\\tsn_library\\ramp_detail\\consolidated\\tsn_ramp_detail_normalized.xlsx",
+        "typed_counts": {
+          "differing_cells": 619,
+          "differing_rows": 468,
+          "paired_rows": 15204,
+          "side_a_only_rows": 9,
+          "side_b_only_rows": 206
+        }
+      },
+      "status": "COMPLETE",
+      "formulas": {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\rd_pdf vs tsn (formulas).xlsx",
+        "size": 20514829,
+        "sha256_as_generated": "29efb797a8a5e675749cc77bc5ea3f98b0ca4da601ce83a5862ff6cbd20e0944",
+        "recalculated_copy": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\rd_pdf vs tsn (formulas) [recalculated].xlsx",
+        "sha256_after_recalc": "6b506e4a27f9cd3dc90c4fee93f389dc4b17253dd8b04f5b618597f926df1380",
+        "size_after_recalc": 26256873
+      },
+      "values": {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\rd_pdf vs tsn.xlsx",
+        "size": 11615210,
+        "sha256": "cc6e1a2b834cafc165da93ce22ed023792506a246cb8606fabdfd0211b88df3f"
+      },
+      "excel": {
+        "recalculated": true,
+        "version": "16.0",
+        "seconds": 87.3,
+        "error": ""
+      },
+      "headline_agree": true,
+      "headline_labels_compared": 39,
+      "per_field_agree": true,
+      "per_field_columns_compared": 12,
+      "per_field": {
+        "formulas": {
+          "PR": 0,
+          "District": 1,
+          "Date of Record": 15,
+          "HG": 69,
+          "Area 4": 36,
+          "City Code": 156,
+          "R/U": 68,
+          "Description": 163,
+          "Ramp Name": "not compared (context)",
+          "On/Off": 74,
+          "Ramp Type": 37,
+          "ADT": "not compared (context)"
+        },
+        "values": {
+          "PR": 0,
+          "District": 1,
+          "Date of Record": 15,
+          "HG": 69,
+          "Area 4": 36,
+          "City Code": 156,
+          "R/U": 68,
+          "Description": 163,
+          "Ramp Name": "not compared (context)",
+          "On/Off": 74,
+          "Ramp Type": 37,
+          "ADT": "not compared (context)"
+        }
+      },
+      "representation_disclosure": {
+        "formulas": {
+          "label": "\u2014 of which representation-only (punctuation / spacing / quoting / letter case; still counted as differences, classified at build time)",
+          "count": 3
+        },
+        "values": {
+          "label": "\u2014 of which representation-only (punctuation / spacing / quoting / letter case; still counted as differences, classified at build time)",
+          "count": 3
+        }
+      },
+      "representation_disclosure_agree": true,
+      "representation_note_present": {
+        "formulas": true,
+        "values": true
+      },
+      "self_checks": {
+        "Every Comparison row has a status (Both + TSMIS (PDF) only + TSN only)": "OK",
+        "Every row with TSMIS (PDF) data found its TSMIS (PDF) sheet row": "OK",
+        "Every row with TSN data found its TSN sheet row": "OK",
+        "'Only in TSMIS (PDF)' sheet rows = TSMIS (PDF)-only rows in the Comparison": "OK",
+        "'Only in TSN' sheet rows = TSN-only rows in the Comparison": "OK",
+        "Per-field difference counts add up to the total differing cells": "OK",
+        "Build-time source identity and duplicate pairing snapshot is current": "OK",
+        "Routes sheet TSMIS (PDF) row counts add up to the TSMIS (PDF) sheet": "OK",
+        "Routes sheet TSN row counts add up to the TSN sheet": "OK",
+        "Routes sheet 'Ramps compared' adds up to the Comparison": "OK"
+      },
+      "self_checks_clean": true,
+      "cached_error_cells": {
+        "Summary": 0,
+        "Spot Check": 0,
+        "Comparison": 0,
+        "Routes": 0,
+        "Only in TSMIS (PDF)": 0,
+        "Only in TSN": 0,
+        "TSMIS (PDF)": 0,
+        "TSN": 0,
+        "Notes": 0,
+        "Source Files": 0,
+        "__CMP_E2_SNAPSHOT_A": 0,
+        "__CMP_E2_SNAPSHOT_B": 0,
+        "Provenance": 0
+      },
+      "cached_error_cells_total": 0,
+      "verdict": true
+    },
+    "clean_road": {
+      "label": "Clean Road Highway vs TSN",
+      "generation": {
+        "generation_id": "886290b8-c695-48d3-ae44-16b6a75a4d56",
+        "requested_mode": "formulas",
+        "side_a": "C:\\Users\\Yunus\\Projects\\wt-rb5\\output\\arcgis_cleanroad\\clean_highway_built.xlsx",
+        "side_b": "C:\\Users\\Yunus\\Projects\\wt-rb5\\tsn_library\\clean_highway\\raw\\CA HIGHWAYS 09.08.2025.xlsx",
+        "typed_counts": {
+          "differing_cells": 281393,
+          "differing_rows": 48942,
+          "paired_rows": 52629,
+          "side_a_only_rows": 5113,
+          "side_b_only_rows": 7454
+        }
+      },
+      "status": "BLOCKED - measured hardware limit, not a product result",
+      "formulas": {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head-formulas\\clean_road vs tsn (formulas).xlsx",
+        "size": 473646751,
+        "sha256_as_generated": "984a08e36000f8b1b414e039f6f8e381d02784c71b9c6dbb7b098d3890fbdd2a"
+      },
+      "values": {
+        "path": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_scratch\\post-comparison-hotfixes\\HF-09\\rb5-a1\\head\\clean_road_highway vs tsn.xlsx",
+        "size": 202605155
+      },
+      "excel": {
+        "recalculated": false,
+        "version": "16.0",
+        "seconds": null,
+        "error": "the host bugchecked mid-recalculation"
+      },
+      "verdict": null,
+      "blocked_evidence": {
+        "what_happened": "Excel had this workbook open and recalculating from 19:35; at 19:58:30 on 2026-08-30 the host bugchecked and rebooted, killing the run.",
+        "bugcheck": "0x0000010E VIDEO_MEMORY_MANAGEMENT_INTERNAL (0x2D, ...), dump C:\\WINDOWS\\Minidump\\083026-31890-01.dmp",
+        "not_caused_by_this_work": "the identical bugcheck code and subcode (0x10E / 0x2D) hit this host on 2026-07-30, with a 0x116 VIDEO_TDR_ERROR the same evening, none of it during this program - it is a recurring graphics-driver fault that memory pressure exposes",
+        "why_not_retried": "this workbook is 473,646,751 bytes with ~4.9M formulas on a 15.4 GB host; free physical memory measured 1.44 GB with 19.27 GB committed, so a retry in that state would most likely reproduce the crash on the owner's daily-driver machine. Prompt 05 requires approval before an operation that exceeds the owner's resource limits.",
+        "how_to_close": "re-run excel_recalc2.py for this one case on an otherwise idle host; it needs roughly 30-60 minutes and no other large process.",
+        "what_is_NOT_claimed": "nothing about this case's formulas twin is asserted. Its VALUES twin, its typed counts and its base-vs-head count invariance are separately evidenced and unaffected."
+      }
+    }
+  }
+}

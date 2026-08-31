@@ -7,11 +7,13 @@ RB-3 is MERGED at `61fcac611de255c56759551a95ccd2e552287bfc`; its 158/158
 post-merge gate and frozen application self-test both passed;
 RB-4 is MERGED at `83a24896a5a970a3686df87934210f54cea43778`; its 158/158
 post-merge gate and frozen application self-test both passed;
-RB-5's readiness contract was prepared from `main` at
-`1e9446bb7f1f9771b7698482d63980840ee5ec28`; no RB-5 branch, RB-5 product change,
-generation, or acceptance run has begun**
+RB-5 is IMPLEMENTED on `hotfix/rb-5-difference-classification` from base
+`87e368c3e9a7eaf26395308e8ddea4aba7d303e5` and is AWAITING ADVERSARIAL REVIEW.
+Codex Review 1 returned it once on `RB5-R1-EG-001` (a missing acceptance leg,
+not a product defect); that evidence was supplied on 2026-08-30 and Review 1
+resumes**
 
-Last updated: 2026-08-21
+Last updated: 2026-08-30
 
 > **`main` has moved a long way since this program last ran.** The readiness
 > contract above was prepared against `v0.34.0`-era `main`, and the state line
@@ -37,12 +39,18 @@ first pass.
 
 ## Next action
 
-Invoke
-[`PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md`](prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md)
-in a fresh task with `<BUNDLE_ID> = RB-5` and `<IMPLEMENTER> = Claude`.
-Create `hotfix/rb-5-difference-classification` only after Prompt 04 verifies and
-records the exact clean pushed `main` base. The readiness commit is provenance,
-not the branch point. `v0.35.0` separately made `HG`, `City`, and `Distance To
+Resume **Codex Review 1** on `hotfix/rb-5-difference-classification` with
+[`PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md`](prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md)
+for `RB-5`. The returned item `RB5-R1-EG-001` is answered by
+[`hotfix-bundles/HF-09/witness/installed-excel-recalc.json`](hotfix-bundles/HF-09/witness/installed-excel-recalc.json)
+and the "Review 1 return" section of
+[`hotfix-bundles/RB-5/IMPLEMENTATION.md`](hotfix-bundles/RB-5/IMPLEMENTATION.md):
+formulas twins were generated for all eight cases and recalculated in installed
+Excel — **seven complete and passing, zero cached error cells**; the eighth
+(Clean Road, 452 MB) is BLOCKED on a measured hardware limit after the host
+bugchecked mid-recalculation, is not claimed, and needs only an idle machine to
+close. **Do not re-run the seven that passed.** One denial of the maximum two
+has been used. Historical context that still governs: `v0.35.0` separately made `HG`, `City`, and `Distance To
 Next Point` asserted in Highway Sequence vs-TSN; that owner-directed release is
 the pre-existing baseline, not RB-5 work. RB-5 must preserve it. In every RB-5
 criterion that says Highway Sequence vs-TSN counts are unchanged, "unchanged"
@@ -126,8 +134,8 @@ did not create a branch, modify product code, or begin an acceptance run.
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-5 READY — IMPLEMENTATION NOT STARTED** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-4 COMPLETE; RB-5 NOT STARTED** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-5 IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (returned once on `RB5-R1-EG-001`; evidence supplied) | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-4 COMPLETE; RB-5 Review 1 RETURNED ONCE — resumes on the supplied evidence** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.
