@@ -3,6 +3,22 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.42.1 — 2026-08-31
+
+The startup sign-in check now tells you whether it worked.
+
+- **"Background sign-in check finished." now says the outcome.** On start (and
+  after an environment switch) the app quietly checks the saved sign-in, and
+  sign-in, verify and exports all wait for it. It announced that it was running
+  and then closed with a bare "finished" — so the pane confirmed a check had
+  happened and never whether you were actually signed in, which is the one thing
+  worth knowing at startup. It now ends on one line stating the result: signed
+  in with Edge device sign-in (no saved login needed), the saved sign-in still
+  works, NOT signed in plus the reason, or — when the check handed the browser
+  to another task before finishing — that it stopped early and re-checked
+  nothing. That last case is deliberately not phrased as a failed sign-in.
+  Detail still goes to the log file.
+
 ## v0.42.0 — 2026-08-31
 
 Stops the Highway Sequence self-check reporting a by-design difference in how

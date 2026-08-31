@@ -1124,6 +1124,29 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
         self._maybe_active_env_check("retry")
         return {"ok": True}
 
+    @staticmethod
+    def _active_env_outcome(payload):
+        """The ONE line the background sign-in check ends on.
+
+        Four outcomes, from the fields the check already posts. `via_device`
+        means it signed in with NO saved file, which is what actually proves
+        Edge one-click; `signed_in` with a saved file means the stored session
+        is still good. A check that yielded the Edge profile to a user task
+        reports NEITHER signed in nor a reason, so it must not be read as a
+        failed sign-in — it never finished. UI-neutral by the console-free
+        rule: no window, file or menu names.
+        """
+        if payload.get("signed_in"):
+            if payload.get("via_device"):
+                return ("Sign-in check finished: signed in with Edge device "
+                        "sign-in — no saved login needed.")
+            return ("Sign-in check finished: the saved sign-in still works.")
+        reason = (payload.get("reason") or "").strip()
+        if reason:
+            return f"Sign-in check finished: NOT signed in — {reason}"
+        return ("Sign-in check stopped early to free the browser for another "
+                "task — the saved sign-in was not re-checked.")
+
     def _on_active_env_done(self, payload):
         """The quiet active-env check finished. Drop a stale result (a newer env
         switch bumped the seq and owns the flag); otherwise clear the flag, light
@@ -1143,8 +1166,11 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
                 # why so the Edge one-click chip can say so (M1-E/G6).
                 self._device_signin_reason = payload.get("reason")
         # Close the loop on the "waiting for this" line above, so the gate is
-        # visibly released. Outcome detail stays in the log file (quiet by design).
-        self._emit_log("Background sign-in check finished.")
+        # visibly released — and SAY WHAT HAPPENED. Announcing that a check ran
+        # without saying whether the saved sign-in works withheld the one fact
+        # the line exists to deliver. The payload already carries it, so this
+        # states the outcome in ONE line and leaves the detail in the log file.
+        self._emit_log(self._active_env_outcome(payload))
         if via_device:
             self._refresh_auth()
         self._push_state()

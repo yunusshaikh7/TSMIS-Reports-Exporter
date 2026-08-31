@@ -640,6 +640,38 @@ def test_active_env_check_gates():
         check("stale active_env_done is ignored", a._active_check is True)
         a._on_active_env_done({"seq": a._active_check_seq, "via_device": False})
         check("matching active_env_done clears the flag", a._active_check is False)
+
+        # E7: the finish line must say WHETHER the saved sign-in works, not just
+        # that a check ran. One line per outcome, and a yielded check must never
+        # read as a failed sign-in.
+        outcome = a._active_env_outcome
+        device = outcome({"signed_in": True, "via_device": True, "had_file": False})
+        saved = outcome({"signed_in": True, "via_device": False, "had_file": True})
+        failed = outcome({"signed_in": False, "via_device": False, "had_file": True,
+                          "reason": "The TSMIS site was unreachable — check the "
+                                    "VPN / network."})
+        yielded = outcome({"signed_in": False, "via_device": False,
+                           "had_file": True, "reason": None})
+        for label, line in (("device", device), ("saved", saved),
+                            ("failed", failed), ("yielded", yielded)):
+            check(f"sign-in outcome ({label}) is exactly one line",
+                  bool(line) and "\n" not in line)
+        check("device sign-in outcome names the one-click path",
+              "device sign-in" in device and "no saved login" in device)
+        check("saved-session outcome says the saved sign-in still works",
+              "saved sign-in still works" in saved)
+        check("a failed check says NOT signed in and carries the reason",
+              "NOT signed in" in failed and "unreachable" in failed)
+        check("a YIELDED check is not reported as a failed sign-in",
+              "NOT signed in" not in yielded and "not re-checked" in yielded)
+        check("every outcome differs from the others",
+              len({device, saved, failed, yielded}) == 4)
+        # Console-free rule: no window/file/menu wording leaks into the pane.
+        for label, line in (("device", device), ("saved", saved),
+                            ("failed", failed), ("yielded", yielded)):
+            check(f"sign-in outcome ({label}) stays UI-neutral",
+                  not any(bad in line.lower()
+                          for bad in (".bat", "this window", "menu option")))
     finally:
         gui_api.ActiveEnvCheckWorker = orig_worker
         gui_api.has_valid_auth = orig_has_auth
