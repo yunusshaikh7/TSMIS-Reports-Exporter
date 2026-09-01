@@ -52,7 +52,8 @@ from common import (
 from paths import EDGE_LOGIN_PROFILE_DIR
 from reports import (COMPARE_DISPLAY, COMPARE_GROUPS, COMPARE_KEYS, COMPARE_REPORTS,
                      CONSOLIDATE_DISPLAY, CONSOLIDATE_KEYS,
-                     CONSOLIDATE_REPORTS, EXPORT_DISPLAY, EXPORT_REPORTS, PICKER_ORDER,
+                     CONSOLIDATE_REPORTS, EXPORT_DISPLAY, EXPORT_ONLY_KEYS,
+                     EXPORT_REPORTS, PICKER_ORDER,
                      compare_input_shapes, consolidate_index_for_key,
                      export_reports_status, matrix_rows)
 import outcome
@@ -129,14 +130,17 @@ def _ui_index_path():
 def _export_report_rows():
     """Export-picker rows in PICKER_ORDER (flat reports first, then family groups);
     `group`/`short` drive the grouped picker, `key` is the stable op key, `idx` is
-    display position only."""
+    display position only. `export_only` (PCOA-FINAL-018) marks an edition the app
+    can export but has no way to CHECK — the picker says so instead of leaving the
+    gap silent."""
     ordered = sorted(export_reports_status(),
                      key=lambda t: PICKER_ORDER.index(t[3].subdir))
     out = []
     for pos, (_i, label, fmt, spec, disabled) in enumerate(ordered):
         group, short = EXPORT_DISPLAY.get(spec.subdir, (None, None))
         out.append({"key": spec.subdir, "idx": pos, "label": label, "fmt": fmt,
-                    "disabled": disabled, "group": group, "short": short})
+                    "disabled": disabled, "group": group, "short": short,
+                    "export_only": spec.subdir in EXPORT_ONLY_KEYS})
     return out
 
 

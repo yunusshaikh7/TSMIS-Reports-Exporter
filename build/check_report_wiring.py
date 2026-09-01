@@ -15,7 +15,10 @@ equivalence; this owns the cross-module wiring):
   * day_matrix._day_rows agrees with the MATRIX fmt + support for every row;
   * the Reset (Delete-all-reports) cleanup lists cover every ENABLED export's output
     subdir and every wired PDF report's consolidated workbook, so a
-    new report's consolidated outputs are actually removable.
+    new report's consolidated outputs are actually removable;
+  * every ENABLED export edition either has a comparison path or is DECLARED
+    export-only and shown as export-only in the picker (PCOA-FINAL-018) — so an
+    edition the app can never check can never be added silently.
 
 Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_report_wiring.py
@@ -27,6 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
 import day_matrix
+import gui_api
 import gui_worker_maint
 import matrix
 import report_catalog
@@ -133,6 +137,48 @@ def test_reset_covers_every_export():
               f"add {wb!r} to gui_worker_maint._LEGACY_CONSOLIDATED_FILES")
 
 
+def test_every_enabled_export_is_verifiable_or_declared():
+    """PCOA-FINAL-018: an ENABLED export edition must either have a dispatchable
+    comparison path or be DECLARED export-only in the catalog AND surfaced as
+    export-only in the report picker.
+
+    Three enabled editions (`ramp_summary_excel`, `intersection_summary_pdf`,
+    `highway_summary_pdf`) have no consolidator, no MATRIX row and no comparison
+    recipe, so no workflow can check the files they save — and until this gate
+    nothing said so. The declaration is EXPLICIT, never derived from the absence
+    of a MATRIX row: a newly added edition that is neither wired nor declared
+    fails here by name rather than inheriting the same silence.
+
+    (The finding named `highway_summary` as the third. It gained its consolidator
+    and both comparisons in v0.37.0, and `highway_summary_pdf` — added in v0.38.0
+    — took its place. The set is derived here, never transcribed.)"""
+    print("every ENABLED export edition is comparable or declared export-only:")
+    disabled = set(reports.DISABLED_EXPORT_SUBDIRS)
+    wired = {m.row_key for m in report_catalog.matrix_rows_meta()}
+    declared = set(report_catalog.export_only_keys())
+    picker = {r["key"]: r for r in gui_api._export_report_rows()}
+    for e in report_catalog.EXPORT:
+        if e.key in disabled or e.spec.subdir in disabled:
+            continue
+        check(f"{e.key}: has a comparison path OR is declared export-only",
+              (e.key in wired) != (e.key in declared),
+              "no MATRIX row and no export_only=True in report_catalog.EXPORT — "
+              "wire a comparison for it, or declare it export_only so the picker "
+              "can say the app will never check it"
+              if e.key not in wired and e.key not in declared else
+              "it is BOTH wired and declared export-only; drop the declaration")
+    print("...and every declared export-only edition says so in the report picker:")
+    for key in sorted(declared):
+        row = picker.get(key)
+        check(f"{key}: the picker row carries export_only",
+              bool(row) and row.get("export_only") is True,
+              f"gui_api._export_report_rows() gave {row!r}")
+    for key in sorted(set(picker) - declared):
+        check(f"{key}: the picker row is NOT marked export-only",
+              picker[key].get("export_only") is False,
+              "a wired edition must not be labelled export-only")
+
+
 def test_compare_day_picker_resolves():
     """Every FILE-kind comparison recipe must resolve BOTH its sides through
     report_catalog.compare_file_sides -> a consolidator with out_path_for, or the
@@ -171,6 +217,7 @@ def main():
     test_dual_edition_families()
     test_day_matrix_agrees()
     test_reset_covers_every_export()
+    test_every_enabled_export_is_verifiable_or_declared()
     test_compare_day_picker_resolves()
     print()
     if _fail:

@@ -30,6 +30,11 @@ EXPORT_REPORTS = _catalog.export_rows()
 # keys off the stable export key as before.
 EXPORT_DISPLAY = _catalog.export_display()
 
+# PCOA-FINAL-018: the editions the app EXPORTS but can never CHECK — no
+# consolidator, no matrix row, no comparison recipe. Declared in the catalog,
+# shown as "export only" in the picker, and gated by check_report_wiring.
+EXPORT_ONLY_KEYS = _catalog.export_only_keys()
+
 # Report-PICKER display order (export keys) — distinct from the registry/matrix
 # order: flat reports first in the TSMIS site's order, then the TSAR family groups.
 PICKER_ORDER = _catalog.picker_order()

@@ -59,6 +59,13 @@ function makeReportRow(rep, checked, off, onChange) {
     const note = document.createElement("span");
     note.className = "option-static-note"; note.textContent = " — not yet available";
     name.appendChild(note);
+  } else if (rep.export_only) {
+    // PCOA-FINAL-018: exported, but nothing in the app can CHECK it — it has no
+    // consolidator and no comparison. Still fully pickable; the note is the only
+    // place a user is told the files won't be verified.
+    const note = document.createElement("span");
+    note.className = "option-note"; note.textContent = " — export only";
+    name.appendChild(note);
   }
   const chip = document.createElement("span");
   chip.className = "chip " + (rep.fmt === "PDF" ? "chip-pdf" : "chip-excel");
@@ -67,11 +74,19 @@ function makeReportRow(rep, checked, off, onChange) {
   // Print editions (the *_pdf keys) explain themselves on hover; the
   // env-availability sync APPENDS its warning to this base title (never
   // replaces it). Ramp Summary is fmt PDF but not a print edition.
+  const tips = [];
   if (/_pdf$/.test(rep.key)) {
-    row.dataset.baseTitle =
-      "The same on-site report as its Excel sibling, saved via the site's own "
+    tips.push("The same on-site report as its Excel sibling, saved via the site's own "
       + "Print layout (print-accurate). Ticking both editions generates the "
-      + "report once per route and saves both files.";
+      + "report once per route and saves both files.");
+  }
+  if (rep.export_only && !off) {
+    tips.push("Export only: this edition has no consolidation and no comparison, so "
+      + "the app cannot check the files it saves. Its sibling edition is the one "
+      + "the Consolidate and Compare tabs verify.");
+  }
+  if (tips.length) {
+    row.dataset.baseTitle = tips.join(" ");
     row.title = row.dataset.baseTitle;
   }
   cb.addEventListener("change", () => {
