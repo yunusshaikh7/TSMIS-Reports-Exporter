@@ -1,6 +1,13 @@
 # `RB-6` — Implementation Record
 
-Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW**
+Status: **DENIED — RETURN TO IMPLEMENTATION**
+
+> Codex Review 1 (2026-08-31): **DENIED — EVIDENCE GAP**, solely
+> `RB6-R1-EG-001` — retain the contract-required HF-08 post-double-rebuild
+> vs-TSN comparisons for every buildable dataset, both twins, with unchanged
+> counts and exact runtime/source/library/output bindings. See
+> [REVIEW.md](REVIEW.md). The implementation claims below are preserved; this
+> precondition return does not allege a product defect.
 
 | Field | Value |
 |---|---|

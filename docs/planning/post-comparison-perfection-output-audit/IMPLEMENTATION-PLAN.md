@@ -182,7 +182,7 @@ Two layers, because the owner wants **fewer branches, reviews and releases**
 | 3 | **RB-3** | HF-04 | Ramp Detail — restores 9 comparison placements that produce nothing today | None | `hotfix/rb-3-ramp-detail-layout` | **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc` |
 | 4 | **RB-4** | HF-05 + HF-10 | Evidence, end to end — **AMENDED by the owner 2026-08-05 and 2026-08-09**: print crops on the four `_pdf` report families only; anchorless blanks from the print's own cell geometry are disclosed limitations | None | `hotfix/rb-4-evidence` | **MERGED** — `83a24896a5a970a3686df87934210f54cea43778` |
 | 5 | **RB-5** | HF-06 + HF-09 | Difference classification — the two opposite rulings applied to the right classes | RB-1, RB-2 | `hotfix/rb-5-difference-classification` | **MERGED** — `f11f9d2546b7775e432a22d5174f895f01210c35` |
-| 6 | **RB-6** | HF-07 + HF-08 + HF-11 | Engine hygiene, coverage truth, and the closeout guards | RB-2, RB-3, RB-5 | `hotfix/rb-6-hygiene-and-guards` | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| 6 | **RB-6** | HF-07 + HF-08 + HF-11 | Engine hygiene, coverage truth, and the closeout guards | RB-2, RB-3, RB-5 | `hotfix/rb-6-hygiene-and-guards` | **DENIED — RETURN TO IMPLEMENTATION** |
 
 ### Prompt and record identity
 
@@ -483,7 +483,7 @@ mapping also proves one primary implementation/review bundle per finding:
 | **RB-3** | HF-04 | 001, 012 | 2 | **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc` |
 | **RB-4** | HF-05, HF-10 | 004, 005, 006, 007 | 4 | **MERGED** — `83a24896a5a970a3686df87934210f54cea43778` |
 | **RB-5** | HF-06, HF-09 | 011, 013 | 2 | **MERGED** — `f11f9d2546b7775e432a22d5174f895f01210c35` |
-| **RB-6** | HF-07, HF-08, HF-11 | 015, 017, 018, 020, 021, 022 | 6 | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| **RB-6** | HF-07, HF-08, HF-11 | 015, 017, 018, 020, 021, 022 | 6 | **DENIED — RETURN TO IMPLEMENTATION** |
 | **Total** | 11 work items | 22 unique findings | **22** | |
 
 ## Secondary regression dependencies (verify, do not re-implement)
@@ -1502,7 +1502,7 @@ before/after count table.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer. Both findings are Claude-unique, so Codex must bind to Claude's `witness\export_coverage.txt`, the committed `claude-round1-export-coverage.txt`, and the three timing witnesses, then re-measure independently |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-6: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| Status | **Inherits RB-6: DENIED — RETURN TO IMPLEMENTATION** |
 
 **Exact scope.** 015: the folder-comparison preflight on every statewide PDF
 family, in classic environment, Baseline and Everything ENV. 018: the catalog's
@@ -1605,7 +1605,7 @@ and the re-derived coverage census.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer. Claude-unique finding, so Codex must bind to Claude's `witness\tsn_rebuild_all.json` and re-run the double rebuild itself; the root cause is an unverified hypothesis and the reviewer's first job is to confirm the implementer actually established it |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-6: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| Status | **Inherits RB-6: DENIED — RETURN TO IMPLEMENTATION** |
 
 **Exact scope.** The TSN library's normalized-workbook build and identity for all
 eight supported datasets, and the consequence that pressing *Rebuild* invalidates
@@ -1917,7 +1917,7 @@ table and the count-invariance proof.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to `source-audit/prior-7.9-highway-log-sibling-raw-source-audit.json` (its own 021 witness) and to Claude's `witness\pdf_head_census.txt` for 022 |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-6: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| Status | **Inherits RB-6: DENIED — RETURN TO IMPLEMENTATION** |
 
 **Exact scope.** Turn two prose regression guards into executable checks, and
 create the owner-facing vendor escalation record for route 140. **No product
@@ -2244,3 +2244,14 @@ invalidation is disclosed there. Status is
 `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW`; not merged, not released.
 
 **RB-5 final closeout / RB-6 readiness — 2026-08-31:** main merge `f11f9d2546b7775e432a22d5174f895f01210c35` and passing smoke pushed. Merged RB-5 branches and implementation worktree removed; retained input paths preserved as an artifact-only folder. RB-6 is READY with complete HF-07/HF-08/HF-11 contract from main `a0787e7710b326945797c7c51f56acb7081d0f20`; no implementation or acceptance started.
+
+**RB-6 Stage 5, Review 1 — 2026-08-31:** Codex returned RB-6 as
+`DENIED — RETURN TO IMPLEMENTATION` with verdict **DENIED — EVIDENCE GAP**,
+solely `RB6-R1-EG-001`. HF-08 retains the nine-dataset double-rebuild
+byte/identity/token and cell-content proof, but not the contract-required
+post-rebuild vs-TSN comparisons for each buildable dataset, both twins, with
+unchanged counts and exact bindings. This is a material acceptance-output gap,
+not a demonstrated runtime defect. The signed record is
+[`RB-6/REVIEW.md`](hotfix-bundles/RB-6/REVIEW.md). Return the same branch for
+that one item; the next applicable pass remains Review 1. No merge, push,
+cleanup or Review 2 occurred.

@@ -1,8 +1,8 @@
 # Post-Comparison Output Program — Start Here
 
-Workflow state: **Stages 1A, 1B, 2 and 3 complete; RB-1 through RB-5 are MERGED. RB-6 is IMPLEMENTED on `hotfix/rb-6-hygiene-and-guards` and AWAITS ADVERSARIAL REVIEW — not merged, not released.**
+Workflow state: **Stages 1A, 1B, 2 and 3 complete; RB-1 through RB-5 are MERGED. RB-6 Review 1 is DENIED — EVIDENCE GAP on `hotfix/rb-6-hygiene-and-guards`; return to implementation for `RB6-R1-EG-001` — not merged, not released.**
 
-Last updated: 2026-08-31 (RB-6 Stage 4)
+Last updated: 2026-08-31 (RB-6 Review 1 evidence return)
 
 > **`main` has moved a long way since this program last ran.** The readiness
 > contract above was prepared against `v0.34.0`-era `main`, and the state line
@@ -32,7 +32,13 @@ first pass.
 
 ## Next action
 
-Invoke `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` in a fresh review task with `<BUNDLE_ID> = RB-6` and `<REVIEWER> = Codex`. Read [RB-6/IMPLEMENTATION.md](hotfix-bundles/RB-6/IMPLEMENTATION.md) first — it records the established HF-08 root cause, three corrected stale scope statements, and the ONE-TIME TSN identity invalidation this bundle causes by design.
+Resume `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` on the existing
+`hotfix/rb-6-hygiene-and-guards` branch with `<BUNDLE_ID> = RB-6` and
+`<IMPLEMENTER> = Claude`. Supply solely `RB6-R1-EG-001`: the retained HF-08
+post-double-rebuild vs-TSN result for every buildable dataset, both twins, with
+unchanged counts and exact runtime/source/library/output bindings. See the
+signed [RB-6 review](hotfix-bundles/RB-6/REVIEW.md). Do not begin Review 2;
+after the return is supplied, the next applicable pass remains Review 1.
 
 RB-6 was implemented by Claude from base `62bb0f329c7d7deea6c5ee9010c3d21b0acf6325`
 (the repo is at **v0.43.0**, two releases beyond what the readiness note assumed).
@@ -136,8 +142,8 @@ did not create a branch, modify product code, or begin an acceptance run.
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-6 IMPLEMENTED — awaiting adversarial review** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-6 NOT STARTED** (RB-5 complete: both approvals, merge and smoke passed) | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-6 DENIED — return `RB6-R1-EG-001`** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-6 REVIEW 1 DENIED — EVIDENCE GAP** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.
