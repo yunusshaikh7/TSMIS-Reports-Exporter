@@ -7,7 +7,7 @@ Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW**
 | Implementer | Claude |
 | Branch | `hotfix/rb-6-hygiene-and-guards` |
 | Base `main` commit | `62bb0f329c7d7deea6c5ee9010c3d21b0acf6325` (clean, `origin/main` identical, fetched 2026-08-31; repo at **v0.43.0**) |
-| Implementation commit | see `git log` on the branch |
+| Implementation commits | `8a295e9` preflight · `b239cb7` export-only · `70b93ab` TSN determinism · `cb35bde` guards + VEN-01 · `0b011ef` records (head `0b011ef`) |
 | Generated-output root | `%TEMP%\claude\…\scratchpad\rb6\` (local, disposable); committed witnesses under `hotfix-bundles/HF-07,08,11/witness/` |
 | Work items | HF-07 (PCOA-FINAL-015, -018), HF-08 (-017), HF-11 (-020, -021, -022) |
 
