@@ -8,14 +8,23 @@ pressing Settings' *Rebuild* silently invalidated every existing vs-TSN
 comparison even when nothing had changed, forcing a full statewide re-comparison.
 
 ESTABLISHED root cause (the finding labelled the openpyxl explanation an explicit
-hypothesis; this check is the measurement, not the guess). openpyxl stamps
-`docProps/core.xml` with `dcterms:created` / `dcterms:modified` = the wall clock
-at save. Two saves of the same workbook object one second apart differ in exactly
-those two elements and in nothing else — identical member names, identical ZIP
-`date_time` fields, identical every other part — and two saves inside the same
-second were already byte-identical. So the bytes were a function of the CLOCK,
-and the identity is a sha256 over the bytes. No parser and no projection is
-involved, which is why the fix moves no normalized content.
+hypothesis; this check is the measurement, not the guess). A saved .xlsx carries
+TWO wall clocks, and both had to be found:
+
+  1. `docProps/core.xml` — `save_workbook` assigns `properties.modified = now()`
+     immediately before serializing, and `properties.created` defaults to when
+     the workbook object was constructed;
+  2. every ZIP entry's `date_time` — `zipfile` seeds each member from the clock
+     at MS-DOS TWO-SECOND resolution.
+
+The second is why a short probe can pass by luck: two builds about a second
+apart often land in the same two-second bucket, so only the document properties
+differ and the archive looks stable. It was caught because the Highway Sequence
+writer produced differing bytes with ZERO differing member content.
+
+Either clock makes the bytes a function of time rather than of data, and the
+identity is a sha256 over those bytes. No parser and no projection is involved,
+which is why the fix moves no normalized content.
 
 Locks:
   * two consecutive `build_consolidated(report, force=True)` calls over unchanged
