@@ -459,8 +459,12 @@ def _write_workbook(all_rows, out_path, proceed=None):
     marker = wb.create_sheet(MARKER_SHEET)
     marker.append(["Report", REPORT_NAME])
     marker.append(["Normalization version", NORMALIZATION_VERSION])
-    # F9 temp + os.replace + the P12 TOCTOU gate at the replace.
-    return artifact_store.atomic_save_if(wb, out_path, proceed or (lambda: True))
+    # F9 temp + os.replace + the P12 TOCTOU gate at the replace. stable_identity
+    # (PCOA-FINAL-017): these bytes are the TSN library's normalized workbook, so
+    # their digest — the identity token every bound vs-TSN comparison carries —
+    # must depend on the parsed content, not on when Rebuild was pressed.
+    return artifact_store.atomic_save_if(wb, out_path, proceed or (lambda: True),
+                                         stable_identity=True)
 
 
 # =============================================================================

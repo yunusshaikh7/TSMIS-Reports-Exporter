@@ -1187,6 +1187,12 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             header_override=hlc.HEADER, header_comment=hlc.comment_for,
             decorate_workbook=_decorate_normalized,
             commit_guard=publish_guard,
+            # PCOA-FINAL-017: this IS the TSN library's normalized Highway Log
+            # workbook, and its digest is the identity token every bound vs-TSN
+            # comparison carries — so the bytes must follow the parsed content,
+            # not the clock. The TSMIS Highway Log consolidators call
+            # consolidate_xlsx without this and are byte-for-byte unchanged.
+            stable_identity=True,
         )
         if source_problem[0] and result.status != "ok":
             return source_changed()
