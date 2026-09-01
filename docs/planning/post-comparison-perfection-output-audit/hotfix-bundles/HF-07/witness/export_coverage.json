@@ -1,0 +1,166 @@
+{
+  "schema": 1,
+  "finding": "PCOA-FINAL-018",
+  "operation": "RB-6 re-derived export-coverage census",
+  "verified_by": "Claude, 2026-08-31",
+  "frozen_archive": "C:\\Users\\Yunus\\Downloads\\TSMIS\\ground-truth\\All Reports 7.23\\2026-07-23 ssor-prod",
+  "derivation": "The export-only set is DERIVED from report_catalog's own export_only declaration, never transcribed. Enabled == not in reports.DISABLED_EXPORT_SUBDIRS.",
+  "export_only_now": [
+    "highway_summary_pdf",
+    "intersection_summary_pdf",
+    "ramp_summary_excel"
+  ],
+  "export_only_in_the_finding": [
+    "ramp_summary_excel",
+    "intersection_summary_pdf",
+    "highway_summary"
+  ],
+  "set_change": "highway_summary gained its consolidator and both comparisons in v0.37.0 and is now VERIFIED; highway_summary_pdf (added v0.38.0) took its place. Still exactly three, one member replaced.",
+  "rows": [
+    {
+      "key": "ramp_summary",
+      "fmt": "PDF",
+      "files_in_frozen_archive": 126,
+      "coverage": "wired"
+    },
+    {
+      "key": "ramp_detail",
+      "fmt": "Excel",
+      "files_in_frozen_archive": 126,
+      "coverage": "wired"
+    },
+    {
+      "key": "highway_sequence",
+      "fmt": "Excel",
+      "files_in_frozen_archive": 252,
+      "coverage": "wired"
+    },
+    {
+      "key": "highway_log",
+      "fmt": "Excel",
+      "files_in_frozen_archive": 252,
+      "coverage": "wired"
+    },
+    {
+      "key": "highway_log_pdf",
+      "fmt": "PDF",
+      "files_in_frozen_archive": 252,
+      "coverage": "wired"
+    },
+    {
+      "key": "intersection_summary",
+      "fmt": "Excel",
+      "files_in_frozen_archive": 217,
+      "coverage": "wired"
+    },
+    {
+      "key": "intersection_detail",
+      "fmt": "Excel",
+      "files_in_frozen_archive": 217,
+      "coverage": "wired"
+    },
+    {
+      "key": "intersection_detail_pdf",
+      "fmt": "PDF",
+      "files_in_frozen_archive": 217,
+      "coverage": "wired"
+    },
+    {
+      "key": "highway_detail",
+      "fmt": "Excel",
+      "files_in_frozen_archive": 0,
+      "coverage": "wired"
+    },
+    {
+      "key": "highway_summary",
+      "fmt": "Excel",
+      "files_in_frozen_archive": 0,
+      "coverage": "wired"
+    },
+    {
+      "key": "highway_detail_pdf",
+      "fmt": "PDF",
+      "files_in_frozen_archive": 0,
+      "coverage": "wired"
+    },
+    {
+      "key": "highway_sequence_pdf",
+      "fmt": "PDF",
+      "files_in_frozen_archive": 252,
+      "coverage": "wired"
+    },
+    {
+      "key": "ramp_detail_pdf",
+      "fmt": "PDF",
+      "files_in_frozen_archive": 126,
+      "coverage": "wired"
+    },
+    {
+      "key": "ramp_summary_excel",
+      "fmt": "Excel",
+      "files_in_frozen_archive": 126,
+      "coverage": "export_only"
+    },
+    {
+      "key": "intersection_summary_pdf",
+      "fmt": "PDF",
+      "files_in_frozen_archive": 217,
+      "coverage": "export_only"
+    },
+    {
+      "key": "highway_summary_pdf",
+      "fmt": "PDF",
+      "files_in_frozen_archive": 0,
+      "coverage": "export_only"
+    }
+  ],
+  "total_exported_route_files": 2380,
+  "unverifiable_files": 343,
+  "unverifiable_pct": 14.4,
+  "reproduces_the_finding": "126 ramp_summary_excel + 217 intersection_summary_pdf = 343 of 2,380 (14.4%). highway_summary_pdf contributes 0 files because it postdates the frozen archive, so the number is unchanged.",
+  "ui_surfacing": {
+    "source": "gui_api._export_report_rows()",
+    "rows_marked_export_only": [
+      "highway_summary_pdf",
+      "intersection_summary_pdf",
+      "ramp_summary_excel"
+    ],
+    "mock_preview": {
+      "url": "http://localhost:8791/index.html#mock",
+      "measured": "2026-08-31, viewport 1400x900 (default desktop width)",
+      "rows_rendering_the_note": [
+        {
+          "key": "ramp_summary_excel",
+          "name": "Summary (Excel) \u2014 export only",
+          "pickable": true
+        },
+        {
+          "key": "intersection_summary_pdf",
+          "name": "Summary (PDF) \u2014 export only",
+          "pickable": true
+        },
+        {
+          "key": "highway_summary_pdf",
+          "name": "Summary (PDF) \u2014 export only",
+          "pickable": true
+        }
+      ],
+      "legibility": {
+        "row_width_px": 579,
+        "name_scrollWidth": 472,
+        "name_clientWidth": 472,
+        "clipped": false,
+        "note_font_size": "11px",
+        "note_colour": "oklch(0.7 0.012 256) (muted-foreground)"
+      },
+      "picker_grouping_intact": [
+        "Ramp",
+        "Intersection",
+        "Highway",
+        "Clean Road"
+      ],
+      "total_picker_rows": 20
+    }
+  },
+  "gate": "build/check_report_wiring.py :: test_every_enabled_export_is_verifiable_or_declared"
+}

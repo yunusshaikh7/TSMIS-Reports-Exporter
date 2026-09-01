@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "finding": "PCOA-FINAL-015",
+  "operation": "RB-6 missing-side latency, measured on real statewide PDF exports",
+  "verified_by": "Claude, 2026-08-31",
+  "budget_seconds": 5.0,
+  "method": "Side A is the real statewide print folder; side B's report subfolder is ABSENT. `pre_fix_side_a_load_s` is side A's OWN loader, timed directly - that IS the pre-fix wait by construction, because pre-fix compare_folders handed side A to this loader and only reached side B's refusal afterwards. No product code was reverted to measure it.",
+  "workflow_coverage": "All three witnessed workflows dispatch to the same adapter.compare_folders - classic gui_compare_api.py:525, Baseline baseline_matrix.py:453, Everything ENV matrix_build.py:760 - so one preflight serves all three. build/check_compare_env_missing_side.py proves it per adapter for all 13 registered cross-environment families.",
+  "measurements": [
+    {
+      "witness": "intersection_detail_pdf (cross-environment; audit witness 429.4 s)",
+      "adapter": "intersection_detail_pdf",
+      "side_a": "C:\\Users\\Yunus\\Downloads\\TSMIS\\ground-truth\\All Reports 7.23\\2026-07-23 ssor-prod",
+      "side_a_print_count": 217,
+      "post_fix_s": 0.49,
+      "status": "error",
+      "message_first_line": "No Intersection Detail (PDF) files were found for the _side_b_with_no_expo side:",
+      "names_the_second_side": true,
+      "under_budget": true,
+      "pre_fix_side_a_rows": 16459,
+      "pre_fix_side_a_load_s": 439.9,
+      "speedup": 898
+    },
+    {
+      "witness": "highway_detail_pdf (Everything ENV; audit witness 1,229.7 s)",
+      "adapter": "highway_detail_pdf",
+      "side_a": "C:\\Users\\Yunus\\Downloads\\TSMIS\\ground-truth\\HD + HS Release 8.17\\2026-08-17 ssor-prod",
+      "side_a_print_count": 252,
+      "post_fix_s": 0.51,
+      "status": "error",
+      "message_first_line": "No Highway Detail (PDF) files were found for the _side_b_with_no_expo side:",
+      "names_the_second_side": true,
+      "under_budget": true
+    }
+  ],
+  "not_reproduced": "The pre-fix wall clock was re-measured for intersection_detail_pdf only. highway_detail_pdf's pre-fix leg would cost a further ~20 minutes to re-derive a number the audit already witnessed (1,229.7 s), and the change is in the shared preflight, which the per-adapter check covers.",
+  "gate": "build/check_compare_env_missing_side.py"
+}

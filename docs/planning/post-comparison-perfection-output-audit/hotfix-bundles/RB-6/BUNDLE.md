@@ -17,7 +17,7 @@ source rebuild or acceptance generation has begun.
 | RB-5 merge | `f11f9d2546b7775e432a22d5174f895f01210c35`; two separate Codex approvals, post-merge gate 171/171 and packaged application self-test PASS |
 | Prerequisites | RB-2, RB-3 and RB-5 all MERGED |
 | Implementer / reviewers | Claude / Codex Review 1 and a separate fresh Codex Review 2 |
-| Stage-4 base | PENDING — Prompt 04 must fetch and record the then-current clean pushed main before branching |
+| Stage-4 base | `62bb0f329c7d7deea6c5ee9010c3d21b0acf6325` — clean pushed `main` (`origin/main` identical), fetched 2026-08-31; the repo is at **v0.43.0**, two releases beyond the v0.41.1 the readiness note assumed |
 
 ## Current-main qualifications
 

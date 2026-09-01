@@ -1,24 +1,28 @@
 # Post-Comparison Output Program — Start Here
 
-Workflow state: **Stages 1A, 1B, 2 and 3 complete; RB-1 through RB-5 are MERGED. RB-5 merged at `f11f9d2546b7775e432a22d5174f895f01210c35` after both Codex approvals; its 171/171 post-merge gate and packaged application self-test passed. RB-6 is READY; implementation has not started.**
+Workflow state: **Stages 1A, 1B, 2 and 3 complete; RB-1 through RB-5 are MERGED. RB-6 is IMPLEMENTED on `hotfix/rb-6-hygiene-and-guards` and AWAITS ADVERSARIAL REVIEW — not merged, not released.**
 
-Last updated: 2026-08-31
+Last updated: 2026-08-31 (RB-6 Stage 4)
 
 > **`main` has moved a long way since this program last ran.** The readiness
 > contract above was prepared against `v0.34.0`-era `main`, and the state line
-> here tracked it to `v0.35.0`. **`main` is now `v0.41.1`** — eleven releases
-> later. Stage 4 must fetch and record the exact current clean base itself; the
-> readiness commit is PROVENANCE, not the branch point, and no hash written in
-> this folder should be treated as "current `main`".
+> here tracked it to `v0.35.0`. **`main` was at `v0.43.0`** when RB-6 branched
+> from `62bb0f329c7d7deea6c5ee9010c3d21b0acf6325`. Every Stage 4 must fetch and
+> record the exact current clean base itself; a readiness commit is PROVENANCE,
+> not the branch point, and no hash written in this folder should be treated as
+> "current `main`".
 >
-> Re-read every scope statement against today's code before trusting it. Two are
-> known stale: **HF-07** excludes Highway Detail as *pre-release* (that freeze
-> lifted in v0.37.0 and HD's backlog closed in v0.38.0), and **HF-08** counts
-> *eight* supported TSN datasets (there are now eleven —
-> `python -c "import sys; sys.path.insert(0,'scripts'); import report_catalog as rc; print(len(rc.TSN))"`).
-> The program also predates the ArcGIS "Reports vs layers" lane (v0.39.0) and the
-> v0.40–v0.41 comparison-speed work, so a family it names may have grown a
-> sibling it does not.
+> Re-read every scope statement against today's code before trusting it. **Four
+> were stale by RB-6, and three had to be corrected during implementation:**
+> **HF-07** excludes Highway Detail as *pre-release* (that freeze lifted in
+> v0.37.0 and HD's backlog closed in v0.38.0); **HF-08** counts *eight* supported
+> TSN datasets (there are now eleven); **HF-07's** unverifiable-edition set had
+> one member replaced (`highway_summary` gained its comparisons in v0.37.0;
+> `highway_summary_pdf` took its place); and **HF-11's** four `GENERATE` print
+> families include one that has no parser at all, because it is itself
+> export-only. The program also predates the ArcGIS "Reports vs layers" lane
+> (v0.39.0) and the v0.40–v0.41 comparison-speed work, so a family it names may
+> have grown a sibling it does not.
 
 This is the entry point for every new Codex or Claude chat. Read this file
 before opening the other audit documents. The project deliberately separates
@@ -28,7 +32,16 @@ first pass.
 
 ## Next action
 
-Invoke `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` in a fresh implementation task with `<BUNDLE_ID> = RB-6` and `<IMPLEMENTER> = Claude`. Read [RB-6/BUNDLE.md](hotfix-bundles/RB-6/BUNDLE.md), fetch and record the latest clean pushed main, then create the specified branch. This review prepared readiness only; it did not start RB-6 implementation or acceptance.
+Invoke `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` in a fresh review task with `<BUNDLE_ID> = RB-6` and `<REVIEWER> = Codex`. Read [RB-6/IMPLEMENTATION.md](hotfix-bundles/RB-6/IMPLEMENTATION.md) first — it records the established HF-08 root cause, three corrected stale scope statements, and the ONE-TIME TSN identity invalidation this bundle causes by design.
+
+RB-6 was implemented by Claude from base `62bb0f329c7d7deea6c5ee9010c3d21b0acf6325`
+(the repo is at **v0.43.0**, two releases beyond what the readiness note assumed).
+Both findings in HF-07 are Claude-unique and HF-08's cause was an unverified
+hypothesis, so Review 1's first job is to confirm the implementer actually
+established it: it is **two** wall clocks, not one — openpyxl's
+`docProps/core.xml` timestamps and every ZIP entry's `date_time` at MS-DOS
+two-second resolution. Committed witnesses for every criterion are under
+`hotfix-bundles/HF-07/witness/`, `HF-08/witness/` and `HF-11/witness/`.
 
 RB-5's two separate Codex approvals and exact verification are in
 [RB-5/REVIEW.md](hotfix-bundles/RB-5/REVIEW.md). Both old returns are closed.
@@ -123,8 +136,8 @@ did not create a branch, modify product code, or begin an acceptance run.
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-5 MERGED; RB-6 READY — implementation not started** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-5 COMPLETE — both approvals, merge and smoke passed** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **RB-6 IMPLEMENTED — awaiting adversarial review** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **RB-6 NOT STARTED** (RB-5 complete: both approvals, merge and smoke passed) | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.

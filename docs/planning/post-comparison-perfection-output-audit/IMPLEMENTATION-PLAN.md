@@ -182,7 +182,7 @@ Two layers, because the owner wants **fewer branches, reviews and releases**
 | 3 | **RB-3** | HF-04 | Ramp Detail — restores 9 comparison placements that produce nothing today | None | `hotfix/rb-3-ramp-detail-layout` | **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc` |
 | 4 | **RB-4** | HF-05 + HF-10 | Evidence, end to end — **AMENDED by the owner 2026-08-05 and 2026-08-09**: print crops on the four `_pdf` report families only; anchorless blanks from the print's own cell geometry are disclosed limitations | None | `hotfix/rb-4-evidence` | **MERGED** — `83a24896a5a970a3686df87934210f54cea43778` |
 | 5 | **RB-5** | HF-06 + HF-09 | Difference classification — the two opposite rulings applied to the right classes | RB-1, RB-2 | `hotfix/rb-5-difference-classification` | **MERGED** — `f11f9d2546b7775e432a22d5174f895f01210c35` |
-| 6 | **RB-6** | HF-07 + HF-08 + HF-11 | Engine hygiene, coverage truth, and the closeout guards | RB-2, RB-3, RB-5 | `hotfix/rb-6-hygiene-and-guards` | **READY** |
+| 6 | **RB-6** | HF-07 + HF-08 + HF-11 | Engine hygiene, coverage truth, and the closeout guards | RB-2, RB-3, RB-5 | `hotfix/rb-6-hygiene-and-guards` | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
 
 ### Prompt and record identity
 
@@ -483,7 +483,7 @@ mapping also proves one primary implementation/review bundle per finding:
 | **RB-3** | HF-04 | 001, 012 | 2 | **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc` |
 | **RB-4** | HF-05, HF-10 | 004, 005, 006, 007 | 4 | **MERGED** — `83a24896a5a970a3686df87934210f54cea43778` |
 | **RB-5** | HF-06, HF-09 | 011, 013 | 2 | **MERGED** — `f11f9d2546b7775e432a22d5174f895f01210c35` |
-| **RB-6** | HF-07, HF-08, HF-11 | 015, 017, 018, 020, 021, 022 | 6 | **READY** |
+| **RB-6** | HF-07, HF-08, HF-11 | 015, 017, 018, 020, 021, 022 | 6 | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
 | **Total** | 11 work items | 22 unique findings | **22** | |
 
 ## Secondary regression dependencies (verify, do not re-implement)
@@ -1502,7 +1502,7 @@ before/after count table.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer. Both findings are Claude-unique, so Codex must bind to Claude's `witness\export_coverage.txt`, the committed `claude-round1-export-coverage.txt`, and the three timing witnesses, then re-measure independently |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-6: READY** |
+| Status | **Inherits RB-6: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
 
 **Exact scope.** 015: the folder-comparison preflight on every statewide PDF
 family, in classic environment, Baseline and Everything ENV. 018: the catalog's
@@ -1605,7 +1605,7 @@ and the re-derived coverage census.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer. Claude-unique finding, so Codex must bind to Claude's `witness\tsn_rebuild_all.json` and re-run the double rebuild itself; the root cause is an unverified hypothesis and the reviewer's first job is to confirm the implementer actually established it |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-6: READY** |
+| Status | **Inherits RB-6: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
 
 **Exact scope.** The TSN library's normalized-workbook build and identity for all
 eight supported datasets, and the consequence that pressing *Rebuild* invalidates
@@ -1917,7 +1917,7 @@ table and the count-invariance proof.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to `source-audit/prior-7.9-highway-log-sibling-raw-source-audit.json` (its own 021 witness) and to Claude's `witness\pdf_head_census.txt` for 022 |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-6: READY** |
+| Status | **Inherits RB-6: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
 
 **Exact scope.** Turn two prose regression guards into executable checks, and
 create the owner-facing vendor escalation record for route 140. **No product
@@ -2224,5 +2224,23 @@ applicable pass after correction, and RB-6 remains blocked on RB-5.
 **Stage 5 Review 2 — 2026-08-31:** separate Codex non-implementing Review 2 APPROVED the corrected runtime. Both sign-offs now exist; RB-5 is JOINTLY APPROVED with RB5-R2-FU-001 carried under the two-denial ceiling. Merge and post-merge closeout follow; RB-6 remains blocked until then. See the signed RB-5 review and verification witness.
 
 **RB-5 merge — 2026-08-31:** merged as `f11f9d2546b7775e432a22d5174f895f01210c35` after separate Codex Reviews 1 and 2; post-merge gate 171/171 and packaged application self-test PASS. Runtime remains `0d54799`. Unicode classification follow-up RB5-R2-FU-001 and disclosed limitations are retained; no acceptance run repeated. Cleanup and RB-6 readiness follow.
+
+**RB-6 Stage 4 — 2026-08-31:** implemented by Claude on
+`hotfix/rb-6-hygiene-and-guards` from base
+`62bb0f329c7d7deea6c5ee9010c3d21b0acf6325` (repo at v0.43.0, two releases beyond
+the readiness note's assumption). HF-08's root cause was ESTABLISHED before any
+fix and is **two** wall clocks, not one — openpyxl's `docProps/core.xml`
+timestamps AND every ZIP entry's `date_time` at MS-DOS two-second resolution;
+neither lies in a per-report loader, so the documented split trigger was not
+invoked, but the fix needs the shared save boundary rather than
+`scripts/tsn_library.py` alone (five product files, all default-off opt-ins).
+Two scope statements were stale and are corrected with evidence in
+[RB-6/IMPLEMENTATION.md](hotfix-bundles/RB-6/IMPLEMENTATION.md): the export-only
+set is now `ramp_summary_excel` / `intersection_summary_pdf` /
+`highway_summary_pdf` (`highway_summary` gained its comparisons in v0.37.0), and
+the finding's four `GENERATE` print families include one that has no parser
+because it is itself export-only. The expected ONE-TIME TSN identity
+invalidation is disclosed there. Status is
+`IMPLEMENTED — AWAITING ADVERSARIAL REVIEW`; not merged, not released.
 
 **RB-5 final closeout / RB-6 readiness — 2026-08-31:** main merge `f11f9d2546b7775e432a22d5174f895f01210c35` and passing smoke pushed. Merged RB-5 branches and implementation worktree removed; retained input paths preserved as an artifact-only folder. RB-6 is READY with complete HF-07/HF-08/HF-11 contract from main `a0787e7710b326945797c7c51f56acb7081d0f20`; no implementation or acceptance started.
