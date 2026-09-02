@@ -1,6 +1,6 @@
 # `RB-6` — Implementation Record
 
-Status: **DENIED — RETURN TO IMPLEMENTATION**
+Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (Review 1 return `RB6-R1-EG-001` closed 2026-09-01)
 
 > Codex Review 1 (2026-08-31): **DENIED — EVIDENCE GAP**, solely
 > `RB6-R1-EG-001` — retain the contract-required HF-08 post-double-rebuild
@@ -14,7 +14,7 @@ Status: **DENIED — RETURN TO IMPLEMENTATION**
 | Implementer | Claude |
 | Branch | `hotfix/rb-6-hygiene-and-guards` |
 | Base `main` commit | `62bb0f329c7d7deea6c5ee9010c3d21b0acf6325` (clean, `origin/main` identical, fetched 2026-08-31; repo at **v0.43.0**) |
-| Implementation commits | `8a295e9` preflight · `b239cb7` export-only · `70b93ab` TSN determinism · `cb35bde` guards + VEN-01 · `0b011ef` records (head `0b011ef`) |
+| Implementation commits | `8a295e9` preflight · `b239cb7` export-only · `70b93ab` TSN determinism (last `scripts/` commit) · `cb35bde` guards + VEN-01 · `0b011ef` `9253890` records · `093fdc2` Review 1 return · `a49c43e` docstring correction · the `RB6-R1-EG-001` remedy commit (head at finalization `a49c43e`) |
 | Generated-output root | `%TEMP%\claude\…\scratchpad\rb6\` (local, disposable); committed witnesses under `hotfix-bundles/HF-07,08,11/witness/` |
 | Work items | HF-07 (PCOA-FINAL-015, -018), HF-08 (-017), HF-11 (-020, -021, -022) |
 
@@ -371,6 +371,11 @@ witness records it per build), so the `_TSN_PDFS_IN_RAW` families' prints and
 their bindings are unaffected. Per-sheet row counts are recorded for every build,
 so the normalization marker sheet is present and identical post-fix.
 
+### HF-08 / 017 — post-rebuild vs-TSN comparisons (`RB6-R1-EG-001`)
+
+See the *Review 1 remedy* section at the end of this record; its witness is
+`HF-08/witness/post_rebuild_vs_tsn.json`.
+
 ### HF-11 — source truth
 
 Witnesses: `HF-11/witness/pdf_only_rows.json`,
@@ -424,5 +429,101 @@ entry belongs to whichever release ships this bundle.
   that the BOTH-empty verdict is unchanged.
 * The route-140 census contradicts the finding's framing (one day, not always);
   re-derive it before trusting the vendor record.
+
+## Review 1 return — Codex, 2026-09-01 (`RB6-R1-EG-001`)
+
+Review 1 **DENIED — EVIDENCE GAP** at review-entry head `9253890`, solely
+`RB6-R1-EG-001`: `BUNDLE.md` requires, under HF-08's "Values / formulas and
+installed-Excel checks", *one vs-TSN comparison per dataset regenerated after
+the double rebuild, both twins, counts unchanged* — and this record retained the
+library-level identity and cell-content proof (`double_rebuild.json`) but not
+that leg. The reviewer's practical-impact reading is correct: after a user
+presses **Rebuild TSN library**, the next user-visible operation is a vs-TSN
+comparison, so this is the only acceptance leg proving the new stable library
+identity binds to both published workbook flavors without moving their counts
+or typed outcomes. No runtime defect was alleged; nine focused checks passed and
+the raw-source spots matched the committed witnesses. The signed record is
+[REVIEW.md](REVIEW.md); the denial commit is `093fdc2`.
+
+## Review 1 remedy — Claude, 2026-09-01 (`RB6-R1-EG-001` CLOSED)
+
+The missing leg is supplied as ONE committed witness,
+[`HF-08/witness/post_rebuild_vs_tsn.json`](../HF-08/witness/post_rebuild_vs_tsn.json),
+produced by `hf08_vs_tsn_leg.py` (retained with its inputs' outputs under
+`_scratch\post-comparison-hotfixes\HF-08\`). Nothing in `scripts/` changed:
+git's own answer to "the last commit touching `scripts/`" is
+`70b93ab`, and every file changed between it and the
+generation head `a49c43e` is a check, a record or a
+witness — the witness lists them.
+
+**Method.** Per buildable dataset the TSMIS side is resolved ONCE and hashed, so
+both legs provably compare the same input. `pre` builds the library with the
+stable-identity save OFF and runs the family's registered vs-TSN comparator in
+`mode="both"`; `post` rebuilds the library TWICE on the shipped path — the
+contract's "after the second unchanged-raw deterministic rebuild" — and runs the
+SAME comparator over the SAME input. Comparators come from
+`matrix.tsn_comparator_for`, the product's own lookup. The library's raw
+manifest, normalization version, post-rebuild workbook identity and artifact
+token, both legs' generation ids, and all four twins' paths, sizes and SHA-256
+are recorded per dataset.
+
+**What must not move, and did not.** The ENTIRE typed outcome — status,
+completion, verdict, pairing quality, duplicate-group count, warning/failure
+counts, paired and one-sided totals, differing rows, total AND per-field
+differing cells — is compared for equality between the legs. Then, beyond the
+typed counts, every sheet of both twins of each dataset's PRE and POST workbooks
+was walked cell by cell (`eg001_celldiff.py`): Comparison, Summary, Spot Check,
+both Only-in sheets, both source sheets, Notes, Source Files and both hidden
+`CMP_E2` snapshot sheets are IDENTICAL. The only differing cell, in every twin of
+every dataset, is the Provenance row that records the TSN library's sha256 — the
+identity the fix moves once, by design.
+
+| Dataset | Compare pre / post | Typed status / completion / verdict | Paired | One-sided | Differing rows | Differing cells | Fields counted | Cells differing PRE→POST, formulas / values | Unchanged |
+|---|---:|---|---:|---:|---:|---:|---:|---|---|
+| `highway_log` | 1229 / 1447 s | ok / complete / diff | 48,351 | 15,265 | 39,623 | 140,643 | 30 | 1 / 1 | ✔ |
+| `ramp_detail` | 124 / 115 s | ok / complete / diff | 15,212 | 202 | 737 | 843 | 12 | 1 / 1 | ✔ |
+| `ramp_summary` | 1 / 1 s | ok / complete / diff | 29 | 2 | 24 | 24 | 1 | 1 / 1 | ✔ |
+| `intersection_summary` | 1 / 1 s | ok / complete / diff | 58 | 8 | 53 | 53 | 1 | 1 / 1 | ✔ |
+| `intersection_detail` | 430 / 344 s | ok / complete / diff | 16,199 | 687 | 2,816 | 5,092 | 34 | 1 / 1 | ✔ |
+| `highway_sequence` | 412 / 475 s | ok / complete / diff | 57,072 | 16,154 | 23,691 | 30,005 | 6 | 1 / 1 | ✔ |
+| `highway_detail` | 1807 / 1760 s | ok / complete / diff | 48,477 | 14,456 | 48,287 | 160,347 | 34 | 1 / 1 | ✔ |
+| `highway_summary` | 1 / 1 s | ok / complete / diff | 92 | 4 | 89 | 89 | 1 | 1 / 1 | ✔ |
+| `clean_highway` | 2509 / 2177 s | ok / partial / diff | 52,629 | 12,567 | 48,942 | 281,393 | 74 | 1 / 1 | ✔ |
+
+**9 of 9 buildable datasets: every
+check met.** The published VALUES workbook's own Status/Diffs (read by header
+label through `matrix_state.read_counts`) equal the typed totals in every leg,
+and `consolidation_meta.require_published_comparison` accepts every result —
+returned typed outcome, committed generation, succeeded attempt and strict
+sidecar agree. `clean_intersection`, `clean_ramp` are retained as
+typed refusals (no normalizer, DEF-05), not invented outputs.
+
+**Two cross-checks against blessed numbers, unprompted.** Highway Detail's
+160,347 differing cells is exactly the CMP-AUD-244 statewide figure recorded in
+`CLAUDE.md`; Highway Summary's 89 of 92 categories differing is the recorded
+vintage gap. The leg reproduces known canaries, not merely itself.
+
+**Determinism across sessions, not just within one.** The 2026-08-31
+double-rebuild witness recorded each dataset's post-fix library bytes and
+token. This run — a separate process, a day later, from the same raw —
+reproduced every one of the nine exactly
+(`post_library_byte_identical_to_prior_independent_run_all_datasets`:
+true).
+
+**One input had to be rebuilt, and the refusal is itself evidence.** The
+prebuilt `output/arcgis_cleanroad/clean_highway_built.xlsx` (2026-07-22) carries
+the 74-column header; the comparator has required the 75-column `ARC_HEADER`
+since v0.39.1 and refused it in BOTH legs — the header gate working as designed.
+The Clean Road Highway workbook was rebuilt with the current runtime from the
+40-layer library as-of the TSN extract's own date (2025-09-08; 57,742 rows,
+252 routes, `partial` with 146 unplaced spans — the disclosed HF-01 class) and
+the leg re-run over it. The refused attempt is kept in the witness as
+`superseded_attempt`.
+
+**Declared beyond the requested item.** Commit `a49c43e` corrects the docstring
+of `build/check_tsn_identity_determinism.py`, which still carried the
+pre-discovery claim that ZIP `date_time` fields were identical — contradicting
+the two-clock root cause the review independently confirmed. Documentation only;
+no assertion changed; the check passes.
 
 Do not merge this branch. When complete, push it and run Prompt 05.

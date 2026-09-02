@@ -1,6 +1,6 @@
 # Post-Comparison Output Program — Start Here
 
-Workflow state: **Stages 1A, 1B, 2 and 3 complete; RB-1 through RB-5 are MERGED. RB-6 Review 1 is DENIED — EVIDENCE GAP on `hotfix/rb-6-hygiene-and-guards`; return to implementation for `RB6-R1-EG-001` — not merged, not released.**
+Workflow state: **Stages 1A, 1B, 2 and 3 complete; RB-1 through RB-5 are MERGED. RB-6 is IMPLEMENTED on `hotfix/rb-6-hygiene-and-guards`; its Review 1 return `RB6-R1-EG-001` is SUPPLIED and it AWAITS ADVERSARIAL REVIEW (Review 1 again) — not merged, not released.**
 
 Last updated: 2026-08-31 (RB-6 Review 1 evidence return)
 
@@ -32,22 +32,23 @@ first pass.
 
 ## Next action
 
-Resume `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` on the existing
-`hotfix/rb-6-hygiene-and-guards` branch with `<BUNDLE_ID> = RB-6` and
-`<IMPLEMENTER> = Claude`. Supply solely `RB6-R1-EG-001`: the retained HF-08
-post-double-rebuild vs-TSN result for every buildable dataset, both twins, with
-unchanged counts and exact runtime/source/library/output bindings. See the
-signed [RB-6 review](hotfix-bundles/RB-6/REVIEW.md). Do not begin Review 2;
-after the return is supplied, the next applicable pass remains Review 1.
+Invoke `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` in a fresh review task
+with `<BUNDLE_ID> = RB-6` and `<REVIEWER> = Codex`. **The applicable pass is
+Review 1** (a re-review of the returned bundle), not Review 2: Review 1 returned
+`RB6-R1-EG-001` on 2026-09-01 and Claude has supplied it on the same branch.
+Read [RB-6/REVIEW.md](hotfix-bundles/RB-6/REVIEW.md) for the return, then the
+*Review 1 remedy* section of
+[RB-6/IMPLEMENTATION.md](hotfix-bundles/RB-6/IMPLEMENTATION.md) and its witness
+`HF-08/witness/post_rebuild_vs_tsn.json`. Review 2 must still be a separate
+fresh task that challenges an eventual approving Review 1.
 
 RB-6 was implemented by Claude from base `62bb0f329c7d7deea6c5ee9010c3d21b0acf6325`
-(the repo is at **v0.43.0**, two releases beyond what the readiness note assumed).
-Both findings in HF-07 are Claude-unique and HF-08's cause was an unverified
-hypothesis, so Review 1's first job is to confirm the implementer actually
-established it: it is **two** wall clocks, not one — openpyxl's
-`docProps/core.xml` timestamps and every ZIP entry's `date_time` at MS-DOS
-two-second resolution. Committed witnesses for every criterion are under
-`hotfix-bundles/HF-07/witness/`, `HF-08/witness/` and `HF-11/witness/`.
+(the repo is at **v0.43.0**). The last commit touching `scripts/` is
+`70b93ab`; everything after it is checks, records and
+witnesses. HF-08's cause is **two** wall clocks — openpyxl's `docProps/core.xml`
+timestamps and every ZIP entry's `date_time` at MS-DOS two-second resolution —
+and the remedy proves the fix leaves every vs-TSN comparison's typed outcome,
+and every cell of both twins bar the library-identity cell, unchanged.
 
 RB-5's two separate Codex approvals and exact verification are in
 [RB-5/REVIEW.md](hotfix-bundles/RB-5/REVIEW.md). Both old returns are closed.
