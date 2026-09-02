@@ -12,6 +12,20 @@ const MX_HI = 50;   // >= this many discrepancies reads as "many" (red); tunable
 // progress text shared by all three matrix progress lines. elapsed/ETA come from
 // the worker (compare_timings); when there's no history yet, ETA is simply absent
 // (elapsed still shows) rather than a made-up number.
+// The add-day pickers' option text: the date plus, as short codes, the reports
+// ACTUALLY exported that day for this matrix (`snap.available_day_reports`, date
+// -> codes), so a day holding one Ramp Summary pull no longer reads like a full
+// export. An empty list says so in words; `today` (the vs-TSN / PDF-vs-Excel
+// matrices' always-offered exportable column) says "today" too.
+function mxDayOptionText(d, snap) {
+  const codes = ((snap && snap.available_day_reports) || {})[d];
+  if (!Array.isArray(codes)) return d;                 // an older bridge: date only
+  if (!codes.length) {
+    return `${d}  ·  ${snap && snap.today === d ? "today — nothing exported yet" : "nothing exported"}`;
+  }
+  return `${d}  ·  ${codes.join(" ")}`;
+}
+
 function fmtDur(sec) {
   if (typeof sec !== "number" || sec < 0) return "";
   const s = Math.round(sec);
@@ -1094,7 +1108,7 @@ async function renderDayMatrix() {
       addSel.appendChild(o);
     } else {
       avail.forEach((d) => {
-        const o = document.createElement("option"); o.value = d; o.textContent = d;
+        const o = document.createElement("option"); o.value = d; o.textContent = mxDayOptionText(d, snap);
         addSel.appendChild(o);
       });
     }
@@ -1492,7 +1506,7 @@ async function renderBaselineMatrix() {
       addSel.appendChild(o);
     } else {
       avail.forEach((d) => {
-        const o = document.createElement("option"); o.value = d; o.textContent = d;
+        const o = document.createElement("option"); o.value = d; o.textContent = mxDayOptionText(d, snap);
         addSel.appendChild(o);
       });
     }
@@ -1762,7 +1776,7 @@ async function renderPveMatrix() {
       addSel.appendChild(o);
     } else {
       avail.forEach((d) => {
-        const o = document.createElement("option"); o.value = d; o.textContent = d;
+        const o = document.createElement("option"); o.value = d; o.textContent = mxDayOptionText(d, snap);
         addSel.appendChild(o);
       });
     }

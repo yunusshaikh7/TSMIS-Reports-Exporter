@@ -100,6 +100,10 @@ def test_export_presence_gate():
               cell["export"]["present"] is False and cell["export"]["pdf_present"] is True)
         check("only PDF exported -> cell NOT buildable (missing the Excel side)",
               not matrix.cell_buildable(cell["cmp"]))
+        tags = pve.available_day_reports("ssor-prod")
+        check("only PDF exported -> the add-day tag says which edition ('HL:pdf'), "
+              "today offered empty",
+              tags.get("2026-07-22") == ["HL:pdf"] and tags.get(pve.today_str()) == [])
         _touch_export(day, "highway_log")         # add the Excel edition
         snap = pve.pve_matrix_snapshot("ssor-prod", ["2026-07-22"], today="2099-01-01")
         cell = snap["cells"]["highway_log_pdf"]["2026-07-22"]
@@ -107,6 +111,8 @@ def test_export_presence_gate():
               cell["export"]["present"] is True and matrix.cell_buildable(cell["cmp"]))
         check("both exported, no comparison yet -> cell is stale (needs build)",
               cell["cmp"].get("stale") is True)
+        check("both editions exported -> the add-day tag is the family code ('HL')",
+              pve.available_day_reports("ssor-prod").get("2026-07-22") == ["HL"])
         rebuild = pve.cells_to_rebuild(snap, scope="stale")
         check("cells_to_rebuild lists the buildable stale cell",
               ("2026-07-22", "highway_log_pdf") in rebuild)

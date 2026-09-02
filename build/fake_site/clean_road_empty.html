@@ -1,0 +1,15 @@
+<!doctype html>
+<!--
+Clean Road File (Highway / Intersection / Ramp), EMPTY state. AUTHORED SYNTHETIC
+reconstruction of clh_/cli_/clr_showResults('none') (dev site 9.1): #rampResults
+holds ONLY <span class="ramp-empty">No results found in this segment.</span> --
+NO action bar, so there is no Export button for the engine to click. wait_js
+must resolve on the marker alone; is_empty must be True via the structural
+.ramp-empty (the loose "No ... found" text is the fallback).
+-->
+<html>
+<head><meta charset="utf-8"><title>clean road: empty</title></head>
+<body>
+  <div id="rampResults" class="ramp-results" style="display:block;"><span class="ramp-empty">No results found in this segment.</span></div>
+</body>
+</html>

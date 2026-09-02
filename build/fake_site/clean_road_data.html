@@ -1,0 +1,34 @@
+<!doctype html>
+<!--
+Clean Road File (Highway / Intersection / Ramp), DATA state. AUTHORED SYNTHETIC
+reconstruction of what clh_/cli_/clr_renderPage() builds (dev site 9.1,
+BUILD_DATE 2026-08-19): the shared action bar (renderActionBar -> Export FIRST,
+Print LAST, both class="export-btn") followed by the flat .clh-table inside its
+scroll frame and the "Generated on" line. All three Clean Road reports share
+this template (the .clh-* classes are generic), so one fixture serves the three
+specs. wait_js = EXPORT_READY_JS || .ramp-empty || /No \w+ found/ -> True via
+the Export button; is_empty -> False (no marker, no phrase).
+-->
+<html>
+<head><meta charset="utf-8"><title>clean road: data</title></head>
+<body>
+  <div id="rampResults" class="ramp-results" style="display:block;">
+    <div class="report-action-bar">
+      <button class="export-btn" onclick="clh_exportToExcel()">Export</button>
+      <div class="report-title">
+        <div class="report-title-line1">California Department of Transportation</div>
+        <div class="report-title-line2">Clean Road File — Highway</div>
+        <div class="report-title-line3"><span style="color:#000;">REF DATE: 2026-09-02</span></div>
+      </div>
+      <button class="export-btn" onclick="clh_printAll()">Print</button>
+    </div>
+    <div class="clh-table-wrap">
+      <table class="clh-table">
+        <thead><tr><th>BEGIN_OFFSET<br>AMT</th><th>COUNTY<br>CODE</th><th>LANDMARK<br>SHORT_DESC</th></tr></thead>
+        <tbody><tr><td>0.000</td><td>ORA</td><td>JCT. RTE. 5</td></tr></tbody>
+      </table>
+    </div>
+    <div class="generated-on">Generated on 9/2/2026, 10:00:00 AM</div>
+  </div>
+</body>
+</html>

@@ -219,6 +219,33 @@ def available_days(source):
     return out
 
 
+def available_day_reports(source):
+    """{date: [tag, ...]} for every day `available_days` offers — which families
+    are ACTUALLY exported that day. A family with BOTH editions on disk is its
+    compact code ('HL'); one with a single edition — a cell this matrix cannot
+    build — says which ('HL:pdf' / 'HL:xlsx'), so the picker never lets a
+    one-edition day pass for a self-checkable one. TODAY is present with an
+    empty list when nothing is exported yet (it is always offered)."""
+    import report_catalog                        # already loaded via reports
+    rows = _pve_rows()
+    subs = []
+    for _rk, _label, pdf_sub, excel_sub in rows:
+        subs += [pdf_sub, excel_sub]
+    present = artifact_store.exported_subdirs_by_day(source, subs)
+    out = {today_str(): []}
+    for date, found in present.items():
+        tags = []
+        for _rk, _label, pdf_sub, excel_sub in rows:
+            code = report_catalog.short_code(excel_sub)
+            has_pdf, has_xlsx = pdf_sub in found, excel_sub in found
+            if has_pdf and has_xlsx:
+                tags.append(code)
+            elif has_pdf or has_xlsx:
+                tags.append(f"{code}:{'pdf' if has_pdf else 'xlsx'}")
+        out[date] = tags
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # the snapshot the GUI renders (pure filesystem read)
 # --------------------------------------------------------------------------- #

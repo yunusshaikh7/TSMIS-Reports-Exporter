@@ -254,6 +254,18 @@ def available_days(source):
     return out
 
 
+def available_day_reports(source):
+    """{date: [short code, ...]} for every day `available_days` offers — which of
+    the matrix's reports are ACTUALLY exported that day, as the catalog's compact
+    codes in row order, so the add-day picker shows what a day holds before it
+    is added (no "today" here: this matrix compares historical exports only)."""
+    import report_catalog                        # already loaded via reports
+    subs = [(r[2], report_catalog.short_code(r[0])) for r in _rows() if r[3]]
+    code_of = dict(subs)
+    present = artifact_store.exported_subdirs_by_day(source, [s for s, _c in subs])
+    return {date: [code_of[s] for s in found] for date, found in present.items()}
+
+
 def _present_count(folder, rows):
     """How many of the matrix reports have files under `folder` (per-day /
     store coverage shown in the baseline picker)."""

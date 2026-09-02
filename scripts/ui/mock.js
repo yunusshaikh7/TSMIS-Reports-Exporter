@@ -52,10 +52,11 @@ function makeMockApi() {
     { key: "highway_summary", label: "Highway Summary", fmt: "Excel", group: "Highway", short: "Summary" },
     { key: "highway_summary_pdf", label: "Highway Summary (PDF)", fmt: "PDF", group: "Highway", short: "Summary (PDF)", export_only: true },
     // 2026-07-22: the dev site 7.21 "Clean Road Files" group (ids 16/17/18) —
-    // reserved, app-DISABLED (shown greyed) until the site un-greys them.
-    { key: "clean_highway", label: "Clean Road: Highway", fmt: "Excel", group: "Clean Road", short: "Highway", disabled: true },
-    { key: "clean_intersection", label: "Clean Road: Intersection", fmt: "Excel", group: "Clean Road", short: "Intersection", disabled: true },
-    { key: "clean_ramp", label: "Clean Road: Ramp", fmt: "Excel", group: "Clean Road", short: "Ramp", disabled: true },
+    // reserved + greyed until the dev site 9.1 capture un-greyed them; export
+    // ENABLED 2026-09-02.
+    { key: "clean_highway", label: "Clean Road: Highway", fmt: "Excel", group: "Clean Road", short: "Highway", export_only: true },
+    { key: "clean_intersection", label: "Clean Road: Intersection", fmt: "Excel", group: "Clean Road", short: "Intersection", export_only: true },
+    { key: "clean_ramp", label: "Clean Road: Ramp", fmt: "Excel", group: "Clean Road", short: "Ramp", export_only: true },
   ];
   // The Consolidate radios carry each row's stable `cons:*` key (P3) — this list
   // matches reports.CONSOLIDATE_REPORTS (9 rows as of CR-002: both Intersection
@@ -457,6 +458,28 @@ function makeMockApi() {
     "ars-prod": ["2026-06-17", "2026-06-11"],
     "ssor-test": ["2026-06-16"], "ssor-dev": [], "ars-test": [], "ars-dev": [],
   };
+  // Per day, WHICH reports are actually exported (the catalog's short codes, in
+  // row order) — the add-day pickers' per-option tags. A partial day is the
+  // realistic case (one report pulled that day), which is why the tags exist.
+  const MOCK_DAY_REPORTS = {
+    "ssor-prod": { "2026-06-18": ["RS", "RD", "HSL", "HL", "IS", "ID", "HL-PDF", "ID-PDF", "HD", "HD-PDF", "HSL-PDF", "RD-PDF", "HS"],
+                   "2026-06-17": ["RS", "HL"], "2026-06-11": ["RD"] },
+    "ars-prod": { "2026-06-17": ["HL"], "2026-06-11": ["RS", "RD"] },
+    "ssor-test": { "2026-06-16": ["HSL"] },
+  };
+  // The PDF-vs-Excel picker's tags: a family with BOTH editions is its code; a
+  // single edition says which (a cell that matrix cannot build).
+  const MOCK_PVE_DAY_REPORTS = {
+    "ssor-prod": { "2026-06-18": ["HL", "ID", "HD", "HSL", "RD"], "2026-06-17": ["HL:xlsx"],
+                   "2026-06-11": ["RD:xlsx"] },
+    "ars-prod": { "2026-06-17": ["HL:xlsx"], "2026-06-11": ["RD:xlsx"] },
+    "ssor-test": { "2026-06-16": ["HSL:xlsx"] },
+  };
+  function mockDayReports(table, source, withToday) {
+    const out = Object.assign({}, (table[source] || {}));
+    if (withToday) out[MOCK_TODAY] = [];          // today: always offered, nothing pulled yet
+    return out;
+  }
   // The 12 matrix report rows (shared by the by-day and vs-Baseline mocks —
   // parity with reports.matrix_rows(): Highway Detail included since v0.20.0).
   const MOCK_DAY_ROWS = [
@@ -538,7 +561,8 @@ function makeMockApi() {
              tsn_meta: tsnMeta, cells,
              day_consolidated: Object.fromEntries(days.map((d, i) =>
                [d, { exists: i % 3 !== 0, fresh: i % 2 === 0, actionable: i % 4 !== 0 }])),
-             available_days: MOCK_DAY_AVAIL[source] || [] };
+             available_days: [MOCK_TODAY, ...(MOCK_DAY_AVAIL[source] || [])],
+             available_day_reports: mockDayReports(MOCK_DAY_REPORTS, source, true) };
   }
   // v0.26.0 "vs Baseline" matrix mock — day columns within one source, each cell
   // vs the picked baseline (an earlier day, or the Everything store).
@@ -601,6 +625,7 @@ function makeMockApi() {
              rows: shown.map((r) => r.key), row_labels: rowLabels,
              row_supported: rowSupported, all_rows: MOCK_DAY_ROWS, hidden, cells,
              available_days: MOCK_DAY_AVAIL[source] || [],
+             available_day_reports: mockDayReports(MOCK_DAY_REPORTS, source, false),
              baseline_options: mockBaselineOptions(source) };
   }
 
@@ -644,10 +669,11 @@ function makeMockApi() {
              sources: ["ssor-prod", "ssor-test", "ssor-dev", "ars-prod", "ars-test", "ars-dev"]
                .map((k) => { const [s, v] = k.split("-");
                  return { key: k, label: `${s.toUpperCase()} / ${v[0].toUpperCase()}${v.slice(1)}` }; }),
-             days,
+             days, today: MOCK_TODAY,
              rows: shown.map((r) => r.key), row_labels: rowLabels,
              row_supported: rowSupported, all_rows: MOCK_PVE_ROWS, hidden, cells,
-             available_days: MOCK_DAY_AVAIL[source] || [] };
+             available_days: [MOCK_TODAY, ...(MOCK_DAY_AVAIL[source] || [])],
+             available_day_reports: mockDayReports(MOCK_PVE_DAY_REPORTS, source, true) };
   }
   // v0.16.0 mock job queue — mirrors gui_api: enqueue, run one at a time, auto-
   // advance. `kind` drives the run-mode/icon; `total` feeds the compare progress.
@@ -1208,11 +1234,13 @@ function makeMockApi() {
            { t: "run_started", mode: "consolidate", label: "Capturing site source…" });
       setTimeout(() => {
         push({ t: "log", text: "Signing in and opening the report page…" },
-             { t: "log", text: "Saving the page (rendered DOM + raw HTML)…" },
-             { t: "log", text: "Fetching 6 same-origin script/style file(s) (2 third-party skipped)…" },
-             { t: "log", text: "  [ 1/6] Scripts__customreport.js (48,112 bytes)" },
-             { t: "log", text: "  [ 2/6] Scripts__site.js (12,004 bytes)" },
-             { t: "log", text: "✓ Captured 8 file(s)." },
+             { t: "log", text: "Saving the page (raw HTML + rendered DOM)…" },
+             { t: "log", text: "Site build: 2026-08-19 09:35" },
+             { t: "log", text: "Fetching every same-origin file the page uses (1 third-party skipped)…" },
+             { t: "log", text: "  [ 1] config.js (2,431 bytes)" },
+             { t: "log", text: "  [ 2] shared.js (142,059 bytes)" },
+             { t: "log", text: "  [ 3] clean_highway.js (19,465 bytes)" },
+             { t: "log", text: "✓ Captured 21 file(s)." },
              { t: "log", text: "  Folder: C:\\Tools\\TSMIS Exporter\\output\\site-capture\\2026-07-10 ssor-prod 141530" },
              { t: "run_ended" });
         st.task = null; st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";

@@ -1369,6 +1369,7 @@ class GuiMatrixMixin:
         matrix_info)."""
         snap = self._day_matrix_snapshot()
         snap["available_days"] = day_matrix.available_days(snap["source"])
+        snap["available_day_reports"] = day_matrix.available_day_reports(snap["source"])
         self._push_state()
         return snap
 
@@ -1672,6 +1673,8 @@ class GuiMatrixMixin:
         """The PDF-vs-Excel matrix snapshot + the add-day picker's available days."""
         snap = self._pve_matrix_snapshot()
         snap["available_days"] = pdf_excel_matrix.available_days(snap["source"])
+        snap["available_day_reports"] = pdf_excel_matrix.available_day_reports(
+            snap["source"])
         self._push_state()
         return snap
 
@@ -1860,6 +1863,8 @@ class GuiMatrixMixin:
         reports it covers)."""
         snap = self._baseline_matrix_snapshot()
         snap["available_days"] = baseline_matrix.available_days(snap["source"])
+        snap["available_day_reports"] = baseline_matrix.available_day_reports(
+            snap["source"])
         snap["baseline_options"] = baseline_matrix.baseline_options(
             snap["source"], settings.get_batch_dest())
         self._push_state()

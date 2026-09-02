@@ -358,6 +358,19 @@ matrix's `matrix_formulas`; the **evidence-images pair** (`#dayMatrixEvidence` +
 the Everything matrix's. Engine + store: [comparison-engine.md](comparison-engine.md) §12.
 Mock + bridge exercised at `/index.html#mock` (Compare ▸ vs TSN Matrix).
 
+**The add-day picker names what each day holds** (2026-09-02, all three day matrices). A
+run folder exists as soon as ANY report was pulled that day, so a bare date in the picker
+read like a full export when it might hold one Ramp Summary. Every option now reads
+`2026-08-31  ·  HL HSL RD` — the catalog's short codes (`report_catalog.short_code`, one
+per export key, asserted unique at import) of the reports actually exported that day for
+THIS matrix, in row order, from the snapshot's `available_day_reports` (each matrix module's
+`available_day_reports(source)` over the ONE shared walk, `artifact_store.exported_subdirs_by_day`,
+which applies the same real-export-file test as `available_days`, so a day is offered exactly
+when it carries at least one tag). An export-less today says `today — nothing exported yet`;
+the PDF-vs-Excel picker tags a family with both editions `HL` and a one-edition family
+`HL:xlsx` / `HL:pdf` (a cell it cannot build). One renderer, `mxDayOptionText`, serves the
+three pickers; an older bridge without the map falls back to the bare date.
+
 ### The Compare-tab "vs Baseline Matrix" (v0.26.0)
 
 A **third** matrix sub-tab under Compare (group id `baseline_by_day`, appended beside

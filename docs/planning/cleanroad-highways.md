@@ -134,6 +134,23 @@ PRINTS `THY_LEFT_ROAD_EFF_DATE`, so the report's rule is very likely right here 
 these columns are COUNTED in the vs-TSN comparison and its blessed canary and the dev box
 has no staged TSN extract. Roadmap **DA5** owns that measurement.
 
+**The vendor's own mapping, cross-checked (2026-09-02).** The dev site 9.1 capture
+ships `clean_highway.js` — the site's Clean Road File (Highway) export, the same 74-column
+THY table rendered by the vendor from the same layers (52 columns sourced, 22 left blank).
+Its column registry is a second, independent mapping table, read against `PROVENANCE`:
+
+| Verdict | Columns |
+|---|---|
+| **Agrees layer-for-layer** | every attribute column — surface type (136/137), lanes + travel-way width (139/140), special features (134/135), outer/inner shoulder widths (128/129, 120/121), median type/width/variance (124), curb-landscape (112), barrier (110), access control + its date (109), terrain (11), design speed (113), non-add (125, `N` else `A`), landmark (123), population (130), highway group (116), network start date + `SegOrderId` (122), equate `E` from equation points, route breaks from 133 |
+| **Same rule** | the block eff dates are the PRIMARY layer's own `InventoryItemStartDate` (139 / 124 / 140) — the v0.39.2 `primary_eff` rule, independently chosen by the vendor (DA5 support) |
+| **Sources we mark "no TSMIS source"** | `THY_FUNCTIONAL_CLASS_CODE` ← layer 91 `F_System`; `THY_LAST_SIG_CHG_DATE` ← the newest `InventoryItemStartDate` among the layers whose change made the row significant (lanes, access, treated-shoulder >4, travel-way >5, median-width to/from 0 — the Highway Log's own significance test). TSN's FUNCTIONAL_CLASS is all-null, so the first is context anyway; the second is a real candidate for our build |
+| **Differs by design** | `THY_TOLL_FOREST_CODE` = layer 115's `Forest_Hwy` value alone (no toll mux from 138); `THY_BREAK_DESC` = BEG/END only (no CNTY/DIST/BEGL/ENDR); the offsets are OD measures (AR→OD translate) and length = OD end − begin; district comes off the HL point stream (85/116) rather than SHS District (114); `THY_CITY_CODE` reads layer 74's `City_Code` FIELD directly — our layer export carries city NAMES and translates them through `city_codes` |
+| **Left blank by the vendor** | `THY_PROFILE_CODE` / `THY_ADT_AMT` / `THY_CHANGE_PER_MILE_AMT` (we derive them from Traffic Volume Segments), `THY_POPULATION_GROUP_CODE` ("awaiting group field name"), and the same bookkeeping / SIG_CHG_IND / federal-aid / lands / scenic set we leave empty |
+
+One consequence worth acting on when the site's Highway export is available statewide: it is
+a third THY-shaped side, so "site export vs our build" measures the two reconstructions of
+the same layers against each other with no TSN vintage gap at all.
+
 **Build-only columns (v0.39.1)** — ours, with no TSN counterpart, so CONTEXT in the
 vs-TSN comparison and never counted there. `chc.HEADER` stays exactly TSN's 74 (the
 library loads the raw extract through it as an exact gate); `chc.ARC_HEADER` =

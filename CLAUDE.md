@@ -39,6 +39,9 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 | 7b | Highway Detail (PDF) | PDF (Letter, landscape) | `output/<run>/highway_detail_pdf/` |
 | 8 | Highway Summary | XLSX | `output/<run>/highway_summary/` |
 | 8b | Highway Summary (PDF) | PDF (Letter, portrait) | `output/<run>/highway_summary_pdf/` |
+| 9 | Clean Road File: Highway | XLSX | `output/<run>/clean_highway/` |
+| 10 | Clean Road File: Intersection | XLSX | `output/<run>/clean_intersection/` |
+| 11 | Clean Road File: Ramp | XLSX | `output/<run>/clean_ramp/` |
 
 `<run>` is a run folder `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`);
 **since v0.32.0 each per-route file inside it carries that run identity
@@ -60,9 +63,11 @@ coalesces** — the route is generated ONCE and both files saved off that render
 the standard path (v0.19.2), in fast mode, and for matrix-queued edition steps (both
 v0.32.0). Where the live site greys a report, `select_report` fails fast rather than
 stalling. The dev site's **Route History Table** is a greyed reserved placeholder
-(stable id 15), and the **Clean Road Files** group (`clean_highway` /
-`clean_intersection` / `clean_ramp`, stable ids 16/17/18) is `cs-disabled` on the
-site with refusing placeholder specs (`export_clean_road.py`).
+(stable id 15). The **Clean Road Files** group (`clean_highway` /
+`clean_intersection` / `clean_ramp`, stable ids 16/17/18) is **EXPORT-ENABLED since
+2026-09-02** off the dev site 9.1 capture (real Excel-sibling specs in
+`export_clean_road.py`; export-only until real files are censused; prod may still
+grey them, in which case `select_report` fails fast).
 
 **The 13 fully-integrated export types consolidate AND compare vs TSN** — each has a
 vs-TSN comparator and lives in the Everything, by-day, and (for the 5 dual-edition
@@ -523,7 +528,10 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   task_coordinator.py contract.py        GUI task-state owner / Python⇄JS bridge enum SSOT
   gui_endpoint.py gui_matrix.py gui_win32.py   the endpoint envelope (+_task_endpoint/pick_path) / matrix mixin / Win32
   validation.py credential_safety.py     one-click validation + diagnostic credential guard
-  site_capture.py            the Settings website-source capture (v0.26.0, local-only)
+  site_capture.py            the Settings website-source capture (v0.26.0, local-only;
+                             exhaustive since 2026-09-02 — every same-origin file under
+                             its site name + a manifest with BUILD_DATE and hashes; no
+                             archive — evidence.py is the one zip writer)
   baseline_matrix.py         the Compare-tab "vs Baseline" day-vs-baseline matrix (v0.26.0)
   pdf_excel_matrix.py        the Compare-tab "PDF vs Excel" by-day self-check matrix (v0.31.0, M2-B)
   ui/                        index.html app.css app.js + ui-export/-batch/-compare/-matrix/-settings/-dom.js + mock.js + contract.js

@@ -245,6 +245,23 @@ def available_days(source):
     return out
 
 
+def available_day_reports(source):
+    """{date: [short code, ...]} for every day `available_days` offers — which of
+    the matrix's reports are ACTUALLY exported that day, as the catalog's compact
+    codes in row order ('HL', 'HL-PDF', 'RS', …), so the add-day picker can say
+    "2026-08-31 · HL HSL RD" instead of a bare date that reads like a full pull.
+    TODAY is present with an empty list when nothing is exported yet (it is
+    always offered — the matrix exports into it)."""
+    import report_catalog                        # already loaded via reports
+    subs = [(r[2], report_catalog.short_code(r[0])) for r in _day_rows() if r[4]]
+    code_of = dict(subs)
+    present = artifact_store.exported_subdirs_by_day(source, [s for s, _c in subs])
+    out = {today_str(): []}
+    for date, found in present.items():
+        out[date] = [code_of[s] for s in found]
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # the snapshot the GUI renders (pure filesystem read)
 # --------------------------------------------------------------------------- #

@@ -313,15 +313,24 @@ These controls have current executable checks; re-audit them when their boundari
   build leaves the prior good evidence bundle byte-for-byte intact. Locked by
   `check_evidence_bundle.py` and `check_validation.py`.
 - **The website-source capture is local-only diagnostic data** (v0.26.0,
-  Settings ▸ "Capture website source" → `site_capture.py`). It saves the current
-  site's report page + its SAME-ORIGIN scripts/styles into
-  `output/site-capture/<date src-env HHMMSS>/` with a manifest — the maintainer's
-  manual devtools ▸ Sources walk, automated. The TSMIS source is
-  **Caltrans-internal**: the capture stays on disk (the manifest says so in-band),
-  is never added to the support bundle or uploaded, and third-party URLs are never
-  fetched. Filenames are flattened + sanitized (`_safe_name` — traversal-proof;
-  locked by `check_site_capture.py`). Runs on whatever sign-in the exports use; no
-  new permissions, no endpoints beyond the TSMIS page itself.
+  Settings ▸ "Capture website source" → `site_capture.py`; made exhaustive
+  2026-09-02). It saves the current site's report page (`index.html` + the
+  rendered DOM) and EVERY same-origin file the page uses — what the DOM loaded
+  plus every relative file name found in the page and inside each fetched file,
+  followed to a fixpoint (the `document.write`'d report modules, `config.js`,
+  `debug.js`, images, referenced notes) — into `output/site-capture/<date src-env
+  HHMMSS>/` under the files' own site names, with a manifest (BUILD_DATE, CONFIG
+  env/src, a SHA-256 per file, the third-party URLs it saw), so the folder is
+  handed over as-is. It deliberately writes NO archive: `evidence.py` is the one
+  module in the app that builds a zip (`check_evidence_bundle` pins that), and an
+  archive of Caltrans-internal source is exactly what a second writer must not
+  produce. The TSMIS source is **Caltrans-internal**: the capture stays on disk
+  (the manifest says so in-band), is never added to the support bundle or
+  uploaded, and third-party URLs are never fetched (a file cap bounds the
+  reference walk). Filenames are sanitized and
+  traversal-proof (`_clean_name`, falling back to the flattened `_safe_name` on a
+  collision; locked by `check_site_capture.py`). Runs on whatever sign-in the
+  exports use; no new permissions, no endpoints beyond the TSMIS page itself.
 - **Settings writes are atomic.** `config.json` (and the batch manifest,
   `batch_manifest.save` → temp file + `os.replace`) are written atomically, so a
   crash mid-write can't corrupt them.
