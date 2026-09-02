@@ -62,6 +62,35 @@ pickers say what each day actually holds.
   the app had marked unsourced (functional class and a last-significant-change
   date); see `docs/planning/cleanroad-highways.md`.
 
+This release also carries the last bundle of the output-audit program, RB-6,
+merged on 2026-09-02 after two independent reviews:
+
+- **A folder comparison with nothing on its second side now refuses at once.**
+  A cross-environment or vs-Baseline comparison whose other side has no export
+  used to parse the whole first side before saying so — 440 seconds on a
+  statewide Intersection Detail export. It now refuses through the empty side's
+  own loader before parsing anything, in half a second, with the same message.
+- **The report picker says which editions the app can never check.** Ramp
+  Summary (Excel), Intersection Summary (PDF) and Highway Summary (PDF) are
+  exported but have no consolidation and no comparison — each family is verified
+  through its other edition — and the picker now labels them "export only", with
+  the reason on hover. The Clean Road exports above carry the same label.
+- **Rebuilding a TSN library no longer changes its identity when nothing
+  changed.** Two clocks made every rebuild produce different bytes — the
+  workbook's own modified timestamp and the two-second ZIP member stamps — so
+  pressing Rebuild invalidated every vs-TSN comparison bound to the library even
+  when the content was identical. Both are now pinned for the TSN library only;
+  every other workbook the app writes is unchanged. **Expect one full
+  re-comparison after updating:** the fix moves every dataset's identity token
+  exactly once, so every vs-TSN cell reads stale until it is rebuilt, and the
+  rebuild returns the same counts.
+- **Two must-not-regress notes became executable guards** (the re-skinned TASAS
+  print, the stray `GENERATE` line), and the route 140 Highway Log defect is now
+  an owner-facing record, `docs/vendor-escalations.md` (VEN-01): on the
+  2026-07-23 export alone, the Excel edition of route 140 dropped `R/U`, `TER`,
+  `H/G` and `A/C` on every row while its own same-day print carries them. The
+  app keeps reporting it; only a corrected export closes it.
+
 ## v0.43.0 — 2026-08-31
 
 The ArcGIS "Reports vs layers" tab renders a second report — Intersection
