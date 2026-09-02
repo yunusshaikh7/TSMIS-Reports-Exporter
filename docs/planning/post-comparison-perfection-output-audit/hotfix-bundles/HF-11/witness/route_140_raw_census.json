@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "finding": "PCOA-FINAL-020",
+  "status": "NOT A PRODUCT DEFECT - VENDOR ACTION REQUIRED",
+  "operation": "RB-6 route-140 raw census across every locally available export day",
+  "verified_by": "Claude, 2026-08-31",
+  "columns": [
+    "R/U",
+    "TER",
+    "H/G",
+    "A/C"
+  ],
+  "excel_exports": [
+    {
+      "set": "ground-truth/All Reports 6.19",
+      "export_date": "2026-06-19",
+      "data_rows": 199,
+      "blank": {
+        "R/U": 4,
+        "TER": 0,
+        "H/G": 4,
+        "A/C": 0
+      }
+    },
+    {
+      "set": "ground-truth/All Reports 7.9",
+      "export_date": "2026-07-09",
+      "data_rows": 219,
+      "blank": {
+        "R/U": 0,
+        "TER": 0,
+        "H/G": 0,
+        "A/C": 0
+      }
+    },
+    {
+      "set": "ground-truth/All Reports 7.23",
+      "export_date": "2026-07-23",
+      "data_rows": 213,
+      "blank": {
+        "R/U": 213,
+        "TER": 213,
+        "H/G": 213,
+        "A/C": 213
+      },
+      "defective": true
+    }
+  ],
+  "same_day_control": {
+    "set": "ground-truth/All Reports 7.23",
+    "file": "highway_log_route_138.xlsx",
+    "data_rows": 264,
+    "blank": {
+      "R/U": 0,
+      "TER": 0,
+      "H/G": 0,
+      "A/C": 0
+    }
+  },
+  "print_of_the_defective_day": {
+    "file": "ground-truth/All Reports 7.23/2026-07-23 ssor-prod/highway_log_pdf/highway_log_route_140.pdf",
+    "parsed_rows": 214,
+    "nonblank": {
+      "R/U": 214,
+      "TER": 214,
+      "H/G": 214,
+      "A/C": 214
+    },
+    "values": {
+      "R/U": {
+        "R": 175,
+        "U": 39
+      },
+      "TER": {
+        "F": 112,
+        "M": 62,
+        "R": 40
+      },
+      "H/G": {
+        "D": 35,
+        "U": 179
+      },
+      "A/C": {
+        "C": 214
+      }
+    }
+  },
+  "conclusion": "The 2026-07-23 Excel export of route 140 dropped four whole columns that its OWN same-day print carries in full, that the SAME route carried two weeks earlier, and that its same-day sibling route 138 carries. It is a one-day, one-route regression in the vendor's Excel export, not a standing property of the route.",
+  "latest_available": "2026-07-23 is the most recent route-140 Highway Log Excel available locally; no later pull exists, so whether the defect persists is UNKNOWN and needs a fresh export.",
+  "on_delivery_acceptance_test": "Re-export Highway Log (both editions) for route 140 and run the PDF-vs-Excel self check: it must report ZERO 'X != (blank)' differences on R/U, TER, H/G and A/C.",
+  "record": "docs/vendor-escalations.md"
+}

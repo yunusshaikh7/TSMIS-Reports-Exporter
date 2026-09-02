@@ -1151,7 +1151,9 @@ def _statewide_raw_candidates(rdir, glob):
 
 def _write_normalized_workbook(sheet, header, header_align, rows):
     """A write-only workbook: one `sheet`, the styled `header` row (the shared
-    TSN-library blue header + the report's own Alignment kwargs), then `rows`."""
+    TSN-library blue header + the report's own Alignment kwargs), then `rows`.
+    Saved through `atomic_save_if(..., stable_identity=True)` below, so the bytes
+    depend only on this content (PCOA-FINAL-017)."""
     from openpyxl import Workbook
     from openpyxl.cell import WriteOnlyCell
     from openpyxl.styles import Alignment, Font, PatternFill
@@ -1308,7 +1310,13 @@ def build_normalized(raw_dir, out_path, *, glob, deps_ok, deps_msg, no_raw_what,
         return ConsolidateResult(status="error", message=deps_msg)
     import artifact_store
     try:
-        committed = artifact_store.atomic_save_if(wb, out_path, source_current)
+        # PCOA-FINAL-017: `normalized_workbook_identity` is a sha256 over these
+        # bytes and the identity token binds every committed vs-TSN comparison to
+        # it, so a saved wall clock made a no-op *Rebuild* invalidate every
+        # existing comparison. stable_identity removes both clocks; no content
+        # moves.
+        committed = artifact_store.atomic_save_if(wb, out_path, source_current,
+                                                  stable_identity=True)
     except PermissionError:
         return ConsolidateResult(
             status="error",

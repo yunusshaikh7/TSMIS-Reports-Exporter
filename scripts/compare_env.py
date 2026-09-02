@@ -1090,6 +1090,26 @@ class EnvCompare:
                    or (self.sheet_name is None and self.side_loader is None))
         return "*.pdf" if use_pdf else "*.xlsx"
 
+    def _side_loader_fn(self):
+        """The ONE `(folder, label, events) -> LoadedSide` callable this adapter
+        loads a side with. `compare_folders` resolves it once and uses it for
+        BOTH sides and for the missing-side preflight, so the preflight refuses
+        through the very loader that would otherwise have refused later — its
+        message can never drift from the real one."""
+        if self.side_loader is not None:      # aggregate per-route XLSX
+            return lambda d, lab, ev: _coerce_loaded_side(
+                self.side_loader(d, lab, ev), declared_schema=self.agg_header)
+        if self.sheet_name is None:           # Ramp Summary: PDFs, route-keyed
+            return lambda d, lab, ev: _coerce_loaded_side(
+                _load_ramp_summary_side(d, lab, ev), declared_schema=RS_HEADER)
+        if self.flat_pdf_loader is not None:  # flat, PDF-sourced
+            return lambda d, lab, ev: _coerce_loaded_side(
+                self.flat_pdf_loader(d, lab, ev))
+        return lambda d, lab, ev: _coerce_loaded_side(_load_xlsx_side(
+            d, lab, self.subdir, self.sheet_name, self.REPORT_NAME, ev,
+            expected_header=self.expected_header,
+            value_normalizer=self.value_normalizer))
+
     def _effective_input_dir(self, folder):
         """The RESOLVED directory this adapter actually loads from for one side —
         <folder>/<subdir> when that holds the files, else <folder> (see
@@ -1208,33 +1228,33 @@ class EnvCompare:
         events.on_log("")
 
         layout_extras = None
+        load_side = self._side_loader_fn()
         try:
+            # PCOA-FINAL-015: both sides' member lists are already discovered
+            # above, yet side A used to be handed to its loader first — so a
+            # statewide PDF family parsed 217-252 prints (up to 20.5 minutes)
+            # before reaching side B's "nothing was exported here" refusal, while
+            # a missing FIRST side errored in 0.0 s. Refuse on the empty side
+            # BEFORE anything is parsed, by calling its own loader: the verdict is
+            # byte-for-byte what it always was, only the latency changes.
+            # Guarded on side A having files so a BOTH-empty pair still refuses on
+            # side A first, exactly as before. `_find_input_dir` already drops
+            # Excel's `~$` owner-lock stubs (CMP-AUD-029), so "discovered nothing"
+            # and "the loader will refuse" are the same predicate for every family
+            # — including the two aggregate loaders that filter lock files again.
+            if files_a and not files_b:
+                load_side(dir_b, lb, events)
             if self.side_loader is not None:  # aggregate per-route XLSX (Intersection Summary)
-                loaded_a = _coerce_loaded_side(
-                    self.side_loader(dir_a, la, events),
-                    declared_schema=self.agg_header)
-                loaded_b = _coerce_loaded_side(
-                    self.side_loader(dir_b, lb, events),
-                    declared_schema=self.agg_header)
+                loaded_a = load_side(dir_a, la, events)
+                loaded_b = load_side(dir_b, lb, events)
                 header, has_route = list(self.agg_header), False
             elif self.sheet_name is None:     # Ramp Summary: PDFs, route-keyed
-                loaded_a = _coerce_loaded_side(
-                    _load_ramp_summary_side(dir_a, la, events),
-                    declared_schema=RS_HEADER)
-                loaded_b = _coerce_loaded_side(
-                    _load_ramp_summary_side(dir_b, lb, events),
-                    declared_schema=RS_HEADER)
+                loaded_a = load_side(dir_a, la, events)
+                loaded_b = load_side(dir_b, lb, events)
                 header, has_route = list(RS_HEADER), False
             else:                             # flat (has_route=True): XLSX, or PDF-sourced
-                def _flat_load(d, lab):
-                    if self.flat_pdf_loader is not None:
-                        return self.flat_pdf_loader(d, lab, events)
-                    return _load_xlsx_side(d, lab, self.subdir, self.sheet_name,
-                                           self.REPORT_NAME, events,
-                                           expected_header=self.expected_header,
-                                           value_normalizer=self.value_normalizer)
-                loaded_a = _coerce_loaded_side(_flat_load(dir_a, la))
-                loaded_b = _coerce_loaded_side(_flat_load(dir_b, lb))
+                loaded_a = load_side(dir_a, la, events)
+                loaded_b = load_side(dir_b, lb, events)
                 header = list(loaded_a.declared_schema)
                 header_b = list(loaded_b.declared_schema)
                 if self.header_canonicalizer is not None:

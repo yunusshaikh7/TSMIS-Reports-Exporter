@@ -9,6 +9,9 @@
     temp name back out of the returned result. `confirm_late_overwrite`
     + `atomic_save_if` add the P12 pre-commit re-check that closes the consolidate
     confirm-then-appears TOCTOU window (the truncation half is already covered by F9).
+    Both take an OPT-IN `stable_identity` (`save_stable`, PCOA-FINAL-017) that removes
+    the two wall clocks a saved .xlsx carries, so identical content produces identical
+    bytes — used only by the TSN library, whose digest is a published identity.
 
   * **Journaled store promotion + startup recovery** (`promote_store`,
     `recover_promotions`) — the Export-Everything store swap (`live` <- `staging`) is
@@ -28,6 +31,7 @@ contracts and ``events`` result shape; ``openpyxl`` is imported LAZILY inside
 produced file to reject a malformed/unreadable XLSX before committing it — a typed
 comparison reads its own package directly instead, and falls back to those).
 """
+import datetime
 import hashlib
 import json
 import logging
@@ -330,27 +334,164 @@ def comparison_output_paths(out_path, mode):
 
 
 # --------------------------------------------------------------------------- #
+# deterministic artifact identity (PCOA-FINAL-017)
+# --------------------------------------------------------------------------- #
+# A saved .xlsx carries TWO wall clocks that have nothing to do with its content:
+#
+#   1. `docProps/core.xml` — openpyxl's `save_workbook` assigns
+#      `properties.modified = now()` immediately before serializing, and
+#      `properties.created` defaults to the time the object was constructed;
+#   2. every ZIP entry's `date_time` — `zipfile` takes it from the clock (or the
+#      source file's mtime) at MS-DOS TWO-SECOND resolution, which is why two
+#      builds a second apart often looked identical and then did not.
+#
+# Either one makes the file's sha256 a function of the CLOCK rather than of the
+# data. For the TSN library that is not cosmetic: `normalized_workbook_identity`
+# IS that digest, and the identity token binds every committed vs-TSN comparison
+# to its source — so pressing Settings' *Rebuild* over unchanged raw invalidated
+# every existing comparison and forced a full statewide re-run.
+#
+# A fixed epoch removes both time-dependent inputs. It says nothing about when
+# the file was written (the filesystem mtime and the sidecar already do), and it
+# is deliberately OPT-IN: only the producers whose bytes ARE an identity ask for
+# it, so no other family's output moves.
+STABLE_DOCUMENT_TIMESTAMP = "1980-01-01T00:00:00"
+_STABLE_DOCUMENT_DATETIME = datetime.datetime(1980, 1, 1, 0, 0, 0)
+# The ZIP epoch. 1980-01-01 is the earliest an MS-DOS timestamp can express, so
+# it round-trips exactly and never becomes a negative/undefined field.
+STABLE_ZIP_DATE_TIME = (1980, 1, 1, 0, 0, 0)
+
+
+class _StableZipFile(zipfile.ZipFile):
+    """A `ZipFile` that stamps every member with `STABLE_ZIP_DATE_TIME`.
+
+    Both `writestr` (which builds a ZipInfo from the clock) and `write` (which
+    builds one from the source file's mtime) hand that ZipInfo to
+    `open(zinfo, "w")`, so pinning it there covers every way openpyxl adds a
+    part — including the write-only worksheets it streams in from temp files."""
+
+    def open(self, name, mode="r", pwd=None, *, force_zip64=False):
+        if mode == "w" and isinstance(name, zipfile.ZipInfo):
+            name.date_time = STABLE_ZIP_DATE_TIME
+        return super().open(name, mode, pwd, force_zip64=force_zip64)
+
+
+_SERIALISATION_REGISTRIES = ("__attrs__", "__elements__", "__nested__",
+                             "__namespaced__")
+
+
+def _stable_properties_class():
+    """`DocumentProperties` whose `modified` cannot be re-stamped.
+
+    Pinning the value before ``save`` is NOT enough: openpyxl's
+    ``writer.excel.save_workbook`` assigns ``workbook.properties.modified =
+    datetime.now(utc)`` unconditionally, immediately before serializing, so the
+    ASSIGNMENT itself has to be inert. `created` survives an ordinary assignment
+    and is set normally by the caller.
+
+    Built lazily so importing this module never requires openpyxl (every other
+    entry point here is dependency-free).
+    """
+    from openpyxl.packaging.core import DocumentProperties
+
+    class _StableDocumentProperties(DocumentProperties):
+        def __setattr__(self, name, value):
+            if name == "modified":
+                value = _STABLE_DOCUMENT_DATETIME
+            super().__setattr__(name, value)
+
+    # openpyxl's MetaSerialisable rebuilds the serialisation registries from the
+    # SUBCLASS namespace alone and overwrites __namespaced__ unconditionally, so
+    # a subclass that adds no Descriptor of its own would serialise to an EMPTY
+    # <coreProperties/>. Restore the parent's registries after class creation.
+    # `check_tsn_identity_determinism` asserts the produced docProps/core.xml is
+    # complete, so an openpyxl upgrade that changes this fails the gate loudly
+    # instead of silently emptying the part.
+    for attr in _SERIALISATION_REGISTRIES:
+        setattr(_StableDocumentProperties, attr, getattr(DocumentProperties, attr))
+    return _StableDocumentProperties
+
+
+def stable_document_identity(workbook):
+    """Pin an openpyxl `workbook`'s document properties so its saved bytes depend
+    only on its CONTENT (PCOA-FINAL-017). Returns the workbook, so it can be used
+    inline. `save_stable` calls this; a producer that saves some other way can
+    call it directly.
+
+    Only the timestamps and the machine-identifying `lastModifiedBy` are touched
+    — never a cell, a style or a sheet — so the content is unchanged by
+    construction."""
+    props = _stable_properties_class()()
+    props.created = _STABLE_DOCUMENT_DATETIME
+    props.lastModifiedBy = None
+    workbook.properties = props
+    return workbook
+
+
+def save_stable(workbook, path):
+    """`workbook.save(path)` with every wall clock removed (PCOA-FINAL-017): the
+    document properties are pinned and the archive stamps a fixed time on each
+    member, so identical content always produces identical bytes.
+
+    Drives `ExcelWriter` over our own archive rather than `Workbook.save`, which
+    hard-codes a plain `ZipFile`. Everything else — the parts, their order, their
+    content — is openpyxl's own, so the workbook is byte-for-byte what it always
+    was apart from the two timestamps."""
+    from openpyxl.writer.excel import ExcelWriter
+    stable_document_identity(workbook)
+    # `Workbook.save` seeds a sheet for an empty write-only workbook before
+    # serializing; mirror it so this path cannot produce a workbook the other
+    # cannot. No TSN builder reaches here without a sheet — build_normalized
+    # refuses zero rows — so this is a guard, not a behaviour.
+    if workbook.write_only and not workbook.worksheets:
+        workbook.create_sheet()
+    archive = _StableZipFile(str(path), "w", zipfile.ZIP_DEFLATED, allowZip64=True)
+    try:
+        ExcelWriter(workbook, archive).save()   # ExcelWriter.save() closes it
+    except BaseException:
+        try:
+            archive.close()
+        except Exception:  # silent-ok: cleanup close; the original error is the cause
+            pass
+        raise
+
+
+# --------------------------------------------------------------------------- #
 # atomic single-file write (F9)
 # --------------------------------------------------------------------------- #
-def atomic_save(workbook, out_path):
+def _save(workbook, path, stable_identity):
+    """One save boundary: `save_stable` when the producer's bytes ARE an identity
+    (PCOA-FINAL-017), otherwise openpyxl's own save, unchanged."""
+    if stable_identity:
+        save_stable(workbook, path)
+    else:
+        workbook.save(path)
+
+
+def atomic_save(workbook, out_path, *, stable_identity=False):
     """Save an openpyxl `workbook` to a temp sibling of `out_path`, then atomically
     ``os.replace`` it onto `out_path`. An interrupted or failed write (disk error, or
     the DESTINATION open in Excel -> ``PermissionError`` on ``os.replace``) leaves the
     prior `out_path` UNTOUCHED (F9: never truncate a good prior artifact). The original
     exception propagates to the caller's existing handler AFTER the temp is removed, so
-    a consolidator's ``except PermissionError`` keeps reporting "file open in Excel"."""
+    a consolidator's ``except PermissionError`` keeps reporting "file open in Excel".
+
+    `stable_identity` (opt-in) removes the two wall clocks a saved .xlsx carries,
+    so identical content produces identical bytes. Off by default: it moves an
+    artifact's bytes once, and only a producer whose digest is a published
+    identity needs it."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = _producer_temp(out_path, _new_token())
     try:
-        workbook.save(tmp)
+        _save(workbook, tmp, stable_identity)
         os.replace(tmp, out_path)
     except BaseException:
         _silent_unlink(tmp)
         raise
 
 
-def atomic_save_if(workbook, out_path, proceed):
+def atomic_save_if(workbook, out_path, proceed, *, stable_identity=False):
     """Like `atomic_save`, but the final ``os.replace`` is GATED on `proceed()` —
     a 0-arg callback evaluated AFTER the workbook is fully serialized to the temp
     sibling and JUST BEFORE the replace. If `proceed()` is falsy the temp is removed
@@ -360,12 +501,14 @@ def atomic_save_if(workbook, out_path, proceed):
     the NARROWEST possible point — the workbook is already written to the temp, so
     there is no half-streamed ``write_only`` workbook to abandon (which would leave
     an open temp + a dangling row generator). Same F9 guarantee as `atomic_save`: a
-    prior good `out_path` is never truncated; the temp is removed on any exit."""
+    prior good `out_path` is never truncated; the temp is removed on any exit.
+
+    `stable_identity` is `atomic_save`'s opt-in, unchanged: see there."""
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = _producer_temp(out_path, _new_token())
     try:
-        workbook.save(tmp)
+        _save(workbook, tmp, stable_identity)
         if not proceed():
             _silent_unlink(tmp)
             return False

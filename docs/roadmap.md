@@ -36,13 +36,10 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 >    TSMIS intranet. Seventeen releases have landed since v0.32.0 and every one of
 >    them is offline-verified only. It blocks nothing, but it is the only thing
 >    standing between "the checks pass" and "it works in the field."
-> 2. **H — RB-5, then RB-6.** The bounded output-audit program merged four of its
->    six bundles and stopped. **Five work items are still open** (HF-06 · 07 · 08 ·
->    09 · 11), re-verified against the code on 2026-08-20, and until today they
->    were missing from this inventory entirely. RB-5 is READY with a frozen
->    contract; the sharpest single item is **HF-06** — the Highway Sequence
->    self-check reports 3,714 differing cells for a class the Notes already say is
->    two editions writing one equation two ways.
+> 2. **H — RB-6 is implemented and awaiting review.** The bounded output-audit
+>    program has merged five of its six bundles; RB-5 shipped in v0.42.0 and
+>    RB-6 — its last — is implemented on `hotfix/rb-6-hygiene-and-guards` and
+>    now needs its two adversarial reviews. Nothing in H is unstarted.
 > 3. **G1 — the CA INTERSECTIONS + CA RAMPS clean-road builds**, on the v0.29.0
 >    CA HIGHWAYS pattern, with the mappings already censused in
 >    [planning/cleanroad-highways.md](planning/cleanroad-highways.md). **The next
@@ -234,33 +231,36 @@ whole family is now closed.
 |---|---|---|
 | G1 | **CA INTERSECTIONS + CA RAMPS clean-road builds** (DEF-05) | On the v0.29.0 CA HIGHWAYS pattern; mappings already censused in [planning/cleanroad-highways.md](planning/cleanroad-highways.md). `tsn_load_clean_road` deliberately has no normalizer for these two slots until their builds land. |
 
-### H. The bounded output-audit program — RB-5 MERGED (v0.42.0), RB-6 is the last bundle
+### H. The bounded output-audit program — RB-6 IMPLEMENTED, awaiting review
 
 **This group was missing from the inventory until 2026-08-20 and is the largest
 genuinely-open block of work in the repo.** The post-comparison output program
 (`planning/post-comparison-perfection-output-audit/`, entry point
 [START-HERE.md](planning/post-comparison-perfection-output-audit/START-HERE.md))
 ran Stages 1–3 to a jointly-approved plan and has merged five of its six bundles.
-**RB-1 · RB-2 · RB-3 · RB-4 · RB-5 are merged; only RB-6 remains**, carrying three
-work items. RB-5 merged 2026-08-31 after two independent Codex approvals and
-shipped in v0.42.0; H1 and H2 below are closed by it.
+**RB-1 · RB-2 · RB-3 · RB-4 · RB-5 are merged, and RB-6 — the last — is
+IMPLEMENTED and awaiting its two adversarial reviews.** RB-5 merged 2026-08-31
+after two independent Codex approvals and shipped in v0.42.0; H1 and H2 below are
+closed by it. RB-6 was implemented 2026-08-31 on
+`hotfix/rb-6-hygiene-and-guards` from base `62bb0f3`; it is not merged and not
+released.
 
-| # | Item | Bundle | Verified state (2026-08-20) |
+| # | Item | Bundle | Verified state (H3–H5 re-verified 2026-08-31, during RB-6 Stage 4) |
 |---|---|---|---|
 | H1 | ~~**HF-06 — Highway Sequence self-check equation classification**~~ (PCOA-FINAL-011, P1) | RB-5 | **CLOSED — v0.42.0.** The self check normalizes the by-design equate relation before comparing: statewide **3,714 → 7** differing cells over the same 60,254 locations, the seven survivors being genuine one-sided `E` markers that must keep reporting. Pair-aware, so the moved suffix closes too; fires only where the print declared an equate; a duplicate postmile group it cannot resolve by content is left alone. HSL vs-TSN counts unmoved. |
 | H2 | ~~**HF-09 — representation-only difference classification**~~ (PCOA-FINAL-013, P2) | RB-5 | **CLOSED — v0.42.0.** Five families gain one Summary line saying how much of the differing-cell total is punctuation/spacing/quoting/case rather than data (HL 1,243, HSL 12, ID 1, RD-PDF 3, plus Clean Road). Disclosure only — every cell keeps its `D` state and every published total is unchanged, proved base-vs-head per family. Follow-up **RB5-R2-FU-001**: the class key keeps only ASCII, so a dropped accented letter can be *labelled* presentation-only; it stays flagged and counted. |
-| H3 | **HF-07 — missing-side fast fail and export coverage truth** (PCOA-FINAL-015 / -018, P2) | RB-6 | **Open.** The folder-comparison preflight on the statewide PDF families, plus surfacing the catalog's export-only truth for `ramp_summary_excel`, `intersection_summary_pdf` and `highway_summary`. |
-| H4 | **HF-08 — TSN normalization identity determinism** (PCOA-FINAL-017, P2) | RB-6 | **Open.** A force rebuild over unchanged raw produced different bytes, so pressing *Rebuild* invalidates every bound vs-TSN comparison. Its root cause is recorded as an **unestablished hypothesis** — establishing it is the first task, not the fix. |
-| H5 | **HF-11 — source-side escalation and must-not-regress guards** (PCOA-FINAL-020 / -021 / -022) | RB-6 | **Open.** The program closeout. |
+| H3 | **HF-07 — missing-side fast fail and export coverage truth** (PCOA-FINAL-015 / -018, P2) | RB-6 | **IMPLEMENTED, awaiting review.** The preflight refuses through the empty side's OWN loader before anything is parsed: measured on the real 217-print statewide Intersection Detail export, **439.9 s → 0.49 s**. The export-only set had to be re-derived — `highway_summary` gained its comparisons in v0.37.0, so it is `ramp_summary_excel` / `intersection_summary_pdf` / `highway_summary_pdf` now, still 343 of 2,380 files (14.4%). |
+| H4 | **HF-08 — TSN normalization identity determinism** (PCOA-FINAL-017, P2) | RB-6 | **IMPLEMENTED, awaiting review.** Root cause ESTABLISHED and it is **two** clocks: openpyxl stamps `docProps/core.xml` with the wall clock at save, and `zipfile` stamps every member's `date_time` at MS-DOS two-second resolution — which is why early probes looked clean by luck. Both are pinned at an opt-in save boundary used only by the TSN library. **Expect ONE full re-comparison after this merges**: the fix moves every dataset's identity token once, by design. |
+| H5 | **HF-11 — source-side escalation and must-not-regress guards** (PCOA-FINAL-020 / -021 / -022) | RB-6 | **IMPLEMENTED, awaiting review.** Both prose guards are executable and fail against a deliberate regression; no `scripts/` change. Route 140 became [VEN-01](vendor-escalations.md) — and the census sharpened it: the four columns are blank on **one day only** (2026-07-23), complete two weeks earlier, complete in that day's own print, complete on the same day's route 138. |
 
 **Read the plan against today's code before starting, not just as written.** It
-froze at **v0.35.0** and the tree has moved eleven releases since: HF-07's scope
-excludes Highway Detail as *pre-release* (that freeze **lifted in v0.37.0**),
-HF-08 counts *eight* supported TSN datasets (Highway Summary became one in
-v0.37.0), and the whole plan predates the ArcGIS "Reports vs layers" lane and
-the v0.40–v0.41 comparison-speed work. `IMPLEMENTATION-PLAN.md` remains
-authoritative over the per-bundle `BUNDLE.md`, and Stage 4 must record the exact
-clean `main` base before touching code.
+froze at **v0.35.0** and the tree has moved thirteen releases since. RB-6's
+implementation had to correct three stale scope statements against live code —
+the export-only set, the count of supported TSN datasets, and one print family
+the plan assumed had a parser — all recorded in
+[RB-6/IMPLEMENTATION.md](planning/post-comparison-perfection-output-audit/hotfix-bundles/RB-6/IMPLEMENTATION.md).
+`IMPLEMENTATION-PLAN.md` remains authoritative over the per-bundle `BUNDLE.md`,
+and every Stage 4 must record the exact clean `main` base before touching code.
 
 **Weigh the process cost honestly when ranking this.** Each bundle carries two
 independent adversarial review rounds, and RB-2 consumed ten of them on column

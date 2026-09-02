@@ -1,0 +1,486 @@
+{
+  "schema": 1,
+  "finding": "PCOA-FINAL-017",
+  "operation": "RB-6 double force rebuild over the owner's real staged raw, every registered TSN dataset",
+  "verified_by": "Claude, 2026-08-31",
+  "method": "Each dataset's real raw is copied into a PRIVATE library root and the SHIPPED tsn_library.build_consolidated(report, force=True) runs three times, separated by more than the ZIP timestamp's 2-second resolution: `pre` with the stable-identity save turned OFF (pre-fix behaviour), then `post1` and `post2` on the shipped path. Each build's bytes are SNAPSHOTTED immediately and every read happens afterwards off the snapshots - reading the live output path between builds left a Windows handle that made the next os.replace fail, which was a harness defect, not a product one. The owner's staged library is only READ.",
+  "criteria": {
+    "2": "two consecutive force rebuilds -> byte-identical workbook, identical tsn_normalized_workbook_identity and tsn_artifact_identity_token",
+    "3": "a rebuild that SHOULD change identity still does - covered by check_tsn_identity_determinism (changed content and changed raw bytes both move the token)",
+    "4": "normalized content unchanged cell-for-cell by the fix - `pre` vs `post1` content digest over every sheet's every cell",
+    "5": "the ONE-TIME invalidation is real and disclosed - `the_fix_DID_move_the_bytes_once` is true for every dataset"
+  },
+  "result": {
+    "datasets_registered": 11,
+    "datasets_built": 9,
+    "datasets_passed": 9,
+    "datasets_skipped": [
+      "clean_intersection",
+      "clean_ramp"
+    ],
+    "all_four_criteria_met": true,
+    "one_time_invalidation_confirmed": true
+  },
+  "marker_sheets_intact": "Every build's per-sheet row counts are recorded above; the normalization marker sheet is present in each post-fix workbook exactly as in its pre-fix counterpart, and the content digest covers it.",
+  "datasets": [
+    {
+      "report": "highway_log",
+      "raw_kind": "district_pdfs",
+      "normalization_version": 5,
+      "raw_from": "C:\\Users\\Yunus\\Downloads\\TSMIS\\tsn_library\\highway_log\\raw",
+      "raw_count": 12,
+      "built": true,
+      "seconds_total": 2110.0,
+      "raw_unchanged_across_all_three_builds": true,
+      "pre": {
+        "sha256": "d084e85a95a70540a38e4cf332af93df3d021465cf42b6be31af48073404600a",
+        "bytes": 6664132,
+        "identity_token": "tsn-normalized-v1:132a2d5f1952fdd1519cde04e34ba51c2ea45b88f953cd78c59af660f3c8adf4",
+        "content_sha256": "6e6221d2203346ffb45c58fedc4acc0dec726f41aef56d41945b4fee972b61bf",
+        "sheet_rows": {
+          "Highway Log": 60084,
+          "Legend": 35,
+          "TSN Normalization": 2
+        }
+      },
+      "post1": {
+        "sha256": "fe8eb9eb3c4dd75e246c6a9f927e63c99eeb925ebefbd05a64eccbcde57d4e0f",
+        "bytes": 6664123,
+        "workbook_identity_sha256": "fe8eb9eb3c4dd75e246c6a9f927e63c99eeb925ebefbd05a64eccbcde57d4e0f",
+        "identity_token": "tsn-normalized-v1:817b3648c5a20da96a948986c970350b3dd07a59974254d8e23e1f884f042a86",
+        "content_sha256": "6e6221d2203346ffb45c58fedc4acc0dec726f41aef56d41945b4fee972b61bf",
+        "sheet_rows": {
+          "Highway Log": 60084,
+          "Legend": 35,
+          "TSN Normalization": 2
+        }
+      },
+      "post2": {
+        "sha256": "fe8eb9eb3c4dd75e246c6a9f927e63c99eeb925ebefbd05a64eccbcde57d4e0f",
+        "bytes": 6664123,
+        "workbook_identity_sha256": "fe8eb9eb3c4dd75e246c6a9f927e63c99eeb925ebefbd05a64eccbcde57d4e0f",
+        "identity_token": "tsn-normalized-v1:817b3648c5a20da96a948986c970350b3dd07a59974254d8e23e1f884f042a86",
+        "content_sha256": "6e6221d2203346ffb45c58fedc4acc0dec726f41aef56d41945b4fee972b61bf",
+        "sheet_rows": {
+          "Highway Log": 60084,
+          "Legend": 35,
+          "TSN Normalization": 2
+        }
+      },
+      "criteria": {
+        "post1_post2_byte_identical": true,
+        "workbook_identity_unchanged": true,
+        "identity_token_unchanged": true,
+        "normalized_content_unchanged_by_the_fix": true,
+        "the_fix_DID_move_the_bytes_once": true
+      },
+      "pass": true
+    },
+    {
+      "report": "ramp_detail",
+      "raw_kind": "statewide_xlsx",
+      "normalization_version": 5,
+      "raw_from": "C:\\Users\\Yunus\\Downloads\\TSMIS\\tsn_library\\ramp_detail\\raw",
+      "raw_count": 1,
+      "built": true,
+      "seconds_total": 15.1,
+      "raw_unchanged_across_all_three_builds": true,
+      "pre": {
+        "sha256": "177aa787fd5b2111e8674301663d98413964d591dd3c55ec8a3369f61f9d7562",
+        "bytes": 1112190,
+        "identity_token": "tsn-normalized-v1:4675d91b5dd7d511948b4d6d3e40067feea2b1d09743b533998b4e5914711bcd",
+        "content_sha256": "0094d34ddc1c4682f8700e76a2391337d31d8f9fce255c44adfaad63d56b48db",
+        "sheet_rows": {
+          "Ramp Detail (TSN)": 15411,
+          "TSN Normalization": 2
+        }
+      },
+      "post1": {
+        "sha256": "753e8fdf7cc84215e261d25e8678c7a6f241174b760580326d867525a0fce0cd",
+        "bytes": 1112180,
+        "workbook_identity_sha256": "753e8fdf7cc84215e261d25e8678c7a6f241174b760580326d867525a0fce0cd",
+        "identity_token": "tsn-normalized-v1:8bce166141cb87d9d3d6378af1457bcdc6bb93bac964f240ef639fe276222ba4",
+        "content_sha256": "0094d34ddc1c4682f8700e76a2391337d31d8f9fce255c44adfaad63d56b48db",
+        "sheet_rows": {
+          "Ramp Detail (TSN)": 15411,
+          "TSN Normalization": 2
+        }
+      },
+      "post2": {
+        "sha256": "753e8fdf7cc84215e261d25e8678c7a6f241174b760580326d867525a0fce0cd",
+        "bytes": 1112180,
+        "workbook_identity_sha256": "753e8fdf7cc84215e261d25e8678c7a6f241174b760580326d867525a0fce0cd",
+        "identity_token": "tsn-normalized-v1:8bce166141cb87d9d3d6378af1457bcdc6bb93bac964f240ef639fe276222ba4",
+        "content_sha256": "0094d34ddc1c4682f8700e76a2391337d31d8f9fce255c44adfaad63d56b48db",
+        "sheet_rows": {
+          "Ramp Detail (TSN)": 15411,
+          "TSN Normalization": 2
+        }
+      },
+      "criteria": {
+        "post1_post2_byte_identical": true,
+        "workbook_identity_unchanged": true,
+        "identity_token_unchanged": true,
+        "normalized_content_unchanged_by_the_fix": true,
+        "the_fix_DID_move_the_bytes_once": true
+      },
+      "pass": true
+    },
+    {
+      "report": "ramp_summary",
+      "raw_kind": "statewide_pdf",
+      "normalization_version": 3,
+      "raw_from": "C:\\Users\\Yunus\\Downloads\\TSMIS\\tsn_library\\ramp_summary\\raw",
+      "raw_count": 1,
+      "built": true,
+      "seconds_total": 0.6,
+      "raw_unchanged_across_all_three_builds": true,
+      "pre": {
+        "sha256": "ea083333c4c78bb62055c954685aa362be90d253bb50b28772f537a5e281cd95",
+        "bytes": 5760,
+        "identity_token": "tsn-normalized-v1:55410162d1be573112f816880fbd295af7f699404c025b421601eb07d88c46e4",
+        "content_sha256": "de74d545cac6a29c18fe4752734d30ac9019af716956ed21227a25fa646a878e",
+        "sheet_rows": {
+          "Ramp Summary (TSN)": 32
+        }
+      },
+      "post1": {
+        "sha256": "c3914982068d048d148b310c22669065507abc4a0300deaec60f2ef16abe999e",
+        "bytes": 5757,
+        "workbook_identity_sha256": "c3914982068d048d148b310c22669065507abc4a0300deaec60f2ef16abe999e",
+        "identity_token": "tsn-normalized-v1:e81ff4926e0783e5c9223b14932735bee779edbf11992630e8d1b63310e829fc",
+        "content_sha256": "de74d545cac6a29c18fe4752734d30ac9019af716956ed21227a25fa646a878e",
+        "sheet_rows": {
+          "Ramp Summary (TSN)": 32
+        }
+      },
+      "post2": {
+        "sha256": "c3914982068d048d148b310c22669065507abc4a0300deaec60f2ef16abe999e",
+        "bytes": 5757,
+        "workbook_identity_sha256": "c3914982068d048d148b310c22669065507abc4a0300deaec60f2ef16abe999e",
+        "identity_token": "tsn-normalized-v1:e81ff4926e0783e5c9223b14932735bee779edbf11992630e8d1b63310e829fc",
+        "content_sha256": "de74d545cac6a29c18fe4752734d30ac9019af716956ed21227a25fa646a878e",
+        "sheet_rows": {
+          "Ramp Summary (TSN)": 32
+        }
+      },
+      "criteria": {
+        "post1_post2_byte_identical": true,
+        "workbook_identity_unchanged": true,
+        "identity_token_unchanged": true,
+        "normalized_content_unchanged_by_the_fix": true,
+        "the_fix_DID_move_the_bytes_once": true
+      },
+      "pass": true
+    },
+    {
+      "report": "intersection_summary",
+      "raw_kind": "statewide_pdf",
+      "normalization_version": 3,
+      "raw_from": "C:\\Users\\Yunus\\Downloads\\TSMIS\\tsn_library\\intersection_summary\\raw",
+      "raw_count": 1,
+      "built": true,
+      "seconds_total": 0.8,
+      "raw_unchanged_across_all_three_builds": true,
+      "pre": {
+        "sha256": "17b9a4d3b39a8111e11c7ec26a2a188f1e28d17c7612da9f6dcd6f716b925e38",
+        "bytes": 6327,
+        "identity_token": "tsn-normalized-v1:957408e4498ccec269fd3e9f6a7fa6f6826ae056e02515edb232cad11e2580e7",
+        "content_sha256": "3ca0f209c0da7d54436c05dcc5eda2c24c70612cf916eb8249106571c1fc6244",
+        "sheet_rows": {
+          "Intersection Summary (TSN)": 59
+        }
+      },
+      "post1": {
+        "sha256": "c0deaf66d14208c14e944bcdb0d0627de6504b55826979f00813571e7d7ead59",
+        "bytes": 6323,
+        "workbook_identity_sha256": "c0deaf66d14208c14e944bcdb0d0627de6504b55826979f00813571e7d7ead59",
+        "identity_token": "tsn-normalized-v1:678f0e8e1adb585480c13b0a45e6ba6d6c24761e434194da5a9c454a1d3cb4f0",
+        "content_sha256": "3ca0f209c0da7d54436c05dcc5eda2c24c70612cf916eb8249106571c1fc6244",
+        "sheet_rows": {
+          "Intersection Summary (TSN)": 59
+        }
+      },
+      "post2": {
+        "sha256": "c0deaf66d14208c14e944bcdb0d0627de6504b55826979f00813571e7d7ead59",
+        "bytes": 6323,
+        "workbook_identity_sha256": "c0deaf66d14208c14e944bcdb0d0627de6504b55826979f00813571e7d7ead59",
+        "identity_token": "tsn-normalized-v1:678f0e8e1adb585480c13b0a45e6ba6d6c24761e434194da5a9c454a1d3cb4f0",
+        "content_sha256": "3ca0f209c0da7d54436c05dcc5eda2c24c70612cf916eb8249106571c1fc6244",
+        "sheet_rows": {
+          "Intersection Summary (TSN)": 59
+        }
+      },
+      "criteria": {
+        "post1_post2_byte_identical": true,
+        "workbook_identity_unchanged": true,
+        "identity_token_unchanged": true,
+        "normalized_content_unchanged_by_the_fix": true,
+        "the_fix_DID_move_the_bytes_once": true
+      },
+      "pass": true
+    },
+    {
+      "report": "intersection_detail",
+      "raw_kind": "statewide_xlsx",
+      "normalization_version": 5,
+      "raw_from": "C:\\Users\\Yunus\\Downloads\\TSMIS\\tsn_library\\intersection_detail\\raw",
+      "raw_count": 1,
+      "built": true,
+      "seconds_total": 28.6,
+      "raw_unchanged_across_all_three_builds": true,
+      "pre": {
+        "sha256": "fb29beae1ab10d8248010578cb46c134aaa8877a9c2d42f02376cca4651d596e",
+        "bytes": 2254446,
+        "identity_token": "tsn-normalized-v1:5b268570636a46d28d84e0f5c595b3b2d2d2e543fd688ac3b91e1b12afd49b2d",
+        "content_sha256": "00dacfda1d8a3e6d45882cbe4250856dc2fa9108e489701c5a716d4af42317f3",
+        "sheet_rows": {
+          "Intersection Detail (TSN)": 16627,
+          "TSN Normalization": 2
+        }
+      },
+      "post1": {
+        "sha256": "4e08f7b19233638a11b20d8516d56a7a09e0a3c4d6b6cfacbea687ff018fa50f",
+        "bytes": 2254439,
+        "workbook_identity_sha256": "4e08f7b19233638a11b20d8516d56a7a09e0a3c4d6b6cfacbea687ff018fa50f",
+        "identity_token": "tsn-normalized-v1:4b2de78d3a91330b9ecda637ed71eb394664b56e2254b9be264ddc456bc40cc1",
+        "content_sha256": "00dacfda1d8a3e6d45882cbe4250856dc2fa9108e489701c5a716d4af42317f3",
+        "sheet_rows": {
+          "Intersection Detail (TSN)": 16627,
+          "TSN Normalization": 2
+        }
+      },
+      "post2": {
+        "sha256": "4e08f7b19233638a11b20d8516d56a7a09e0a3c4d6b6cfacbea687ff018fa50f",
+        "bytes": 2254439,
+        "workbook_identity_sha256": "4e08f7b19233638a11b20d8516d56a7a09e0a3c4d6b6cfacbea687ff018fa50f",
+        "identity_token": "tsn-normalized-v1:4b2de78d3a91330b9ecda637ed71eb394664b56e2254b9be264ddc456bc40cc1",
+        "content_sha256": "00dacfda1d8a3e6d45882cbe4250856dc2fa9108e489701c5a716d4af42317f3",
+        "sheet_rows": {
+          "Intersection Detail (TSN)": 16627,
+          "TSN Normalization": 2
+        }
+      },
+      "criteria": {
+        "post1_post2_byte_identical": true,
+        "workbook_identity_unchanged": true,
+        "identity_token_unchanged": true,
+        "normalized_content_unchanged_by_the_fix": true,
+        "the_fix_DID_move_the_bytes_once": true
+      },
+      "pass": true
+    },
+    {
+      "report": "highway_sequence",
+      "raw_kind": "district_pdfs",
+      "normalization_version": 4,
+      "raw_from": "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\tsn_library\\highway_sequence\\raw",
+      "raw_count": 12,
+      "built": true,
+      "seconds_total": 337.8,
+      "raw_unchanged_across_all_three_builds": true,
+      "pre": {
+        "sha256": "3d150338a9c53967ca266a4fc269ecc8bb6671a1efaf184a05b60aad5d5a69bd",
+        "bytes": 2542547,
+        "identity_token": "tsn-normalized-v1:11bad8cbaadb0da20e21ea5d151b6bedab6c5c26eab26d61c8c2e4469e2a74f4",
+        "content_sha256": "b5c3a7f102233f2cffaf8a5de9b34c1c0624b8b8acb51676178c108c1b23d79d",
+        "sheet_rows": {
+          "Highway Locations (TSN)": 69805,
+          "TSN Normalization": 2
+        }
+      },
+      "post1": {
+        "sha256": "b35b313aa03d0c085b7fd6f5c7e8289ac5031c39a99128487429dcd1a1b05d46",
+        "bytes": 2542540,
+        "workbook_identity_sha256": "b35b313aa03d0c085b7fd6f5c7e8289ac5031c39a99128487429dcd1a1b05d46",
+        "identity_token": "tsn-normalized-v1:d7fd184be8b2251a3ee1c2309f5395861881a449698eed847be8b4820801e4c0",
+        "content_sha256": "b5c3a7f102233f2cffaf8a5de9b34c1c0624b8b8acb51676178c108c1b23d79d",
+        "sheet_rows": {
+          "Highway Locations (TSN)": 69805,
+          "TSN Normalization": 2
+        }
+      },
+      "post2": {
+        "sha256": "b35b313aa03d0c085b7fd6f5c7e8289ac5031c39a99128487429dcd1a1b05d46",
+        "bytes": 2542540,
+        "workbook_identity_sha256": "b35b313aa03d0c085b7fd6f5c7e8289ac5031c39a99128487429dcd1a1b05d46",
+        "identity_token": "tsn-normalized-v1:d7fd184be8b2251a3ee1c2309f5395861881a449698eed847be8b4820801e4c0",
+        "content_sha256": "b5c3a7f102233f2cffaf8a5de9b34c1c0624b8b8acb51676178c108c1b23d79d",
+        "sheet_rows": {
+          "Highway Locations (TSN)": 69805,
+          "TSN Normalization": 2
+        }
+      },
+      "criteria": {
+        "post1_post2_byte_identical": true,
+        "workbook_identity_unchanged": true,
+        "identity_token_unchanged": true,
+        "normalized_content_unchanged_by_the_fix": true,
+        "the_fix_DID_move_the_bytes_once": true
+      },
+      "pass": true
+    },
+    {
+      "report": "highway_detail",
+      "raw_kind": "statewide_xlsx",
+      "normalization_version": 4,
+      "raw_from": "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\tsn_library\\highway_detail\\raw",
+      "raw_count": 1,
+      "built": true,
+      "seconds_total": 141.1,
+      "raw_unchanged_across_all_three_builds": true,
+      "pre": {
+        "sha256": "aa44d27d0788a53fec3caba0d7a4eeede64a591f7b70b91004ee12fdbf8103a6",
+        "bytes": 12125092,
+        "identity_token": "tsn-normalized-v1:f1dc0aeb24be7635e4f2ebc20447e17bef65b913de48b0eea8af602a26f1caae",
+        "content_sha256": "137a0d028a419f61697e0c8a27d923d77298fe594c0307d0b6800ebca990d31e",
+        "sheet_rows": {
+          "Highway Detail (TSN)": 60084,
+          "TSN Normalization": 4
+        }
+      },
+      "post1": {
+        "sha256": "6528517f40502107fba63b30a58c36737dd65f43eb7f800cb84e6d279d3b83b5",
+        "bytes": 12125085,
+        "workbook_identity_sha256": "6528517f40502107fba63b30a58c36737dd65f43eb7f800cb84e6d279d3b83b5",
+        "identity_token": "tsn-normalized-v1:973e0a9c63aaafcb3e2802d2ba352a384febcef128f66827fb52a945e58d4191",
+        "content_sha256": "137a0d028a419f61697e0c8a27d923d77298fe594c0307d0b6800ebca990d31e",
+        "sheet_rows": {
+          "Highway Detail (TSN)": 60084,
+          "TSN Normalization": 4
+        }
+      },
+      "post2": {
+        "sha256": "6528517f40502107fba63b30a58c36737dd65f43eb7f800cb84e6d279d3b83b5",
+        "bytes": 12125085,
+        "workbook_identity_sha256": "6528517f40502107fba63b30a58c36737dd65f43eb7f800cb84e6d279d3b83b5",
+        "identity_token": "tsn-normalized-v1:973e0a9c63aaafcb3e2802d2ba352a384febcef128f66827fb52a945e58d4191",
+        "content_sha256": "137a0d028a419f61697e0c8a27d923d77298fe594c0307d0b6800ebca990d31e",
+        "sheet_rows": {
+          "Highway Detail (TSN)": 60084,
+          "TSN Normalization": 4
+        }
+      },
+      "criteria": {
+        "post1_post2_byte_identical": true,
+        "workbook_identity_unchanged": true,
+        "identity_token_unchanged": true,
+        "normalized_content_unchanged_by_the_fix": true,
+        "the_fix_DID_move_the_bytes_once": true
+      },
+      "pass": true
+    },
+    {
+      "report": "highway_summary",
+      "raw_kind": "statewide_pdf",
+      "normalization_version": 2,
+      "raw_from": "C:\\Users\\Yunus\\Projects\\TSMIS-Reports-Exporter\\tsn_library\\highway_summary\\raw",
+      "raw_count": 1,
+      "built": true,
+      "seconds_total": 1.5,
+      "raw_unchanged_across_all_three_builds": true,
+      "pre": {
+        "sha256": "e56f1e298f6d76d0ef0dc9cc0ca9e5dcea4c061593635ef757c0dbf80b0b147b",
+        "bytes": 7266,
+        "identity_token": "tsn-normalized-v1:03467c44c79282db0961725f36d3ab5d53add1462a71ea89cd20338b2d459cdc",
+        "content_sha256": "4c7bfe86b566fae34ff5ac0ecd1411575741b3f15fc47cc8528bbf535e935670",
+        "sheet_rows": {
+          "Highway Summary (TSN)": 93
+        }
+      },
+      "post1": {
+        "sha256": "6b83b1787c5c4dd2128f1445cca8d5016a7b5d596ebc44f2698a290561fa59ea",
+        "bytes": 7262,
+        "workbook_identity_sha256": "6b83b1787c5c4dd2128f1445cca8d5016a7b5d596ebc44f2698a290561fa59ea",
+        "identity_token": "tsn-normalized-v1:32c3e97375d017d1c0e37f29424921f9cd9644e1a0634aa93a80c1adc46f57aa",
+        "content_sha256": "4c7bfe86b566fae34ff5ac0ecd1411575741b3f15fc47cc8528bbf535e935670",
+        "sheet_rows": {
+          "Highway Summary (TSN)": 93
+        }
+      },
+      "post2": {
+        "sha256": "6b83b1787c5c4dd2128f1445cca8d5016a7b5d596ebc44f2698a290561fa59ea",
+        "bytes": 7262,
+        "workbook_identity_sha256": "6b83b1787c5c4dd2128f1445cca8d5016a7b5d596ebc44f2698a290561fa59ea",
+        "identity_token": "tsn-normalized-v1:32c3e97375d017d1c0e37f29424921f9cd9644e1a0634aa93a80c1adc46f57aa",
+        "content_sha256": "4c7bfe86b566fae34ff5ac0ecd1411575741b3f15fc47cc8528bbf535e935670",
+        "sheet_rows": {
+          "Highway Summary (TSN)": 93
+        }
+      },
+      "criteria": {
+        "post1_post2_byte_identical": true,
+        "workbook_identity_unchanged": true,
+        "identity_token_unchanged": true,
+        "normalized_content_unchanged_by_the_fix": true,
+        "the_fix_DID_move_the_bytes_once": true
+      },
+      "pass": true
+    },
+    {
+      "report": "clean_highway",
+      "raw_kind": "statewide_xlsx",
+      "normalization_version": 1,
+      "raw_from": "C:\\Users\\Yunus\\Downloads\\TSMIS\\_inbox\\Cleanroad\\TSN_Cleanroad_files",
+      "raw_count": 1,
+      "built": true,
+      "seconds_total": 173.6,
+      "raw_unchanged_across_all_three_builds": true,
+      "pre": {
+        "sha256": "9cf51bfd5d5b9e89b9af9ccdbb6466951660a5d3b34abced3b6097c53f151169",
+        "bytes": 14864395,
+        "identity_token": "tsn-normalized-v1:a23364b8ab70108492c2f77458a4e61af36dd5559da0265fd5a702ff20785cf3",
+        "content_sha256": "764e4b762f7ae934c160048d204aeb4e6ca7a46eb1dc6dfa719914e0b318f1df",
+        "sheet_rows": {
+          "Clean Road Highway (TSN)": 60084,
+          "TSN Normalization": 2
+        }
+      },
+      "post1": {
+        "sha256": "d9873931a4da05c72404f28a04f14da021da9b7ddd3bbce18d1b0b903641bd13",
+        "bytes": 14864387,
+        "workbook_identity_sha256": "d9873931a4da05c72404f28a04f14da021da9b7ddd3bbce18d1b0b903641bd13",
+        "identity_token": "tsn-normalized-v1:2c1b329ed2bef37d2773720f8caf3ee5ddfcc5388874c17bb9240fe545e96f90",
+        "content_sha256": "764e4b762f7ae934c160048d204aeb4e6ca7a46eb1dc6dfa719914e0b318f1df",
+        "sheet_rows": {
+          "Clean Road Highway (TSN)": 60084,
+          "TSN Normalization": 2
+        }
+      },
+      "post2": {
+        "sha256": "d9873931a4da05c72404f28a04f14da021da9b7ddd3bbce18d1b0b903641bd13",
+        "bytes": 14864387,
+        "workbook_identity_sha256": "d9873931a4da05c72404f28a04f14da021da9b7ddd3bbce18d1b0b903641bd13",
+        "identity_token": "tsn-normalized-v1:2c1b329ed2bef37d2773720f8caf3ee5ddfcc5388874c17bb9240fe545e96f90",
+        "content_sha256": "764e4b762f7ae934c160048d204aeb4e6ca7a46eb1dc6dfa719914e0b318f1df",
+        "sheet_rows": {
+          "Clean Road Highway (TSN)": 60084,
+          "TSN Normalization": 2
+        }
+      },
+      "criteria": {
+        "post1_post2_byte_identical": true,
+        "workbook_identity_unchanged": true,
+        "identity_token_unchanged": true,
+        "normalized_content_unchanged_by_the_fix": true,
+        "the_fix_DID_move_the_bytes_once": true
+      },
+      "pass": true
+    },
+    {
+      "report": "clean_intersection",
+      "raw_kind": "statewide_xlsx",
+      "built": false,
+      "reason": "no staged raw",
+      "note": "DEF-05: tsn_load_clean_road has no normalizer for this slot, so its builder refuses and writes no workbook. check_tsn_identity_determinism asserts the refusal rather than assuming it."
+    },
+    {
+      "report": "clean_ramp",
+      "raw_kind": "statewide_xlsx",
+      "built": false,
+      "reason": "no staged raw",
+      "note": "DEF-05: tsn_load_clean_road has no normalizer for this slot, so its builder refuses and writes no workbook. check_tsn_identity_determinism asserts the refusal rather than assuming it."
+    }
+  ],
+  "gate": "build/check_tsn_identity_determinism.py"
+}

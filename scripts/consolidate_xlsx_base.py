@@ -85,7 +85,7 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
                      events=None, confirm_overwrite=None, existed_at_confirm=None,
                      header_override=None, header_comment=None,
                      decorate_workbook=None, commit_guard=None,
-                     input_files=None):
+                     input_files=None, stable_identity=False):
     """Combine every per-route XLSX in `input_dir` (reading worksheet
     `sheet_name`) into one workbook at `out_path`, prepending a "Route" column so
     rows from different routes stay distinguishable.
@@ -107,6 +107,12 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
     When supplied, only those direct children of ``input_dir`` are read; the
     directory is not globbed. Ordinary per-route consolidators omit it and keep
     their existing ``*.xlsx`` discovery behavior.
+
+    ``stable_identity`` (opt-in, PCOA-FINAL-017) removes the two wall clocks a
+    saved .xlsx carries, so identical content always produces identical bytes.
+    Only the TSN Highway Log library build asks for it — its digest is a
+    published identity that binds committed comparisons; every other caller
+    saves exactly as before.
     """
     events = events or Events()
     input_dir = Path(input_dir)
@@ -314,7 +320,8 @@ def consolidate_xlsx(*, input_dir, out_path, sheet_name, report_name, title,
             wb, out_path,
             lambda: (consolidation_meta.guard_allows(commit_guard, out_path)
                      and artifact_store.confirm_late_overwrite(
-                         out_path, existed_at_confirm, confirm)))
+                         out_path, existed_at_confirm, confirm)),
+            stable_identity=stable_identity)
     except PermissionError:
         return ConsolidateResult(
             status="error",

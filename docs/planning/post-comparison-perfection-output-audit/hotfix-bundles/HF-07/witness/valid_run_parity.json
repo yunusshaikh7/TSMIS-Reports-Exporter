@@ -1,0 +1,254 @@
+{
+  "schema": 1,
+  "finding": "PCOA-FINAL-015",
+  "operation": "RB-6 base-vs-head parity: a VALID cross-environment comparison is unchanged by the preflight refactor",
+  "verified_by": "Claude, 2026-08-31",
+  "base": "62bb0f329c7d7deea6c5ee9010c3d21b0acf6325",
+  "method": "compare_folders no longer repeats its four-way loader dispatch inline; it resolves it once through _side_loader_fn(). That is a pure extraction, so it is PROVED on real statewide data rather than asserted. Each family's real cross-environment comparison (2026-07-09 vs 2026-07-23 ssor-prod) is generated twice in separate processes - once against `git show <base>:scripts/compare_env.py` placed first on sys.path, once against the head - in mode='both', and both twins are digested cell for cell. `base_had_preflight_helper=false` / `head_had_preflight_helper=true` proves the two processes really did run different code.",
+  "branch_coverage": {
+    "highway_log": "flat XLSX branch (_load_xlsx_side)",
+    "intersection_summary": "aggregate branch (side_loader)",
+    "ramp_summary": "Ramp Summary PDF branch (sheet_name and side_loader both None)"
+  },
+  "not_covered": "The flat PDF-sourced branch (flat_pdf_loader) is not re-run here: it shares the extracted call shape with the flat XLSX branch, and the missing-side latency witness already drives both PDF adapters end to end. build/check_compare_env_missing_side.py exercises all 13.",
+  "results": [
+    {
+      "family": "highway_log",
+      "status": "ok",
+      "base_had_preflight_helper": false,
+      "head_had_preflight_helper": true,
+      "twins": [
+        "highway_log (values).xlsx",
+        "highway_log.xlsx"
+      ],
+      "identical": true,
+      "base_twins": {
+        "highway_log (values).xlsx": {
+          "sha256": "f40573b7629e31bb12e76b617443e2f0ce92b9dd3f9cbc546cda9fb3ac9079ba",
+          "sheet_rows": {
+            "Summary": 82,
+            "Spot Check": 50,
+            "Comparison": 54379,
+            "Routes": 253,
+            "Only in SSOR-PROD 2026-07-09": 1558,
+            "Only in SSOR-PROD 2026-07-23": 2495,
+            "SSOR-PROD 2026-07-09": 51886,
+            "SSOR-PROD 2026-07-23": 52823,
+            "Legend": 35,
+            "Source Files": 104706,
+            "__CMP_E2_SNAPSHOT_A": 51885,
+            "__CMP_E2_SNAPSHOT_B": 52822,
+            "Provenance": 13
+          }
+        },
+        "highway_log.xlsx": {
+          "sha256": "cbc37752a69f46c3fe7ba84f69e174060ec7cf9665332f4856c5b28f9a14d504",
+          "sheet_rows": {
+            "Summary": 83,
+            "Spot Check": 50,
+            "Comparison": 54379,
+            "Routes": 253,
+            "Only in SSOR-PROD 2026-07-09": 1558,
+            "Only in SSOR-PROD 2026-07-23": 2495,
+            "SSOR-PROD 2026-07-09": 51886,
+            "SSOR-PROD 2026-07-23": 52823,
+            "Legend": 35,
+            "Source Files": 104706,
+            "__CMP_E2_SNAPSHOT_A": 51885,
+            "__CMP_E2_SNAPSHOT_B": 52822,
+            "Provenance": 13
+          }
+        }
+      },
+      "head_twins": {
+        "highway_log (values).xlsx": {
+          "sha256": "f40573b7629e31bb12e76b617443e2f0ce92b9dd3f9cbc546cda9fb3ac9079ba",
+          "sheet_rows": {
+            "Summary": 82,
+            "Spot Check": 50,
+            "Comparison": 54379,
+            "Routes": 253,
+            "Only in SSOR-PROD 2026-07-09": 1558,
+            "Only in SSOR-PROD 2026-07-23": 2495,
+            "SSOR-PROD 2026-07-09": 51886,
+            "SSOR-PROD 2026-07-23": 52823,
+            "Legend": 35,
+            "Source Files": 104706,
+            "__CMP_E2_SNAPSHOT_A": 51885,
+            "__CMP_E2_SNAPSHOT_B": 52822,
+            "Provenance": 13
+          }
+        },
+        "highway_log.xlsx": {
+          "sha256": "cbc37752a69f46c3fe7ba84f69e174060ec7cf9665332f4856c5b28f9a14d504",
+          "sheet_rows": {
+            "Summary": 83,
+            "Spot Check": 50,
+            "Comparison": 54379,
+            "Routes": 253,
+            "Only in SSOR-PROD 2026-07-09": 1558,
+            "Only in SSOR-PROD 2026-07-23": 2495,
+            "SSOR-PROD 2026-07-09": 51886,
+            "SSOR-PROD 2026-07-23": 52823,
+            "Legend": 35,
+            "Source Files": 104706,
+            "__CMP_E2_SNAPSHOT_A": 51885,
+            "__CMP_E2_SNAPSHOT_B": 52822,
+            "Provenance": 13
+          }
+        }
+      }
+    },
+    {
+      "family": "intersection_summary",
+      "status": "ok",
+      "base_had_preflight_helper": false,
+      "head_had_preflight_helper": true,
+      "twins": [
+        "intersection_summary (values).xlsx",
+        "intersection_summary.xlsx"
+      ],
+      "identical": true,
+      "base_twins": {
+        "intersection_summary (values).xlsx": {
+          "sha256": "5dc98d889bcc6b6565201cdd7ac5ccdd0197659657b61abd4ab467b426d7406e",
+          "sheet_rows": {
+            "Summary": 109,
+            "Spot Check": 86,
+            "Comparison": 218,
+            "Only in SSOR-PROD 2026-07-09": 1,
+            "Only in SSOR-PROD 2026-07-23": 1,
+            "SSOR-PROD 2026-07-09": 219,
+            "SSOR-PROD 2026-07-23": 219,
+            "__CMP_E2_SNAPSHOT_A": 218,
+            "__CMP_E2_SNAPSHOT_B": 218,
+            "Provenance": 13
+          }
+        },
+        "intersection_summary.xlsx": {
+          "sha256": "e2b7f604cf4f432c9ff313dda3292f391e08ae4704ea4b6f7c786dc9ac176cd7",
+          "sheet_rows": {
+            "Summary": 108,
+            "Spot Check": 86,
+            "Comparison": 218,
+            "Only in SSOR-PROD 2026-07-09": 1,
+            "Only in SSOR-PROD 2026-07-23": 1,
+            "SSOR-PROD 2026-07-09": 219,
+            "SSOR-PROD 2026-07-23": 219,
+            "__CMP_E2_SNAPSHOT_A": 218,
+            "__CMP_E2_SNAPSHOT_B": 218,
+            "Provenance": 13
+          }
+        }
+      },
+      "head_twins": {
+        "intersection_summary (values).xlsx": {
+          "sha256": "5dc98d889bcc6b6565201cdd7ac5ccdd0197659657b61abd4ab467b426d7406e",
+          "sheet_rows": {
+            "Summary": 109,
+            "Spot Check": 86,
+            "Comparison": 218,
+            "Only in SSOR-PROD 2026-07-09": 1,
+            "Only in SSOR-PROD 2026-07-23": 1,
+            "SSOR-PROD 2026-07-09": 219,
+            "SSOR-PROD 2026-07-23": 219,
+            "__CMP_E2_SNAPSHOT_A": 218,
+            "__CMP_E2_SNAPSHOT_B": 218,
+            "Provenance": 13
+          }
+        },
+        "intersection_summary.xlsx": {
+          "sha256": "e2b7f604cf4f432c9ff313dda3292f391e08ae4704ea4b6f7c786dc9ac176cd7",
+          "sheet_rows": {
+            "Summary": 108,
+            "Spot Check": 86,
+            "Comparison": 218,
+            "Only in SSOR-PROD 2026-07-09": 1,
+            "Only in SSOR-PROD 2026-07-23": 1,
+            "SSOR-PROD 2026-07-09": 219,
+            "SSOR-PROD 2026-07-23": 219,
+            "__CMP_E2_SNAPSHOT_A": 218,
+            "__CMP_E2_SNAPSHOT_B": 218,
+            "Provenance": 13
+          }
+        }
+      }
+    },
+    {
+      "family": "ramp_summary",
+      "status": "ok",
+      "base_had_preflight_helper": false,
+      "head_had_preflight_helper": true,
+      "twins": [
+        "ramp_summary (values).xlsx",
+        "ramp_summary.xlsx"
+      ],
+      "identical": true,
+      "base_twins": {
+        "ramp_summary (values).xlsx": {
+          "sha256": "34ab79b4c83790143ccf303acd0950356b57fbd08fdf690c9468ad1e38eea558",
+          "sheet_rows": {
+            "Summary": 75,
+            "Spot Check": 52,
+            "Comparison": 127,
+            "Only in SSOR-PROD 2026-07-09": 1,
+            "Only in SSOR-PROD 2026-07-23": 1,
+            "SSOR-PROD 2026-07-09": 128,
+            "SSOR-PROD 2026-07-23": 128,
+            "__CMP_E2_SNAPSHOT_A": 127,
+            "__CMP_E2_SNAPSHOT_B": 127,
+            "Provenance": 13
+          }
+        },
+        "ramp_summary.xlsx": {
+          "sha256": "aecd7e9b03a9928c5bef6fba0aad2d0339846734961f5f0ff1423ced47f5975e",
+          "sheet_rows": {
+            "Summary": 74,
+            "Spot Check": 52,
+            "Comparison": 127,
+            "Only in SSOR-PROD 2026-07-09": 1,
+            "Only in SSOR-PROD 2026-07-23": 1,
+            "SSOR-PROD 2026-07-09": 128,
+            "SSOR-PROD 2026-07-23": 128,
+            "__CMP_E2_SNAPSHOT_A": 127,
+            "__CMP_E2_SNAPSHOT_B": 127,
+            "Provenance": 13
+          }
+        }
+      },
+      "head_twins": {
+        "ramp_summary (values).xlsx": {
+          "sha256": "34ab79b4c83790143ccf303acd0950356b57fbd08fdf690c9468ad1e38eea558",
+          "sheet_rows": {
+            "Summary": 75,
+            "Spot Check": 52,
+            "Comparison": 127,
+            "Only in SSOR-PROD 2026-07-09": 1,
+            "Only in SSOR-PROD 2026-07-23": 1,
+            "SSOR-PROD 2026-07-09": 128,
+            "SSOR-PROD 2026-07-23": 128,
+            "__CMP_E2_SNAPSHOT_A": 127,
+            "__CMP_E2_SNAPSHOT_B": 127,
+            "Provenance": 13
+          }
+        },
+        "ramp_summary.xlsx": {
+          "sha256": "aecd7e9b03a9928c5bef6fba0aad2d0339846734961f5f0ff1423ced47f5975e",
+          "sheet_rows": {
+            "Summary": 74,
+            "Spot Check": 52,
+            "Comparison": 127,
+            "Only in SSOR-PROD 2026-07-09": 1,
+            "Only in SSOR-PROD 2026-07-23": 1,
+            "SSOR-PROD 2026-07-09": 128,
+            "SSOR-PROD 2026-07-23": 128,
+            "__CMP_E2_SNAPSHOT_A": 127,
+            "__CMP_E2_SNAPSHOT_B": 127,
+            "Provenance": 13
+          }
+        }
+      }
+    }
+  ],
+  "verdict": "IDENTICAL 3/3 - both twins, cell for cell, on 54,379 / 218 / 127 Comparison rows."
+}

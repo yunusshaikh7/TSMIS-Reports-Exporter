@@ -24,6 +24,8 @@ function makeMockApi() {
   // reports first in the TSMIS site's order (Highway Log, its PDF, then Sequence),
   // then the TSAR family groups. group/short carry the family header + leaf label
   // (omitted for a flat report). Stable keys live in report_catalog, not here.
+  // `export_only` (PCOA-FINAL-018) mirrors report_catalog: the app exports these
+  // editions but has no consolidation or comparison for them, so the picker says so.
   const REPORTS = [
     { key: "highway_log", label: "Highway Log", fmt: "Excel" },
     { key: "highway_log_pdf", label: "Highway Log (PDF)", fmt: "PDF" },
@@ -35,12 +37,12 @@ function makeMockApi() {
     { key: "route_history", label: "Route History Table", fmt: "SSRS", disabled: true },
     { key: "ramp_summary", label: "TSAR: Ramp Summary", fmt: "PDF", group: "Ramp", short: "Summary" },
     // v0.25.1: Ramp Summary's Excel sibling (the site's rs_exportToExcel, id 13).
-    { key: "ramp_summary_excel", label: "TSAR: Ramp Summary (Excel)", fmt: "Excel", group: "Ramp", short: "Summary (Excel)" },
+    { key: "ramp_summary_excel", label: "TSAR: Ramp Summary (Excel)", fmt: "Excel", group: "Ramp", short: "Summary (Excel)", export_only: true },
     { key: "ramp_detail", label: "TSAR: Ramp Detail", fmt: "Excel", group: "Ramp", short: "Detail" },
     { key: "ramp_detail_pdf", label: "TSAR: Ramp Detail (PDF)", fmt: "PDF", group: "Ramp", short: "Detail (PDF)" },
     { key: "intersection_summary", label: "Intersection Summary", fmt: "Excel", group: "Intersection", short: "Summary" },
     // v0.25.1: Intersection Summary's print edition (ints_printAll, id 14).
-    { key: "intersection_summary_pdf", label: "Intersection Summary (PDF)", fmt: "PDF", group: "Intersection", short: "Summary (PDF)" },
+    { key: "intersection_summary_pdf", label: "Intersection Summary (PDF)", fmt: "PDF", group: "Intersection", short: "Summary (PDF)", export_only: true },
     { key: "intersection_detail", label: "Intersection Detail", fmt: "Excel", group: "Intersection", short: "Detail" },
     { key: "intersection_detail_pdf", label: "Intersection Detail (PDF)", fmt: "PDF", group: "Intersection", short: "Detail (PDF)" },
     // The "Highway" TSAR group — export enabled v0.19.1 (Detail/Summary) + the Highway
@@ -48,7 +50,7 @@ function makeMockApi() {
     { key: "highway_detail", label: "Highway Detail", fmt: "Excel", group: "Highway", short: "Detail" },
     { key: "highway_detail_pdf", label: "Highway Detail (PDF)", fmt: "PDF", group: "Highway", short: "Detail (PDF)" },
     { key: "highway_summary", label: "Highway Summary", fmt: "Excel", group: "Highway", short: "Summary" },
-    { key: "highway_summary_pdf", label: "Highway Summary (PDF)", fmt: "PDF", group: "Highway", short: "Summary (PDF)" },
+    { key: "highway_summary_pdf", label: "Highway Summary (PDF)", fmt: "PDF", group: "Highway", short: "Summary (PDF)", export_only: true },
     // 2026-07-22: the dev site 7.21 "Clean Road Files" group (ids 16/17/18) —
     // reserved, app-DISABLED (shown greyed) until the site un-greys them.
     { key: "clean_highway", label: "Clean Road: Highway", fmt: "Excel", group: "Clean Road", short: "Highway", disabled: true },

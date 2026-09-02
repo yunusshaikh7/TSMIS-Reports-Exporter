@@ -76,9 +76,11 @@ def _run_with_late_save_appearance(out_path, run):
     catch it. Restores the real atomic_save_if afterward."""
     real = artifact_store.atomic_save_if
 
-    def inject(wb, out, proceed):
+    def inject(wb, out, proceed, **kwargs):
+        # **kwargs forwards the producer's save options (stable_identity), so
+        # this double stays a pass-through as the boundary grows.
         Path(out).write_text("APPEARED", encoding="utf-8")   # external appearance, post-build
-        return real(wb, out, proceed)
+        return real(wb, out, proceed, **kwargs)
 
     artifact_store.atomic_save_if = inject
     try:
@@ -349,9 +351,9 @@ def tsn_highway_sequence_post_replace_source_change():
         # recheck can catch it. This is the exact TOCTOU window 035 closes.
         real_asi = artifact_store.atomic_save_if
 
-        def inject(wb, out, proceed):
-            committed = real_asi(wb, out, proceed)          # gate passes -> replace
-            src.write_bytes(b"%PDF-1.4 CHANGED DURING COMMIT")   # source changes now
+        def inject(wb, out, proceed, **kwargs):
+            committed = real_asi(wb, out, proceed, **kwargs)   # gate passes -> replace
+            src.write_bytes(b"%PDF-1.4 CHANGED DURING COMMIT")  # source changes now
             return committed
 
         artifact_store.atomic_save_if = inject

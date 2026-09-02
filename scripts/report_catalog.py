@@ -88,8 +88,16 @@ import compare_highway_detail_pdf as _cmp_highway_detail_pdf
 # shown under that header, or None for a flat top-level report shown by its full
 # label. Display-only — the stable key, EXPORT order, and the matrix/consolidate/
 # compare derivations are unaffected.
-ExportEntry = namedtuple("ExportEntry", "key label fmt spec group short_label",
-                         defaults=(None, None))
+# `export_only` (PCOA-FINAL-018): this edition is EXPORTED but no workflow can
+# check it — it has no consolidator, no `MATRIX` row and no comparison recipe, so
+# nothing in the app ever verifies the files the user just pulled. It is an
+# EXPLICIT declaration, not a derivation from the absence of a MATRIX row: a new
+# edition that is neither wired nor declared must FAIL `check_report_wiring`
+# rather than inherit silence. Additive metadata only — the stable key, the
+# EXPORT order and every derivation are unaffected.
+ExportEntry = namedtuple("ExportEntry",
+                         "key label fmt spec group short_label export_only",
+                         defaults=(None, None, False))
 ConsolidateEntry = namedtuple("ConsolidateEntry", "key label module")
 CompareEntry = namedtuple("CompareEntry", "key label adapter kind group")
 # normalization_version: bump WHENEVER a report's TSN normalizer/parser changes
@@ -171,10 +179,17 @@ EXPORT = (
     # Summary gains its print edition (`ints_printAll`). Appended LAST (stable
     # ids 13/14, batch order frozen). Both coalesce with their siblings
     # automatically (shared data_value).
+    # EXPORT-ONLY (PCOA-FINAL-018): each is the edition its family verifies
+    # through the OTHER one — Ramp Summary is checked via its PDF, Intersection
+    # Summary via its Excel — so neither of these two has a consolidator or a
+    # comparison. Closing the gap is a separate feature; the marker makes it
+    # visible instead of silent.
     ExportEntry("ramp_summary_excel", "TSAR: Ramp Summary (Excel)", "Excel",
-                _RAMP_SUMMARY_EXCEL_SPEC, group="Ramp", short_label="Summary (Excel)"),
+                _RAMP_SUMMARY_EXCEL_SPEC, group="Ramp", short_label="Summary (Excel)",
+                export_only=True),
     ExportEntry("intersection_summary_pdf", "Intersection Summary (PDF)", "PDF",
-                _INT_SUMMARY_PDF_SPEC, group="Intersection", short_label="Summary (PDF)"),
+                _INT_SUMMARY_PDF_SPEC, group="Intersection", short_label="Summary (PDF)",
+                export_only=True),
     # Route History Table (dev site, 2026-07-09) — RESERVED groundwork at stable
     # id 15, app-wide DISABLED (`reports.DISABLED_EXPORT_SUBDIRS`): the site's
     # report is an embedded SSRS page with no export flow, so the picker shows
@@ -203,7 +218,7 @@ EXPORT = (
     # Coalesces with the Excel edition automatically (shared data_value).
     ExportEntry("highway_summary_pdf", "Highway Summary (PDF)", "PDF",
                 _HIGHWAY_SUMMARY_PDF_SPEC, group="Highway",
-                short_label="Summary (PDF)"),
+                short_label="Summary (PDF)", export_only=True),
 )
 
 # Consolidate tab. The three Highway Log consolidators split by source/format
@@ -616,6 +631,15 @@ def export_keys():
     return tuple(e.key for e in EXPORT)
 
 
+def export_only_keys():
+    """`(export key, ...)` for every edition DECLARED export-only (PCOA-FINAL-018)
+    — exported, but with no consolidator, no MATRIX row and no comparison recipe,
+    so no workflow in the app can check the files it produces. Surfaced in the
+    report picker and gated by `build/check_report_wiring.py`, which fails naming
+    any ENABLED edition that is neither wired nor declared here."""
+    return tuple(e.key for e in EXPORT if e.export_only)
+
+
 def export_display():
     """`{export key: (group, short_label)}` — the report-PICKER grouping metadata.
     `group` is the family a report nests under (Ramp / Intersection / Highway), or
@@ -1006,6 +1030,12 @@ assert {m.tsn_key for m in MATRIX if m.tsn_key} <= _compare_keys, \
     "MATRIX tsn_key names an unknown COMPARE recipe"
 assert {m.self_key for m in MATRIX if m.self_key} <= _compare_keys, \
     "MATRIX self_key names an unknown COMPARE recipe"
+# PCOA-FINAL-018: the export-only DECLARATION and the comparison wiring are
+# mutually exclusive — an edition that has a matrix row is verifiable, so calling
+# it export-only in the picker would be a lie. (The converse, an unwired and
+# undeclared edition, is the gate in build/check_report_wiring.py: it needs
+# reports.DISABLED_EXPORT_SUBDIRS, which lives one layer up.)
+assert not ({e.key for e in EXPORT if e.export_only} & {m.row_key for m in MATRIX}),     "an export_only edition must not also have a MATRIX comparison row"
 # A self-check row must name BOTH the mode id and its comparator, or neither.
 assert all((m.self_id is None) == (m.self_key is None) for m in MATRIX), \
     "MATRIX self_id/self_key must be set together"

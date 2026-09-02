@@ -1,6 +1,11 @@
 # `RB-6` — Bundle Contract
 
-Status: **READY**
+Status: **JOINTLY APPROVED**
+
+> Original readiness froze this contract. Claude implemented the bundle;
+> Codex Review 1 returned solely `RB6-R1-EG-001`, which the return round
+> supplied. Separate Codex Review 1 and Review 2 approvals now make RB-6
+> jointly approved. See [REVIEW.md](REVIEW.md). Scope is unchanged.
 
 This readiness record combines the complete HF-07, HF-08 and HF-11 sections
 from [IMPLEMENTATION-PLAN.md](../../IMPLEMENTATION-PLAN.md). The plan remains
@@ -17,7 +22,7 @@ source rebuild or acceptance generation has begun.
 | RB-5 merge | `f11f9d2546b7775e432a22d5174f895f01210c35`; two separate Codex approvals, post-merge gate 171/171 and packaged application self-test PASS |
 | Prerequisites | RB-2, RB-3 and RB-5 all MERGED |
 | Implementer / reviewers | Claude / Codex Review 1 and a separate fresh Codex Review 2 |
-| Stage-4 base | PENDING — Prompt 04 must fetch and record the then-current clean pushed main before branching |
+| Stage-4 base | `62bb0f329c7d7deea6c5ee9010c3d21b0acf6325` — clean pushed `main` (`origin/main` identical), fetched 2026-08-31; the repo is at **v0.43.0**, two releases beyond the v0.41.1 the readiness note assumed |
 
 ## Current-main qualifications
 
@@ -62,7 +67,7 @@ remain valid. Do not create this acceptance evidence during readiness.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer. Both findings are Claude-unique, so Codex must bind to Claude's `witness\export_coverage.txt`, the committed `claude-round1-export-coverage.txt`, and the three timing witnesses, then re-measure independently |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | Inherits RB-6: READY |
+| Status | Inherits RB-6: JOINTLY APPROVED |
 
 **Exact scope.** 015: the folder-comparison preflight on every statewide PDF
 family, in classic environment, Baseline and Everything ENV. 018: the catalog's
@@ -165,7 +170,7 @@ and the re-derived coverage census.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer. Claude-unique finding, so Codex must bind to Claude's `witness\tsn_rebuild_all.json` and re-run the double rebuild itself; the root cause is an unverified hypothesis and the reviewer's first job is to confirm the implementer actually established it |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | Inherits RB-6: READY |
+| Status | Inherits RB-6: JOINTLY APPROVED |
 
 **Exact scope.** The TSN library's normalized-workbook build and identity for all
 eight supported datasets, and the consequence that pressing *Rebuild* invalidates
@@ -260,7 +265,7 @@ eight datasets and the content-invariance proof.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to `source-audit/prior-7.9-highway-log-sibling-raw-source-audit.json` (its own 021 witness) and to Claude's `witness\pdf_head_census.txt` for 022 |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | Inherits RB-6: READY |
+| Status | Inherits RB-6: JOINTLY APPROVED |
 
 **Exact scope.** Turn two prose regression guards into executable checks, and
 create the owner-facing vendor escalation record for route 140. **No product

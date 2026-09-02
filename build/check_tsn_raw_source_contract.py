@@ -217,9 +217,11 @@ def test_statewide_immutable_snapshot_and_commit_guard():
         member.write_bytes(b"A")
         real_atomic_save_if = artifact_store.atomic_save_if
 
-        def late_mutation(workbook, path, proceed):
+        def late_mutation(workbook, path, proceed, **kwargs):
+            # **kwargs forwards the producer's save options (stable_identity),
+            # so this double stays a pass-through as the boundary grows.
             member.write_bytes(b"B")
-            return real_atomic_save_if(workbook, path, proceed)
+            return real_atomic_save_if(workbook, path, proceed, **kwargs)
 
         with patch(artifact_store, "atomic_save_if", late_mutation):
             late = tsn_library.build_normalized(

@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "finding": "PCOA-FINAL-021",
+  "operation": "RB-6 re-verification of the two PDF-only prior-7.9 Highway Log rows",
+  "verified_by": "Claude, 2026-08-31, independently of the Stage-1A audit",
+  "source_set": "ground-truth/All Reports 7.9/2026-07-09 ssor-prod",
+  "method": "Each route's raw PDF was re-read through the shipped char-window reader (pdf_table_lib.char_lines at the Highway Log tolerances Y=3 / word gap=1.5) and each Excel sibling through openpyxl. Note the Location PREFIX prints as its OWN token: a first-word match finds route 074's unprefixed 000.000 but MISSES route 101's R022.828, which is why the search is on the joined line. A probe that returns 0 is broken until a positive control says otherwise \u2014 route 074 is that control here.",
+  "rows": [
+    {
+      "route": "074",
+      "location": "000.000",
+      "occurrence": 2,
+      "description": "PDF-ONLY OCCURRENCE",
+      "pdf_count": 2,
+      "excel_count": 1,
+      "raw_pdf_page": 7,
+      "raw_pdf_line_text": "000.000 002.080 000.000 R 60 M U C H 01 Z 08 00 12 00 00 B7Z 00Z H 01 Z 00 00 11 02 00 640101",
+      "reverified": true
+    },
+    {
+      "route": "101",
+      "location": "R022.828",
+      "occurrence": 1,
+      "description": "PDF-ONLY ROW",
+      "pdf_count": 1,
+      "excel_count": 0,
+      "raw_pdf_page": 142,
+      "raw_pdf_line_text": "R 022.828 000.007 022.807 U 70 F D F H 04 N 10 10 45 10 10 07 N 840626",
+      "reverified": true,
+      "note": "The Excel sibling carries no row containing '022.828' in ANY column, not merely none whose Location equals R022.828."
+    }
+  ],
+  "rule": "The PDF-derived row universe RETAINS both rows; the Excel-derived universe must never synthesize them. They surface as ONE-SIDED, never paired against an invented partner.",
+  "guard": "build/check_site_change_regression_guards.py"
+}

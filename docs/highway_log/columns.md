@@ -6,6 +6,11 @@ most of them), how those labels are written and recognized, the hover tooltips +
 Legend sheet, and where the labeling is wired in. Owned here:
 `scripts/highway_log_columns.py`. (v0.14.0.)
 
+> **`R/U`, `TER`, `H/G`, `A/C` on route 140 are blank in the 2026-07-23 Excel
+> export and populated in its own print.** That is a vendor data defect, not a
+> label or parser problem — see [VEN-01](../vendor-escalations.md#ven-01).
+> Never infer the missing values.
+
 ## TL;DR
 
 - The vendor TSMIS Excel export **mislabeled most Highway Log columns**; those
