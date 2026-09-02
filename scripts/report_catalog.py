@@ -195,19 +195,22 @@ EXPORT = (
     # report is an embedded SSRS page with no export flow, so the picker shows
     # it greyed until the site gives it one (the v0.18.1 Highway-pair path).
     ExportEntry("route_history", "Route History Table", "SSRS", _ROUTE_HISTORY_SPEC),
-    # The "Clean Road Files" group (dev site, 2026-07-21) — RESERVED groundwork at
-    # stable ids 16/17/18, app-wide DISABLED (`reports.DISABLED_EXPORT_SUBDIRS`):
-    # the site added a `cs-header` + three `cs-disabled` options with NO report
-    # module behind them, so there is no export flow to drive yet. Appended LAST
-    # (stable-id append-only; batch positions 0–15 frozen). Their TSN sources ARE
-    # already staged — see the TSN block below. Enabling one = write its real save
-    # off a fresh capture + drop its subdir from the gate.
+    # The "Clean Road Files" group (dev site, 2026-07-21) — reserved at stable ids
+    # 16/17/18 while the site's three options were `cs-disabled` with no report
+    # module behind them; EXPORT ENABLED 2026-09-02 off the dev site 9.1 capture
+    # (BUILD_DATE 2026-08-19), which un-greyed them and ships `clean_*.js` — real
+    # Excel-sibling specs in export_clean_road. Appended LAST (stable-id
+    # append-only; batch positions 0–15 frozen). EXPORT-ONLY (PCOA-FINAL-018):
+    # no consolidator, MATRIX row or comparison recipe until real per-route files
+    # are censused — the TSN sources ARE staged (the TSN block below), so the
+    # picker says "export only" rather than the app pretending to check them.
     ExportEntry("clean_highway", "Clean Road: Highway", "Excel", _CLEAN_HIGHWAY_SPEC,
-                group="Clean Road", short_label="Highway"),
+                group="Clean Road", short_label="Highway", export_only=True),
     ExportEntry("clean_intersection", "Clean Road: Intersection", "Excel",
-                _CLEAN_INTERSECTION_SPEC, group="Clean Road", short_label="Intersection"),
+                _CLEAN_INTERSECTION_SPEC, group="Clean Road", short_label="Intersection",
+                export_only=True),
     ExportEntry("clean_ramp", "Clean Road: Ramp", "Excel", _CLEAN_RAMP_SPEC,
-                group="Clean Road", short_label="Ramp"),
+                group="Clean Road", short_label="Ramp", export_only=True),
     # Highway Summary (PDF), v0.38.0 — the same "Highway Summary" dropdown option
     # saved via the site's Print layout (hs_printAll), the exact parallel of
     # Intersection Summary (PDF). Confirmed on the 2026-08-10 site capture.
