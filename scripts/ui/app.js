@@ -81,9 +81,16 @@ function makeReportRow(rep, checked, off, onChange) {
       + "report once per route and saves both files.");
   }
   if (rep.export_only && !off) {
-    tips.push("Export only: this edition has no consolidation and no comparison, so "
-      + "the app cannot check the files it saves. Its sibling edition is the one "
-      + "the Consolidate and Compare tabs verify.");
+    // A print/Excel EDITION (*_pdf / *_excel) is verified through its sibling
+    // edition; a standalone export-only report (the Clean Road trio) has no
+    // sibling — its consolidation and comparison simply haven't been built yet.
+    tips.push(/_(pdf|excel)$/.test(rep.key)
+      ? "Export only: this edition has no consolidation and no comparison, so "
+        + "the app cannot check the files it saves. Its sibling edition is the one "
+        + "the Consolidate and Compare tabs verify."
+      : "Export only: this report has no consolidation and no comparison yet, so "
+        + "the app cannot check the files it saves. Those come later, once real "
+        + "exports exist to build them on.");
   }
   if (tips.length) {
     row.dataset.baseTitle = tips.join(" ");
