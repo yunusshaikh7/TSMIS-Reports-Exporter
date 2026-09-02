@@ -182,7 +182,7 @@ Two layers, because the owner wants **fewer branches, reviews and releases**
 | 3 | **RB-3** | HF-04 | Ramp Detail — restores 9 comparison placements that produce nothing today | None | `hotfix/rb-3-ramp-detail-layout` | **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc` |
 | 4 | **RB-4** | HF-05 + HF-10 | Evidence, end to end — **AMENDED by the owner 2026-08-05 and 2026-08-09**: print crops on the four `_pdf` report families only; anchorless blanks from the print's own cell geometry are disclosed limitations | None | `hotfix/rb-4-evidence` | **MERGED** — `83a24896a5a970a3686df87934210f54cea43778` |
 | 5 | **RB-5** | HF-06 + HF-09 | Difference classification — the two opposite rulings applied to the right classes | RB-1, RB-2 | `hotfix/rb-5-difference-classification` | **MERGED** — `f11f9d2546b7775e432a22d5174f895f01210c35` |
-| 6 | **RB-6** | HF-07 + HF-08 + HF-11 | Engine hygiene, coverage truth, and the closeout guards | RB-2, RB-3, RB-5 | `hotfix/rb-6-hygiene-and-guards` | **JOINTLY APPROVED** |
+| 6 | **RB-6** | HF-07 + HF-08 + HF-11 | Engine hygiene, coverage truth, and the closeout guards | RB-2, RB-3, RB-5 | `hotfix/rb-6-hygiene-and-guards` | **MERGED** — `154e83b86d7b4f43429f05f6a71929f4d6c8e7c3` |
 
 ### Prompt and record identity
 
@@ -483,7 +483,7 @@ mapping also proves one primary implementation/review bundle per finding:
 | **RB-3** | HF-04 | 001, 012 | 2 | **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc` |
 | **RB-4** | HF-05, HF-10 | 004, 005, 006, 007 | 4 | **MERGED** — `83a24896a5a970a3686df87934210f54cea43778` |
 | **RB-5** | HF-06, HF-09 | 011, 013 | 2 | **MERGED** — `f11f9d2546b7775e432a22d5174f895f01210c35` |
-| **RB-6** | HF-07, HF-08, HF-11 | 015, 017, 018, 020, 021, 022 | 6 | **JOINTLY APPROVED** |
+| **RB-6** | HF-07, HF-08, HF-11 | 015, 017, 018, 020, 021, 022 | 6 | **MERGED** — `154e83b86d7b4f43429f05f6a71929f4d6c8e7c3` |
 | **Total** | 11 work items | 22 unique findings | **22** | |
 
 ## Secondary regression dependencies (verify, do not re-implement)
@@ -1502,7 +1502,7 @@ before/after count table.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer. Both findings are Claude-unique, so Codex must bind to Claude's `witness\export_coverage.txt`, the committed `claude-round1-export-coverage.txt`, and the three timing witnesses, then re-measure independently |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-6: JOINTLY APPROVED** |
+| Status | **Inherits RB-6: MERGED** |
 
 **Exact scope.** 015: the folder-comparison preflight on every statewide PDF
 family, in classic environment, Baseline and Everything ENV. 018: the catalog's
@@ -1605,7 +1605,7 @@ and the re-derived coverage census.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer. Claude-unique finding, so Codex must bind to Claude's `witness\tsn_rebuild_all.json` and re-run the double rebuild itself; the root cause is an unverified hypothesis and the reviewer's first job is to confirm the implementer actually established it |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-6: JOINTLY APPROVED** |
+| Status | **Inherits RB-6: MERGED** |
 
 **Exact scope.** The TSN library's normalized-workbook build and identity for all
 eight supported datasets, and the consequence that pressing *Rebuild* invalidates
@@ -1917,7 +1917,7 @@ table and the count-invariance proof.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to `source-audit/prior-7.9-highway-log-sibling-raw-source-audit.json` (its own 021 witness) and to Claude's `witness\pdf_head_census.txt` for 022 |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-6: JOINTLY APPROVED** |
+| Status | **Inherits RB-6: MERGED** |
 
 **Exact scope.** Turn two prose regression guards into executable checks, and
 create the owner-facing vendor escalation record for route 140. **No product
@@ -2283,3 +2283,13 @@ supplemental cell-walker's structural boundary. Three new focused checks pass;
 all seven witness hashes and exact discrepancy results reconcile. No candidate
 passes the practical-impact gate. Both reviews approve; RB-6 is **JOINTLY
 APPROVED** and eligible for Prompt 05 merge closeout.
+
+**RB-6 merge and program closeout — 2026-09-02:** merged without force as
+`154e83b86d7b4f43429f05f6a71929f4d6c8e7c3`, whose first parent is the fetched
+unchanged `origin/main` base `62bb0f329c7d7deea6c5ee9010c3d21b0acf6325`
+and whose second parent is joint-approval head
+`ab09ce2249a4ac3350d9ffae406abdf8eacfa41c`. The once-only post-merge gate
+passed **175/175 in 161 seconds**. The hash-pinned packaged application then
+passed its exact-artifact self-test (`SMOKE OK`; 171 MB onefolder). No statewide
+generation, Excel recalculation, raw census or acceptance corpus was repeated.
+RB-1 through RB-6 are all merged; no later bundle is eligible.

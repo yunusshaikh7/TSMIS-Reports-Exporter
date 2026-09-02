@@ -1,13 +1,32 @@
 # RB-6 — Adversarial Review Record
 
-Status: **JOINTLY APPROVED**
+Status: **MERGED**
 
-Current decision: **Codex Review 2 is APPROVED** at entry head
-`4df2c72e7c23c1ba8b2c966782a09416058044ca`. Codex Review 1 and the separate
-Codex Review 2 both approve; neither reviewer implemented the Claude bundle.
-The prior evidence return `RB6-R1-EG-001` remains closed, every criterion has
-exact bound evidence, and the independent Review 2 challenges found no
-practical-impact failure. RB-6 is **JOINTLY APPROVED** and mergeable.
+Current decision: **JOINTLY APPROVED AND MERGED**. Codex Review 1 and the
+separate Codex Review 2 approved joint-review head
+`ab09ce2249a4ac3350d9ffae406abdf8eacfa41c`; neither reviewer implemented the
+Claude bundle. The prior evidence return `RB6-R1-EG-001` remains closed, every
+criterion has exact bound evidence, and the independent Review 2 challenges
+found no practical-impact failure. RB-6 merged without force as
+`154e83b86d7b4f43429f05f6a71929f4d6c8e7c3`; both prescribed post-merge smoke
+legs passed.
+
+## Post-merge smoke and program closeout — 2026-09-02
+
+| Closeout item | Result |
+|---|---|
+| Remote-main confirmation | PASS — a fresh fetch left `origin/main` at recorded base `62bb0f329c7d7deea6c5ee9010c3d21b0acf6325`; local `main` also named that base before integration |
+| No-force merge | PASS — merge `154e83b86d7b4f43429f05f6a71929f4d6c8e7c3`; parents are unchanged remote-main base `62bb0f329c7d7deea6c5ee9010c3d21b0acf6325` and approved RB-6 head `ab09ce2249a4ac3350d9ffae406abdf8eacfa41c` |
+| Full post-merge gate | **PASS — 175 passed, 0 failed of 175 in 161 seconds** via `python build/run_checks.py -j 4 -k` |
+| Packaged application | **PASS — exact frozen executable reported `SMOKE OK` and exercised every app-required code path; 171 MB onefolder** via `build/build.ps1 -SelfTest` |
+| Non-duplication | PASS — no statewide generation, installed-Excel recalculation, raw-source recount, comparison acceptance corpus, UI recapture or evidence rebuild was performed |
+| Next bundle | **NONE — RB-1 through RB-6 are merged; the ordered implementation queue is complete** |
+
+The merge smoke ran once on the integrated tree after both approvals. Build
+outputs are ignored local artifacts and are not part of the merge. Preserve
+all retained acceptance evidence and review records. After the closeout record
+is pushed, only the fully merged RB-6 hotfix branch and its dedicated worktree
+are eligible for Prompt 05's bounded cleanup.
 
 ## Review 2 — Codex — APPROVED
 

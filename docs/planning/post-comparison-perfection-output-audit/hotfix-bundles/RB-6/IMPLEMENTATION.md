@@ -1,6 +1,6 @@
 # `RB-6` — Implementation Record
 
-Status: **JOINTLY APPROVED** (Review 1 return `RB6-R1-EG-001` closed; separate Codex Reviews 1 and 2 approved 2026-09-01)
+Status: **MERGED** (Review 1 return `RB6-R1-EG-001` closed; separate Codex Reviews 1 and 2 approved before merge `154e83b86d7b4f43429f05f6a71929f4d6c8e7c3`)
 
 > Codex Review 1 (2026-08-31): **DENIED — EVIDENCE GAP**, solely
 > `RB6-R1-EG-001` — retain the contract-required HF-08 post-double-rebuild

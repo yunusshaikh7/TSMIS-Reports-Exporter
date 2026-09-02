@@ -1,8 +1,8 @@
 # Post-Comparison Output Program — Start Here
 
-Workflow state: **Stages 1A, 1B, 2 and 3 complete; RB-1 through RB-5 are MERGED. RB-6 is JOINTLY APPROVED after separate Codex Reviews 1 and 2; Prompt 05 merge closeout is authorized — not yet merged or released.**
+Workflow state: **PROGRAM COMPLETE — Stages 1A, 1B, 2 and 3 are complete, and RB-1 through RB-6 are MERGED. RB-6 merged as `154e83b86d7b4f43429f05f6a71929f4d6c8e7c3` after separate Codex Reviews 1 and 2; its post-merge gate and packaged-application self-test passed.**
 
-Last updated: 2026-09-01 (RB-6 Review 2 approval)
+Last updated: 2026-09-02 (RB-6 merge and program closeout)
 
 > **`main` has moved a long way since this program last ran.** The readiness
 > contract above was prepared against `v0.34.0`-era `main`, and the state line
@@ -32,13 +32,12 @@ first pass.
 
 ## Next action
 
-Complete Prompt 05's authorized final-approval sequence for RB-6: commit the
-joint review record, fetch and confirm remote `main`, merge
-`hotfix/rb-6-hygiene-and-guards` without force, run the planned post-merge smoke
-once, record the merge SHA, push `main`, then remove only the fully merged RB-6
-branch/worktree. [RB-6/REVIEW.md](hotfix-bundles/RB-6/REVIEW.md) contains both
-signed approvals and the independent Review 2 challenge. RB-6 is the final
-queued bundle, so no later RB readiness record or acceptance run follows.
+No later RB bundle is eligible. Preserve `main`, `gh-pages`, unrelated
+branches, retained acceptance artifacts, audit roots and all review records.
+[RB-6/REVIEW.md](hotfix-bundles/RB-6/REVIEW.md) contains both signed approvals,
+the independent Review 2 challenge and the passing merge smoke. Any later
+feature, release or evidence cleanup is a separately owner-directed task
+outside this completed implementation queue.
 
 RB-6 was implemented by Claude from base `62bb0f329c7d7deea6c5ee9010c3d21b0acf6325`
 (the repo is at **v0.43.0**). The last commit touching `scripts/` is
@@ -141,8 +140,8 @@ did not create a branch, modify product code, or begin an acceptance run.
 | 1B | Claude independent deliverable audit | **COMPLETE** (freeze `c788b29`) | `prompts/PROMPT-01-CLAUDE-INDEPENDENT-AUDIT.md` | `CLAUDE-FINDINGS.md` |
 | 2 | Codex/Claude cross-check and canonical findings | **COMPLETE — JOINTLY APPROVED** | `prompts/PROMPT-02-CROSSCHECK-AND-FINAL-FINDINGS.md` | `FINAL-RECONCILIATION.md`, `FINAL-FINDINGS-FOR-IMPLEMENTATION.md` |
 | 3 | Agree on ordered implementation bundles | **COMPLETE — JOINTLY AGREED** | `prompts/PROMPT-03-AGREE-IMPLEMENTATION-PLAN.md` | `IMPLEMENTATION-PLAN.md`, `hotfix-bundles/<RB-ID>/BUNDLE.md` |
-| 4 | Implement one bounded RB bundle | **RB-6 IMPLEMENTED; RETURN CLOSED** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
-| 5 | Adversarially review and approve that bundle | **RB-6 JOINTLY APPROVED — MERGE CLOSEOUT AUTHORIZED** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
+| 4 | Implement one bounded RB bundle | **COMPLETE — RB-6 MERGED** | `prompts/PROMPT-04-IMPLEMENT-HOTFIX-BUNDLE.md` | Hotfix branch plus `hotfix-bundles/<RB-ID>/IMPLEMENTATION.md` |
+| 5 | Adversarially review and approve that bundle | **COMPLETE — RB-6 MERGED AFTER TWO APPROVALS** | `prompts/PROMPT-05-ADVERSARIAL-REVIEW-HOTFIX.md` | `hotfix-bundles/<RB-ID>/REVIEW.md`; merge or return to Stage 4 |
 
 Stages 4 and 5 repeat until every accepted implementation bundle is merged.
 Each new bundle starts from the latest clean `main`.
