@@ -3,6 +3,65 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.44.0 — 2026-09-02
+
+The dev site's Clean Road Files went live, so the app now exports them; the
+website-source capture pulls everything the page uses; and the matrix day
+pickers say what each day actually holds.
+
+- **Clean Road File: Highway, Intersection and Ramp now export.** The dev site's
+  2026-08-19 build un-greyed the three "Clean Road Files" options and ships their
+  report modules, so the three picker entries reserved in July (stable ids
+  16/17/18) are real Excel exports. Each is the site's flat, one-row-per-record
+  replica of the legacy TASAS clean-road file with the FULL legacy header — 74 THY
+  / 55 INX / 34 RAM columns (the first two match the TSN extracts' headers exactly;
+  Ramp adds two blank columns to TSN's 32) — with the columns the site cannot
+  source present and blank. They ride the same Export button as every Excel
+  report, Reset cleans their folders, and Export Everything ticks them. Export-only
+  for now, and the picker says so: consolidating and comparing them waits for
+  real files to census first.
+  Prod may still grey them; the export then fails fast with the usual "currently
+  unavailable" message, so pick the development site in Settings until prod
+  catches up. Clean Highway runs the site's whole Highway Log builder plus four
+  more layer lookups per route, so expect Highway-Log-class run times. Verified
+  offline by driving the app's own report selection and Generate sequence over the
+  real captured site source — every option on the 9.1 and 8.10 captures, with the
+  three new reports rendering the empty state the app recognises; the live data
+  path is work-PC only.
+- **Capture website source pulls everything.** The Settings capture used to save
+  only the scripts and stylesheets the page had loaded, under flattened names. It
+  now saves the raw page as `index.html` plus the rendered DOM and then EVERY
+  same-origin file the page uses: what the DOM loaded, plus every relative file
+  name mentioned in the page or inside any fetched file, followed until nothing new
+  turns up — the report modules the page inserts with `document.write`,
+  `config.js`, `debug.js`, images, referenced notes. Files keep their site names
+  (`shared.js`), and the manifest records the site's BUILD_DATE, its CONFIG
+  environment and data source, a SHA-256 per file, and the third-party URLs it saw
+  but never fetched. Driven over a served copy of the 9.1 site source it fetched
+  every file of a manual capture byte-identical. It deliberately writes no archive:
+  the support bundle stays the one zip the app produces, so zip the folder
+  yourself to hand it over.
+- **The add-day pickers show what each day holds.** A run folder exists as soon as
+  any one report is pulled, so a bare date in a matrix's add-day picker read like a
+  full export when it might hold a single Ramp Summary. Every option in all three
+  day matrices now reads `2026-08-31 · HL HSL RD RS IS ID HD HS` — short codes for
+  the reports actually exported that day for that matrix, in row order; an
+  export-less today says `today — nothing exported yet`; the PDF vs Excel picker
+  tags a family with both editions `HL` and a one-edition family `HL:xlsx`, since
+  that cell cannot be built. The codes are defined once in the report catalog, one
+  per export, and a day is offered exactly when it carries at least one tag.
+- **What the 2026-08-19 site build changes in your exports** — a site change, not an
+  app defect. The site now drops retired re-calibration copies of a segment, so a
+  Highway Log, Highway Detail, Highway Summary or Highway Sequence export pulled
+  after that date can differ from an earlier pull in its DATE OF REC rows and
+  values; read a vs-Baseline cell that spans the date accordingly. Postmile mode
+  now scopes results to the entered counties and the county list gained YOL and
+  YUB; neither touches the app's District/County/Route exports. The vendor's own
+  Clean Highway column-to-layer mapping was cross-checked against the app's ArcGIS
+  build: it agrees layer for layer on every attribute column and names two sources
+  the app had marked unsourced (functional class and a last-significant-change
+  date); see `docs/planning/cleanroad-highways.md`.
+
 ## v0.43.0 — 2026-08-31
 
 The ArcGIS "Reports vs layers" tab renders a second report — Intersection

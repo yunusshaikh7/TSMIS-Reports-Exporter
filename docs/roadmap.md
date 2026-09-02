@@ -74,7 +74,7 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 
 ---
 
-## ▣ OPEN WORK INVENTORY (current as of v0.43.0, 2026-08-31)
+## ▣ OPEN WORK INVENTORY (current as of v0.44.0, 2026-09-02)
 
 **This is the definitive list of what is left.** Everything below is genuinely
 open; anything not here is either shipped (see `CHANGELOG.md`) or a historical
@@ -118,13 +118,13 @@ counts as migration drift, not defect — see C4 + D5.
 
 | # | Item | Notes |
 |---|---|---|
-| B1 | **The work-PC acceptance run — now against v0.43.0. THE TOP PRIORITY: everything since v0.32.0 is offline-verified only.** | Comparison + evidence output intentionally differ from v0.26.2/v0.27.x: re-run both sides, never reconcile old against new. TSN libraries rebuild once; PDF-sourced workbooks re-consolidate once. Then the carried v0.30–v0.32 items in [the backlog plan §4](planning/v0.30-owner-backlog-plan.md): Retry Edge sign-in, the PDF vs Excel Matrix, a fast-mode dual-format run, a pre-v0.32 partial resume, one Excel-row evidence run. **New for v0.37.0:** a Highway Summary export → consolidate → vs-TSN run, and one Highway Detail evidence generation (its evidence lane just opened — see D1). **New for v0.38.x:** re-consolidate Highway Detail (PDF) and confirm it reports COMPLETE with a clean PDF-vs-Excel cell; let the TSN Highway Detail library rebuild once (v4) and confirm the Report View's DCR + ADT columns are populated; and run a **both-editions Highway Summary** export to confirm one render saves both files in the right order. **New for v0.38.2:** drag a day COLUMN on each by-day matrix and confirm it moves on screen (it never did before); toggle a report chip on a matrix and confirm it responds instantly; and — the one worth watching on a STOCKED TSN library — confirm the matrices repaint quickly after the first render, now that the raw manifest memoizes instead of re-hashing every raw source each time. **New for v0.40.0–v0.41.0 (all comparison-speed work, offline-verified only):** rebuild a few cells and confirm the workbooks still open and read as before (output is byte-identical by construction, so anything else is a bug); and tick **Counts only** under Comparison output, refresh a matrix, and confirm the cells show `counts only — build to certify` in grey with NO workbooks written, that a zero-difference cell reads `match*` rather than a green tick, and that building one for real replaces the preview with a normal green result. **New for v0.41.2 — and note the v0.41.0 line above was untestable until now**: the Counts only checkbox never persisted, so confirm FIRST that it stays ticked, mirrors onto the by-day matrix, and survives an app restart. Then run it over a STALE cell that already has a workbook and confirm the workbook is left on disk untouched and the cell reads **counts confirmed** with a green left edge when the numbers still agree (grey ground, still offering a build — never a green tick). **New for v0.42.2:** consolidate a statewide Highway Sequence (PDF) export and confirm it reports COMPLETE with no ⚠ unparsed-line note — a single printed row the site renders with a blank Highway Group used to be dropped and take the whole 252-route consolidation to partial with it. |
+| B1 | **The work-PC acceptance run — now against v0.44.0. THE TOP PRIORITY: everything since v0.32.0 is offline-verified only.** | Comparison + evidence output intentionally differ from v0.26.2/v0.27.x: re-run both sides, never reconcile old against new. TSN libraries rebuild once; PDF-sourced workbooks re-consolidate once. Then the carried v0.30–v0.32 items in [the backlog plan §4](planning/v0.30-owner-backlog-plan.md): Retry Edge sign-in, the PDF vs Excel Matrix, a fast-mode dual-format run, a pre-v0.32 partial resume, one Excel-row evidence run. **New for v0.37.0:** a Highway Summary export → consolidate → vs-TSN run, and one Highway Detail evidence generation (its evidence lane just opened — see D1). **New for v0.38.x:** re-consolidate Highway Detail (PDF) and confirm it reports COMPLETE with a clean PDF-vs-Excel cell; let the TSN Highway Detail library rebuild once (v4) and confirm the Report View's DCR + ADT columns are populated; and run a **both-editions Highway Summary** export to confirm one render saves both files in the right order. **New for v0.38.2:** drag a day COLUMN on each by-day matrix and confirm it moves on screen (it never did before); toggle a report chip on a matrix and confirm it responds instantly; and — the one worth watching on a STOCKED TSN library — confirm the matrices repaint quickly after the first render, now that the raw manifest memoizes instead of re-hashing every raw source each time. **New for v0.40.0–v0.41.0 (all comparison-speed work, offline-verified only):** rebuild a few cells and confirm the workbooks still open and read as before (output is byte-identical by construction, so anything else is a bug); and tick **Counts only** under Comparison output, refresh a matrix, and confirm the cells show `counts only — build to certify` in grey with NO workbooks written, that a zero-difference cell reads `match*` rather than a green tick, and that building one for real replaces the preview with a normal green result. **New for v0.41.2 — and note the v0.41.0 line above was untestable until now**: the Counts only checkbox never persisted, so confirm FIRST that it stays ticked, mirrors onto the by-day matrix, and survives an app restart. Then run it over a STALE cell that already has a workbook and confirm the workbook is left on disk untouched and the cell reads **counts confirmed** with a green left edge when the numbers still agree (grey ground, still offering a build — never a green tick). **New for v0.42.2:** consolidate a statewide Highway Sequence (PDF) export and confirm it reports COMPLETE with no ⚠ unparsed-line note — a single printed row the site renders with a blank Highway Group used to be dropped and take the whole 252-route consolidation to partial with it. **New for v0.44.0:** on the DEV site, export one route of each Clean Road report and confirm a workbook lands with the full legacy header (on prod the trio may still fail fast as "currently unavailable" — expected until prod catches up); run Settings ▸ Capture website source once and confirm the folder holds `index.html` plus every module under its site name with the BUILD_DATE in the manifest; open each matrix's add-day picker and confirm every day lists the reports it holds. |
 
 ### C. Waiting on the vendor / the site
 
 | # | Item | Unlock |
 |---|---|---|
-| C1 | **Clean Road exports** (`clean_highway` / `clean_intersection` / `clean_ramp`) | All three `cs-disabled` with no report module behind them. A statewide export of each unlocks their real `save` + TSN normalizers. |
+| C1 | ~~**Clean Road exports**~~ **EXPORT SHIPPED 2026-09-02** off the dev site 9.1 capture (`clean_*.js` live, the options un-greyed). Still owed by the site/owner: **a statewide work-PC export of each** (`clean_highway` / `clean_intersection` / `clean_ramp`) | Real per-route files unlock the next tiers — a consolidator, the SITE-export-vs-TSN comparison (the TSN slots + `tsn_load_clean_road` are staged) and the site-export-vs-our-ArcGIS-build comparison (all three THY-shaped), plus the `*_printAll` print editions if wanted. The 9.1 capture is DEV: prod may still grey the trio, in which case the export fails fast. |
 | C2 | **Route History export flow** | Dev-site only, greyed reserved placeholder (stable id 15). |
 | C3 | **Statewide Highway Summary PRINTS** | The export edition SHIPPED in v0.38.0 (`export_highway_summary_pdf`, `hs_printAll`) and is deliberately export-only: there is no real statewide print yet to verify a parser against. One work-PC run producing 252 PDFs unlocks its consolidator + PDF-vs-Excel self-check (the HSL / RD-PDF sequence). |
 | C4 | ~~A same-date TSN Highway Summary print~~ **— THERE WILL NEVER BE ONE.** Not a wait; a permanent property | **TSMIS REPLACED TSN.** The site says so on every report cover page ("TASAS — TSMIS has officially replaced the TASAS — TSN database"), and every TSN source we hold is from the one final pull (HD extract REF 2025-09-08; the RD / RS / IS / HS prints all 09/15/2025). The TSN side is a FROZEN historical snapshot and will not be refreshed. See D5 for what that means for the comparisons. |
@@ -675,14 +675,20 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
 
 ## Feature backlog
 
-- [ ] **Clean Road Files (Highway / Intersection / Ramp)** [L] — **STAGED 2026-07-22, blocked on
-  the site.** The dev site 7.21 capture (`site-captures/TSMIS Dev Site 7.21/`) adds a "Clean Road
-  Files" dropdown group: `clean_highway` / `clean_intersection` / `clean_ramp`, all `cs-disabled`,
-  with **no `clean_*.js` report module** and no reference to those values anywhere in the site's JS.
-  Wired as reserved-DISABLED groundwork exactly like the v0.18.1 Highway pair and v0.25.1 Route
-  History — stable ids **16/17/18** (`export_clean_road.py`, `reports.DISABLED_EXPORT_SUBDIRS`,
-  `batch_manifest` appended, greyed in every picker; each `save` refuses loudly if un-gated
-  without a real implementation).
+- [ ] **Clean Road Files (Highway / Intersection / Ramp)** [L] — **EXPORT SHIPPED 2026-09-02;
+  the consolidate/compare tiers wait on real files.** Staged 2026-07-22 off the dev site 7.21
+  capture (a "Clean Road Files" dropdown group: `clean_highway` / `clean_intersection` /
+  `clean_ramp`, all `cs-disabled`, no `clean_*.js` module) as reserved-DISABLED groundwork —
+  stable ids **16/17/18**. The dev site 9.1 capture (`site-captures/TSMIS Dev Site 9.1/`,
+  BUILD_DATE 2026-08-19) un-greyed the three options and ships their modules, so
+  `export_clean_road.py` now carries real Excel-sibling specs and the trio left
+  `reports.DISABLED_EXPORT_SUBDIRS` (Route History is the one placeholder left). Each export
+  is the site's flat legacy-CSV replica with the FULL header (74 THY / 55 INX / 34 RAM columns
+  — the first two are exactly the TSN extracts' headers; Ramp adds `RAM_HPMS_ID` +
+  `RAM_RAMP_ROUTE_NAME` to TSN's 32), the unsourced columns present-and-blank (22 / 10 / 13).
+  Verified offline by driving the shipped `select_report` + Generate over the real captured
+  site JS with every ArcGIS query stubbed (docs/reports.md); live data + the download are
+  work-PC only (B1).
   **The TSN side is already delivered and staged:** `report_catalog.TSN` carries three library
   slots for the owner's clean-road extracts (`CA HIGHWAYS 09.08.2025.xlsx` 60,083×74,
   `CA INTERSECTIONS 09.03.2025.xlsx` 16,626×55, `CA RAMPS 09.08.2025.xlsx` 15,410×32 —
@@ -692,10 +698,17 @@ and fixed the dark-mode checkbox eyesore. Next: **v0.17.0** — see `docs/v0.17.
   normalizer** — the normalized shape is decided by the comparison it feeds, and no Clean Road
   report exports from the site yet, so any projection written now would be a guess. Its builders
   return a typed error naming that state; the raw is still counted and the folders are created.
-  **Unlock:** a statewide export of each report once the site un-greys them. Then per report:
-  write the real `save` off a fresh capture, write the TSN projection (the
-  `tsn_load_highway_detail` pattern), bump that slot's `normalization_version`, add the
-  comparator + matrix rows, and drop its subdir from the gate. See
+  **Unlock for the next tiers:** a statewide work-PC export of each report. Then per report:
+  census the real files, write the consolidator (a `consolidate_xlsx` wrap — the site emits
+  the full legacy header, so the TSN projection can stay verbatim like Highway's), bump that
+  slot's `normalization_version`, add the comparator + matrix rows. For Highway two
+  comparisons open up with all three sides THY-shaped — the site export vs TSN, and the site
+  export vs OUR ArcGIS build. The vendor's own column→layer mapping (`clean_highway.js`) has
+  been cross-checked against `clean_highway_columns.PROVENANCE` (2026-09-02, detail in
+  [planning/cleanroad-highways.md](planning/cleanroad-highways.md)): it agrees layer-for-layer
+  on every attribute column and on the primary-layer block eff-date rule, and it names two
+  sources we mark unsourced — `THY_FUNCTIONAL_CLASS_CODE` ← layer 91 `F_System` and
+  `THY_LAST_SIG_CHG_DATE` ← the newest significant-change layer date. See
   [reports.md](reports.md) footnote 7.
 - [x] **ArcGIS layer processing → build our own Clean Road CA HIGHWAYS** [L] — **SHIPPED
   v0.29.0 (2026-07-22), same-day from the owner's full 40-layer per-layer drop.** The ArcGIS
