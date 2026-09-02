@@ -40,6 +40,7 @@ import export_highway_log_pdf as highway_log_pdf  # noqa: E402
 import export_intersection_detail as intersection_detail  # noqa: E402
 import export_intersection_detail_pdf as intersection_detail_pdf  # noqa: E402
 import export_intersection_summary as intersection_summary  # noqa: E402
+import export_clean_road as clean_road  # noqa: E402
 
 from playwright.sync_api import sync_playwright  # noqa: E402
 
@@ -132,6 +133,16 @@ _REPORTS = [
      "intersection_detail_data.html", "intersection_detail_empty.html"),
     (intersection_summary.SPEC, "Intersection Summary",
      "intersection_summary_data.html", "intersection_summary_empty.html"),
+    # The three Clean Road Files reports (dev site 9.1) render through ONE
+    # template -- the shared action bar + .clh-table, and `*_showResults('none')`
+    # renders the bare .ramp-empty marker with NO action bar -- so all three specs
+    # must resolve on the same fixture pair.
+    (clean_road.HIGHWAY_SPEC, "Clean Road: Highway",
+     "clean_road_data.html", "clean_road_empty.html"),
+    (clean_road.INTERSECTION_SPEC, "Clean Road: Intersection",
+     "clean_road_data.html", "clean_road_empty.html"),
+    (clean_road.RAMP_SPEC, "Clean Road: Ramp",
+     "clean_road_data.html", "clean_road_empty.html"),
 ]
 
 
@@ -309,6 +320,13 @@ def test_nested_menu(page):
     # A flat top-level option on the nested menu still selects with no flyout.
     check("nested: flat highway_log selects without a flyout",
           _drive("Highway Log", "highway_log") == "Highway Log")
+    # A FLAT cs-sub option under the "Clean Road Files" header (dev site 9.1):
+    # not a fly-out leaf, visible text just "Highway" (also a TSAR fly-out
+    # parent's text), the full name in data-label -- chosen by data-value, with
+    # no reveal needed.
+    check("nested: flat cs-sub clean_highway selects via data-value (no flyout)",
+          _drive("Clean Road File Highway", "clean_highway")
+          == "Clean Road File Highway")
 
     # A cs-disabled leaf (the "coming soon" Highway group) -> ReportUnavailableError,
     # raised at the class gate before any flyout reveal is needed.
@@ -369,9 +387,12 @@ def test_env_scan_probe(page):
         {"label": "TSAR: Ramp Summary",  "value": "Ramp_Summary"},
         {"label": "Highway Log",         "value": "highway_log"},   # flat, no flyout
         {"label": "Highway Detail",      "value": "highway_detail"},  # cs-disabled group
+        {"label": "Clean Road File Ramp", "value": "clean_ramp"},     # flat cs-sub row
         {"label": "Nonexistent Report",  "value": "nope"},
     ]
     opts = page.evaluate(_REPORT_OPTIONS_JS, probe)
+    check("flat cs-sub Clean Road row found via data-value -> ok",
+          opts.get("Clean Road File Ramp", {}).get("state") == "ok")
     check("grouped Intersection leaf found via data-value -> ok",
           opts.get("Intersection Detail", {}).get("state") == "ok")
     check("grouped Ramp leaf found via data-value -> ok",

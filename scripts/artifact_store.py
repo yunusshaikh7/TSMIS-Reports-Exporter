@@ -1818,6 +1818,34 @@ def newest_report_file_mtime(folder):
     return newest
 
 
+def exported_subdirs_by_day(source, subdirs):
+    """{date: [subdir, ...]} — for every run folder of `source` under output/
+    (newest first), which of `subdirs` (kept in the order given) hold at least one
+    real export file. A day none of them is exported on is omitted. The ONE truth
+    behind the matrix add-day pickers' per-day "what's actually here" tags — the
+    same `newest_report_file_mtime` test the matrices' `available_days` use, so a
+    day is offered exactly when it carries at least one tag.
+
+    Where one date has both a suffixed run folder and a pre-v0.10 bare-date
+    folder, the first folder (newest-first order) that holds an export answers
+    for the date, mirroring `available_days`."""
+    from paths import OUTPUT_ROOT, list_output_days, parse_run_folder  # leaf module
+    out = {}
+    for name in list_output_days():
+        parsed = parse_run_folder(name)
+        if not parsed:
+            continue
+        date, src, env = parsed
+        if f"{src}-{env}" != source or date in out:
+            continue
+        base = OUTPUT_ROOT / name
+        present = [s for s in subdirs
+                   if newest_report_file_mtime(base / s) is not None]
+        if present:
+            out[date] = present
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # CMP-AUD-080 — CONTENT identity for every effective source.
 #

@@ -37,6 +37,8 @@ _LEGACY_OUTPUT_DIRS = ("ramp_summary", "ramp_summary_excel",
                        "intersection_summary", "intersection_summary_pdf",
                        "highway_detail", "highway_detail_pdf",
                        "highway_summary", "highway_summary_pdf",
+                       # The Clean Road Files exports (enabled 2026-09-02).
+                       "clean_highway", "clean_intersection", "clean_ramp",
                        "consolidated", "tsn_highway_log", "tsmis_highway_log_pdf",
                        "tsmis_intersection_detail_pdf", "tsmis_highway_detail_pdf",
                        "tsmis_highway_sequence_pdf", "tsmis_ramp_detail_pdf",

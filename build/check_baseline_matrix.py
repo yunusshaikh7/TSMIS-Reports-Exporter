@@ -127,6 +127,10 @@ def main():
         check("days scoped to the source, newest first",
               baseline_matrix.available_days("ssor-prod") == ["2026-06-18", "2026-06-11"]
               and baseline_matrix.available_days("ars-prod") == [])
+        check("available_day_reports: per-day short codes in row order, no today",
+              baseline_matrix.available_day_reports("ssor-prod")
+              == {"2026-06-18": ["RD", "HL"], "2026-06-11": ["RD"]}
+              and baseline_matrix.available_day_reports("ars-prod") == {})
         opts = baseline_matrix.baseline_options("ssor-prod", str(dest))
         check("options = store + both days, with per-option report coverage",
               [o["id"] for o in opts] == ["store", "day:2026-06-18", "day:2026-06-11"]
@@ -298,6 +302,8 @@ def main():
         check("baseline_matrix_info carries available_days + baseline_options",
               info["available_days"] == ["2026-06-18", "2026-06-11"]
               and [o["id"] for o in info["baseline_options"]][0] == "store")
+        check("baseline_matrix_info carries the per-day report tags",
+              info.get("available_day_reports", {}).get("2026-06-11") == ["RD"])
         check("unknown source rejected",
               bool(a.set_baseline_matrix_source("zz-zz").get("error")))
         check("valid source set", a.set_baseline_matrix_source("ssor-prod").get("ok"))

@@ -681,6 +681,30 @@ def picker_order():
     return _PICKER_ORDER
 
 
+# Compact per-report codes for space-tight UI — the matrix day pickers' per-day
+# "what's actually exported" tags (2026-09-02). Keyed by export key; a print
+# edition is its Excel sibling's code + "-PDF". Every EXPORT key has one and the
+# codes are unique (both asserted at import), so a new report cannot ship without
+# a tag and two reports can never read alike.
+_SHORT_CODES = {
+    "ramp_summary": "RS", "ramp_summary_excel": "RS-XLSX",
+    "ramp_detail": "RD", "ramp_detail_pdf": "RD-PDF",
+    "highway_sequence": "HSL", "highway_sequence_pdf": "HSL-PDF",
+    "highway_log": "HL", "highway_log_pdf": "HL-PDF",
+    "intersection_summary": "IS", "intersection_summary_pdf": "IS-PDF",
+    "intersection_detail": "ID", "intersection_detail_pdf": "ID-PDF",
+    "highway_detail": "HD", "highway_detail_pdf": "HD-PDF",
+    "highway_summary": "HS", "highway_summary_pdf": "HS-PDF",
+    "route_history": "RH",
+    "clean_highway": "CR-HWY", "clean_intersection": "CR-INT", "clean_ramp": "CR-RMP",
+}
+
+
+def short_code(key):
+    """The compact code for an export key (`highway_log` -> 'HL')."""
+    return _SHORT_CODES[key]
+
+
 # ----------------------------------------------------------------------------- #
 # W2 (v0.19.0): ONE family organization across every tab's report picker — the
 # Consolidate radios and the Compare radios mirror the Export picker: flat
@@ -1022,6 +1046,9 @@ assert set(_INPUT_PROFILE_BY_KEY.values()) <= set(_INPUT_PROFILES), \
 # every declared tsn_key/self_key resolves to a real COMPARE entry (so a matrix row
 # can never dispatch to a comparator that doesn't exist — the v0.17.3 crash class).
 _assert_unique("MATRIX", tuple(m.row_key for m in MATRIX), len(MATRIX))
+assert set(_SHORT_CODES) == set(export_keys()), \
+    "every EXPORT key needs exactly one short code (and no stale ones)"
+_assert_unique("SHORT_CODES", tuple(_SHORT_CODES.values()), len(_SHORT_CODES))
 assert {m.row_key for m in MATRIX} <= set(export_keys()), "MATRIX row_key is not an export key"
 assert {m.self_pdf for m in MATRIX if m.self_pdf} <= set(export_keys()), \
     "MATRIX self_pdf is not an export key"

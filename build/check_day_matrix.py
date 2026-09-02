@@ -248,6 +248,17 @@ def main():
         check("an export-less source still offers TODAY (W3: the matrix exports "
               "into today itself)",
               day_matrix.available_days("ars-dev") == [_today])
+        # The add-day picker's per-day tags: WHICH reports each offered day holds,
+        # as the catalog's short codes in row order; today with nothing = [].
+        check("available_day_reports: per-day short codes in row order (+ an empty today)",
+              day_matrix.available_day_reports("ssor-prod")
+              == {_today: [], "2026-06-18": ["HL", "HL-PDF"], "2026-06-17": ["HL"]}
+              and day_matrix.available_day_reports("ars-prod")
+              == {_today: [], "2026-06-17": ["HL"]}
+              and day_matrix.available_day_reports("ars-dev") == {_today: []})
+        check("every offered day carries a tag list (the two readers agree)",
+              set(day_matrix.available_day_reports("ssor-prod"))
+              == set(day_matrix.available_days("ssor-prod")))
         # W3: a TODAY column with NO export renders every cell export-absent (so
         # the UI hides Build and shows only the Export action) — the snapshot
         # must not choke on the not-yet-exported day.
@@ -367,6 +378,8 @@ def main():
         info = a.day_matrix_info()
         check("day_matrix_info carries available_days + sources",
               "available_days" in info and len(info["sources"]) == 6)
+        check("day_matrix_info carries the per-day report tags for the add-day picker",
+              info.get("available_day_reports", {}).get("2026-06-18") == ["HL", "HL-PDF"])
         picked = dest / "picked-shared-tsn.xlsx"
         wb = Workbook(); wb.active["A1"] = "TSN"; wb.save(picked); wb.close()
         picked_res = a.set_matrix_tsn_file("highway_log_pdf", str(picked))

@@ -50,6 +50,9 @@ is exactly the contract select_report's submenu-reveal must satisfy.
     <option value="highway_sequence">Highway Sequence Listing</option>
     <option value="highway_detail">Highway Detail</option>
     <option value="highway_summary">Highway Summary</option>
+    <option value="clean_highway">Clean Road File Highway</option>
+    <option value="clean_intersection">Clean Road File Intersection</option>
+    <option value="clean_ramp">Clean Road File Ramp</option>
     <option value="intersection_detail">Intersection Detail</option>
     <option value="intersection_summary">Intersection Summary</option>
     <option value="Ramp_Detail">Ramp Detail</option>
@@ -63,6 +66,16 @@ is exactly the contract select_report's submenu-reveal must satisfy.
     <ul class="cs-list">
       <li class="cs-option" data-value="highway_log">Highway Log</li>
       <li class="cs-option" data-value="highway_sequence">Highway Sequence Listing</li>
+      <!-- The "Clean Road Files" group (dev site 9.1, BUILD_DATE 2026-08-19): a
+           cs-header followed by FLAT cs-option cs-sub rows -- indented under the
+           header but NOT fly-out leaves (no cs-parent, no cs-submenu, no hover
+           reveal). Visible text is the short "Highway" (which also happens to be
+           a TSAR fly-out parent's text); the full name is in data-label and the
+           stable id in data-value. -->
+      <li class="cs-header">Clean Road Files</li>
+      <li class="cs-option cs-sub" data-value="clean_highway"      data-label="Clean Road File Highway">Highway</li>
+      <li class="cs-option cs-sub" data-value="clean_intersection" data-label="Clean Road File Intersection">Intersection</li>
+      <li class="cs-option cs-sub" data-value="clean_ramp"         data-label="Clean Road File Ramp">Ramp</li>
       <li class="cs-header">TSAR Reports</li>
       <li class="cs-sub cs-parent cs-disabled">Highway
         <ul class="cs-submenu">

@@ -62,7 +62,49 @@ def main():
           and not so("http://tsmis.example.gov/a.js", page)
           and not so("https://evil.tsmis.example.gov.attacker.io/a.js", page))
 
-    print("manifest writer:")
+    print("clean names — the site's own file names, collision-safe:")
+    cn = site_capture._clean_name
+    taken = {}
+    n1 = cn("https://x/shared.js?v=2026-08-19%2009%3A35", taken); taken[n1] = "https://x/shared.js?v=2026-08-19%2009%3A35"
+    check("basename, cache-buster query dropped", n1 == "shared.js")
+    check("the same URL keeps its name", cn("https://x/shared.js?v=2026-08-19%2009%3A35", taken) == "shared.js")
+    n2 = cn("https://x/Scripts/shared.js", taken)
+    check("a DIFFERENT url wanting a taken name falls back to the flattened spelling",
+          n2 != "shared.js" and n2 == site_capture._safe_name("https://x/Scripts/shared.js"))
+    check("traversal neutralized",
+          "/" not in cn("https://x/../../etc/passwd", {}) and ".." not in cn("https://x/a/..%2F..", {}))
+
+    print("reference discovery — relative names in page text and scripts:")
+    fr = site_capture._find_refs
+    page = "https://tsmis-dev.dot.ca.gov/index.html?env=dev&src=ars"
+    html = ("<script src=\"https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js\"></script>"
+            "<link rel=\"stylesheet\" href=\"styles.css\"><img src=\"caltranslogo.png\">"
+            "document.write('<scr'+'ipt src=\"config.js' + _v + '\"></scr'+'ipt>' +"
+            "'<scr'+'ipt src=\"clean_highway.js' + _v + '\"></scr'+'ipt>');")
+    refs = fr(html, page)
+    names = [u.rsplit("/", 1)[-1] for u in refs]
+    check("finds the stylesheet, image and document.write'd modules",
+          names == ["styles.css", "caltranslogo.png", "config.js", "clean_highway.js"])
+    check("resolves against the page (same origin, query-free)",
+          refs[0] == "https://tsmis-dev.dot.ca.gov/styles.css")
+    check("an absolute CDN URL's own file name is NOT a site reference",
+          not any("xlsx" in u for u in refs))
+    js = ("// See DEBUG.md for the reference. const u = `${window.location.origin}/index.html`;"
+          " fetch(`${CONFIG.mapServiceUrl}/85/query?f=json`); data.error.message; /\\.js$/.test(x);"
+          " const rows = results.map(r => r); const d = await resp.json(); codes.map (c => c);"
+          " const s = 'shared.js'; const s2 = 'shared.js'; //# sourceMappingURL=shared.js.map")
+    refs2 = [u.rsplit("/", 1)[-1] for u in fr(js, page)]
+    check("scripts: a markdown note, root-relative index.html and a source map found; "
+          "JS syntax (`f=json`, `.message`, a `\\.js` regex, `.map(`/`.json(` calls) "
+          "ignored; duplicates collapsed",
+          refs2 == ["DEBUG.md", "index.html", "shared.js", "shared.js.map"])
+    check("canonical identity drops the cache-buster",
+          site_capture._canonical("https://x/a.js?v=1#f") == site_capture._canonical("https://x/a.js"))
+
+    print("build date + manifest:")
+    check("BUILD_DATE parsed from the page",
+          site_capture._build_date("<script>const BUILD_DATE = '2026-08-19 09:35';</script>")
+          == "2026-08-19 09:35" and site_capture._build_date("<p>no stamp</p>") is None)
     d = Path(tempfile.mkdtemp(prefix="tsmis_cap_"))
     try:
         site_capture._write_manifest(d, "https://x/p", "ssor", "prod",
@@ -75,6 +117,21 @@ def main():
               "ssor-prod" in text and "page (rendered DOM).html" in text
               and "HTTP 404" in text and "INCOMPLETE" in text
               and "Caltrans-internal" in text)
+        site_capture._write_manifest(d, "https://x/p", "ssor", "dev",
+                                     [("shared.js", 10, "ab" * 32)], [],
+                                     build_date="2026-08-19 09:35",
+                                     config={"env": "dev", "src": "ars", "service": "https://x/M"},
+                                     foreign=["https://cdn.sheetjs.com/x.js"])
+        text = (d / "_capture_info.txt").read_text(encoding="utf-8")
+        check("manifest carries the build date, CONFIG, a sha256 per file and the "
+              "third-party list",
+              "2026-08-19 09:35" in text and "env=dev src=ars" in text
+              and "sha256=" + "ab" * 32 in text and "cdn.sheetjs.com" in text)
+        # evidence.py is the ONE zip writer in the app (check_evidence_bundle pins
+        # it); the capture hands over a FOLDER, never an archive of internal source.
+        src_text = (ROOT / "scripts" / "site_capture.py").read_text(encoding="utf-8")
+        check("the capture writes no archive (zipfile is not imported)",
+              "zipfile" not in src_text)
     finally:
         shutil.rmtree(d, ignore_errors=True)
 

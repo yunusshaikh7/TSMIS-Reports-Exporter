@@ -1507,6 +1507,12 @@ row.) Like `matrix.py`, it NEVER edits the manual compare code — it only orche
   live-formulas, report toggles) live in a mirrored corner `#dayMatrixConfig` (shown via
   `body.matrix-wide.mw-day`), keeping the grid area lean — the per-report TSN pickers sit in the
   row headers (v0.17.0), not the corner. See [gui.md](gui.md).
+- **The add-day picker tags each day with what it holds (2026-09-02):** `available_day_reports(source)`
+  (here, in `baseline_matrix` and in `pdf_excel_matrix`) returns `{date: [short code, …]}` over the one
+  shared walk `artifact_store.exported_subdirs_by_day` — the same real-export-file test as
+  `available_days`, so the two readers agree day for day — and the snapshot carries it as
+  `available_day_reports`. The picker renders `2026-08-31 · HL HSL RD`; the PDF-vs-Excel variant
+  marks a one-edition family `HL:xlsx`. Locked by the three matrix checks' pins.
 - **Boundary guard:** `build_day_cell` rejects any `date`/`source` whose combined folder name doesn't
   parse as a real run folder, so neither can traverse out of `output/`.
 - **Locked by** `build/check_day_matrix.py` (rows/sources, available-day detection, snapshot + greyed
