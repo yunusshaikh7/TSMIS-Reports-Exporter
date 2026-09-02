@@ -182,7 +182,7 @@ Two layers, because the owner wants **fewer branches, reviews and releases**
 | 3 | **RB-3** | HF-04 | Ramp Detail — restores 9 comparison placements that produce nothing today | None | `hotfix/rb-3-ramp-detail-layout` | **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc` |
 | 4 | **RB-4** | HF-05 + HF-10 | Evidence, end to end — **AMENDED by the owner 2026-08-05 and 2026-08-09**: print crops on the four `_pdf` report families only; anchorless blanks from the print's own cell geometry are disclosed limitations | None | `hotfix/rb-4-evidence` | **MERGED** — `83a24896a5a970a3686df87934210f54cea43778` |
 | 5 | **RB-5** | HF-06 + HF-09 | Difference classification — the two opposite rulings applied to the right classes | RB-1, RB-2 | `hotfix/rb-5-difference-classification` | **MERGED** — `f11f9d2546b7775e432a22d5174f895f01210c35` |
-| 6 | **RB-6** | HF-07 + HF-08 + HF-11 | Engine hygiene, coverage truth, and the closeout guards | RB-2, RB-3, RB-5 | `hotfix/rb-6-hygiene-and-guards` | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| 6 | **RB-6** | HF-07 + HF-08 + HF-11 | Engine hygiene, coverage truth, and the closeout guards | RB-2, RB-3, RB-5 | `hotfix/rb-6-hygiene-and-guards` | **JOINTLY APPROVED** |
 
 ### Prompt and record identity
 
@@ -483,7 +483,7 @@ mapping also proves one primary implementation/review bundle per finding:
 | **RB-3** | HF-04 | 001, 012 | 2 | **MERGED** — `61fcac611de255c56759551a95ccd2e552287bfc` |
 | **RB-4** | HF-05, HF-10 | 004, 005, 006, 007 | 4 | **MERGED** — `83a24896a5a970a3686df87934210f54cea43778` |
 | **RB-5** | HF-06, HF-09 | 011, 013 | 2 | **MERGED** — `f11f9d2546b7775e432a22d5174f895f01210c35` |
-| **RB-6** | HF-07, HF-08, HF-11 | 015, 017, 018, 020, 021, 022 | 6 | **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| **RB-6** | HF-07, HF-08, HF-11 | 015, 017, 018, 020, 021, 022 | 6 | **JOINTLY APPROVED** |
 | **Total** | 11 work items | 22 unique findings | **22** | |
 
 ## Secondary regression dependencies (verify, do not re-implement)
@@ -1502,7 +1502,7 @@ before/after count table.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer. Both findings are Claude-unique, so Codex must bind to Claude's `witness\export_coverage.txt`, the committed `claude-round1-export-coverage.txt`, and the three timing witnesses, then re-measure independently |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-6: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| Status | **Inherits RB-6: JOINTLY APPROVED** |
 
 **Exact scope.** 015: the folder-comparison preflight on every statewide PDF
 family, in classic environment, Baseline and Everything ENV. 018: the catalog's
@@ -1605,7 +1605,7 @@ and the re-derived coverage census.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer. Claude-unique finding, so Codex must bind to Claude's `witness\tsn_rebuild_all.json` and re-run the double rebuild itself; the root cause is an unverified hypothesis and the reviewer's first job is to confirm the implementer actually established it |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-6: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| Status | **Inherits RB-6: JOINTLY APPROVED** |
 
 **Exact scope.** The TSN library's normalized-workbook build and identity for all
 eight supported datasets, and the consequence that pressing *Rebuild* invalidates
@@ -1917,7 +1917,7 @@ table and the count-invariance proof.
 | Implementer | Claude |
 | Review 1 | **Codex** — non-implementer; binds to `source-audit/prior-7.9-highway-log-sibling-raw-source-audit.json` (its own 021 witness) and to Claude's `witness\pdf_head_census.txt` for 022 |
 | Review 2 | **Codex** — a second, separate chat that must challenge review 1 and re-derive from source, never copy it |
-| Status | **Inherits RB-6: IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** |
+| Status | **Inherits RB-6: JOINTLY APPROVED** |
 
 **Exact scope.** Turn two prose regression guards into executable checks, and
 create the owner-facing vendor escalation record for route 140. **No product
@@ -2269,3 +2269,17 @@ runtime, as-of 2025-09-08; the refusal is retained as evidence. Highway Detail
 reproduces the CMP-AUD-244 statewide 160,347. No `scripts/` change; one
 declared docstring correction (`a49c43e`). Status returns to
 `IMPLEMENTED — AWAITING ADVERSARIAL REVIEW`; the next applicable pass is Review 1.
+
+**RB-6 Stage 5, Review 1 re-review — 2026-09-01:** Codex independently
+verified the exact remedy/runtime bindings and closed `RB6-R1-EG-001`. All nine
+buildable datasets, both workbook twins, typed outcomes, discrepancy counts and
+36 retained workbook hashes reconcile; the retained full gate remains 175/175.
+Review 1 APPROVED and advanced RB-6 to a separate Review 2.
+
+**RB-6 Stage 5, Review 2 — 2026-09-01:** a separate Codex task independently
+challenged Review 1 across omitted flat-PDF loader shapes, cross-session TSN
+determinism, atomic comparison publication, freshness/failure behavior and the
+supplemental cell-walker's structural boundary. Three new focused checks pass;
+all seven witness hashes and exact discrepancy results reconcile. No candidate
+passes the practical-impact gate. Both reviews approve; RB-6 is **JOINTLY
+APPROVED** and eligible for Prompt 05 merge closeout.

@@ -1,12 +1,196 @@
 # RB-6 — Adversarial Review Record
 
-Status: **REVIEW 1 APPROVED — AWAITING REVIEW 2**
+Status: **JOINTLY APPROVED**
 
-Current decision: **Codex Review 1 re-review is APPROVED** at
-`b790e1080d7fd463fe8997e93d7fc55c90965bdc`. The bounded return
-`RB6-R1-EG-001` is closed: retained, hash-bound post-double-rebuild vs-TSN
-comparisons now cover all nine buildable registered datasets, both workbook
-twins, and unchanged typed outcomes/counts. No practical-impact failure remains.
+Current decision: **Codex Review 2 is APPROVED** at entry head
+`4df2c72e7c23c1ba8b2c966782a09416058044ca`. Codex Review 1 and the separate
+Codex Review 2 both approve; neither reviewer implemented the Claude bundle.
+The prior evidence return `RB6-R1-EG-001` remains closed, every criterion has
+exact bound evidence, and the independent Review 2 challenges found no
+practical-impact failure. RB-6 is **JOINTLY APPROVED** and mergeable.
+
+## Review 2 — Codex — APPROVED
+
+| Field | Reviewed identity |
+|---|---|
+| Reviewer / pass | Codex / Review 2, separate fresh task; independent non-implementer |
+| Implementer | Claude |
+| Branch / worktree | `hotfix/rb-6-hygiene-and-guards` / `C:/Users/Yunus/Projects/TSMIS-hotfix-rb-6` |
+| Recorded base | `62bb0f329c7d7deea6c5ee9010c3d21b0acf6325` (`main` and `origin/main` on entry) |
+| Last product/check runtime | `70b93ab8e92ee2eaced7d0dc864be6a94179cc0f` |
+| Evidence-generation head | `a49c43eeaf278f922afc03f474dbea6920842d69` |
+| Remedy head | `b790e1080d7fd463fe8997e93d7fc55c90965bdc` |
+| Review entry / Review 1 record head | `4df2c72e7c23c1ba8b2c966782a09416058044ca` |
+| New review-record commit | This documentation-only commit; resolve with `git log -1 --format=%H -- docs/planning/post-comparison-perfection-output-audit/hotfix-bundles/RB-6/REVIEW.md` |
+| Counted active review | 2026-09-02T03:02:41.6382436Z to 2026-09-02T03:31:41.6382436Z — 29.00 minutes; sandbox/approval wait time excluded |
+| Resource budget | RESPECTED — no process expected over five minutes, no operation over 500 MB new output, no Excel, GUI generation, statewide regeneration, full gate, raw recount, frozen build or new audit framework |
+| Verdict | **APPROVED — REVIEW 2 COMPLETE; JOINTLY APPROVED** |
+
+The dedicated checkout was clean at review entry. The complete recorded-base
+to entry-head history is ten commits and 34 files, with 6,534 insertions and
+105 deletions; the increase beyond Review 1's inspected 6,346 insertions is
+review/evidence documentation. `git diff --check
+62bb0f329c7d7deea6c5ee9010c3d21b0acf6325..4df2c72e7c23c1ba8b2c966782a09416058044ca`
+passed. The merge base is the recorded base, and local `main` and
+`origin/main` both resolved to it before the final remote-divergence check.
+The full branch diff, every changed product/check file, the controlling scope
+records, the implementation record, all prior review history and every witness
+were independently inspected.
+
+### Preconditions, reused evidence and Review 1 challenge
+
+| Precondition | Review 2 result |
+|---|---|
+| Applicable pass | PASS — entry status was Review 1 approved and awaiting an independent Review 2 |
+| Independence | PASS — Claude implemented; Codex performed both reviews in separate tasks, and this task challenged rather than copied Review 1 |
+| Exact branch/base/runtime/review head | PASS — identities above matched Git and the committed bindings |
+| Expensive acceptance evidence retained and bound | PASS — the full gate, double rebuild, comparisons, raw census, UI capture and discrepancy witnesses exist without reviewer regeneration |
+| Prior return | PASS — `RB6-R1-EG-001` remains closed by the retained nine-dataset, two-twin post-rebuild witness |
+| Merge eligibility | PASS — both signed reviews approve and at least one approver is not the implementer |
+
+Review 2 explicitly challenged the following plausible Review 1 misses:
+
+| What Review 1 could have missed | Bounded independent challenge | Result |
+|---|---|---|
+| The retained valid-run parity sample omitted the flat-PDF loader shape | Ran `python build/check_compare_env_pdf_completion.py`, which covers all five PDF converters, valid modes and failure completion | PASS |
+| In-process double rebuilding could conceal a short-clock or process-local ZIP timestamp defect | Cross-matched the later remedy corpus against the earlier independent double-rebuild witness; all nine buildable workbook hashes, byte sizes, artifact tokens and normalization versions agree. Inspected all retained ZIP member timestamps and pinned core properties | PASS — one reviewer display rendered DOS local midnight as `08:00Z`; the packages are uniformly pinned, so this is a probe-expectation note, not a product failure |
+| The supplemental cell walker pairs rows/cells and could miss a trailing structural-only change | Inspected the helper and attempted one read-only structural probe across the 36 retained twins. The optional probe produced no model-visible result and was not retried under the one-try rule. Exact raw/library bindings, typed results, per-field counts and all 36 hashes still reconcile | NOTE — no demonstrated output difference |
+| Publication could leave an interrupted generation looking current | Ran `python build/check_comparison_publication.py`, including interrupted metadata and workbook-rewrite checks | PASS — interrupted state remains untrusted and workbooks are not silently rewritten |
+| Stale, absent, unreadable or ambiguous TSN state could escape the identity fix | Ran `python build/check_tsn_freshness.py` across current/stale/missing/unreadable/ambiguous cases and matrix blocking | PASS |
+| The HF-11 leading-`GENERATE` fixture is more specific for Highway Sequence than the other parser-backed families | Reconciled the committed guards with Review 1's retained real-PDF spot checks for all affected parser-backed families and the route-140 raw census | NOTE — future fixture specificity only; no current wrong, stale or lost report |
+
+All committed witness files independently matched the hashes signed by Review 1:
+
+| Witness | SHA-256 |
+|---|---|
+| `HF-07/witness/export_coverage.json` | `6f45e9a3800365d4384e0626423cfbd23016642be3807edc1f946bed55d219b2` |
+| `HF-07/witness/missing_side_latency.json` | `3dd39415d472c13c05dcd46c5bdfff8264e012dbebf9f679fef166cdda448e4b` |
+| `HF-07/witness/valid_run_parity.json` | `76bcc50ea493142f464dc473e8fe430a263af24c332f37f59ac2fcfa29947ce1` |
+| `HF-08/witness/double_rebuild.json` | `29268d76e9dfeb7feaf76c4eceb9f896232174bf90c23690fd8030ea02fd478a` |
+| `HF-08/witness/post_rebuild_vs_tsn.json` | `3ec88dda47acfa5643398cda55ff868fa5f613ff9bf4683ab1fd957f6b2e9911` |
+| `HF-11/witness/pdf_only_rows.json` | `b623c9b360e0faea495a51d616ed635d160fa5e15117a428760f4b8eee8db021` |
+| `HF-11/witness/route_140_raw_census.json` | `4863d94ee326ff14fe5aa92b813101af632814e19a8c3252853be45e015f8499` |
+
+The retained-root copy of `post_rebuild_vs_tsn.json` has the same hash. Its
+binding names remedy commit `b790e1080d7fd463fe8997e93d7fc55c90965bdc`,
+runtime `70b93ab8e92ee2eaced7d0dc864be6a94179cc0f`, the exact TSMIS library,
+per-dataset raw manifests, identities/tokens, comparison generations, output
+paths/sizes/hashes, typed outcomes, counts and per-field counts. A separate
+hash pass matched every one of the 36 retained comparison workbooks. The
+retained full gate remains 175/175 in 128 seconds and was verified, not rerun.
+
+### Exact deliverable and discrepancy results
+
+The retained post-rebuild comparison witness reports all nine buildable
+registered datasets complete and trusted in both VALUES and FORMULAS twins:
+
+| Dataset | Paired | One-sided | Differing rows | Differing cells | Review 2 disposition |
+|---|---:|---:|---:|---:|---|
+| Highway Log | 48,351 | 15,265 | 39,623 | 140,643 | PASS — typed result and counts unchanged |
+| Ramp Detail | 15,212 | 202 | 737 | 843 | PASS — typed result and counts unchanged |
+| Ramp Summary | 29 | 2 | 24 | 24 | PASS — typed result and counts unchanged |
+| Intersection Summary | 58 | 8 | 53 | 53 | PASS — typed result and counts unchanged |
+| Intersection Detail | 16,199 | 687 | 2,816 | 5,092 | PASS — typed result and counts unchanged |
+| Highway Sequence | 57,072 | 16,154 | 23,691 | 30,005 | PASS — typed result and counts unchanged |
+| Highway Detail | 48,477 | 14,456 | 48,287 | 160,347 | PASS — typed result and counts unchanged |
+| Highway Summary | 92 | 4 | 89 | 89 | PASS — typed result and counts unchanged |
+| Clean Highway | 52,629 | 12,567 | 48,942 | 281,393 | PASS — typed result and counts unchanged; disclosed partial coverage preserved |
+
+For every row above, pre-fix and post-rebuild results have identical
+completion state, paired/one-sided totals, differing rows, total and per-field
+differing cells, VALUES/FORMULAS parity and published trust state. The only
+recorded pre/post workbook-cell change is the intended Provenance library
+SHA-256 cell. `clean_intersection` and `clean_ramp` remain explicit typed
+DEF-05 refusals because no normalizer exists; they are not omitted successes.
+
+### Criterion-by-criterion acceptance
+
+| Criterion | Review 2 result and basis |
+|---|---|
+| HF-07.1 missing-side under 5 s | PASS — bound real timings are 0.49/0.51 s; source inspection and the focused missing-side/PDF-completion tests prove refusal before expensive side-A loading |
+| HF-07.2 valid counts/twins/outcome unchanged | PASS — retained three-family parity plus Review 2's all-PDF-converter completion challenge; VALUES and FORMULAS remain cell-identical in the valid samples |
+| HF-07.3 export coverage/UI truth | PASS — the exact export-only set is `highway_summary_pdf`, `intersection_summary_pdf`, and `ramp_summary_excel`; catalog XOR, UI labels/tooltips and retained census agree |
+| HF-07.4 gate/base failure | PASS — durable base RED and exact-head 175/175 GREEN evidence are bound; focused neighboring tests remain green |
+| HF-08.1 root cause | PASS — source and package inspection confirm both clocks are fixed only at the shared opt-in TSN save boundary: core properties and ZIP member timestamps |
+| HF-08.2 unchanged-raw double rebuild | PASS — all nine buildable datasets have byte-identical post1/post2 workbooks, identities and tokens; two unsupported builders refuse explicitly |
+| HF-08.3 legitimate identity changes | PASS — retained negative controls move identity/token for changed normalized content and changed raw bytes |
+| HF-08.4 content and vs-TSN result unchanged | PASS — `RB6-R1-EG-001` covers all nine buildable datasets, both twins, exact typed outcomes and the discrepancy table above |
+| HF-08.5 one-time invalidation | PASS — measured and disclosed per buildable dataset; stale pre-fix bindings fail closed |
+| HF-08.6 gate/base failure | PASS — exact-head focused determinism evidence and retained base RED/full-gate GREEN binding reconcile |
+| HF-11.1 regression guards | PASS — source-universe and leading-`GENERATE` guard groups pass and deliberate regressions go RED; the future-specificity limitation is non-blocking |
+| HF-11.2 no scripts behavior change | PASS — HF-11 changes checks and records only |
+| HF-11.3 vendor record | PASS — VEN-01 names route 140, records the zero-difference delivery test and sends no raw source data |
+| HF-11.4 counts unchanged | PASS — two PDF-only Highway Log rows and the route-140 raw census are retained; no product parser changed |
+| HF-11.5 full gate | PASS — retained 175/175 exact-head gate plus bounded Review 2 neighboring challenges |
+
+### Values/formulas, visual, evidence and regression matrices
+
+| Surface | Independent Review 2 disposition |
+|---|---|
+| Values and formulas | PASS — all 36 retained twins match their bound hashes; every dataset retains the same typed outcome/counts and the sole pre/post cell class is the intended Provenance library identity |
+| Visual and presentation | PASS — no workbook-presentation runtime changed. The only UI change truthfully labels and groups the three export-only editions; the retained 1400×900 capture/measurements and focused UI evidence are bound |
+| Evidence integrity | PASS — Git heads, seven witness hashes, retained-root binding, raw manifests, library identities/tokens, comparison generations and 36 workbook paths/sizes/hashes reconcile |
+| Failure and stale state | PASS — missing-side refusal precedes expensive loading; interrupted comparisons remain untrusted; stale, missing, unreadable and ambiguous TSN state fail closed |
+| Regression and compatibility | PASS — normal non-TSN saves retain default behavior, legitimate TSN changes move identity, all PDF converter shapes complete, and source formats/counts are unchanged |
+| Performance and resource safety | PASS — real missing-side timings are below one second; Review 2 reused all costly evidence and remained inside the 30-minute, 2 GB, five-minute and 500 MB limits |
+
+Review 2 newly ran only these bounded existing checks, each once and each exit
+0:
+
+- `python build/check_compare_env_pdf_completion.py`
+- `python build/check_tsn_freshness.py`
+- `python build/check_comparison_publication.py`
+
+It did not repeat Review 1's nine focused checks or the implementation's full
+gate, double rebuild, statewide comparisons, raw census, UI capture or frozen
+application build.
+
+### Practical-impact gate and non-blocking notes
+
+- The supplemental `eg001_celldiff.py` walker can miss a hypothetical trailing
+  row/column-only structural difference because it pairs iterators. **What
+  would a user see differently?** No demonstrated output difference: the same
+  runtime produced both legs, all typed/per-field counts reconcile and all 36
+  files are hash-bound. This is a helper-coverage NOTE.
+- The Review 2 structural probe produced no model-visible result and was not
+  retried. **What would a user see differently?** Nothing; this was an optional
+  reviewer-environment probe, while retained product evidence remains valid.
+- One timestamp display probe treated pinned MS-DOS local midnight as though it
+  must render `00:00Z`; on this machine it rendered `08:00Z`. **What would a
+  user see differently?** Nothing; every ZIP member shares the pinned timestamp
+  and all nine independently rebuilt package hashes match.
+- The leading-`GENERATE` guard fixture is less direct for three families than
+  for Highway Sequence. **What would a user see differently?** Nothing in the
+  reviewed output; real-PDF spots for the parser-backed families and the raw
+  census pass. More specific fixtures are a future test-quality NOTE.
+- The short `#ven-01` navigation link in `docs/vendor-escalations.md` is
+  renderer-dependent because the visible heading is longer. **What would a
+  user see differently?** At most a documentation jump may not scroll; the app
+  and generated reports are unchanged. It is not a runtime denial.
+
+There are no actionable acceptance failures and no unbound acceptance
+artifacts. The prior evidence-gap denial is historical and closed; no second
+denial is charged.
+
+### Verdict, sign-off and merge authorization
+
+**APPROVED.** Every RB-6 criterion has exact same-head evidence. Review 2
+challenged the loader-shape gap, clock/process determinism, structural
+false-pass possibility, atomic publication, stale-state handling and the
+HF-11 fixture boundary without finding a contradiction that passes the
+practical-impact gate.
+
+Codex Review 1 and Codex Review 2 both approve, and neither implemented the
+Claude bundle. Mark RB-6 **JOINTLY APPROVED**. Prompt 05's final-approval
+sequence is authorized: confirm remote `main`, merge without force, run the
+one planned post-merge smoke on the merged `main`, record the merge SHA, push,
+and remove only the fully merged RB-6 branch/worktree. RB-6 is the final queued
+bundle, so there is no later RB readiness record to prepare.
+
+Signed: **Codex — independent non-implementing reviewer, Review 2**,
+2026-09-02T03:31:41.6382436Z.
+
+---
 
 ## Review 1 re-review — Codex — APPROVED
 

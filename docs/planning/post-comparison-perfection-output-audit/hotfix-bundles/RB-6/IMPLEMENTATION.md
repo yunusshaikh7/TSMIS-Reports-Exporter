@@ -1,6 +1,6 @@
 # `RB-6` — Implementation Record
 
-Status: **IMPLEMENTED — AWAITING ADVERSARIAL REVIEW** (Review 1 return `RB6-R1-EG-001` closed 2026-09-01)
+Status: **JOINTLY APPROVED** (Review 1 return `RB6-R1-EG-001` closed; separate Codex Reviews 1 and 2 approved 2026-09-01)
 
 > Codex Review 1 (2026-08-31): **DENIED — EVIDENCE GAP**, solely
 > `RB6-R1-EG-001` — retain the contract-required HF-08 post-double-rebuild
