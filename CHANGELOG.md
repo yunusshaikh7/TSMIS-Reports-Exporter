@@ -3,7 +3,11 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
-## Unreleased
+## v0.45.0 — 2026-09-02
+
+The ArcGIS tab's main view is now a by-day matrix of every report rendered from
+the layers, with one layer build per report that knows which drop it came from;
+two comparison fixes ride along.
 
 - **The ArcGIS tab's main view is now "Reports vs layers" — a by-day matrix.** Every
   TSMIS report is a row (the two the app can render from the layers today, Highway
