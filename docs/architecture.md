@@ -269,7 +269,12 @@ drop against the 40-layer manifest + the INDEX row counts,
 table from the layers (county+PM overlay, as-of the TSN extract's date) into
 `output/arcgis_cleanroad/`, and `compare_clean_highway_tsn.py` diffs it against
 the TSN extract — see [comparison-engine.md](comparison-engine.md) §9j and
-[planning/cleanroad-highways.md](planning/cleanroad-highways.md). App-private data (`_PRIVATE` = `DATA_ROOT/data` when frozen, else `DATA_ROOT`):
+[planning/cleanroad-highways.md](planning/cleanroad-highways.md). Since
+2026-09-02 the tab's MAIN view is the **Reports vs layers matrix**
+(`arcgis_matrix.py`, §12d): every report in the `arcgis_reports` registry rendered
+from the layers — ONE build per report under `output/arcgis_reports/`, stamped
+with the drop it came from (`arcgis_layers.drop_info`: the manifest's own export
+timestamp + a content fingerprint) — and compared against each exported day. App-private data (`_PRIVATE` = `DATA_ROOT/data` when frozen, else `DATA_ROOT`):
 `AUTH`, `LOG_DIR`, `FAILURES_DIR`, `CONFIG_FILE`, `UPDATE_DIR`,
 `EDGE_LOGIN_PROFILE_DIR`, `WEBVIEW_PROFILE_DIR`, `DOWNLOADED_BROWSERS_DIR`. The
 frozen auth file is `data/tsmis_auth.json`; the dev auth file is
@@ -525,7 +530,7 @@ record of how the structure was built; this is what the structure now holds.
 | **Consolidate** | Turns a run folder's per-route exports into one workbook, per report; also the entry point for the PDF-sourced consolidations. | [reports.md](reports.md) |
 | **Compare** | Every file/folder comparison, in generated sub-tabs: cross-environment, vs TSN, the **vs TSN Matrix** (by day), the **vs Baseline Matrix** (a day against an earlier pull of the same report), and the **PDF vs Excel Matrix** (each dual-edition family self-checked inside one run folder). | [comparison-engine.md](comparison-engine.md) §9, §12b–§12c |
 | **Everything** | Two sub-tabs — the always-current batch store (report types × environments into one undated destination, stage-and-swap) and the **Everything comparison matrix** over it. | [comparison-engine.md](comparison-engine.md) §12 |
-| **ArcGIS** | Two sub-tabs, both built from the manually-stocked `arcgis_layers/` library and neither touching the site: **Clean Road** (our own CA HIGHWAYS table, compared vs the TSN extract) and **Reports vs layers** (a TSMIS report *rendered* from the layers and diffed against our own export of it — Highway Detail first). | [comparison-engine.md](comparison-engine.md) §9j–§9k, [planning/cleanroad-highways.md](planning/cleanroad-highways.md) |
+| **ArcGIS** | Two sub-tabs, both built from the manually-stocked `arcgis_layers/` library and neither touching the site: **Reports vs layers** (the main view since 2026-09-02 — a by-day MATRIX of every TSMIS report *rendered* from the layers and diffed against our own export of it; ONE build per report, each stamped with the layer drop it came from) and **Clean Road vs TSN** (our own CA HIGHWAYS table, compared vs the TSN extract). | [comparison-engine.md](comparison-engine.md) §9j–§9l + §12d, [planning/cleanroad-highways.md](planning/cleanroad-highways.md) |
 | **Settings** | Site/browser targets, timeouts, TSN datasets, comparison output options (including **Counts only**), the support bundle, updates. | [gui.md](gui.md), [build-and-release.md](build-and-release.md) |
 
 ### Three source lanes, deliberately separate

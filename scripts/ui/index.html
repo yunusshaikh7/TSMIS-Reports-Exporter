@@ -719,37 +719,86 @@
       </div>
 
       <!-- ArcGIS pane: everything built FROM the layer library, in two sub-tabs.
-           CLEAN ROAD is the CA HIGHWAYS overlay build + the ArcGIS-vs-TSN
-           comparison (Intersections/Ramps are staged skeletons until integrated).
-           REPORTS VS LAYERS renders those same layers as a TSMIS report and
-           diffs it against our own export of it — TSMIS vs TSMIS, so the two
-           sides should agree. -->
-      <div class="card pane hidden" id="paneArcgis">
+           REPORTS VS LAYERS (the main view) renders every TSMIS report from the
+           layers and diffs it against our own export of it as a by-day MATRIX —
+           TSMIS vs TSMIS, so the two sides should agree; one build per report,
+           like the TSN library, each stamped with the layer drop it came from.
+           CLEAN ROAD VS TSN is the CA HIGHWAYS overlay build + the ArcGIS-vs-TSN
+           comparison (kept for when the TSN extract needs re-checking). -->
+      <div class="card pane hidden mx-host" id="paneArcgis">
         <div class="subtabs" role="tablist">
-          <button class="subtab active" id="subAgCleanRoad" role="tab" aria-selected="true">
-            <svg class="ic"><use href="#i-layers"/></svg>Clean Road
-          </button>
-          <button class="subtab" id="subAgReports" role="tab" aria-selected="false">
+          <button class="subtab active" id="subAgReports" role="tab" aria-selected="true">
             <svg class="ic"><use href="#i-compare"/></svg>Reports vs layers
+          </button>
+          <button class="subtab" id="subAgCleanRoad" role="tab" aria-selected="false">
+            <svg class="ic"><use href="#i-layers"/></svg>Clean Road vs TSN
           </button>
         </div>
 
-        <!-- Sub-tab 1: the clean-road files -->
-        <div id="agCleanRoad">
-        <div class="card-section">
+        <!-- Sub-tab 1 (default): the layer library + the by-day matrix -->
+        <div id="agReports" class="mx-pane">
+        <div class="card-section" id="agLibSection">
           <div class="section-head">
             <span class="section-label">ArcGIS layer library</span>
             <span class="section-meta" id="agLibMeta">—</span>
           </div>
           <p class="hint" id="agLibHint">Checking the layer library…</p>
           <div id="agLibIssues"></div>
-          <div class="actions-row">
-            <button class="btn btn-standard btn-small" id="btnAgOpenLayers">
+          <div class="dm-toolbar" style="margin-top:6px">
+            <span class="muted">Build as of</span>
+            <span class="set-input"><input type="text" class="input" id="agMxAsof" data-lock-when-busy
+                   autocomplete="off" spellcheck="false" placeholder="the drop's export date" style="width:170px"></span>
+            <span class="hint">Blank builds the layers as exported. Each row header says what its build is as of.</span>
+            <span class="spacer"></span>
+            <button class="btn btn-subtle btn-small" id="btnAgOpenLayers">
               <svg class="ic"><use href="#i-folder-open"/></svg>Open layers folder
+            </button>
+            <button class="btn btn-subtle btn-small" id="btnAgRepOpenOut">
+              <svg class="ic"><use href="#i-folder-open"/></svg>Open builds folder
             </button>
           </div>
         </div>
 
+        <div class="card-section mx-gridsection">
+          <div class="section-head">
+            <span class="section-label">Reports vs layers — by export day</span>
+            <span class="section-meta">
+              Source
+              <span class="tb-select select-light"><select id="agMatrixSource"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+              <span class="hint" id="agMatrixProgress" hidden></span>
+            </span>
+          </div>
+          <div class="matrix-legend">
+            <span class="mx-key mx-match">identical</span>
+            <span class="mx-key mx-diff-lo">few diffs</span>
+            <span class="mx-key mx-diff-hi">many diffs</span>
+            <span class="mx-key mx-partial">partial inputs</span>
+            <span class="mx-key mx-stale">stale</span>
+            <span class="mx-key mx-missing">needs build / export</span>
+            <span class="mx-key mx-na">no build yet</span>
+          </div>
+          <div class="matrix-wrap"><div class="matrix-grid" id="agMatrixGrid"></div></div>
+        </div>
+
+        <div class="card-section actions-row">
+          <button class="btn btn-subtle btn-small" id="btnAgMxBuildAll">
+            <svg class="ic"><use href="#i-layers"/></svg>Compare all
+          </button>
+          <button class="btn btn-subtle btn-small" id="btnAgMxRebuildAll">
+            <svg class="ic"><use href="#i-refresh"/></svg>Rebuild stale
+          </button>
+          <button class="btn btn-subtle btn-small" id="btnAgMxOpenComparisons">
+            <svg class="ic"><use href="#i-folder-open"/></svg>Open comparisons folder
+          </button>
+          <span class="spacer"></span>
+          <button class="btn btn-subtle btn-small hidden" id="btnAgMxCancel">
+            <svg class="ic"><use href="#i-x"/></svg>Cancel
+          </button>
+        </div>
+        </div><!-- /agReports -->
+
+        <!-- Sub-tab 2: the clean-road files vs the TSN extract -->
+        <div id="agCleanRoad" class="hidden">
         <div class="card-section">
           <div class="section-head">
             <span class="section-label">CA Highways — build &amp; compare</span>
@@ -795,87 +844,6 @@
         </div>
         </div><!-- /agCleanRoad -->
 
-        <!-- Sub-tab 2: the same layers, rendered as a TSMIS report -->
-        <div id="agReports" class="hidden">
-        <div class="card-section">
-          <div class="section-head">
-            <span class="section-label">Report</span>
-            <span class="section-meta" id="agRepPickMeta">—</span>
-          </div>
-          <div class="dm-toolbar">
-            <span class="muted">Render and compare</span>
-            <span class="tb-select select-light"><select id="agRepReport" data-lock-when-busy></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
-          </div>
-          <p class="hint">Each report is rendered from the same layer library and
-            diffed against the app's own export of it. Both sides are TSMIS, so
-            they should agree — a difference is either a gap in the
-            reconstruction or a finding about how the report is built.</p>
-        </div>
-
-        <div class="card-section hidden" id="agRepSourceSection">
-          <div class="section-head">
-            <span class="section-label">Source table</span>
-            <span class="section-meta" id="agRepSourceMeta">—</span>
-          </div>
-          <p class="hint" id="agRepSource">—</p>
-        </div>
-
-        <div class="card-section">
-          <div class="section-head">
-            <span class="section-label" id="agRepHdLabel">Build &amp; compare</span>
-            <span class="section-meta" id="agRepHdMeta">—</span>
-          </div>
-          <p class="hint" id="agRepHdBuilt">—</p>
-          <div class="dm-toolbar" style="margin-top:10px">
-            <span class="muted">Build the network as it stood on</span>
-            <span class="set-input"><input type="text" class="input" id="agRepAsof" data-lock-when-busy
-                   placeholder="YYYY-MM-DD" style="width:130px"></span>
-            <button class="btn btn-subtle btn-small" id="btnAgRepAsofDay" data-lock-when-busy>Use the export's day</button>
-          </div>
-          <div class="actions-row">
-            <button class="btn btn-accent" id="btnAgRepBuild" data-lock-when-busy>
-              <svg class="ic"><use href="#i-play"/></svg>Build report from layers
-            </button>
-            <span class="spacer"></span>
-            <button class="btn btn-subtle btn-small" id="btnAgRepOpenOut">
-              <svg class="ic"><use href="#i-folder-open"/></svg>Open output folder
-            </button>
-          </div>
-          <div class="dm-toolbar" style="margin-top:10px">
-            <span class="muted">Compare against the export of</span>
-            <span class="tb-select select-light"><select id="agRepDay" data-lock-when-busy></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
-          </div>
-          <p class="hint" id="agRepVintage"></p>
-          <div class="actions-row">
-            <label class="fast-toggle"><input type="checkbox" id="agRepWantFormulas" checked>
-              <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
-              <span class="fast-label">Live formulas</span></label>
-            <label class="fast-toggle"><input type="checkbox" id="agRepWantValues" checked>
-              <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
-              <span class="fast-label">Values</span></label>
-            <button class="btn btn-standard" id="btnAgRepCompare" data-lock-when-busy>
-              <svg class="ic"><use href="#i-compare"/></svg>Compare vs TSMIS…
-            </button>
-            <button class="btn btn-subtle btn-small hidden" id="btnAgRepCancel">
-              <svg class="ic"><use href="#i-x"/></svg>Cancel
-            </button>
-          </div>
-          <p class="hint" id="agRepCompareHint"></p>
-        </div>
-
-        <div class="card-section">
-          <div class="section-head"><span class="section-label">More reports</span></div>
-          <p class="hint">Highway Detail went first because it <b>is</b> the CA HIGHWAYS
-            table printed — 33 of its 34 columns are columns of the Clean Road build, so
-            rendering it is a mapping plus one rule: adjacent stretches that agree on every
-            column the report prints are one record. Intersection Detail followed, and it
-            is a different shape: an intersection is a <b>place</b>, not a stretch, so
-            there is no segmentation — the rules that matter there are which approach leg
-            supplies the printed mainline and cross-street values, and whether a gap in a
-            span layer carries the previous value forward. Each report's own rules are
-            listed on its Provenance and Notes sheets.</p>
-        </div>
-        </div><!-- /agReports -->
       </div>
 
       <!-- Settings pane -->
@@ -1447,6 +1415,56 @@
         <div class="mc-group">
           <div class="mc-label">Reports</div>
           <div class="mx-toggles" id="pveMatrixReportToggles"></div>
+        </div>
+      </div>
+
+      <!-- Reports-vs-layers matrix config zone: same corner pattern, shown on the
+           ArcGIS tab's "Reports vs layers" sub-tab (body.matrix-wide.mw-ag). The
+           shared job queue, day columns, the live-formulas option, and the report
+           show/hide toggles. -->
+      <div class="card matrix-config" id="arcgisMatrixConfig">
+        <div class="mc-head"><svg class="ic"><use href="#i-grid"/></svg>Matrix options</div>
+
+        <div class="mc-group mx-queue-group" id="agQueueGroup" hidden>
+          <div class="mc-label">Queue <span class="mx-queue-count" id="agQueueCount"></span></div>
+          <div class="mx-queue" id="agQueue"></div>
+          <div class="mx-queue-actions">
+            <button class="btn btn-subtle btn-small" id="btnAgQueueClear">
+              <svg class="ic"><use href="#i-trash"/></svg>Clear queued
+            </button>
+            <button class="btn btn-subtle btn-small" id="btnAgQueueStopAll">
+              <svg class="ic"><use href="#i-x"/></svg>Stop all
+            </button>
+          </div>
+        </div>
+
+        <div class="mc-group">
+          <div class="mc-label">Day columns</div>
+          <div class="dm-toolbar">
+            <span class="tb-select select-light"><select id="agMatrixAddDay"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
+            <button class="btn btn-standard btn-small" id="btnAgAddDay">
+              <svg class="ic"><use href="#i-check"/></svg>Add day
+            </button>
+          </div>
+          <p class="hint" style="margin:6px 0 0">Add exported days as columns. Each cell
+            compares the report's <b>one</b> layer build against that day's export
+            (either edition, consolidated from its run folder). A cell needs the
+            report built from the layers and exported that day.</p>
+        </div>
+
+        <div class="mc-group">
+          <div class="mc-label">Comparison output</div>
+          <label class="mc-fast" title="Also write a live-formulas (recalculating, auditable) copy beside each values comparison">
+            <input type="checkbox" id="agMatrixFormulas">
+            <span class="checkbox" aria-hidden="true"><svg class="ic"><use href="#i-check"/></svg></span>
+            <svg class="ic"><use href="#i-file-text"/></svg>
+            <span>Also write a live-formulas copy</span>
+          </label>
+        </div>
+
+        <div class="mc-group">
+          <div class="mc-label">Reports</div>
+          <div class="mx-toggles" id="agMatrixReportToggles"></div>
         </div>
       </div>
     </section>

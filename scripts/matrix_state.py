@@ -1006,6 +1006,7 @@ _MISSING_SIDE_REASON = {
     "export": "this report hasn't been exported for that column yet",
     "tsn": "this report's TSN dataset isn't in place yet",
     "baseline": "the baseline column hasn't been exported yet",
+    "layers": "this report hasn't been built from the ArcGIS layers yet",
     "both": "neither side of this comparison has been exported yet",
 }
 

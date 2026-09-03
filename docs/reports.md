@@ -400,9 +400,10 @@ the 7.8 Excel exports; every residual class explained):
   to a producer-owned PARTIAL.
 - **`compare_highway_sequence_pdf.py`** — `TSMIS_PDF_VS_TSN` + `TSMIS_PDF_VS_EXCEL`, the
   `compare_highway_detail_pdf` parallel riding `compare_highway_sequence_tsn`'s loaders +
-  schema, each flavor with its OWN Notes sheet. The print's TSN-style equates make
-  PDF-vs-TSN pair BETTER than Excel-vs-TSN (current same-run 7.9 canary: both 57,505 /
-  asserted 4,916 rows / 5,001 cells vs Excel's 57,072 / 4,894 / 5,589), while PDF-vs-Excel
+  schema, each flavor with its OWN Notes sheet. The print's TSN-style equates meant
+  PDF-vs-TSN paired BETTER than Excel-vs-TSN (same-run 7.9 canary: both 57,505 vs Excel's
+  57,072) until CMP-AUD-246 (2026-09-02) seated the Excel export's equate suffix the TSN
+  way before keying — Excel-vs-TSN now pairs 57,518, PDF-vs-TSN is untouched — while PDF-vs-Excel
   compares the two renders' representation classes directly — **60,493 paired / 0 PDF-only /
   1 Excel-only; asserted 1,410 rows / 3,721 cells (Desc 1,133, FT 1,129, HG 910, PM Suffix
   549)**. The v0.25.0 self-check's "route 037 dropped Description" was later proven a
@@ -493,7 +494,7 @@ The dev site's **"Clean Road Files"** group (`data_value` `clean_highway` / `cle
 - `label` = the site's `data-label` ("Clean Road File Highway" …), `data_value` = the stable id; `subdir` = the id, `filename` = `<id>_route_<ROUTE>.xlsx`. The options are FLAT `cs-option cs-sub` rows under a `cs-header` — indented, but NOT fly-out leaves — so `select_report` needs no submenu reveal (`check_fake_site` covers the shape, including the visible text "Highway" coinciding with a TSAR fly-out parent's).
 - `wait_js` = `EXPORT_READY_JS` OR the empty marker; `is_empty` = the structural `#rampResults .ramp-empty` (`*_showResults('none')` renders `<span class="ramp-empty">No results found in this segment.</span>` with NO action bar) with the loose "No … found" text as the fallback; `save = save_via_export_button` (`clh_/cli_/clr_exportToExcel()` → a client-side `XLSX.writeFile`, one sheet "Clean Road Highway" / "… Intersection" / "… Ramp"; the engine's no-download fast-fail is the backstop).
 - The reports reuse the site's Highway Log / Intersection Detail / Ramp Detail query pipelines — Clean Highway runs the WHOLE Highway Log builder plus four extra layer lookups (functional class 91, forest 115, `SegOrderId` 122, route breaks 133) — so expect **Highway-Log-class run times**, not Ramp-Detail ones.
-- **Export-only** — declared `export_only=True` in the catalog (PCOA-FINAL-018), so the picker says so and `check_report_wiring` holds the app to it. The site's `*_printAll()` print editions (landscape, cover page, scale-to-fit) are NOT wired, and there is no consolidator/comparison for the SITE exports: both wait for real work-PC files to census first (Lesson 13). The TSN side is staged (`report_catalog.TSN` slots + `tsn_load_clean_road`), and the app's OWN Clean Road Highway build lives on the ArcGIS tab (footnote 7 above) — a natural future comparison is the site's export vs that build vs TSN, all three THY-shaped.
+- **Export-only** — declared `export_only=True` in the catalog (PCOA-FINAL-018), so the picker says so and `check_report_wiring` holds the app to it. The site's `*_printAll()` print editions (landscape, cover page, scale-to-fit) are NOT wired, and there is no consolidator/comparison for the SITE exports: both wait for real work-PC files to census first (Lesson 13). The TSN side is staged (`report_catalog.TSN` slots + `tsn_load_clean_road`), and the app's OWN Clean Road Highway build lives on the ArcGIS tab (footnote 7 above). Since 2026-09-02 all three Clean Road files are ROWS of that tab's Reports-vs-layers matrix (`arcgis_reports.py`), greyed until a consolidator for the site's export exists — the comparison is then our build vs the site's export, TSMIS vs TSMIS, with vs TSN still possible off the same builds.
 - **Verified offline against the REAL captured site source, not only fixtures:** the shipped `select_report` was driven over every dropdown option on the 9.1 capture (each arms, County fans to ALL, Route + Generate present) and on the 8.10 capture (the five reports greyed there raise `ReportUnavailableError`); on 9.1, Generate with every ArcGIS query stubbed empty renders the `.ramp-empty` state each spec recognises. Live data and the download are work-PC only (roadmap B1).
 
 ### Coalescing both editions of a report (v0.19.2)

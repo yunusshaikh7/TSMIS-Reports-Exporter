@@ -1130,6 +1130,7 @@ function dispatch(events) {
           if (S.tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP) renderDayMatrix();
           if (S.tab === "compare" && S.compareGroup === BASELINE_MATRIX_GROUP) renderBaselineMatrix();
           if (S.tab === "compare" && S.compareGroup === PVE_MATRIX_GROUP) renderPveMatrix();
+          if (typeof arcgisMatrixActive === "function" && arcgisMatrixActive()) renderArcgisMatrix();
           break;
         case "modal": showMessage(ev.kind, ev.title, ev.message); break;
         default:
@@ -1169,7 +1170,7 @@ function bindEvents() {
     everything: { btn: "tabEverything", pane: "paneEverything", title: "Export everything",
                   sub: "Export selected report types across selected environments." },
     arcgis: { btn: "tabArcgis", pane: "paneArcgis", title: "ArcGIS layers",
-              sub: "Build clean-road files and TSMIS reports from your ArcGIS layer exports, and compare them." },
+              sub: "Render TSMIS reports from your ArcGIS layer exports and compare them against the app's own exports, by day." },
     settings: { btn: "tabSettings", pane: "paneSettings", title: "Settings",
                 sub: "Reliability, debugging and storage options." },
   };
@@ -1266,6 +1267,11 @@ function bindEvents() {
     if (r && r.error) showMessage("error", "Can't set formulas option", r.error);
     syncPveMatrixFormulas();
   });
+  $("agMatrixFormulas")?.addEventListener("change", async (e) => {
+    const r = await api.set_arcgis_matrix_formulas(e.target.checked);
+    if (r && r.error) showMessage("error", "Can't set formulas option", r.error);
+    syncArcgisMatrixFormulas();
+  });
   // Evidence images — ONE shared persisted setting, surfaced on both matrix
   // pages (the checkboxes/counts are mirrors, resynced from each state push).
   // The per-cell camera (generate evidence) is gated on this toggle, so flipping
@@ -1321,6 +1327,9 @@ function bindEvents() {
   $("btnBaselineQueueStopAll")?.addEventListener("click", () => api.matrix_stop_all());
   $("btnPveQueueClear")?.addEventListener("click", () => api.matrix_queue_clear());
   $("btnPveQueueStopAll")?.addEventListener("click", () => api.matrix_stop_all());
+  // The ArcGIS "Reports vs layers" matrix rides the same queue.
+  $("btnAgQueueClear")?.addEventListener("click", () => api.matrix_queue_clear());
+  $("btnAgQueueStopAll")?.addEventListener("click", () => api.matrix_stop_all());
 
   renderThemeButton();
   $("btnTheme").onclick = () => {

@@ -30,10 +30,14 @@ function applyMatrixWide() {
   const day = S.tab === "compare" && S.compareGroup === DAY_MATRIX_GROUP;
   const bl = S.tab === "compare" && S.compareGroup === BASELINE_MATRIX_GROUP;
   const pve = S.tab === "compare" && S.compareGroup === PVE_MATRIX_GROUP;
-  document.body.classList.toggle("matrix-wide", every || day || bl || pve);
+  // The ArcGIS tab's "Reports vs layers" sub-tab is a matrix too (2026-09-02);
+  // its predicate lives in ui-arcgis.js beside the sub-tab state it reads.
+  const ag = typeof arcgisMatrixActive === "function" && arcgisMatrixActive();
+  document.body.classList.toggle("matrix-wide", every || day || bl || pve || ag);
   document.body.classList.toggle("mw-day", day);
   document.body.classList.toggle("mw-bl", bl);
   document.body.classList.toggle("mw-pve", pve);
+  document.body.classList.toggle("mw-ag", ag);
 }
 
 // CMP-AUD-079: true when a COMPARE-TAB comparison is live, so the sub-tab strip

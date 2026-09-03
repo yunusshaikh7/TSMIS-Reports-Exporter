@@ -70,6 +70,11 @@ OUT_PATH = OUT_DIR / FILENAME
 
 ROUTE_COL = hdc.ROUTE_COL
 HEADER = [ROUTE_COL] + list(hdc.HEADER)
+# The "Reports vs layers" library's two hooks: the sidecar payload key the
+# outcome record carries the build facts under, and the layers the build needs
+# (the span engine refuses without every highway layer, so they all gate it).
+SIDECAR_KEY = "arcgis_report_build"
+REQUIRED_LAYERS = cch.HIGHWAY_LAYERS
 
 # --------------------------------------------------------------------------- #
 # The projection: report column -> (THY column(s), how). "how" is the shared
@@ -311,6 +316,13 @@ def built_facts(path):
                 facts["source_build_version"] = _s(val)
             elif key == "Layer library":
                 facts["layer_library"] = _s(val)
+            # The drop the source table was built from — carried onto the
+            # report so the library can tell a build from the staged drop
+            # apart from one built off an older export.
+            elif key == "Layer drop exported":
+                facts["drop_exported"] = _s(val)
+            elif key == "Layer drop fingerprint":
+                facts["drop_fingerprint"] = _s(val)
             # HF-01/RB-1: the source build's unassertable spans. A projection
             # inherits them — the marker token travels into whichever report
             # column the span would have painted — so the counts travel with
@@ -371,6 +383,8 @@ def report_facts(path):
             return facts
         keys = {"As-of date": "asof", "Source workbook": "source",
                 "Build version": "build_version",
+                "Layer drop exported": "drop_exported",
+                "Layer drop fingerprint": "drop_fingerprint",
                 "Report records written": "rows",
                 "Rows merged away": "merged_away", "Routes": "routes",
                 "Skipped source spans": "skipped_source_spans",
@@ -532,6 +546,8 @@ def _write_workbook(out_path, rows, stats, facts, source_path):
         ("Source workbook", str(source_path)),
         ("Source build version", facts.get("source_build_version", "(unknown)")),
         ("Layer library", facts.get("layer_library", "(unknown)")),
+        ("Layer drop exported", facts.get("drop_exported") or "(unknown)"),
+        ("Layer drop fingerprint", facts.get("drop_fingerprint") or "(unknown)"),
         ("CA HIGHWAYS rows read", stats["source_rows"]),
         ("Report records written", stats["rows"]),
         ("Rows merged away", stats["merged_away"]),
@@ -674,10 +690,12 @@ def _consolidate(events, confirm_overwrite, built_path, out_path):
         completion=outcome.PARTIAL if skipped else outcome.COMPLETE)
     if not consolidation_meta.write_outcome(
             out_path, result,
-            extra={"arcgis_report_build": {
+            extra={SIDECAR_KEY: {
                 "report": "highway_detail",
                 "build_version": BUILD_VERSION,
                 "asof": facts.get("asof", ""),
+                "layer_drop": {"fingerprint": facts.get("drop_fingerprint") or None,
+                               "exported": facts.get("drop_exported") or None},
                 "source_workbook": str(source),
                 "source_build_version": facts.get("source_build_version", ""),
                 "context_columns": list(CONTEXT_COLUMNS),

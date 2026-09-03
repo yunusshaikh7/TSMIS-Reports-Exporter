@@ -73,6 +73,7 @@ _DYNAMIC_REPORT_MODULES = ("matrix", "day_matrix", "pdf_excel_matrix",
                            # registry pulls each report's build + comparator
                            # behind it, and those pull the clean-road substrate.
                            "arcgis_reports",
+                           "arcgis_matrix",
                            "arcgis_report_highway_detail",
                            "compare_highway_detail_arcgis",
                            "arcgis_report_intersection_detail",

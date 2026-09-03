@@ -57,9 +57,21 @@ def _src(mod):
 #     one does (which export days have BOTH of a recipe's consolidated sides on
 #     disk); folding it into get_compare_folders would have overloaded a
 #     folder-kind endpoint with an unrelated file-kind return shape.
+#   * the ArcGIS "Reports vs layers" MATRIX (2026-09-02) — the single-report
+#     card's three endpoints (arcgis_report_status / start_arcgis_report_build /
+#     start_arcgis_report_compare) were REPLACED by the by-day matrix surface
+#     below (the pve_* shape, plus the two library endpoints build_arcgis_report
+#     / open_arcgis_report): the card compared one report against one day; the
+#     matrix compares every registry report against every exported day off ONE
+#     layer build per report.
 FROZEN_API = {
-    "arcgis_report_status", "start_arcgis_report_build",
-    "start_arcgis_report_compare", "open_arcgis_reports_folder",
+    "open_arcgis_reports_folder",
+    "arcgis_matrix_info", "set_arcgis_matrix_source", "add_arcgis_matrix_day",
+    "remove_arcgis_matrix_day", "set_arcgis_matrix_report",
+    "set_arcgis_matrix_row_order", "set_arcgis_matrix_day_order",
+    "set_arcgis_matrix_formulas", "build_arcgis_matrix_cell",
+    "rebuild_arcgis_matrix", "open_arcgis_cell_comparison",
+    "open_arcgis_comparisons_folder", "build_arcgis_report", "open_arcgis_report",
     "add_baseline_matrix_day", "baseline_matrix_evidence_cell",
     "baseline_matrix_info", "build_baseline_matrix_cell",
     "open_baseline_cell_comparison", "open_baseline_cell_evidence",

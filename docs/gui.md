@@ -401,32 +401,58 @@ proved the wiring — a new matrix cost a table row per report instead of a fift
 if-chain. Lives in `pdf_excel_matrix.py`; the sub-tab renders through the same
 `ui-matrix.js` as the other three.
 
-### The ArcGIS tab (v0.29.0; two sub-tabs since v0.39.0)
+### The ArcGIS tab (v0.29.0; the "Reports vs layers" MATRIX is the main view since 2026-09-02)
 
 The one tab that never touches the TSMIS site. Both sub-tabs build from the
-manually-stocked `arcgis_layers/` library, and both are ordinary
-build-then-compare flows driven from `gui_arcgis_api.py` (`arcgis_status` /
-`start_arcgis_build` / `start_arcgis_compare`, and the `*_report_*` mirrors) with
-`ui-arcgis.js` as their renderer:
+manually-stocked `arcgis_layers/` library; `gui_arcgis_api.py` owns the endpoints
+and `ui-arcgis.js` renders them:
 
-- **Clean Road** — builds our own CA HIGHWAYS table from the layers as-of a chosen
-  date and compares it against the TSN extract, both flavors. The as-of box
+- **Reports vs layers** (the default sub-tab) — a by-day **matrix**: rows = every
+  TSMIS report the `arcgis_reports` registry lists (the two rendered so far plus the
+  rows still waiting on a build, greyed *no build yet* with the reason on hover),
+  columns = exported days you add, each cell = the report's ONE layer build compared
+  against that day's consolidated export (either edition — Excel preferred). Both
+  sides are TSMIS, so they should agree. The engine is `arcgis_matrix.py`
+  ([comparison-engine.md](comparison-engine.md) §12d); it renders through the same
+  `ui-matrix.js` primitives as the other four matrices, goes full-width via
+  `body.matrix-wide.mw-ag` with its own corner `#arcgisMatrixConfig` (queue,
+  add-day, live-formulas, report toggles), and rides the shared job queue
+  (`which:"arcgis"` compares → `ArcgisMatrixCompareWorker`; `kind:"arcgis_build"`
+  builds → `ArcgisReportBuildWorker`).
+  - **One build per report, like the TSN library** (owner decision 2026-09-02). The
+    **library card** above the grid names the staged drop — the export date read
+    from the `00_INDEX.xlsx` manifest's own timestamp, a content fingerprint over
+    every file, the layer count vs the manifest — and each **row header** carries
+    its build's state on a second line: *not built* / *built as of D · N rows ·
+    current drop* (green) / *built … from the 2026-07-22 drop — rebuild* (warning
+    colour) / *outcome unknown — rebuild*, with a ▤ build button and an open
+    button. A cell whose report is not built reads **needs build** and offers the
+    same ▤. Every build stamps the drop it came from into its marker sheet and
+    outcome sidecar (`layer_drop` under the module's `SIDECAR_KEY`), so a fresher
+    drop makes the row read stale without anyone re-checking by hand.
+  - **The as-of date** defaults to the drop's own export date (the layers as
+    exported), never the TSN extract's — that default belongs to the Clean Road
+    sub-tab only. The "Build as of" box on the library card overrides it for one
+    build; the comparison's Notes state the build's as-of beside the export day.
+  - A build gates on the report's OWN required layers (`REQUIRED_LAYERS`), not
+    the whole 40-layer manifest.
+- **Clean Road vs TSN** — builds our own CA HIGHWAYS table from the layers as-of a
+  chosen date and compares it against the TSN extract, both flavors. The as-of box
   matters: `resolve_default_asof()` takes its default from the *staged TSN
   extract*, not from the layer library, so a build off fresh layers still
-  reconstructs the extract's date unless you set it.
-- **Reports vs layers** — renders a TSMIS *report* from the same layers and diffs
-  it against the app's own export of that report (Highway Detail first). Because
-  both sides are TSMIS, they should agree; the card leads with the **vintage**
-  warning in warning colour, because an as-of that doesn't match the compared
-  export's day measures network change instead of correctness.
+  reconstructs the extract's date unless you set it. Kept for when the TSN extract
+  needs re-checking; the same CA HIGHWAYS build is the Clean Road: Highway row's
+  build on the matrix.
 
-Statewide runs here are long (~25–30 min for a report build), so both flows are
-cancellable and report progress through the same `Events` sink as an export.
+Statewide builds are long (~25–30 min for Highway Detail), so every flow is
+cancellable and reports progress through the same `Events` sink as an export.
 
-**Extending it** (roadmap G1 adds the CA INTERSECTIONS and CA RAMPS builds) is a
-new build + comparator behind the existing endpoint shape — read
+**Extending it** — a new report is a registry row plus its build and comparator
+modules (`arcgis_reports.py`); the matrix, the endpoints, the `#mock` preview and
+`check_arcgis_matrix` derive from the registry. Read
 [planning/cleanroad-highways.md](planning/cleanroad-highways.md) first for the
-measured build rules, and don't re-derive them.
+measured build rules, and don't re-derive them. Mock + bridge exercised at
+`/index.html#mock` (ArcGIS ▸ Reports vs layers).
 
 ### Matrix cell states, and the one that is deliberately not green
 
