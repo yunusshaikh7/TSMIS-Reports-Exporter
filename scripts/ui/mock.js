@@ -283,9 +283,6 @@ function makeMockApi() {
   }
   let timer = null;
   let mockCompareOverwrite = null;
-  let mockAgBuilt = false;       // the ArcGIS tab's built-workbook state
-  let mockAgReportBuilt = false; // ...and its projected-report state (needs the above)
-  let mockAgReportBuiltInx = false; // the Intersection Detail build (needs no source table)
   const push = (...evs) => dispatch(evs);
   const pushState = () => push({ t: "state", s: JSON.parse(JSON.stringify(st)) });
 
@@ -674,6 +671,96 @@ function makeMockApi() {
              row_supported: rowSupported, all_rows: MOCK_PVE_ROWS, hidden, cells,
              available_days: [MOCK_TODAY, ...(MOCK_DAY_AVAIL[source] || [])],
              available_day_reports: mockDayReports(MOCK_PVE_DAY_REPORTS, source, true) };
+  }
+  // The ArcGIS "Reports vs layers" matrix mock (2026-09-02) — the registry's 11
+  // report rows × day columns; ONE layer build per report. Parity with
+  // arcgis_reports.labels(): two rows build + compare, Clean Road Highway builds
+  // but has no comparison yet, the rest have no build yet.
+  const MOCK_AG_DROP = { fingerprint: "v2:41:9c1e4b7a2f0d", exported: "2026-08-19",
+                         exported_at: "2026-08-19T12:14:14", exported_source: "index",
+                         files: 41, index_present: true };
+  const MOCK_AG_ROWS = [
+    { key: "ramp_summary", label: "TSAR: Ramp Summary", code: "RS", supported: false, buildable: false, why: "not rendered from the layers yet" },
+    { key: "ramp_detail", label: "TSAR: Ramp Detail", code: "RD", supported: false, buildable: false, why: "not rendered from the layers yet" },
+    { key: "highway_sequence", label: "Highway Sequence Listing", code: "HSL", supported: false, buildable: false, why: "not rendered from the layers yet" },
+    { key: "highway_log", label: "Highway Log", code: "HL", supported: false, buildable: false, why: "not rendered from the layers yet" },
+    { key: "intersection_summary", label: "Intersection Summary", code: "IS", supported: false, buildable: false, why: "not rendered from the layers yet" },
+    { key: "intersection_detail", label: "Intersection Detail", code: "ID", supported: true, buildable: true, why: "" },
+    { key: "highway_detail", label: "Highway Detail", code: "HD", supported: true, buildable: true, why: "" },
+    { key: "highway_summary", label: "Highway Summary", code: "HS", supported: false, buildable: false, why: "not rendered from the layers yet" },
+    { key: "clean_highway", label: "Clean Road: Highway", code: "CR-HWY", supported: false, buildable: true,
+      why: "no comparison yet — the site's export has no consolidator until real per-route files are censused" },
+    { key: "clean_intersection", label: "Clean Road: Intersection", code: "CR-INT", supported: false, buildable: false, why: "not rendered from the layers yet" },
+    { key: "clean_ramp", label: "Clean Road: Ramp", code: "CR-RMP", supported: false, buildable: false, why: "not rendered from the layers yet" },
+  ];
+  const _agOut = "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports\\";
+  const mockAgBuilds = {};
+  MOCK_AG_ROWS.forEach((r) => {
+    mockAgBuilds[r.key] = { key: r.key, label: r.label, available: r.buildable,
+                            comparable: r.supported, why: r.why, built: false,
+                            missing_layers: [], path: _agOut + r.key + "_from_layers.xlsx" };
+  });
+  // Highway Detail: built from an OLDER drop, so the row reads stale.
+  Object.assign(mockAgBuilds.highway_detail, {
+    built: true, asof: "2026-07-22", rows: 51227, routes: 252, completion: "complete", trusted: true,
+    drop_exported: "2026-07-22", drop_fingerprint: "v2:41:0000older",
+    drop_current: false, comparable_now: true, stale: true, stale_reason: "drop_changed" });
+  // Clean Road Highway: built from the current drop (partial: 102 unplaceable spans).
+  Object.assign(mockAgBuilds.clean_highway, {
+    built: true, asof: "2026-08-19", rows: 57728, routes: 252, completion: "partial", trusted: true,
+    drop_exported: MOCK_AG_DROP.exported, drop_fingerprint: MOCK_AG_DROP.fingerprint,
+    drop_current: true, comparable_now: true, stale: false, stale_reason: "",
+    path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_cleanroad\\clean_highway_built.xlsx" });
+  const MOCK_AG_DAY_REPORTS = {
+    "ssor-prod": { "2026-06-18": ["ID", "HD"], "2026-06-17": ["HD"], "2026-06-11": [] },
+    "ars-prod": { "2026-06-17": ["HD"], "2026-06-11": [] },
+    "ssor-test": { "2026-06-16": [] },
+  };
+  function mockAgLabel(rk) {
+    const r = MOCK_AG_ROWS.find((x) => x.key === rk);
+    return r ? r.label : rk;
+  }
+  function mockAgMatrixSnapshot() {
+    const source = st.arcgis_matrix_source || "ssor-prod";
+    const days = st.arcgis_matrix_days || [];
+    const hidden = st.arcgis_matrix_hidden || [];
+    const _visible = MOCK_AG_ROWS.filter((r) => hidden.indexOf(r.key) < 0);
+    const _byKey = {}; _visible.forEach((r) => { _byKey[r.key] = r; });
+    const shown = mockApplyOrder(_visible.map((r) => r.key), st.arcgis_matrix_row_order)
+      .map((k) => _byKey[k]);
+    const rowLabels = {}, rowSupported = {};
+    MOCK_AG_ROWS.forEach((r) => { rowLabels[r.key] = r.label; rowSupported[r.key] = r.supported; });
+    const dayReports = (MOCK_AG_DAY_REPORTS[source] || {});
+    const cells = {};
+    shown.forEach((r, ri) => {
+      cells[r.key] = {};
+      const b = mockAgBuilds[r.key];
+      days.forEach((d, i) => {
+        const exported = (dayReports[d] || []).indexOf(r.code) >= 0;
+        let cmp;
+        if (!r.supported) cmp = { supported: false, why: r.why };
+        else if (!b.built) cmp = { supported: true, built: false, stale: true, reason: "missing",
+                                   missing_side: exported ? "layers" : "both",
+                                   verdict: null, diff_cells: null, one_sided: null };
+        else if (!exported) cmp = mockCmp("missing");
+        else cmp = mockCmp(i === 0 ? (ri % 2 === 0 ? [12, 3] : [0, 0]) : "notbuilt");
+        cells[r.key][d] = { export: { present: exported, mtime: 0,
+          age_seconds: exported ? (i + 1) * 86400 : null,
+          subdir: exported ? r.key : null }, cmp };
+      });
+    });
+    return { source,
+             sources: ["ssor-prod", "ssor-test", "ssor-dev", "ars-prod", "ars-test", "ars-dev"]
+               .map((k) => { const [s, v] = k.split("-");
+                 return { key: k, label: `${s.toUpperCase()} / ${v[0].toUpperCase()}${v.slice(1)}` }; }),
+             days, today: MOCK_TODAY,
+             rows: shown.map((r) => r.key), row_labels: rowLabels,
+             row_supported: rowSupported, all_rows: MOCK_AG_ROWS, hidden, cells,
+             library: { root: "C:\\Tools\\TSMIS Exporter\\data\\arcgis_layers", drop: MOCK_AG_DROP,
+                        expected: 40, staged: 40, missing: [], unknown: ["99_Scratch Export.xlsx"],
+                        index_present: true, builds: mockAgBuilds },
+             available_days: MOCK_DAY_AVAIL[source] || [],
+             available_day_reports: mockDayReports(MOCK_AG_DAY_REPORTS, source, false) };
   }
   // v0.16.0 mock job queue — mirrors gui_api: enqueue, run one at a time, auto-
   // advance. `kind` drives the run-mode/icon; `total` feeds the compare progress.
@@ -1938,109 +2025,110 @@ function makeMockApi() {
       push({ t: "log", text: "Run report saved: C:\\Users\\you\\Desktop\\run_report.csv" });
       return { saved: true };
     },
-    // ---- the ArcGIS clean-road tab (v0.29.0) ----
+    // ---- the ArcGIS tab: "Reports vs layers" MATRIX + library (2026-09-02) ----
+    // ONE layer build per report; each build records the drop it came from.
+    // The preview shows the three build states the row headers render: Highway
+    // Detail built from an OLDER drop (stale — rebuild), Intersection Detail not
+    // built, Clean Road Highway built from the current drop but with no
+    // comparison yet (no consolidator for the site's export).
+    arcgis_matrix_info: async () => mockAgMatrixSnapshot(),
+    set_arcgis_matrix_source: async (s) => {
+      st.arcgis_matrix_source = s; st.arcgis_matrix_days = [];
+      pushState(); return { ok: true, source: s };
+    },
+    add_arcgis_matrix_day: async (d) => {
+      const avail = MOCK_DAY_AVAIL[st.arcgis_matrix_source || "ssor-prod"] || [];
+      if (avail.indexOf(d) < 0) return { error: "That day has no export for this source." };
+      if ((st.arcgis_matrix_days || []).indexOf(d) < 0)
+        st.arcgis_matrix_days = [...(st.arcgis_matrix_days || []), d];
+      pushState(); return { ok: true, days: st.arcgis_matrix_days };
+    },
+    remove_arcgis_matrix_day: async (d) => {
+      st.arcgis_matrix_days = (st.arcgis_matrix_days || []).filter((x) => x !== d);
+      pushState(); return { ok: true, days: st.arcgis_matrix_days };
+    },
+    set_arcgis_matrix_report: async (rk, visible) => {
+      const hidden = new Set(st.arcgis_matrix_hidden || []);
+      if (visible) hidden.delete(rk); else hidden.add(rk);
+      st.arcgis_matrix_hidden = [...hidden];
+      return { ok: true, hidden: st.arcgis_matrix_hidden };
+    },
+    set_arcgis_matrix_row_order: async (keys) => {
+      st.arcgis_matrix_row_order = keys || [];
+      pushState(); return { ok: true, order: st.arcgis_matrix_row_order };
+    },
+    set_arcgis_matrix_day_order: async (days) => {
+      const cur = st.arcgis_matrix_days || [];
+      const clean = (days || []).filter((d) => cur.includes(d));
+      st.arcgis_matrix_days = [...clean, ...cur.filter((d) => !clean.includes(d))];
+      pushState(); return { ok: true, days: st.arcgis_matrix_days };
+    },
+    set_arcgis_matrix_formulas: async (on) => {
+      st.arcgis_matrix_formulas = !!on;
+      push({ t: "log", text: `Reports-vs-layers live-formulas workbook ${on ? "on" : "off"}.` });
+      pushState(); return { ok: true, on: !!on };
+    },
+    build_arcgis_matrix_cell: async (rk, d) => {
+      const b = mockAgBuilds[rk];
+      if (!b || !b.available) return { error: "That comparison isn't available yet for this report." };
+      if (!b.built) return { error: "this report hasn't been built from the ArcGIS layers yet" };
+      return mockEnqueue("compare", "cell", `Rebuild ${mockAgLabel(rk)} — ${d} vs layers`,
+                         { which: "arcgis", total: 1 });
+    },
+    rebuild_arcgis_matrix: async (scope, row, date) => {
+      if (!(st.arcgis_matrix_days || []).length) return { ok: true, nothing: true };
+      const n = row ? (st.arcgis_matrix_days || []).length : date ? 2 : 3;
+      const label = row ? `Rebuild ${mockAgLabel(row)} — all days vs layers`
+        : date ? `Rebuild all reports — ${date} vs layers`
+        : scope === "all" ? "Rebuild all Reports-vs-layers comparisons"
+          : "Refresh stale Reports-vs-layers comparisons";
+      return mockEnqueue("compare", row ? "row" : date ? "column" : scope, label,
+                         { which: "arcgis", total: n });
+    },
+    build_arcgis_report: async (rk, asof) => {
+      const b = mockAgBuilds[rk];
+      if (!b || !b.available) return { error: `${mockAgLabel(rk)} cannot be built from the layers yet.` };
+      // The mock's job finishes in under a second; the refresh that follows
+      // re-reads the library, so the row reads "current drop" afterwards.
+      Object.assign(b, { built: true, asof: asof || MOCK_AG_DROP.exported, rows: b.rows || 16147,
+                         drop_exported: MOCK_AG_DROP.exported, drop_fingerprint: MOCK_AG_DROP.fingerprint,
+                         drop_current: true, comparable_now: true, completion: "complete",
+                         trusted: true, stale: false, stale_reason: "" });
+      return mockEnqueue("arcgis_build", "cell",
+                         `Build ${mockAgLabel(rk)} from the layers${asof ? " as of " + asof : ""}`,
+                         { which: "arcgis", total: 1 });
+    },
+    open_arcgis_report: async (rk) => {
+      const b = mockAgBuilds[rk];
+      if (!b || !b.built) return { error: "This report hasn't been built from the layers yet." };
+      push({ t: "log", text: `(mock) open ${b.path}` });
+      return { ok: true };
+    },
+    open_arcgis_cell_comparison: async (rk, d) => {
+      push({ t: "log", text: `(mock) open Reports-vs-layers comparison: ${rk}_vs_layers ${d}.xlsx` });
+      return { ok: true };
+    },
+    open_arcgis_comparisons_folder: async () => {
+      push({ t: "log", text: "(mock) open Reports-vs-layers comparisons folder" });
+      return { ok: true };
+    },
+    open_arcgis_reports_folder: async () => push({ t: "log", text: "(mock) would open the arcgis_reports builds folder" }),
+    // ---- the ArcGIS tab: Clean Road vs TSN (v0.29.0) ----
     arcgis_status: async () => ({
       root: "C:\\Tools\\TSMIS Exporter\\data\\arcgis_layers",
-      expected: 40, staged: mockAgBuilt ? 40 : 40,
+      expected: 40, staged: 40,
       missing: [], unknown: ["99_Scratch Export.xlsx"],
       index_present: true,
       highway: {
         layers_ok: true, missing: [],
-        built: mockAgBuilt
-          ? { exists: true, asof: "2025-09-08", build_version: 1,
-              completion: "complete",
-              path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_cleanroad\\clean_highway_built.xlsx" }
-          : { exists: false,
-              path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_cleanroad\\clean_highway_built.xlsx" },
+        built: mockAgBuilds.clean_highway.built
+          ? { exists: true, asof: mockAgBuilds.clean_highway.asof, build_version: 1,
+              completion: mockAgBuilds.clean_highway.completion,
+              path: mockAgBuilds.clean_highway.path }
+          : { exists: false, path: mockAgBuilds.clean_highway.path },
         tsn_raw: true, default_asof: "2025-09-08",
       },
     }),
-    // Reports vs layers (v0.39.0). `mockAgReportBuilt` mirrors the real
-    // dependency: the report is PROJECTED from the clean-road build, so it
-    // cannot exist before it. The as-of dates deliberately DIFFER from the
-    // export day so the preview shows the vintage warning, which is the whole
-    // point of that card.
-    arcgis_report_status: async (report) => {
-      const key = report || "highway_detail";
-      const reports = [{ key: "highway_detail", label: "Highway Detail" },
-                       { key: "intersection_detail", label: "Intersection Detail" }];
-      const out = {
-        reports, report: key,
-        out_dir: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports",
-      };
-      if (key === "intersection_detail") {
-        // A POINT report: single-pass build, so no source table at all.
-        out.built = mockAgReportBuiltInx
-          ? { exists: true, asof: "2026-08-28", build_version: "1",
-              rows: "16147", routes: "215", shells: "22697", retired: "70",
-              path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports\\intersection_detail_from_layers.xlsx" }
-          : { exists: false,
-              path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports\\intersection_detail_from_layers.xlsx" };
-        out.days = [{ day: "2026-08-28", subdir: "intersection_detail_pdf",
-                      path: "C:\\demo\\tsmis_intersection_detail_pdf_consolidated 2026-08-28 ssor-prod.xlsx" }];
-        return out;
-      }
-      out.source = mockAgBuilt
-        ? { exists: true, asof: "2025-09-08", build_version: 1,
-            path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports\\highway_detail_source_table.xlsx" }
-        : { exists: false,
-            path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports\\highway_detail_source_table.xlsx" };
-      out.built = mockAgReportBuilt
-        ? { exists: true, asof: "2025-09-08", build_version: "1",
-            rows: "51227", merged_away: "6501", routes: "252",
-            path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports\\highway_detail_from_layers.xlsx" }
-        : { exists: false,
-            path: "C:\\Tools\\TSMIS Exporter\\output\\arcgis_reports\\highway_detail_from_layers.xlsx" };
-      out.days = [{ day: "2026-08-17", subdir: "highway_detail", path: "C:\\demo\\highway_detail_consolidated 2026-08-17 ssor-prod.xlsx" },
-                  { day: "2026-07-23", subdir: "highway_detail", path: "C:\\demo\\highway_detail_consolidated 2026-07-23 ssor-prod.xlsx" }];
-      return out;
-    },
-    open_arcgis_reports_folder: async () => push({ t: "log", text: "(mock) would open the arcgis_reports output folder" }),
-    start_arcgis_report_build: async (report, asof) => {
-      const inx = report === "intersection_detail";
-      const label = inx ? "Intersection Detail" : "Highway Detail";
-      if (!inx && !mockAgBuilt) return { error: "Build the Clean Road Highway workbook first — the report is projected from it, not from the layers directly." };
-      st.task = "consolidate";
-      st.auth_dot = "busy"; st.auth_text = "Building the report from the layers…";
-      pushState();
-      push({ t: "log", text: `Starting ArcGIS report build: ${label} (ArcGIS)` },
-           { t: "run_started", mode: "consolidate", label: `Building ${label} from the ArcGIS layers${asof ? " as of " + asof : ""}…` });
-      setTimeout(() => push({ t: "log", text: inx
-        ? "  built 16,147 intersection records (215 routes); skipped 22,697 rows with no inventory block and 70 retired"
-        : "  projected 57,728 CA HIGHWAYS rows onto the report's 34 columns -> 51,227 records (6,501 merged away)" }), 1200);
-      setTimeout(() => {
-        if (inx) mockAgReportBuiltInx = true; else mockAgReportBuilt = true;
-        push({ t: "log", text: inx
-          ? "Built 16,147 Intersection Detail records (215 routes) from the ArcGIS layers as of 2026-08-28."
-          : "Built 51,227 Highway Detail records (252 routes) from the ArcGIS layers as of 2025-09-08." },
-             { t: "run_ended" });
-        st.task = null;
-        st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
-        pushState();
-      }, 2000);
-      return { ok: true };
-    },
-    start_arcgis_report_compare: async (report, day, wantFormulas, wantValues) => {
-      const inx = report === "intersection_detail";
-      const label = inx ? "Intersection Detail" : "Highway Detail";
-      if (!(inx ? mockAgReportBuiltInx : mockAgReportBuilt))
-        return { error: `Build the ${label} report from the layers first — the comparison reads it as the ArcGIS side.` };
-      if (!day) return { error: `Pick an export day that has a consolidated ${label} workbook. If the day you want isn't listed, consolidate it first (Consolidate tab).` };
-      if (!wantFormulas && !wantValues) return { error: "Tick at least one output (values and/or live formulas)." };
-      st.task = "compare";
-      st.auth_dot = "busy"; st.auth_text = "Comparing…";
-      pushState();
-      push({ t: "log", text: `Starting comparison: ${label} — ArcGIS vs TSMIS ${day}` },
-           { t: "run_started", mode: "consolidate", label: `Comparing — ${label}…` });
-      setTimeout(() => {
-        push({ t: "log", text: `Comparison written: ArcGIS_vs_TSMIS_${inx ? "IntersectionDetail" : "HighwayDetail"}.xlsx (values + live formulas)` },
-             { t: "run_ended" });
-        st.task = null;
-        st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
-        pushState();
-      }, 3000);
-      return { ok: true };
-    },
     open_arcgis_layers_folder: async () => push({ t: "log", text: "(mock) would open the ArcGIS layers folder" }),
     open_arcgis_output_folder: async () => push({ t: "log", text: "(mock) would open the arcgis_cleanroad output folder" }),
     start_arcgis_build: async (asof) => {
@@ -2053,8 +2141,11 @@ function makeMockApi() {
       setTimeout(() => push({ t: "log", text: "  Traffic Volume Segments: 25,742 as-of spans" }), 1400);
       setTimeout(() => push({ t: "log", text: "  built 252/252 routes (60,102 rows)" }), 2200);
       setTimeout(() => {
-        mockAgBuilt = true;
-        push({ t: "log", text: "Built 60,102 clean-road highway rows (252 routes) as of 2025-09-08." },
+        Object.assign(mockAgBuilds.clean_highway, {
+          built: true, asof: asof || "2025-09-08", completion: "complete",
+          drop_exported: MOCK_AG_DROP.exported, drop_fingerprint: MOCK_AG_DROP.fingerprint,
+          drop_current: true, comparable_now: true, trusted: true, stale: false, stale_reason: "" });
+        push({ t: "log", text: `Built 60,102 clean-road highway rows (252 routes) as of ${asof || "2025-09-08"}.` },
              { t: "run_ended" });
         st.task = null;
         st.auth_dot = st.authed ? "ok" : "bad"; st.auth_text = "Done";
@@ -2063,7 +2154,7 @@ function makeMockApi() {
       return { ok: true };
     },
     start_arcgis_compare: async (wantFormulas, wantValues) => {
-      if (!mockAgBuilt) return { error: "Build the Clean Road Highway workbook first — the comparison reads it as the ArcGIS side." };
+      if (!mockAgBuilds.clean_highway.built) return { error: "Build the Clean Road Highway workbook first — the comparison reads it as the ArcGIS side." };
       if (!wantFormulas && !wantValues) return { error: "Tick at least one output (values and/or live formulas)." };
       st.task = "compare";
       st.auth_dot = "busy"; st.auth_text = "Comparing…";

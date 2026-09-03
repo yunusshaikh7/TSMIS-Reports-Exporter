@@ -181,16 +181,18 @@ class GuiMatrixMixin:
         return f"{verb} all comparisons"
 
     def _make_job(self, kind, scope, label, row=None, env=None, subdir=None,
-                  fast=False, which="env", force=False, origin=None):
-        # `which` ("env" = Everything matrix, "day" = Compare by-day matrix) lets
-        # ONE queue serve both matrices; for day jobs `env` carries the date.
+                  fast=False, which="env", force=False, origin=None, asof=None):
+        # `which` ("env" = Everything matrix, "day" = Compare by-day matrix,
+        # "baseline" / "pdf_vs_excel" / "arcgis" the other by-day matrices) lets
+        # ONE queue serve every matrix; for day jobs `env` carries the date.
         # `force` rebuilds the persistent consolidated even when it looks fresh.
         # `origin` ("canonical"/"legacy") routes a tsn_consolidate job (CMP-AUD-010).
+        # `asof` is an arcgis_build job's reconstruction date (None = the drop's).
         jid = self._coord.next_seq()
         return {"id": jid, "kind": kind, "scope": scope, "label": label,
                 "row": row, "env": env, "subdir": subdir, "fast": bool(fast),
                 "which": which, "force": bool(force), "origin": origin,
-                "status": "queued"}
+                "asof": asof, "status": "queued"}
 
     def _enqueue_matrix_job(self, job):
         """Append a Job and try to start it (or leave it queued behind the
@@ -251,6 +253,8 @@ class GuiMatrixMixin:
             return self._dispatch_evidence_job(job)
         if kind == "tsn_consolidate":
             return self._dispatch_tsn_consolidate_job(job)
+        if kind == "arcgis_build":
+            return self._dispatch_arcgis_build_job(job)
         return False
 
     # CMP-AUD-088: only an EXPORT re-authenticates + launches a browser. compare /
@@ -354,6 +358,8 @@ class GuiMatrixMixin:
             return self._dispatch_baseline_compare_job(job)
         if job.get("which") == "pdf_vs_excel":
             return self._dispatch_pve_compare_job(job)
+        if job.get("which") == "arcgis":
+            return self._dispatch_arcgis_compare_job(job)
         base = self._current_baseline()
         dest = settings.get_batch_dest()
         cells = self._resolve_compare_cells(job, base)

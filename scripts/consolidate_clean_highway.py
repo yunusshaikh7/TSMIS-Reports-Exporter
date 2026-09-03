@@ -40,6 +40,7 @@ import textwrap
 from collections import defaultdict
 from pathlib import Path
 
+import arcgis_layers
 import city_codes
 import clean_highway_columns as chc
 import clean_road_layers as crl
@@ -58,6 +59,10 @@ BUILD_VERSION = 1
 FILENAME = "clean_highway_built.xlsx"
 OUT_DIR = paths.OUTPUT_ROOT / "arcgis_cleanroad"
 OUT_PATH = OUT_DIR / FILENAME
+# The "Reports vs layers" library reads a build's facts through these two: the
+# sidecar payload key its outcome record carries, and the layers the build
+# refuses without (only THOSE gate a build — never the whole 40-layer manifest).
+SIDECAR_KEY = "clean_road_build"
 
 # HF-01 (PCOA-FINAL-010): the reserved marker written into an anchor cell
 # whose source span exists but cannot be placed (an unreadable begin or end
@@ -152,6 +157,7 @@ _RIGHT_TAGS = tuple(t for t, s in SPAN_LAYERS.items() if s[2] == "right")
 HIGHWAY_LAYERS = tuple(sorted(
     {spec[0] for spec in SPAN_LAYERS.values()}
     | {spec[0] for spec in POINT_LAYERS.values()}))
+REQUIRED_LAYERS = HIGHWAY_LAYERS
 
 # Roadbed blocks: the opposite independent row's block stays null (TSN nulls
 # the LT block on R rows and the RT block on L rows).
@@ -1295,8 +1301,10 @@ def _put_table(ws, put, columns, table_rows):
 
 
 def _write_marker_sheet(wb, asof_date, lib_root, warnings, skips, n_marked,
-                        marked_cells):
-    """The build's own record sheet: build identity, the HF-01 skipped-source
+                        marked_cells, drop=None):
+    """The build's own record sheet: build identity, the layer DROP it was
+    built from (its export date + content fingerprint, so the library can say
+    whether the staged drop is still that one), the HF-01 skipped-source
     disclosure the comparator reads back, any warning, and — when spans were
     skipped — the itemized table naming every one of them."""
     from openpyxl.styles import Alignment
@@ -1322,6 +1330,9 @@ def _write_marker_sheet(wb, asof_date, lib_root, warnings, skips, n_marked,
     pair("Build version", BUILD_VERSION)
     pair("As-of date", asof_date.isoformat())
     pair("Layer library", str(lib_root))
+    drop = drop or {}
+    pair("Layer drop exported", drop.get("exported") or "(unknown)")
+    pair("Layer drop fingerprint", drop.get("fingerprint") or "(unknown)")
     # HF-01: the build's own skipped-source record — the comparator reads
     # these keys to disclose the condition in the comparison's Summary/Notes.
     pair("Skipped source spans", len(skips))
@@ -1353,7 +1364,7 @@ def _write_marked_sheet(wb, marked_cells):
 
 
 def _write_workbook(out_path, rows, index, asof_date, lib_root, warnings,
-                    skips=(), n_marked=0, marked_cells=()):
+                    skips=(), n_marked=0, marked_cells=(), drop=None):
     from openpyxl import Workbook
     from openpyxl.cell import WriteOnlyCell
     from openpyxl.comments import Comment
@@ -1398,7 +1409,7 @@ def _write_workbook(out_path, rows, index, asof_date, lib_root, warnings,
                 cells.append(c)
             prov.append(cells)
     _write_marker_sheet(wb, asof_date, lib_root, warnings, skips, n_marked,
-                        marked_cells)
+                        marked_cells, drop=drop)
     _write_marked_sheet(wb, marked_cells)
     tmp = out_path.with_name(out_path.name + ".tmp")
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1412,6 +1423,34 @@ def _write_workbook(out_path, rows, index, asof_date, lib_root, warnings,
             except OSError as e:      # silent-ok: the temp is orphaned only after a failed save; the error path already reports that failure
                 log.warning("could not remove %s (%s: %s)", tmp.name,
                             type(e).__name__, e)
+
+
+def report_facts(path):
+    """The build facts the marker sheet records about THIS workbook — the same
+    surface the report builds expose, so the "Reports vs layers" library can
+    read every build one way. `{}` when absent or unreadable; never invented."""
+    from openpyxl import load_workbook
+
+    facts = {}
+    wb = load_workbook(path, read_only=True, data_only=True)
+    try:
+        if MARKER_SHEET not in wb.sheetnames:
+            return facts
+        keys = {"As-of date": "asof", "Build version": "build_version",
+                "Layer library": "layer_library",
+                "Layer drop exported": "drop_exported",
+                "Layer drop fingerprint": "drop_fingerprint",
+                "Skipped source spans": "skipped_source_spans"}
+        for r in wb[MARKER_SHEET].iter_rows(values_only=True):
+            if not r or r[0] is None:
+                continue
+            key = keys.get(str(r[0]).strip())
+            if key:
+                val = r[1] if len(r) > 1 else None
+                facts[key] = "" if val is None else str(val).strip()
+        return facts
+    finally:
+        wb.close()
 
 
 def resolve_default_asof():
@@ -1514,9 +1553,15 @@ def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes,
                                  message="Cancelled. Existing file kept.",
                                  completion=outcome.CANCELLED)
 
+    # The drop's identity is taken BEFORE the layers are read (the same order
+    # as a comparison's input fingerprint), so the build records the bytes it
+    # actually consumed rather than whatever the folder holds afterwards.
+    drop = arcgis_layers.drop_info(lib_root)
     events.on_log("=" * 60)
     events.on_log(f"Clean Road Highway build — ArcGIS layers as of "
-                  f"{asof_date.isoformat()}")
+                  f"{asof_date.isoformat()}"
+                  + (f" (drop exported {drop['exported']})"
+                     if drop.get("exported") else ""))
     events.on_log("=" * 60)
 
     buckets = defaultdict(lambda: defaultdict(list))
@@ -1576,7 +1621,8 @@ def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes,
         events.on_log(f"  note: {w}")
 
     _write_workbook(out_path, rows, index, asof_date, lib_root, other_warnings,
-                    skips=skips, n_marked=marked, marked_cells=marked_cells)
+                    skips=skips, n_marked=marked, marked_cells=marked_cells,
+                    drop=drop)
     result = ConsolidateResult(
         status="ok",
         message=(f"Built {len(rows):,} clean-road highway rows "
@@ -1593,9 +1639,11 @@ def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes,
         skipped_inputs=len(warnings), failed_inputs=0)
     if not consolidation_meta.write_outcome(
             out_path, result,
-            extra={"clean_road_build": {
+            extra={SIDECAR_KEY: {
                 "asof": asof_date.isoformat(),
                 "build_version": BUILD_VERSION,
+                "layer_drop": {"fingerprint": drop.get("fingerprint"),
+                               "exported": drop.get("exported")},
                 "routes": len(all_routes),
                 "rows": len(rows),
                 "warnings": warnings,

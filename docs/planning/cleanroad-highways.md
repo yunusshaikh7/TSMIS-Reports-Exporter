@@ -291,6 +291,15 @@ IM Filter Points (never exported), IM Intersection Manager Metadata (2 rows),
 MS2 Traffic Station, Posted Speed Limit, the HPMS family, and the 8
 empty-in-export SHS layers.
 
+**Re-target (2026-09-02).** The site now exports all three Clean Road files
+(v0.44.0), so the CA INTERSECTIONS and CA RAMPS builds above land as ROWS of the
+ArcGIS tab's **Reports vs layers matrix** (`arcgis_reports.py` already lists
+`clean_highway` / `clean_intersection` / `clean_ramp`, greyed until their builds and
+the site-export consolidators exist): our build vs the site's export, TSMIS vs
+TSMIS, one build per file stamped with the layer drop it came from. The vs-TSN
+comparison of the same builds stays on the Clean Road sub-tab pattern. The
+measured rules above are unchanged by this — only where the comparison lives.
+
 ## App integration — SHIPPED v0.29.0 (the ArcGIS tab)
 
 The sketch above became the product on 2026-07-22: `clean_road_layers.py` (the

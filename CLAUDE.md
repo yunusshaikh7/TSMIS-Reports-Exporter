@@ -101,7 +101,18 @@ pairs county-blind by decision with the exposure measured and disclosed in the N
 (524 of 59,457 keys carry >1 row; 438 of those span counties = 976 rows, 1.6%).
 **Never infer a county.**
 
-**The ArcGIS tab has TWO sub-tabs (v0.39.0)** — both build from the same
+**The ArcGIS tab has TWO sub-tabs — and since 2026-09-02 "Reports vs layers" is
+its MAIN view, a by-day MATRIX** (`arcgis_matrix.py`, §12d): rows = every report in
+the `arcgis_reports` registry (the two rendered so far; the rest greyed *no build
+yet* with the reason; the three Clean Road files are rows too, owner decision),
+columns = exported days, each cell = the report's ONE layer build vs that day's
+consolidated export. **One build per report, like the TSN library** — the layers
+are exported by hand and rarely — and every build stamps the DROP it came from
+(`arcgis_layers.drop_info`: the `00_INDEX.xlsx` manifest's own export timestamp +
+a content fingerprint over the folder) into its marker sheet and sidecar, so a
+fresher drop reads the row stale. The as-of defaults to the drop's export date,
+never the TSN extract's (that default belongs to the Clean Road sub-tab only); a
+build gates on its own `REQUIRED_LAYERS`. Both sub-tabs build from the same
 manually-stocked `arcgis_layers/` library, which never touches the site.
 
 **Clean Road (v0.29.0) builds the HIGHWAY clean-road file**: our
@@ -195,13 +206,17 @@ acceptance. Details + acceptance oracles: §13 and the
 [finding ledger](docs/planning/comparison-perfection/comparison-audit-findings.md).
 
 **The comparison-perfection project is COMPLETE (2026-07-22, v0.28.0), and EVERY
-finding in the ledger is closed — 245 of 245.** `main` is the completion
+finding in the ledger is closed — 246 of 246.** `main` is the completion
 state. The ⛔ Highway Detail pre-release block (133 · 142 · 186 · 192 + 045-HD) fell
 to the vendor's 2026-08-17 delivery in v0.37.0 / v0.38.0 (see the Highway Detail
 paragraph above; 243 was found and fixed on the released data), and the last two were
 **244** (v0.38.2 — HD vs TSN was counting the paired-roadbed ditto convention as data)
 and **245** (v0.39.1 — the ArcGIS Highway Detail projection counted the HF-01
-unavailable marker as data and reported COMPLETE over a PARTIAL build). The
+unavailable marker as data and reported COMPLETE over a PARTIAL build); **246**
+(2026-09-02 — Highway Sequence Excel vs TSN reported both rows of an equate as
+one-sided whenever the export seated the `E` on the realignment record; TSN now
+declares the relation and the export's suffix is seated on the target row before
+keying, 57,072 → 57,518 paired on the bound 7.9 pair, PDF-vs-TSN untouched). The
 [COMPLETION-PLAN](docs/planning/comparison-perfection/COMPLETION-PLAN.md) + finding
 ledger are the PROJECT RECORD of why each comparison behaves as it does (start at
 [README.md](docs/planning/comparison-perfection/README.md)).
@@ -509,8 +524,12 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   tsn_library.py tsn_load_*.py   the canonical TSN library (versioned normalization, D2) + its loaders
   arcgis_layers.py           the manually-stocked ArcGIS layer drop-zone (staging only, no parser)
   arcgis_reports.py          the "Reports vs layers" REGISTRY — one row per report
-                             (label + build + comparator + the export consolidators that
-                             can supply the TSMIS side); endpoints/picker/checks derive
+                             (build + comparator + the export consolidators that can
+                             supply the TSMIS side; None = not rendered yet, and the
+                             row says why); the matrix/endpoints/mock/checks derive
+  arcgis_matrix.py           the ArcGIS tab's by-day MATRIX engine (2026-09-02): one
+                             layer build per report, stamped with the drop it came
+                             from; each cell = that build vs a day's export
   arcgis_report_highway_detail.py   the CA HIGHWAYS build PROJECTED onto a report's own
                              shape (Highway Detail first, v0.39.0) — the mapping + the
                              merge/description rules that make it a build, not a rename

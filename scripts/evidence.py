@@ -195,6 +195,15 @@ def _state_entries():
     stay OUT — only the JSON that says what they claim to be. This is the half of a
     field report the logs cannot answer: which generation is published, whether it is
     trusted, what the last attempt did, and which sources a comparison actually read.
+
+    Each sidecar keeps its REAL relative path, `_state/` included. Collapsing
+    `_state/` into its parent gave an organized `consolidated/_state/X.outcome.json`
+    and its pre-organization sibling `consolidated/X.outcome.json` the same archive
+    name, and the duplicate-member guard then refused the whole bundle — no zip at
+    all, from the one library shape (both sidecars present) that a long-lived
+    install rebuilt on a current build actually has. Keeping the path is also the
+    more useful record: the bundle now shows whether the install has organized
+    its state at all.
     """
     entries, truncated = [], False
     for root, label in ((paths.OUTPUT_ROOT, "output"),
@@ -208,10 +217,7 @@ def _state_entries():
             if not _is_state_sidecar(f):
                 continue
             try:
-                rel_path = f.relative_to(root)
-                if rel_path.parent.name == output_state.STATE_DIRNAME:
-                    rel_path = rel_path.parent.parent / rel_path.name
-                rel = rel_path.as_posix()
+                rel = f.relative_to(root).as_posix()
             except ValueError:  # silent-ok: a walk result outside its own root is simply skipped
                 continue
             entries.append((f, f"state/{label}/{rel}"))

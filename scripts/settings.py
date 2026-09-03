@@ -922,6 +922,83 @@ def set_pve_matrix_formulas(on):
     return _set_flag("pve_matrix_formulas", on)
 
 
+# ---- ArcGIS-tab "Reports vs layers" matrix ---------------------------------
+# Same shape as the PDF-vs-Excel matrix (a source, ordered day-columns, hidden
+# report rows, a drag row order, a formulas toggle): the other side of every
+# cell is the report's single layer build, which has no per-matrix setting.
+
+_DEFAULT_ARCGIS_MATRIX_SOURCE = "ssor-prod"
+
+
+def get_arcgis_matrix_source():
+    raw = _read_file().get("arcgis_matrix_source")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return _DEFAULT_ARCGIS_MATRIX_SOURCE
+
+
+def set_arcgis_matrix_source(key):
+    """Save (or, empty, reset) the Reports-vs-layers matrix source."""
+    data = dict(_read_file())
+    key = (key or "").strip()
+    if key:
+        data["arcgis_matrix_source"] = key
+    else:
+        data.pop("arcgis_matrix_source", None)
+    _atomic_write(data)
+    log.info("settings: arcgis_matrix_source -> %s", key or "(default)")
+    return get_arcgis_matrix_source()
+
+
+def get_arcgis_matrix_days():
+    """The ordered day-column date strings the user added (default: none)."""
+    raw = _read_file().get("arcgis_matrix_days")
+    if isinstance(raw, list):
+        return [d for d in raw if isinstance(d, str) and d]
+    return []
+
+
+def set_arcgis_matrix_days(days):
+    """Persist the ordered Reports-vs-layers day-column list. Empty -> cleared."""
+    data = dict(_read_file())
+    days = [d for d in (days or []) if isinstance(d, str) and d]
+    if days:
+        data["arcgis_matrix_days"] = days
+    else:
+        data.pop("arcgis_matrix_days", None)
+    _atomic_write(data)
+    log.info("settings: arcgis_matrix_days -> %s", days or "(none)")
+    return get_arcgis_matrix_days()
+
+
+def get_arcgis_matrix_hidden():
+    """Hidden report-row keys on the Reports-vs-layers matrix (default: none)."""
+    return _get_str_list("arcgis_matrix_hidden")
+
+
+def set_arcgis_matrix_hidden(keys):
+    return _set_str_list("arcgis_matrix_hidden", keys)
+
+
+def get_arcgis_matrix_row_order():
+    """The user's drag-to-reorder row order (default: none = registry order)."""
+    return _get_str_list("arcgis_matrix_row_order")
+
+
+def set_arcgis_matrix_row_order(keys):
+    return _set_str_list("arcgis_matrix_row_order", keys)
+
+
+def get_arcgis_matrix_formulas():
+    """Whether the Reports-vs-layers matrix ALSO writes a live-formulas workbook
+    (its own toggle; default off)."""
+    return _get_flag("arcgis_matrix_formulas")
+
+
+def set_arcgis_matrix_formulas(on):
+    return _set_flag("arcgis_matrix_formulas", on)
+
+
 # ---- Compare-tab "vs Baseline" matrix ---------------------------------------
 # Same shape as the by-day matrix: a source, picked day-columns, hidden rows, a
 # row order, and its own formulas toggle — plus the picked BASELINE id

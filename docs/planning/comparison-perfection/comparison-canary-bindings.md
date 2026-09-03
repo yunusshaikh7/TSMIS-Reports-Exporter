@@ -1885,3 +1885,35 @@ equality is proved directly: the `TSN` data sheet and `__CMP_E2_SNAPSHOT_B` are
 cell-identical across 60,085 and 60,084 rows respectively. **When re-verifying
 this canary, bind to the raw extract and the projected content, not to a
 normalized SHA — that byte image is per-tree.**
+
+## 2026-09-02 — CMP-AUD-246: the Highway Sequence Excel-vs-TSN equate seat (re-bless)
+
+Inputs, all local, through the shipped `compare_highway_sequence_tsn.compare()` in
+counts-only preview mode, the pre-fix module taken from `git show HEAD` on the same
+process path:
+
+| Role | File | Bytes | SHA-256 |
+|---|---|---:|---|
+| 7.9 consolidated Excel | `ground-truth\All Reports 7.9\2026-07-09 ssor-prod\consolidated\highway_sequence_consolidated 2026-07-09 ssor-prod.xlsx` | 2,424,214 | `590b19fcba9c3ea6d5f7a86c2e5db288785e6c75499575eaf8af1626ed344d9f` |
+| normalized TSN (v4) | the app's own library rebuild `tsn_library\highway_sequence\consolidated\tsn_highway_sequence_normalized.xlsx`, 69,804 rows, built 2026-08-31 by v0.42.1 from the bound 12-PDF raw set (raw manifest SHA `91d63fc20e82c8368044a9ef00224cd4b9b55309af55109fd34e4dacba7e72a2`, == `HSL-79-current`'s authoritative raw TSN) | 2,542,549 | `22763d06d59fb917c3056b3b26dd69982583f048ca69a782f87490ee72e5390d` |
+| 2026-08-31 consolidated Excel | `ground-truth\HSL Pull 8.31\2026-08-31 ssor-prod\consolidated\highway_sequence_consolidated 2026-08-31 ssor-prod.xlsx` | 2,373,831 | (filed 2026-08-31; the pull's own `_state/` fingerprint sidecar binds it) |
+
+The pre-fix comparator on the 7.9 inputs reproduces the bound canary EXACTLY — 57,072 /
+3,422 / 12,732; 23,691 differing rows / 30,005 cells {City 15,026, HG 2,418, FT 695,
+Distance 6,972, Description 4,894} — which is the content-equivalence proof for the
+library rebuild standing in for the accepted normalized workbook.
+
+| Leg | pre-fix | post-fix (bound from 2026-09-02) |
+|---|---|---|
+| 7.9 Excel-vs-TSN paired / only-TSMIS / only-TSN | 57,072 / 3,422 / 12,732 | **57,518 / 2,976 / 12,286** (+446 per side, 0 pairs lost) |
+| 7.9 Excel-vs-TSN differing rows / cells | 23,691 / 30,005 | **24,063 / 30,954** {City 15,134, HG 2,644, FT 917, Distance 7,090, Description 5,169} |
+| 7.9 seat counts | — | declared 998, seated 224; left: 677 no suffix at the record, 71 record not exported, 23 ambiguous, 3 both carry |
+| 8.31 Excel-vs-TSN | 56,613 / 3,366 / 13,191; 24,721 / 30,368 | **57,052 / 2,927 / 12,752; 25,085 / 31,288**; seated 220 of 998 |
+| 8.31 PDF-vs-TSN (untouched code path) | 57,035 / 2,943 / 12,769; 24,878 / 29,569 | identical |
+| TSN keys the PDF pairs that Excel misses (7.9 / 8.31) | 457 / 444 | 47 / 39 |
+
+The 7.9 PDF-vs-TSN leg could not be re-run here: the filed 7.9 PDF consolidation predates
+the CMP-AUD-066 PDF-conversion marker and is refused by both the pre- and post-fix module
+alike (the same refusal), so its "untouched" claim rests on the 8.31 identity above and on
+the code path (`TSMIS_PDF_VS_TSN` loads through `_load_tsmis`, which still reads the
+export's own seat).

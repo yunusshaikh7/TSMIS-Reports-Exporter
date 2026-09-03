@@ -67,7 +67,9 @@ from gui_worker_env import (ActiveEnvCheckWorker, EnvCheckWorker,              #
 from gui_worker_maint import (CheckWorker, ChromiumWorker, ResetWorker,        # noqa: F401
                               UpdateWorker, ValidationWorker,
                               measure_targets, reset_targets)
-from gui_worker_matrix import (BaselineMatrixCompareWorker,                    # noqa: F401
+from gui_worker_matrix import (ArcgisMatrixCompareWorker,                      # noqa: F401
+                               ArcgisReportBuildWorker,
+                               BaselineMatrixCompareWorker,
                                DayMatrixCompareWorker, MatrixBatchExportWorker,
                                MatrixCompareWorker, MatrixEvidenceWorker,
                                MatrixTsnConsolidateWorker,

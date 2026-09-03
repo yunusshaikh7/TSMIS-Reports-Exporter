@@ -92,6 +92,7 @@ APP_MODULES = [
     "consolidate_clean_highway",         # the ArcGIS CA HIGHWAYS overlay build
     "compare_clean_highway_tsn",         # the ArcGIS-vs-TSN clean-road comparison
     "arcgis_reports",                    # the "Reports vs layers" registry
+    "arcgis_matrix",                     # the ArcGIS tab's by-day Reports-vs-layers matrix engine
     "arcgis_report_highway_detail",      # CA HIGHWAYS projected onto the HD report (v0.39.0)
     "compare_highway_detail_arcgis",     # the ArcGIS-vs-TSMIS Highway Detail comparison
     "arcgis_report_intersection_detail",  # the IM layers rendered as Intersection Detail

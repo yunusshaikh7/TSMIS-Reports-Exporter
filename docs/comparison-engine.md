@@ -1031,18 +1031,27 @@ composited via `key_normalizer` → `"COUNTY POSTMILE"` (County stays its own vi
 `pair_occurrences_by_similarity` handles landmarks still sharing a county+PM). Historical shipped
 reconciliations: **(1)** County trailing-period strip (`LA.`→`LA` etc. — else whole counties go one-sided);
 **(2)** Description strips the TSMIS `^\d{1,3}[A-Z]?/` route prefix + collapses whitespace; **(3)**
-`context_fields` = **HG** (TSMIS blanks it for whole counties), **City** (TSN tags it far more
-aggressively), **Distance To Next Point** (measured to each system's OWN next listed point — a listing-
-granularity artifact, not a disagreement) — shown, never counted; **FT + Description are compared**, with a
-**Notes sheet** (`legend_writer`) indicating all of this. Current canary in
-[tsn-parsers.md](tsn-parsers.md) (same-run 7.9 pair + v4 TSN library, == the Stage-8 oracle exactly):
-**both 57,072 / only-TSMIS 3,422 / only-TSN 12,732; asserted 4,894 rows / 5,589 cells (Description
-4,894 + FT 695); 60,494 vs 69,804 rows**. Live in both matrices — completing all 6 reports + HL-PDF.
+**HG** (TSMIS blanks it for whole counties), **City** (TSN tags it far more aggressively) and
+**Distance To Next Point** (measured to each system's OWN next listed point — a listing-granularity
+artifact, not a disagreement) were `context_fields` until the owner's 2026-08-10 decision made EVERY
+column compared — the structural noise is now disclosed in the **Notes sheet** (`legend_writer`)
+instead of suppressed; **(4)** the **equate seat** (CMP-AUD-246, 2026-09-02): the Excel export puts
+the equate `E` on the realignment record about a quarter of the time where TSN puts it on the equated
+postmile's own row, and with the complete glued postmile as identity both rows of such a relation went
+one-sided — TSN now DECLARES each relation (`equate_relations`) and `_load_pair` seats the export's
+suffix on the target row before the keys are built (`seat_equate_suffixes`, fail-open; the Summary and
+Notes state the per-run counts), nothing else moving, so the annotation's by-design Description/HG/FT
+cells stay counted. Current canary in [tsn-parsers.md](tsn-parsers.md) (same-run 7.9 pair + v4 TSN
+library): **both 57,518 / only-TSMIS 2,976 / only-TSN 12,286; 24,063 differing rows / 30,954 cells
+all-field; 60,494 vs 69,804 rows** (pre-246: 57,072 / 3,422 / 12,732 and 30,005 cells — the pre-fix
+comparator still reproduces those exactly on the same inputs; the 2026-07-16 context-regime
+"asserted 4,894 rows / 5,589 cells" is where the product first met the Stage-8 oracle). Live in both
+matrices — completing all 6 reports + HL-PDF.
 `compare_highway_sequence_pdf` (v0.25.0) adds `TSMIS_PDF_VS_TSN` + `TSMIS_PDF_VS_EXCEL` (the exact
 §9f-PDF parallel, riding this module's loaders + schema) — each flavor carries its OWN Notes sheet
 because the print represents EQUATES the TSN way (annotation row + `E` on the equated postmile), so
-PDF-vs-TSN pairs BETTER than Excel-vs-TSN (current canary: both **57,505** / asserted **4,916 rows /
-5,001 cells** vs Excel's 57,072 / 4,894 / 5,589) while PDF-vs-Excel surfaces the two renders'
+PDF-vs-TSN needed no seat rule and is untouched by 246 (canary: both **57,505**; the two editions now
+pair within 13 keys of each other, where Excel used to trail by 433) while PDF-vs-Excel surfaces the two renders'
 representation classes as COMPARED truth (**60,493 paired / 0 PDF-only / 1 Excel-only; asserted
 1,410 rows / 3,721 cells — Description 1,133, FT 1,129, HG 910, PM Suffix 549**; the four Excel
 `_x000D_` escapes decode as same-source CRLF, and the once-reported route-037 "dropped Description"
@@ -1147,7 +1156,8 @@ both flavors, context-never-counts).
 The first comparison where **both sides are TSMIS**. Side A is OUR Highway Detail,
 rendered from the ArcGIS layer library by `arcgis_report_highway_detail`; side B is the
 app's own consolidated Highway Detail export for a chosen day. It lives on the **ArcGIS
-tab's "Reports vs layers" sub-tab**, not in `COMPARE_REPORTS` or the matrices.
+tab's "Reports vs layers" matrix** (§12d, since 2026-09-02; a single-report card before
+that), not in `COMPARE_REPORTS` or the Compare-tab matrices.
 
 **Side A has its OWN build (v0.39.2).** It shares the span engine with Clean Road but
 not that build's output, because the two reproduce different things: Clean Road
@@ -1212,7 +1222,7 @@ a mapping table plus the report's own measured rules, not a second engine. Side 
 Intersection Detail, built by `arcgis_report_intersection_detail`; side B is the app's own
 consolidated Intersection Detail export for a chosen day (either edition — both consolidate
 to the same shape, which is what each report's PDF-vs-Excel self-check proves). Same
-sub-tab, same registry (`arcgis_reports.py`), same TSMIS-vs-TSMIS reading.
+matrix (§12d), same registry (`arcgis_reports.py`), same TSMIS-vs-TSMIS reading.
 
 **What is structurally different: this is a POINT report.** Highway Detail is the CA
 HIGHWAYS table printed, so it needs the span engine, a segmentation and a merge rule.
@@ -1571,6 +1581,70 @@ PDF baseline.
   REAL `compare_folders` build per baseline kind** — side labels + counts verified off the produced
   workbook — and the gui_api bridge incl. the shared queue). **Owed on the work PC:** two real days
   vs a real baseline end-to-end.
+
+### 12d. The ArcGIS-tab "Reports vs layers" matrix (`scripts/arcgis_matrix.py`, 2026-09-02)
+
+The **fifth** matrix, and the ArcGIS tab's main view — the other four live under Compare
+and Everything. **Rows = every report in the `arcgis_reports` registry** (the site's
+report order: the two rendered so far, the rows still waiting on a build greyed with the
+reason, and the three Clean Road files, owner decision 2026-09-02), **columns = exported
+days you add, each cell = the report's ONE layer build vs that day's consolidated
+export** (either edition — Excel preferred — consolidated from its run folder through the
+shared `matrix._ensure_consolidated`). Both sides are TSMIS, so they should agree.
+
+- **One build per report, like the TSN library** (owner decision 2026-09-02). The layers
+  are exported by hand and rarely, so every day column compares against the same built
+  workbook (`build_mod.OUT_PATH`; HD and ID under `output/arcgis_reports/`, Clean Road
+  Highway under `output/arcgis_cleanroad/`). `build_report` builds it — gating on the
+  report's OWN `REQUIRED_LAYERS`, with the as-of defaulting to the DROP's export date and
+  never the TSN extract's — and the build stamps the drop it came from into its marker
+  sheet and sidecar (`layer_drop: {fingerprint, exported}` under the module's
+  `SIDECAR_KEY`).
+- **The drop's identity** (`arcgis_layers.drop_info`): the v2 content fingerprint over
+  every file in `arcgis_layers/` (`artifact_store.fingerprint`, memoized per file in
+  process — the 350 MB drop hashes once per session) plus the export date read from the
+  `00_INDEX.xlsx` manifest's own `created` timestamp (openpyxl stamps it in UTC; shown as
+  the local date), falling back to the newest file date and saying so. The manifest has
+  no date column; the timestamp is the drop's export moment.
+- **`build_state` / `library_snapshot`**: per row — available (a build module exists),
+  built, trusted (the outcome sidecar is current), `comparable_now` (trusted AND
+  `outcome.comparable`), the as-of, the record count, and `drop_current` (the recorded
+  fingerprint equals the staged drop's). A build from another drop reads `stale`
+  (`drop_changed`) — the row header says *rebuild* — but stays comparable; a build with
+  no trusted outcome record is not comparable and its cells read *needs build*.
+- **Cell state** rides the shared `matrix._cmp_state` with two sources: `layers` (the
+  build — present only when comparable_now, its mtime, and its content identity via
+  `artifact_store.content_digest`) and `export` (the day's edition folder, fingerprinted
+  like every other matrix). A rebuilt layer build therefore reads every cell stale
+  (`layers_newer` / `source_identity_changed`); `missing_side` gains the value
+  **`layers`** ("needs build"), and a row the lane cannot compare yet renders
+  `supported: False` with its `why`.
+- **Store:** `output/comparisons/arcgis-by-day/<date src-env>/<row>_vs_layers <date>
+  <source>.xlsx`, counts cached in that tree's `_state/_results.json` (identity
+  `arcgis-by-day`, per-cell input fingerprint, generation id, producer versions, and
+  `source_identities.layers`), the attempts overlay beside it.
+- **One queue, five matrices:** compare Jobs carry `which:"arcgis"` →
+  `ArcgisMatrixCompareWorker`; a report build is a `kind:"arcgis_build"` Job (its
+  `asof` on the job) → `ArcgisReportBuildWorker`, so a build lines up with the
+  comparisons that need it and is cancellable the same way. Bridge:
+  `arcgis_matrix_info` / `set_arcgis_matrix_source` / `add_/remove_arcgis_matrix_day` /
+  `set_arcgis_matrix_report` / `set_arcgis_matrix_row_order` /
+  `set_arcgis_matrix_day_order` / `set_arcgis_matrix_formulas` /
+  `build_arcgis_matrix_cell` / `rebuild_arcgis_matrix` / `build_arcgis_report` /
+  `open_arcgis_report` / `open_arcgis_cell_comparison` /
+  `open_arcgis_comparisons_folder`. Settings: `arcgis_matrix_source/days/hidden/
+  row_order/formulas`. The single-report card that preceded it
+  (`arcgis_report_status` / `start_arcgis_report_build` / `start_arcgis_report_compare`)
+  is gone.
+- **Vintage** is still the first thing to read: the build is as-of the drop's export
+  date, the column is an export day, and across a gap the comparison measures network
+  change on top of any real difference. The Notes state both dates; nothing blocks on it.
+- **Locked by** `build/check_arcgis_matrix.py` (registry-derived rows, the drop identity
+  on a synthetic library incl. the fingerprint changing with a layer's bytes, the build
+  states, the needs-build / needs-export / buildable / stale cell states, the scoped
+  rebuild list, `build_cell` end to end over the shared primitives with a stub
+  comparator — cache record, identity, the cell reading stale after a rebuilt build,
+  zero evidence artifacts — and `build_report`'s guards + as-of default).
 
 ## 13. Visual evidence (`scripts/visual_evidence.py` + the per-report adapters, v0.21.0; Intersection Detail joined in v0.22.0, Highway Log in v0.24.0, Highway Sequence in v0.25.0, Ramp Detail in v0.26.0; the exact-source rebuild + the cross-environment lane in RB-4/HF-05+HF-10)
 

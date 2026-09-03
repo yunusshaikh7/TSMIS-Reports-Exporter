@@ -3,6 +3,46 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## Unreleased
+
+- **The ArcGIS tab's main view is now "Reports vs layers" — a by-day matrix.** Every
+  TSMIS report is a row (the two the app can render from the layers today, Highway
+  Detail and Intersection Detail; the rest greyed *no build yet* with the reason;
+  the three Clean Road files included, so once the site's exports have a
+  consolidator the comparison is our layer build against the site's own file), every
+  exported day you add is a column, and each cell compares the report's ONE layer
+  build against that day's export — the same one-build-per-report model as the TSN
+  library. The library card above the grid names the staged layer drop (its export
+  date, read from the export manifest's own timestamp, and a content fingerprint),
+  and every build records the drop it came from, so a row built from an older drop
+  says so in warning colour and offers a rebuild; the as-of date now defaults to
+  the drop's export date rather than the TSN extract's. Builds and comparisons ride
+  the shared matrix queue with the usual row/column/all rebuilds, live-formulas
+  option, report toggles and drag ordering. The single-report card it replaces is
+  gone; the Clean Road vs TSN sub-tab is unchanged and its CA HIGHWAYS build doubles
+  as the Clean Road: Highway row's build. Existing builds made before this version
+  carry no drop stamp and read as *older drop — rebuild* once.
+- **Highway Sequence Excel vs TSN no longer reports an equate as missing from both
+  systems.** The Excel export seats the equate `E` suffix on the realignment record
+  about a quarter of the time, where TSN (and the PDF edition) put it on the equated
+  postmile's own row; since the key is the complete glued postmile, both rows of every
+  such relation showed as present in only one system. TSN now declares each relation
+  and the export's suffix is moved to the target row before comparing — nothing else
+  changes, so the annotation's Description/HG/FT differences are still counted, and
+  the Summary and Notes state how many relations were seated and why the rest were
+  left as exported. On the 2026-07-09 statewide pair 446 more locations pair on each
+  side (57,072 → 57,518 paired; 3,422 → 2,976 only-TSMIS; 12,732 → 12,286 only-TSN),
+  no pair is lost, and differing cells rise 30,005 → 30,954 because the newly paired
+  annotations carry their by-design cells. PDF vs TSN is unchanged. Existing
+  Excel-vs-TSN Highway Sequence workbooks keep their old counts until you rebuild
+  them; the matrix cannot tell a comparator change from its inputs (CMP-AUD-246,
+  roadmap E10).
+- **The support bundle builds again when a TSN library carries both sidecar shapes.**
+  A library holding the organized `_state/…outcome.json` and its pre-organization
+  sibling gave the two the same archive name; the duplicate-member guard then refused
+  the whole zip, so Settings ▸ collect-support-bundle silently produced nothing.
+  Every sidecar is now bundled under its real path, `_state/` included (roadmap E8).
+
 ## v0.44.0 — 2026-09-02
 
 The dev site's Clean Road Files went live, so the app now exports them; the

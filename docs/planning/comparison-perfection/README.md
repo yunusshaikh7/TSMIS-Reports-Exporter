@@ -13,7 +13,11 @@ Last updated: 2026-07-22
 > Highway Detail vs TSN was counting the paired-roadbed ditto convention as data;
 > statewide 174,837 → 160,347 differing cells, pairing untouched) and **245** (v0.39.1 —
 > the ArcGIS Highway Detail projection counted the HF-01 unavailable marker as data and
-> reported COMPLETE over a PARTIAL build). New findings still get an entry here even
+> reported COMPLETE over a PARTIAL build). **2026-09-02: 246 of 246** — **246** (the
+> Highway Sequence Excel-vs-TSN equate seat: the export puts the `E` on the realignment
+> record where TSN puts it on the target, so both rows of ~220 relations went one-sided;
+> now seated the TSN way before keying, 57,072 → 57,518 paired on the bound 7.9 pair).
+> New findings still get an entry here even
 > though the project is closed; open WORK lives in [`docs/roadmap.md`](../../roadmap.md).
 >
 > **UPDATE 2026-08-18 (v0.38.0): 243 of 243 closed at that date.** The five

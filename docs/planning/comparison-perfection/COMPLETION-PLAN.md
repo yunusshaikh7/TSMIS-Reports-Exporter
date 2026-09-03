@@ -59,6 +59,11 @@ its findings back-to-back, then update this roadmap.
 > **Updated 2026-08-17 (v0.37.0), on the vendor's HD release: 4 open** — 133/142/186 +
 > 045-HD, no longer deferred; ~~192~~ resolved by the same-build delivery and
 > ~~243~~ opened+closed (HD-PDF single-record-page data loss).
+> **Updated 2026-09-02: 0 open — 246 of 246 CLOSED.** ~~246~~ (the Highway Sequence
+> Excel-vs-TSN equate seat, roadmap E10: the export seats the `E` on the realignment
+> record where TSN puts it on the target, so both rows of ~220 relations went one-sided;
+> bound 7.9 pair 57,072 → 57,518 paired, 0 pairs lost) was found from an owner question
+> and closed on discovery.
 > **Updated 2026-08-20: 0 open — 245 of 245 CLOSED.** ~~244~~ (v0.38.2, the HD ditto
 > convention) and ~~245~~ (v0.39.1, the ArcGIS HF-01 marker) were found after this plan
 > was written and closed on discovery.

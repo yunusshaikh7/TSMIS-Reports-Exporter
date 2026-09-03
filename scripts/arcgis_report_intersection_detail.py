@@ -52,6 +52,7 @@ from collections import defaultdict
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+import arcgis_layers
 import city_codes
 import clean_road_layers as crl
 import consolidate_clean_highway as cch
@@ -74,6 +75,10 @@ OUT_PATH = OUT_DIR / FILENAME
 
 ROUTE_COL = "Route"
 HEADER = [ROUTE_COL] + list(idc.HEADER)
+# The "Reports vs layers" library's hook: the sidecar payload key the outcome
+# record carries the build facts under (REQUIRED_LAYERS is defined with the
+# layer list below).
+SIDECAR_KEY = "arcgis_report_build"
 
 # --------------------------------------------------------------------------- #
 # The layers this report is built from. All must be staged or the build refuses,
@@ -110,6 +115,7 @@ OVERLAY_LAYERS = {
 INTERSECTION_LAYERS = tuple(sorted(
     {INX_LAYER, SEG_LAYER, APP_LAYER}
     | {spec[0] for spec in OVERLAY_LAYERS.values()}))
+REQUIRED_LAYERS = INTERSECTION_LAYERS
 
 _SPAN_ID = ["District", "RouteNum", "RouteSuffix", "Alignment", "BeginCounty",
             "EndCounty", "BeginPMPrefix", "EndPMPrefix", "BeginPMMeasure",
@@ -529,6 +535,8 @@ def report_facts(path):
         keys = {"As-of date": "asof", "Build version": "build_version",
                 "Report records written": "rows", "Routes": "routes",
                 "Layer library": "layer_library",
+                "Layer drop exported": "drop_exported",
+                "Layer drop fingerprint": "drop_fingerprint",
                 "Rows with no inventory block": "shells",
                 "Retired rows skipped": "retired"}
         for r in wb[MARKER_SHEET].iter_rows(values_only=True):
@@ -564,7 +572,7 @@ def _provenance_rows():
     return out
 
 
-def _write_workbook(out_path, rows, stats, asof, lib_root):
+def _write_workbook(out_path, rows, stats, asof, lib_root, drop=None):
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
@@ -601,10 +609,13 @@ def _write_workbook(out_path, rows, stats, asof, lib_root):
 
     mk = wb.create_sheet(MARKER_SHEET)
     mk.sheet_properties.tabColor = "1F3864"
+    drop = drop or {}
     for k, v in [
         ("Build version", BUILD_VERSION),
         ("As-of date", asof),
         ("Layer library", str(lib_root)),
+        ("Layer drop exported", drop.get("exported") or "(unknown)"),
+        ("Layer drop fingerprint", drop.get("fingerprint") or "(unknown)"),
         ("Report records written", stats["rows"]),
         ("Routes", stats["routes"]),
         ("Rows with no inventory block", stats["shells"]),
@@ -672,9 +683,15 @@ def _consolidate(events, confirm_overwrite, out_path, asof, lib_root):
     asof_date = cch._resolve_asof(asof)
     asof_text = asof_date.isoformat()
 
+    # The drop's identity is taken BEFORE the layers are read (the order a
+    # comparison's input fingerprint uses), so the record names the bytes the
+    # build actually consumed.
+    drop = arcgis_layers.drop_info(lib_root)
     events.on_log("=" * 60)
     events.on_log(f"{REPORT_NAME} — built from the ArcGIS layers "
-                  f"(as of {asof_text})")
+                  f"(as of {asof_text})"
+                  + (f" (drop exported {drop['exported']})"
+                     if drop.get("exported") else ""))
     events.on_log("=" * 60)
 
     rows, stats = build_rows(lib, index, asof=crl.to_serial(asof_date),
@@ -688,7 +705,8 @@ def _consolidate(events, confirm_overwrite, out_path, asof, lib_root):
             message="The intersection layers produced no records to project — "
                     "check the layer library and the as-of date.")
 
-    _write_workbook(out_path, rows, stats, asof_text, crl.root())
+    _write_workbook(out_path, rows, stats, asof_text,
+                    Path(lib_root) if lib_root else crl.root(), drop=drop)
     result = ConsolidateResult(
         status="ok",
         message=(f"Built {stats['rows']:,} Intersection Detail records "
@@ -700,11 +718,13 @@ def _consolidate(events, confirm_overwrite, out_path, asof, lib_root):
         completion=outcome.COMPLETE)
     if not consolidation_meta.write_outcome(
             out_path, result,
-            extra={"arcgis_report_build": {
+            extra={SIDECAR_KEY: {
                 "report": "intersection_detail",
                 "build_version": BUILD_VERSION,
                 "asof": asof_text,
-                "layer_library": str(crl.root()),
+                "layer_drop": {"fingerprint": drop.get("fingerprint"),
+                               "exported": drop.get("exported")},
+                "layer_library": str(Path(lib_root) if lib_root else crl.root()),
                 "context_columns": list(CONTEXT_COLUMNS),
                 **stats,
             }}):

@@ -407,6 +407,7 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
         matrix_preview_only = settings.get_matrix_preview_only()
         day_matrix_formulas = settings.get_day_matrix_formulas()
         baseline_matrix_formulas = settings.get_baseline_matrix_formulas()
+        arcgis_matrix_formulas = settings.get_arcgis_matrix_formulas()
         evidence = self._evidence_view()
         with self._lock:
             return {
@@ -436,6 +437,7 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
                 "matrix_preview_only": matrix_preview_only,
                 "day_matrix_formulas": day_matrix_formulas,
                 "baseline_matrix_formulas": baseline_matrix_formulas,
+                "arcgis_matrix_formulas": arcgis_matrix_formulas,
                 "evidence": evidence,
                 "update": dict(self._update),
                 "env_access": {k: dict(v) for k, v in self._env_access.items()},

@@ -315,12 +315,30 @@ def main():
     print("\nthe registry:")
     check("Intersection Detail is registered",
           arcgis_reports.is_report("intersection_detail"))
+    # Every registry row is listed (the matrix shows the whole report set), but
+    # only a row with a BUILD carries the lane's surface; a row still waiting
+    # on its build says so in `why` and has neither module.
     for key in arcgis_reports.KEYS:
         label, build_mod, cmp_mod, exports = arcgis_reports.resolve(key)
+        check(f"{key}: label is non-empty", bool(label))
+        if build_mod is None:
+            check(f"{key}: no build yet -> no comparator, and says why",
+                  cmp_mod is None and bool(arcgis_reports.spec(key).why)
+                  and not arcgis_reports.can_build(key)
+                  and not arcgis_reports.can_compare(key))
+            continue
         check(f"{key}: the build module has the lane's surface",
               all(hasattr(build_mod, a) for a in
-                  ("REPORT_NAME", "OUT_PATH", "OUT_DIR", "HEADER", "consolidate",
-                   "is_arcgis_report", "report_facts", "CONTEXT_COLUMNS")))
+                  ("REPORT_NAME", "OUT_PATH", "OUT_DIR", "consolidate",
+                   "report_facts", "SIDECAR_KEY", "REQUIRED_LAYERS")))
+        if cmp_mod is None:
+            check(f"{key}: a build without a comparison says why",
+                  bool(arcgis_reports.spec(key).why)
+                  and not arcgis_reports.can_compare(key))
+            continue
+        check(f"{key}: a compared build renders the report's own shape",
+              all(hasattr(build_mod, a) for a in
+                  ("HEADER", "is_arcgis_report", "CONTEXT_COLUMNS")))
         check(f"{key}: the comparator has the lane's surface",
               all(hasattr(cmp_mod, a) for a in
                   ("compare", "suggest_name", "CONTEXT_FIELDS", "_load_pair")))
@@ -330,7 +348,8 @@ def main():
                                     for m in exports))
         check(f"{key}: the build and comparator agree on context columns",
               tuple(build_mod.CONTEXT_COLUMNS) == tuple(cmp_mod.CONTEXT_FIELDS))
-        check(f"{key}: label is non-empty", bool(label))
+        check(f"{key}: comparable in the registry's own terms",
+              arcgis_reports.can_compare(key))
 
     print()
     if _fail:

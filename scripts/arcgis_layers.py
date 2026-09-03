@@ -29,6 +29,7 @@ Console-free: creates folders best-effort, returns dicts, never prints or raises
 for ordinary "not there yet" states.
 """
 import logging
+from pathlib import Path
 
 import paths
 
@@ -118,3 +119,90 @@ def status():
             size = None  # names the file, and this panel is informational only
         rows.append({"name": p.name, "size": size})
     return {"root": str(root()), "count": len(staged), "files": rows}
+
+
+# --------------------------------------------------------------------------- #
+# The drop's identity (the "Reports vs layers" library, 2026-09-02)
+# --------------------------------------------------------------------------- #
+# The layers are exported by hand and rarely, and every report built from them
+# is built from ONE drop. A build therefore records WHICH drop it came from, and
+# the library reads stale the moment the staged drop is not that one. Two facts
+# name a drop:
+#
+#   * its CONTENT fingerprint — `artifact_store.fingerprint` over every file in
+#     the folder (the v2 content identity, CMP-AUD-080: a same-size, same-time
+#     replacement of a layer's bytes still changes it). Memoized in-process per
+#     file, so the 350 MB drop is hashed once per session;
+#   * the date it was EXPORTED. The INDEX manifest has no date column, but the
+#     export tool saves every workbook of a drop in one run and openpyxl stamps
+#     the file's own creation timestamp (UTC) in its document properties, so the
+#     manifest's timestamp is the drop's export time. When the manifest is
+#     absent or unreadable the newest file date stands in, and says so.
+_INDEX_NAME = "00_INDEX.xlsx"
+
+
+def _exported_from_index(index_path):
+    """(ISO date, ISO timestamp) from the manifest's own document properties,
+    or (None, None). openpyxl stamps `created` in UTC without a tzinfo, so it
+    is converted to the local date the owner would recognise."""
+    from datetime import timezone
+
+    try:
+        from openpyxl import load_workbook
+        wb = load_workbook(index_path, read_only=True)
+    except Exception as e:      # silent-ok: an unreadable manifest is reported as "date unknown", never raised from a status read
+        log.info("arcgis drop: INDEX unreadable for its export date (%s: %s)",
+                 type(e).__name__, e)
+        return None, None
+    try:
+        created = wb.properties.created
+    finally:
+        wb.close()
+    if created is None:
+        return None, None
+    local = created.replace(tzinfo=timezone.utc).astimezone()
+    return local.date().isoformat(), local.replace(microsecond=0).isoformat()
+
+
+def drop_info(lib_root=None):
+    """The staged drop's identity: `{fingerprint, exported, exported_at,
+    exported_source, files, index_present}`.
+
+    `fingerprint` is None when the folder cannot be read (a build must then
+    refuse to claim a drop). `exported` is the local ISO date the drop was
+    exported, from the manifest's own timestamp (`exported_source` "index") or,
+    failing that, the newest staged file's modification date ("files"); None
+    with source "unknown" when nothing is staged. Never raises."""
+    import artifact_store
+    from datetime import datetime
+
+    lib = Path(lib_root) if lib_root else root()
+    staged = []
+    try:
+        staged = sorted(p for p in lib.glob("*.xlsx") if p.is_file())
+    except OSError as e:  # silent-ok: an unreadable drop-zone reads as empty; the fingerprint below says unreadable
+        log.info("arcgis drop: root not readable (%s: %s)", type(e).__name__, e)
+    fp = artifact_store.fingerprint(lib)
+    if fp == artifact_store._UNREADABLE:
+        fp = None
+    index_path = lib / _INDEX_NAME
+    index_present = index_path.is_file()
+    exported = exported_at = None
+    source = "unknown"
+    if index_present:
+        exported, exported_at = _exported_from_index(index_path)
+        if exported:
+            source = "index"
+    if not exported and staged:
+        try:
+            newest = max(p.stat().st_mtime for p in staged)
+            when = datetime.fromtimestamp(newest)
+            exported = when.date().isoformat()
+            exported_at = when.replace(microsecond=0).isoformat()
+            source = "files"
+        except OSError as e:  # silent-ok: a vanished file mid-stat leaves the date unknown
+            log.info("arcgis drop: file dates unreadable (%s: %s)",
+                     type(e).__name__, e)
+    return {"fingerprint": fp, "exported": exported, "exported_at": exported_at,
+            "exported_source": source, "files": len(staged),
+            "index_present": index_present}

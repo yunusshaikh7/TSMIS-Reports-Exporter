@@ -1092,10 +1092,26 @@ body.busy .option-row:hover { background: transparent; }
   display: none; flex-direction: column; gap: 12px; flex-shrink: 0;
   padding: 12px 14px; max-height: 46%; overflow-y: auto;
 }
-body.matrix-wide:not(.mw-day):not(.mw-bl):not(.mw-pve) #matrixConfig { display: flex; }
+body.matrix-wide:not(.mw-day):not(.mw-bl):not(.mw-pve):not(.mw-ag) #matrixConfig { display: flex; }
 body.matrix-wide.mw-day #dayMatrixConfig { display: flex; }
 body.matrix-wide.mw-bl #baselineMatrixConfig { display: flex; }
 body.matrix-wide.mw-pve #pveMatrixConfig { display: flex; }
+body.matrix-wide.mw-ag #arcgisMatrixConfig { display: flex; }
+
+/* The ArcGIS "Reports vs layers" row header carries a second line: the row's
+   ONE layer build (as-of date, record count, and whether it came from the
+   staged drop) with its build / open buttons. Warning colour when the build is
+   from another drop or its outcome is unknown, success when it is current. */
+.mxrh-build {
+  display: flex; align-items: center; gap: 4px; min-width: 0;
+  font-size: var(--text-2xs); color: var(--muted-foreground); line-height: 1.2;
+}
+.mxrh-build .mxrh-buildtext {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mxrh-build.warn .mxrh-buildtext { color: var(--warning); }
+.mxrh-build.ok .mxrh-buildtext { color: var(--success); }
+body.matrix-wide .mx-pane .mxrh-build .mxch-refresh { width: 18px; height: 18px; }
 .matrix-config .mc-head {
   display: flex; align-items: center; gap: 7px;
   font-size: var(--text-sm); font-weight: 600; color: var(--muted-foreground);
