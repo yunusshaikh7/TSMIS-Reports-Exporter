@@ -31,7 +31,7 @@ product-code freeze" was Highway Detail work; that freeze lifted with the vendor
 2026-08-17 release and the remaining findings closed in v0.37.0 / v0.38.0. The archived
 `archive/comparison-perfection-project.md` holds the Stage-8 audit history it points at;
 it is no longer a live status document.)*  
-Finding ledger: continuous and authoritative through `CMP-AUD-245`  
+Finding ledger: continuous and authoritative through `CMP-AUD-246`  
 Capability baseline AS AUDITED (v0.28.0): 29 classic comparison recipes, 12 matrix
 rows, 30 matrix row-mode placements, 7 canonical TSN datasets. **The audited figures
 are the point-in-time baseline the findings were written against and are deliberately
@@ -550,6 +550,7 @@ explicit transfers or later entry gates rather than unrecorded Phase-2 work:
 | CMP-AUD-243 | P1 | **Resolved 2026-08-17 (v0.37.0)** — the page-local recovery ladder gained a final rung: a band-less page takes its line-2 grid from its OWN header rule row, then line 1 derives from that as before. 13 lost records recovered; all 12 routes convert warning-free at exact Excel row parity, 6 of them cell-for-cell identical | Highway Detail (PDF) silently lost the record on every single-record page (13 pages / 12 routes statewide) and marked the run partial |
 | CMP-AUD-244 | P1 | **Resolved 2026-08-18 (v0.38.2)** — `ditto_nonasserting` + a span-based paired-roadbed `ditto_resolver` on BOTH vs-TSN flavors (explicitly OFF for the PDF-vs-Excel self-check, where both sides expand). Statewide, through the shipped compare(): differing cells **174,837 → 160,347** (−14,490, matching the evidence Ledger's context count exactly), pairing untouched (48,477 paired / 2,850 only-TSMIS / 11,606 only-TSN all unchanged). Red→green in `check_highway_detail_ditto` | **Highway Detail vs TSN counted the paired-roadbed ditto convention as data.** TSN prints one roadbed concrete and the other as width-matched `+` runs — a POINTER to the paired row — and TSMIS expands them, so 14,490 pointer-vs-value cells were reported as differences (~8% of the statewide total). The engine has had the rule since Highway Log; the Highway Detail schema simply never switched it on |
 | CMP-AUD-245 | P1 | **Resolved 2026-08-19 (v0.39.1)** — the projection now carries the CA HIGHWAYS build's skip facts onto its own marker sheet and returns `PARTIAL` with `skipped_inputs`, and `compare_highway_detail_arcgis` arms the opt-in `unavailable_rule` off those facts (Summary + Notes disclosure). Statewide same-date, through the shipped compare(): differing cells **207,030 -> 206,875** (-155), moving EXACTLY the four marker-bearing columns (`LB #Ln` -76, `LB Wid` -77, `RB OT-TO` -1, `RB OT-TR` -1) and no other; pairing untouched (45,124 / 6,073 / 6,203). Red->green in `check_arcgis_report` (6 checks fail pre-fix) | **Highway Detail vs ArcGIS counted the HF-01 unavailable marker as data, and reported COMPLETE over a PARTIAL source.** Where the Clean Road build cannot place a source span it writes a reserved non-asserting token; the v0.39.0 projection inherited the TOKENS but not the RULE, so 155 cells saying "unknowable" were reported as differences, and the comparison called itself complete while resting on a build that was not |
+| CMP-AUD-246 | P1 | **Resolved 2026-09-02** — `compare_highway_sequence_tsn._load_pair` derives the equate relations from the loaded TSN rows and seats the Excel export's suffix on the relation's target row BEFORE keying (fails open; the evidence adapter loads through the same pair). Bound 7.9 pair through the shipped compare(): paired **57,072 → 57,518**, only-TSMIS 3,422 → 2,976, only-TSN 12,732 → 12,286 (0 pairs lost), differing cells 30,005 → 30,954; PDF-vs-TSN unchanged. Red→green in `check_compare_highway_sequence_tsn` | **Highway Sequence Excel vs TSN reported both rows of an equate as one-sided whenever the export seated the `E` on the realignment record.** The vs-TSN identity is the complete glued postmile; TSN and the PDF edition put the equate suffix on the equated postmile's own row, the Excel export puts it on the realignment record about a quarter of the time, so ~220 relations statewide (444 keys) showed as present in only one system when they are in both |
 
 The ` != ` text above represents the engine's spaced not-equal glyph. It is written
 in ASCII in this ledger heading/table to keep terminals that use cp1252 from
@@ -11896,3 +11897,94 @@ the HF-01 marker rows must make the projection PARTIAL with the source's count, 
 all four keys onto its own marker sheet, arm the rule with both counts in the note, and
 put the marker cell in the report (the fixture asserts its own teeth); a skip-free build
 must stay COMPLETE and arm nothing. Six assertions fail against the pre-fix behaviour.
+
+
+### CMP-AUD-246 — Highway Sequence Excel vs TSN reported both rows of an equate as one-sided whenever the export seated the `E` on the realignment record (RESOLVED 2026-09-02)
+
+**Status:** Resolved 2026-09-02. Found 2026-08-31 from an owner question about the
+Highway Sequence one-sided counts (roadmap E10); censused and fixed 2026-09-02.
+
+**What was wrong.** A postmile EQUATION is one fact the three renders spell differently
+by design. TSN and the TSMIS print both write an annotation line at the realignment
+postmile (`EQUATES TO`, flags blank) and put the `E` suffix on the equated postmile's OWN
+row. The Excel export has no annotation convention: it folds the marker onto the
+realignment record (`PM EQUATION` or the landmark label, HG/FT filled from the segment)
+and, about a quarter of the time, seats the `E` THERE instead of on the target. The
+vs-TSN identity is the complete glued postmile (CMP-AUD-045), so a relation the export
+seats on the other member missed on BOTH rows — TSN `R004.629` / Excel `R004.629E` at
+the annotation, TSN `R004.508E` / Excel `R004.508` at the target — and the comparison
+reported a location as present in one system only when it is in both. The PDF-vs-Excel
+self check has canonicalized the relation since HF-06 / PCOA-FINAL-011 (owner ruling
+2026-07-26); neither vs-TSN leg did, and Excel-vs-TSN is where it costs.
+
+**Census (before any rule; raw-level, then re-run through the shipped loaders).**
+2026-08-31 statewide pull, Excel 59,979 / PDF 59,978 / TSN 69,804 rows:
+
+| | count |
+|---|---:|
+| TSN keys the PDF edition pairs that the Excel edition misses | **444** |
+| … of which TSN `EQUATES TO` annotation rows | 214 |
+| … of which TSN `E`-suffixed target rows | 229 |
+| … of which a data row at an annotation postmile the export had seated an `E` on | 1 |
+| … unattributed | **0** |
+| TSN keys the Excel edition pairs that the PDF misses (a print-side class, out of scope) | 23 |
+| TSN annotations statewide / with a suffix of their own / with flags / blank-county | 998 / 0 / 0 / 46 |
+| TSN `E` rows / claimed by a relation / target is the very next row | 998 / 998 / 998 |
+
+The roadmap's "137 unattributed" were annotation rows the first count had not
+recognized; every one of the 444 is the seat.
+
+**Fix.** `compare_highway_sequence_tsn` mirrors the self check with TSN in the print's
+role. `equate_relations(rows_n)` derives every relation from the LOADED TSN rows (a
+bare-postmile `EQUATES TO` row plus the next same-route row carrying a suffix, stopping
+at the next annotation). `seat_equate_suffixes(raw_rows, relations, stats)` returns a NEW
+list of the export's raw rows with each relation's suffix moved from the realignment
+record to the target row, resolved against the ORIGINAL rows only. It fails open: no
+exported record at the annotation postmile (`realignment record not exported`, the 46
+pre-county annotations among them), no suffix carried there (`no suffix at the
+realignment record` — either already on the target, or the export carries none anywhere,
+which stays an honest one-sided difference), no exported target, a suffix on BOTH rows,
+more than one carrier, a carrier whose letter is not TSN's, or a multi-row target group
+with no single row printing TSN's Description (`ambiguous`) leaves the relation exactly
+as exported. Refusing can only leave a one-sided row visible; it can never invent a pair.
+`_load_pair` applies it BEFORE `_tsmis_row` builds the typed keys, so compare_core is
+untouched; `compare()` threads the per-run counts into the Summary's disclosure notes
+and the Notes sheet; `evidence_highway_sequence.load_sides` loads through the same pair
+so evidence and comparison cannot disagree about a row's key. The PDF-vs-TSN and
+PDF-vs-Excel flavors are untouched (`_load_tsmis` still reads the export's own seat).
+
+**Measured, through the shipped `compare()` (counts-only preview; the pre-fix module from
+HEAD on the same inputs).** The bound 7.9 same-run pair with the app's v4 library rebuild
+from the bound raw set — the pre-fix run reproduces the bound canary EXACTLY, which is
+the content-equivalence proof:
+
+| 7.9 pair | pre-fix | post-fix |
+|---|---|---|
+| Paired / only-TSMIS / only-TSN | 57,072 / 3,422 / 12,732 | **57,518 / 2,976 / 12,286** (+446 per side, 0 pairs lost) |
+| Differing rows / cells | 23,691 / 30,005 | 24,063 / 30,954 |
+| Per field: City / HG / FT / Distance / Description | 15,026 / 2,418 / 695 / 6,972 / 4,894 | 15,134 / 2,644 / 917 / 7,090 / 5,169 |
+| Seat: declared / seated / left | — | 998 / **224** / 677 no suffix at the record · 71 record not exported · 23 ambiguous · 3 both carry |
+| TSN keys the PDF pairs that Excel misses | 457 (221 annotations, 235 targets, 1 other) | **47** (17 / 29 / 1) |
+
+| 2026-08-31 pull | pre-fix | post-fix |
+|---|---|---|
+| Paired / only-TSMIS / only-TSN | 56,613 / 3,366 / 13,191 | **57,052 / 2,927 / 12,752** |
+| Differing rows / cells | 24,721 / 30,368 | 25,085 / 31,288 |
+| Seat: declared / seated / left | — | 998 / **220** / 673 · 86 · 17 · 2 |
+| TSN keys the PDF pairs that Excel misses | 444 | **39** (13 annotations, 25 targets, 1 other) |
+| PDF-vs-TSN (untouched) | 57,035 / 2,943 / 12,769; 29,569 cells | identical |
+
+The differing-cell count RISES because the newly paired annotation rows carry their
+by-design cells (Description `PM EQUATION`/label vs `EQUATES TO`, HG/FT filled vs blank)
+— the class the Notes have always disclosed. Those cells are the truth of the pair and
+are not suppressed; only the phantom one-sided rows are gone. The residual 47 / 39 keys
+are relations the export lists elsewhere (a different prefix or county), ambiguously, or
+not at all.
+
+**Guard.** `check_compare_highway_sequence_tsn.test_equate_seat` drives the shipped
+`compare()` over six fixture relations (seated on the record; already on the target; no
+suffix anywhere; an ambiguous two-row target; a two-row target resolved by TSN's
+Description; a pre-county annotation) and reads the verdict back out of the written
+workbook, the one-sided sheets, the Summary and the Notes — 11 of its checks fail on the
+pre-fix module. Existing Excel-vs-TSN Highway Sequence workbooks keep their old counts
+until rebuilt: the matrix fingerprints inputs, not the comparator.

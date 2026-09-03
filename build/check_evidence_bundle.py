@@ -542,6 +542,65 @@ def test_session_facts_reach_the_manifest():
         shutil.rmtree(root, ignore_errors=True)
 
 
+def test_both_sidecar_shapes_bundle():
+    """E8 (roadmap): a library that carries BOTH the organized `_state/X.outcome.json`
+    and its pre-organization sibling `X.outcome.json` — the shape a long-lived
+    library rebuilt on a current build actually has — must still produce a bundle.
+    The collapse of `_state/` into its parent gave the two the same archive name,
+    the duplicate-member guard refused the zip, and Settings got NO bundle at all."""
+    print("a library with both sidecar shapes still yields a bundle (E8):")
+    saved = (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+             paths.LOG_DIR, paths.FAILURES_DIR, paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR)
+    root = Path(tempfile.mkdtemp(prefix="tsmis_ev_shapes_"))
+    try:
+        _plant(root)
+        lib = root / "tsn_library" / "highway_log" / "consolidated"
+        (lib / "_state").mkdir(parents=True, exist_ok=True)
+        organized = lib / "_state" / "tsn_highway_log_consolidated.xlsx.outcome.json"
+        legacy = lib / "tsn_highway_log_consolidated.xlsx.outcome.json"
+        organized.write_text('{"completion":"complete","shape":"organized"}',
+                             encoding="utf-8")
+        legacy.write_text('{"completion":"complete","shape":"legacy"}', encoding="utf-8")
+        # the same shape inside a run folder's comparison store
+        cmp_dir = root / "output" / "2026-06-26 ssor-prod" / "comparisons"
+        (cmp_dir / "_state").mkdir(parents=True, exist_ok=True)
+        (cmp_dir / "_state" / "_attempts.json").write_text(
+            '{"version":1,"cells":{"highway_log|tsn":"failed"}}', encoding="utf-8")
+        _point_paths_at(root, saved)
+        out = root / "shapes.zip"
+        res = evidence.collect(out_path=out, emit=lambda *_: None, run_self_test=False)
+        check("collect succeeded with both shapes present", res.get("ok") is True)
+        check("...and wrote the zip", out.is_file())
+        if not out.is_file():
+            return
+        with zipfile.ZipFile(out) as zf:
+            names = zf.namelist()
+            manifest = zf.read("manifest.txt").decode("utf-8")
+            organized_arc = ("state/tsn_library/highway_log/consolidated/_state/"
+                             "tsn_highway_log_consolidated.xlsx.outcome.json")
+            legacy_arc = ("state/tsn_library/highway_log/consolidated/"
+                          "tsn_highway_log_consolidated.xlsx.outcome.json")
+            check("the organized sidecar is bundled under its real _state/ path",
+                  organized_arc in names)
+            check("the legacy sibling is bundled under ITS real path", legacy_arc in names)
+            check("...and the two carry their own bytes",
+                  organized_arc in names and legacy_arc in names
+                  and b'"organized"' in zf.read(organized_arc)
+                  and b'"legacy"' in zf.read(legacy_arc))
+            check("the organized attempt overlay keeps its _state/ path too",
+                  "state/output/2026-06-26 ssor-prod/comparisons/_state/_attempts.json"
+                  in names
+                  and "state/output/2026-06-26 ssor-prod/comparisons/_attempts.json"
+                  in names)
+        check("no two members share a name", len(names) == len(set(names)))
+        check("the manifest lists both sidecars", organized_arc in manifest
+              and legacy_arc in manifest)
+    finally:
+        (paths.DATA_ROOT, paths.OUTPUT_ROOT, paths.TSN_LIBRARY_ROOT,
+         paths.LOG_DIR, paths.FAILURES_DIR, paths.AUTH, paths.EDGE_LOGIN_PROFILE_DIR) = saved
+        shutil.rmtree(root, ignore_errors=True)
+
+
 def main():
     test_credential_exclusion_and_manifest()
     test_self_test_capture_and_crash()
@@ -549,6 +608,7 @@ def main():
     test_final_member_credential_scan()
     test_every_trigger_uses_the_one_collector()
     test_session_facts_reach_the_manifest()
+    test_both_sidecar_shapes_bundle()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

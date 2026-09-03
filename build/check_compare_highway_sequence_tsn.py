@@ -18,6 +18,7 @@ No PDFs / real files; CI-safe. Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_compare_highway_sequence_tsn.py
 """
 import os
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -287,10 +288,128 @@ def test_end_to_end():
     print(f"      (rows={len(rows)}, total diff cells={total}, context diff cells={ctx_diffs})")
 
 
+def test_equate_seat():
+    """Roadmap E10: the Excel export seats the equate "E" on the realignment
+    record about a quarter of the time, where TSN puts it on the equated
+    postmile's own row; with the complete glued postmile as identity BOTH rows
+    of such a relation went one-sided. TSN now declares the relation and the
+    export's suffix is seated on the target BEFORE the keys are built — through
+    the shipped compare(), read back from the written workbook."""
+    print("equate seat (E10): TSN declares, the export's suffix moves to the target:")
+    root = Path(tempfile.mkdtemp(prefix="tsmis_hs_seat_"))
+    tsmis, tsn, out = root / "t.xlsx", root / "n.xlsx", root / "c.xlsx"
+    # (route, county, city, prefix, pm, suffix, hg, ft, dist, desc)
+    _write_tsmis(tsmis, [
+        # A — the class: the export seats the E on the realignment record.
+        ("001", "CC", None, "R", "004.629", "E", "D", "H", None, "PM EQUATION"),
+        ("001", "CC", None, "R", "004.508", None, "D", "H", "000.660", "BEGIN R REALIGNMENT"),
+        # B — already seated on the target: untouched.
+        ("001", "CC", None, None, "006.000", None, "D", "H", None, "PM EQUATION"),
+        ("001", "CC", None, None, "005.900", "E", "D", "H", "000.100", "JCT ST 4"),
+        # C — the export carries no E anywhere: an honest difference stays.
+        ("001", "CC", None, None, "010.000", None, "D", "H", None, "PM EQUATION"),
+        ("001", "CC", None, None, "009.800", None, "D", "H", "000.200", "END R REALIGNMENT"),
+        # D — the target postmile lists TWO export rows and neither prints
+        #     TSN's Description: ambiguous, left exactly as exported.
+        ("001", "CC", None, None, "020.000", "E", "D", "H", None, "PM EQUATION"),
+        ("001", "CC", None, None, "019.700", None, "D", "H", "000.000", "ROUTE RESUME"),
+        ("001", "CC", None, None, "019.700", None, "D", "H", "000.300", "BRKINRTE"),
+        # E — two export rows at the target; the one printing TSN's
+        #     Description is the target and receives the E.
+        ("001", "CC", None, None, "030.000", "E", "D", "H", None, "PM EQUATION"),
+        ("001", "CC", None, None, "029.500", None, "D", "H", "000.000", "ROUTE RESUME"),
+        ("001", "CC", None, None, "029.500", None, "D", "H", "000.199", "001/N JCT ST FAI 280"),
+    ])
+    # (route, county, pm, city, hg, ft, dist, desc)
+    _write_tsn(tsn, [
+        ("001", "CC", "R004.629", None, None, None, None, "EQUATES TO"),
+        ("001", "CC", "R004.508E", None, "D", "H", "000.660", "BEGIN R REALIGNMENT"),
+        ("001", "CC", "006.000", None, None, None, None, "EQUATES TO"),
+        ("001", "CC", "005.900E", None, "D", "H", "000.100", "JCT ST 4"),
+        ("001", "CC", "010.000", None, None, None, None, "EQUATES TO"),
+        ("001", "CC", "009.800E", None, "D", "H", "000.200", "END R REALIGNMENT"),
+        ("001", "CC", "020.000", None, None, None, None, "EQUATES TO"),
+        ("001", "CC", "019.700E", None, "D", "H", "000.300", "VIA ANGELS CREST HWY"),
+        ("001", "CC", "030.000", None, None, None, None, "EQUATES TO"),
+        ("001", "CC", "029.500", None, "D", "H", "000.000", "ROUTE RESUME"),
+        ("001", "CC", "029.500E", None, "D", "H", "000.199", "N JCT ST FAI 280"),
+        # CMP-AUD-158: a pre-county annotation declares nothing the export can carry.
+        ("001", None, "R000.000", None, None, None, None, "EQUATES TO"),
+        ("001", "CC", "R000.100E", None, "D", "H", "000.010", "PRE-COUNTY TARGET"),
+    ])
+    rows_n, _ = hs._load_tsn(tsn)
+    rel = hs.equate_relations(rows_n)
+    check("TSN declares six relations (the blank-county one included)", len(rel) == 6)
+    check("a relation names (route, ann county, ann bare PM, target county, "
+          "target bare PM, suffix, target Description)",
+          bool(rel) and rel[0] == ("001", "CC", "R004.629", "CC", "R004.508", "E",
+                                   "BEGIN R REALIGNMENT"))
+    check("the pre-county annotation carries its blank county",
+          bool(rel) and rel[-1][1] == "" and rel[-1][4] == "R000.100")
+
+    stats = {}
+    rows_t, _rows_n, _ = hs._load_pair(tsmis, tsn, stats)
+    keys = {str(r[1 + hs.KEY_FIELD]) for r in rows_t}
+    check("A: the export's E moved to the target (R004.629 bare, R004.508E)",
+          "R004.629" in keys and "R004.508E" in keys and "R004.629E" not in keys)
+    check("B: an already-seated relation is untouched",
+          "006.000" in keys and "005.900E" in keys)
+    check("C: an export carrying no E anywhere gets none invented",
+          "010.000" in keys and "009.800" in keys and "009.800E" not in keys)
+    check("D: an ambiguous target group is left exactly as exported",
+          "020.000E" in keys and "019.700E" not in keys)
+    check("E: the row printing TSN's Description is the target",
+          "030.000" in keys and "029.500E" in keys)
+    seated_e = [r for r in rows_t if str(r[1 + hs.KEY_FIELD]) == "029.500E"]
+    check("...and it is the JCT row, not the ROUTE RESUME row",
+          len(seated_e) == 1 and seated_e[0][-1] == "N JCT ST FAI 280")
+    expected = {"declared": 6, "seated": 2, "ambiguous": 1,
+                "no suffix at the realignment record": 2,
+                "realignment record not exported": 1}
+    check("stats: 6 declared, 2 seated, 1 ambiguous, 2 with no suffix at the record, "
+          "1 record not exported (the pre-county annotation)", stats == expected)
+    if stats != expected:
+        print(f"      stats={stats}")
+    plain, _ = hs._load_tsmis(tsmis)
+    check("the plain loader (PDF flavors) still reads the export's own seat",
+          "R004.629E" in {str(r[1 + hs.KEY_FIELD]) for r in plain})
+
+    res = hs.compare(tsmis, tsn, out, events=Events(),
+                     confirm_overwrite=lambda _p: True, mode="values")
+    check("compare ok", res.status == "ok")
+    header, rows, sheets = _comparison(out)
+    by = {r[header.index("PM")]: r for r in rows}
+    only_tsmis = _sheet_text(out, "Only in TSMIS")
+    only_tsn = _sheet_text(out, "Only in TSN")
+    check("A pairs on both rows in the written workbook",
+          "001 / CC / R004.629" in by and "001 / CC / R004.508E" in by)
+    check("...so neither A row is one-sided",
+          "R004.629" not in only_tsmis and "R004.508" not in only_tsn)
+    check("A's annotation still reports its by-design Description difference "
+          "(PM EQUATION vs EQUATES TO)",
+          DIFF in by["001 / CC / R004.629"][header.index("Description")])
+    check("C stays honestly one-sided on the target (TSN 009.800E / TSMIS 009.800)",
+          "009.800E" in only_tsn and "009.800" in only_tsmis)
+    check("D stays as exported (TSMIS 020.000E and TSN 019.700E one-sided)",
+          "020.000E" in only_tsmis and "019.700E" in only_tsn)
+    check("the blank-county annotation is still disclosed one-sided",
+          "R000.000" in only_tsn)
+    summary = _sheet_text(out, "Summary")
+    notes = _sheet_text(out, "Notes")
+    check("the Summary discloses the seat counts",
+          "Equate suffix seat: TSN declares 6" in summary and "for 2 relations" in summary
+          and "1 ambiguous" in summary)
+    check("...and the Notes carry the rule and the same counts",
+          "moved to that target row before comparing" in notes
+          and "TSN declares 6" in notes)
+    shutil.rmtree(root, ignore_errors=True)
+
+
 def main():
     test_schema()
     test_parser_helpers()
     test_end_to_end()
+    test_equate_seat()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

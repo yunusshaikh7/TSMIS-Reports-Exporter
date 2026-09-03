@@ -227,13 +227,21 @@ the layout is **NOT char-window** (columns are widely spaced, so word-level extr
 - **Approved counts (CANARY — current 7.9 same-run pair + the bound 12-PDF raw set; v4 semantics,
   2026-07-16):** TSN normalized **69,804 rows / 263 routes** (68,806 data + 998 equates; 46 blank-county;
   565 pointer tokens; 154 numeric-prefix Descriptions). Leg shapes (paired / TSMIS-only / TSN-only):
-  Excel-vs-TSN **57,072 / 3,422 / 12,732**; PDF-vs-TSN **57,505 / 2,988 / 12,299**; PDF-vs-Excel
-  **60,493 / 0 / 1** with PM Suffix 549 · HG 910 · FT 1,129 compared cells exact. Live asserted counts
-  (post-CMP-AUD-220/197, 2026-07-16 — the product engine lands on the Stage-8 oracle table EXACTLY;
-  replay-confirmed through the shipped matrix path on the current tip 2026-07-22, CMP-AUD-193):
-  Excel-vs-TSN **4,894 rows / 5,589 cells** {Description 4,894, FT 695}; PDF-vs-TSN **4,916 / 5,001**
-  {Description 4,916, FT 85}; PDF↔Excel **1,410 / 3,721** {Desc 1,133, FT 1,129, HG 910, PM Suffix
-  549}; zero literal `_x000d_` survives the vs-TSN loaders.
+  Excel-vs-TSN **57,518 / 2,976 / 12,286** (since 2026-09-02, CMP-AUD-246 — the export's equate
+  suffix is seated on the target row the TSN way before keying; **57,072 / 3,422 / 12,732** before
+  it, and the pre-fix comparator on the same inputs still reproduces those exactly — 446 more
+  locations pair per side, 0 pairs lost); PDF-vs-TSN **57,505 / 2,988 / 12,299** (untouched by 246);
+  PDF-vs-Excel **60,493 / 0 / 1** with PM Suffix 549 · HG 910 · FT 1,129 compared cells exact.
+  Live counts: since the owner's 2026-08-10 decision EVERY Highway Sequence column is compared
+  (HG / City / Distance were context), so the live Excel-vs-TSN figure is the all-field one —
+  **24,063 differing rows / 30,954 cells** {City 15,134, HG 2,644, FT 917, Distance 7,090,
+  Description 5,169} (pre-246: 23,691 / 30,005 {15,026 / 2,418 / 695 / 6,972 / 4,894}; the rise is
+  the newly paired annotations' by-design cells). The 2026-07-16 context-regime figures
+  (post-CMP-AUD-220/197 — the product engine lands on the Stage-8 oracle table EXACTLY;
+  replay-confirmed through the shipped matrix path on the current tip 2026-07-22, CMP-AUD-193)
+  date that agreement: Excel-vs-TSN **4,894 rows / 5,589 cells** {Description 4,894, FT 695};
+  PDF-vs-TSN **4,916 / 5,001** {Description 4,916, FT 85}; PDF↔Excel **1,410 / 3,721** {Desc 1,133,
+  FT 1,129, HG 910, PM Suffix 549}; zero literal `_x000d_` survives the vs-TSN loaders.
   *(Historical v3 canary, superseded: 6.19 set — 69,758 TSN rows, both 57,070, FT 699 / Description 4,839
   under the old symmetric-strip semantics; kept only to date the change.)*
 - **Stage-8 current-source resolution (found 2026-07-13; product landed 2026-07-16;

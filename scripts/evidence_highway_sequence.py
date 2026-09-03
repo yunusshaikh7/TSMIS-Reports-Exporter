@@ -106,8 +106,10 @@ def load_sides(consolidated_path, tsn_path):
     DISTRICT ROUTING above); `sidecar` is a truthy placeholder so the engine
     proceeds."""
     try:
-        tsmis_rows, _ = chsl._load_tsmis(consolidated_path)
-        tsn_rows, _ = chsl._load_tsn(tsn_path)
+        # The comparator's own pair loader: the Excel export's equate suffix is
+        # seated the TSN way there, so the evidence sees exactly the keys the
+        # comparison paired on (two separate loads would not).
+        tsmis_rows, tsn_rows, _ = chsl._load_pair(consolidated_path, tsn_path)
     except ValueError as e:
         return None, None, None, str(e)
     return tsmis_rows, tsn_rows, {"routing": "per-print"}, None

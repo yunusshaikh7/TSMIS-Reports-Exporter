@@ -218,7 +218,9 @@ def _tsmis_row(r):
             _desc_tsmis(at(_TSMIS["desc"]), route)]
 
 
-def _load_tsmis(path):
+def _load_tsmis_raw(path):
+    """The consolidated workbook's data rows exactly as exported (the header gate
+    applied, nothing normalized) — the shape `seat_equate_suffixes` rewrites."""
     return load_consolidated_rows(
         path, TSMIS_SHEET,
         missing_sheet_hint="pick the consolidated TSMIS Highway Sequence workbook.",
@@ -226,7 +228,16 @@ def _load_tsmis(path):
                        "current site layout (expected a leading 'Route' column and "
                        "the exact export header) — consolidate a fresh export first.",
         header_ok=ctc.exact_consolidated_header_ok(_TSMIS_HEADER),  # CMP-AUD-034
-        row_transform=_tsmis_row)
+        row_transform=list)
+
+
+def _load_tsmis(path):
+    """The consolidated TSMIS rows in comparison shape, exactly as exported.
+    The Excel-vs-TSN leg seats the export's equate suffix first (`_load_pair`,
+    the equate-seat section below); the PDF-edition flavors load through this
+    directly because the print already seats it the TSN way."""
+    rows, has_route = _load_tsmis_raw(path)
+    return [_tsmis_row(r) for r in rows], has_route
 
 
 def _normalization_version(wb):
@@ -304,6 +315,181 @@ def _load_tsn(path):
 
 
 # --------------------------------------------------------------------------- #
+# the equate seat — TSN declares the relation, the Excel export's suffix is
+# seated where TSN and the print put it (roadmap E10)
+# --------------------------------------------------------------------------- #
+# A postmile EQUATION is one fact the three renders spell differently by
+# design. TSN and the TSMIS print both write an annotation line at the
+# realignment postmile ("EQUATES TO", flags blank) and put the "E" suffix on
+# the equated postmile's OWN row. The Excel export has no annotation
+# convention: it folds the marker onto the realignment record and, about a
+# quarter of the time, seats the "E" THERE instead of on the target. The
+# vs-TSN identity is the complete glued postmile (CMP-AUD-045), so a relation
+# the export seats on the other member missed on BOTH rows — TSN "R004.629" /
+# Excel "R004.629E" at the annotation, TSN "R004.508E" / Excel "R004.508" at
+# the target — and the comparison reported a location as present in one
+# system only when it is in both.
+#
+# Measured on the 2026-08-31 statewide pull (raw census, before any rule): the
+# PDF edition paired 444 TSN keys the Excel edition missed, and 444 of the 444
+# were this class — 214 annotation rows, 229 E-suffixed targets, and one data
+# row at an annotation postmile the export had seated an "E" on. TSN declares
+# 998 relations statewide; every one is a bare-postmile annotation followed by
+# exactly one "E" row of the same route, and no "E" row is unclaimed.
+#
+# The rule mirrors the PDF-vs-Excel self check (compare_highway_sequence_pdf,
+# HF-06 / PCOA-FINAL-011) with TSN in the print's role: TSN DECLARES each
+# relation; the export's suffix is moved from the annotation's postmile to the
+# relation's target row, and nothing else changes — the marker text, the
+# annotation row's HG/FT and every other cell are compared exactly as before,
+# so the by-design Description/FT differences at a paired equate stay counted
+# and stay disclosed in the Notes. It FAILS OPEN: a relation the export does
+# not carry, whose rows it cannot single out, or whose two rows both carry a
+# suffix is left exactly as exported. Refusing can only leave a one-sided row
+# visible; it can never invent a pair.
+_EQUATE_MARKER = "EQUATES TO"
+_GLUED_PM_RE = re.compile(r"^(?P<bare>[A-Z]?\d{3}\.\d{3})(?P<suffix>[A-Z]?)$")
+
+
+def _split_glued(pm):
+    """A glued postmile -> (bare postmile, equate suffix), or None when the
+    token is not a printed postmile (the reserved no-postmile marker)."""
+    m = _GLUED_PM_RE.match("" if pm is None else str(pm).strip())
+    return (m.group("bare"), m.group("suffix")) if m else None
+
+
+def equate_relations(rows_n):
+    """The equate relations the LOADED TSN rows declare, in file order, each
+    (route, annotation county, annotation bare PM, target county, target bare
+    PM, target suffix, target Description).
+
+    An annotation is a bare-postmile "EQUATES TO" row; its target is the next
+    row of the same route carrying a suffix, searched forward and stopping at
+    the next annotation (statewide it is always the very next row). An
+    annotation with no such target, or printed with a suffix of its own,
+    declares nothing."""
+    pm_idx = 1 + KEY_FIELD
+    county_idx = 1 + SHARED_HEADER.index("County")
+    desc_idx = 1 + SHARED_HEADER.index("Description")
+    out = []
+    for i, row in enumerate(rows_n):
+        if row[desc_idx] != _EQUATE_MARKER:
+            continue
+        split = _split_glued(row[pm_idx])
+        if split is None or split[1]:
+            continue
+        target = None
+        for j in range(i + 1, len(rows_n)):
+            nxt = rows_n[j]
+            if nxt[0] != row[0] or nxt[desc_idx] == _EQUATE_MARKER:
+                break
+            t_split = _split_glued(nxt[pm_idx])
+            if t_split is not None and t_split[1]:
+                target = (nxt[county_idx], t_split[0], t_split[1], nxt[desc_idx])
+                break
+        if target is not None:
+            out.append((row[0], row[county_idx], split[0]) + target)
+    return tuple(out)
+
+
+def _raw_cell(row, i):
+    return "" if i >= len(row) or row[i] is None else str(row[i]).strip()
+
+
+def _with_suffix(row, suffix):
+    """A copy of one raw export row with its suffix cell set (None = blank,
+    the export's own representation)."""
+    out = list(row) + [None] * max(0, _TSMIS["suffix"] + 1 - len(row))
+    out[_TSMIS["suffix"]] = suffix or None
+    return out
+
+
+def seat_equate_suffixes(raw_rows, relations, stats=None):
+    """A NEW list of the export's raw rows with each TSN-declared relation's
+    suffix seated on its target row. `stats` (an optional dict) receives the
+    counts: `declared`, `seated`, and why every other relation was left as
+    exported. Rows are resolved against the ORIGINAL rows, never the partly
+    rewritten copy, so one relation's move can never shift the next one's
+    view of the export."""
+    P = _TSMIS
+    groups = {}
+    for i, r in enumerate(raw_rows):
+        route = _v(r[P["route"]] if len(r) > P["route"] else None)
+        bare = _glue_pm(_raw_cell(r, P["prefix"]), _raw_cell(r, P["pm"]), None)
+        groups.setdefault((route, _norm_county(_raw_cell(r, P["county"])), bare),
+                          []).append(i)
+    counts = Counter()
+    out = [list(r) for r in raw_rows]
+    for route, a_county, a_bare, t_county, t_bare, t_suffix, t_desc in relations:
+        counts["declared"] += 1
+        ann_group = groups.get((route, a_county, a_bare), ())
+        if not ann_group:
+            # the 46 pre-county annotations (CMP-AUD-158) and the breaks the
+            # export does not list at all — nothing here to seat anything on
+            counts["realignment record not exported"] += 1
+            continue
+        carriers = [i for i in ann_group if _raw_cell(raw_rows[i], P["suffix"])]
+        if not carriers:
+            # already on the target, or the export carries none anywhere —
+            # either way nothing to move, and a missing marker stays visible
+            counts["no suffix at the realignment record"] += 1
+            continue
+        if len(carriers) > 1 or _raw_cell(raw_rows[carriers[0]], P["suffix"]) != t_suffix:
+            counts["ambiguous"] += 1
+            continue
+        tgt_group = groups.get((route, t_county, t_bare), ())
+        if not tgt_group:
+            counts["target not exported"] += 1
+            continue
+        if any(_raw_cell(raw_rows[i], P["suffix"]) for i in tgt_group):
+            counts["both rows carry a suffix"] += 1
+            continue
+        if len(tgt_group) == 1:
+            tgt = tgt_group[0]
+        else:
+            # the export lists several rows at the target postmile: the one
+            # that IS TSN's target is the one printing its Description
+            matches = [i for i in tgt_group
+                       if _desc_tsmis(_raw_cell(raw_rows[i], P["desc"]), route) == t_desc]
+            if len(matches) != 1:
+                counts["ambiguous"] += 1
+                continue
+            tgt = matches[0]
+        ann = carriers[0]
+        out[ann] = _with_suffix(out[ann], None)
+        out[tgt] = _with_suffix(out[tgt], t_suffix)
+        counts["seated"] += 1
+    if stats is not None:
+        stats.update(counts)
+    return out
+
+
+_SEAT_LEFT_REASONS = ("no suffix at the realignment record",
+                      "realignment record not exported", "target not exported",
+                      "both rows carry a suffix", "ambiguous")
+
+
+def _equate_seat_disclosure(stats):
+    """The run-resolved disclosure line for the Summary and the Notes."""
+    def line():
+        if not stats:
+            return ""
+        left = ", ".join(f"{stats[k]:,} {k}" for k in _SEAT_LEFT_REASONS if stats.get(k))
+        return (f"Equate suffix seat: TSN declares {stats.get('declared', 0):,} equate "
+                "relations (an \"EQUATES TO\" annotation plus the next row carrying "
+                "the \"E\"). The Excel export seats that \"E\" on the realignment "
+                "record about a quarter of the time, where TSN puts it on the "
+                "equated postmile's own row; since the key is the complete glued "
+                "postmile, that seat alone made BOTH rows of such a relation "
+                f"one-sided. The suffix was moved to the target row for "
+                f"{stats.get('seated', 0):,} relations before comparing — nothing "
+                "else changed, so the annotation's Description/HG/FT are still "
+                "compared and counted"
+                + (f" — and left exactly as exported for {left}." if left else "."))
+    return line
+
+
+# --------------------------------------------------------------------------- #
 # Notes sheet — the INDICATOR for the context fields + key
 # --------------------------------------------------------------------------- #
 _NOTES_TITLE = "Highway Sequence — TSMIS vs TSN: comparison notes"
@@ -327,6 +513,15 @@ _NOTES_LINES = (
     "label vs \"EQUATES TO\") and usually an FT difference (TSMIS \"H\" vs TSN "
     "blank). Nearly all FT differences statewide are this class; the few remaining "
     "are genuine feature-type disagreements (H vs I, R vs H).",
+    "The Excel export seats the equate \"E\" suffix on the realignment record about a "
+    "quarter of the time, where TSN (and the TSMIS print) put it on the equated "
+    "postmile's own row. Because the key is the complete glued postmile, that seat "
+    "alone made BOTH rows of such a relation one-sided. TSN declares each relation "
+    "(its \"EQUATES TO\" annotation plus the next row carrying the suffix); the "
+    "export's suffix is moved to that target row before comparing and nothing else "
+    "is changed — the annotation's Description/HG/FT are still compared. A relation "
+    "the export does not carry, cannot single out, or seats on both rows is left "
+    "exactly as exported; the Summary states the counts.",
     "Descriptions: the TSMIS export prepends the row's own route as a label "
     "(\"001/NB OFF TO DOHENY PK RD\") — that label alone is stripped before "
     "comparing. TSN text is compared VERBATIM: TSN's numeric route prefixes "
@@ -402,15 +597,20 @@ _SCHEMA = CompareSchema(
 
 
 def _schema_with_claims(tsn_path, schema=None, title=_NOTES_TITLE,
-                        lines=_NOTES_LINES):
+                        lines=_NOTES_LINES, disclosure=None):
     """The per-run schema: the flavor's static Notes plus the normalized
     workbook's persisted source claims (read from its sidecar — absent claims
-    get an explicit rebuild hint instead of silence). CMP-AUD-155."""
+    get an explicit rebuild hint instead of silence). CMP-AUD-155. `disclosure`
+    is an optional run-resolved callable (the equate-seat counts) that reaches
+    both the Summary's disclosure notes and the Notes sheet."""
     base = schema if schema is not None else _SCHEMA
     claim_lines = claims_notes(
         consolidation_meta.read_extra(Path(tsn_path), "tsn_source_claims"))
-    return replace(base, legend_writer=ctc.make_notes_writer(
-        title, tuple(lines) + tuple(claim_lines)))
+    notes = tuple(lines) + tuple(claim_lines)
+    if disclosure is None:
+        return replace(base, legend_writer=ctc.make_notes_writer(title, notes))
+    return replace(base, disclosure_notes=(disclosure,),
+                   legend_writer=ctc.make_notes_writer(title, notes + (disclosure,)))
 
 
 # --------------------------------------------------------------------------- #
@@ -421,12 +621,17 @@ def suggest_name(tsmis_path):
                               "TSMIS_vs_TSN_HighwaySequence")
 
 
-def _load_pair(tsmis_path, tsn_path):
+def _load_pair(tsmis_path, tsn_path, stats=None):
     """(rows_t, rows_n, warnings) for the shared driver — no input warnings here, so
-    run_compare uses its () default."""
-    rows_t, _ = _load_tsmis(tsmis_path)
+    run_compare uses its () default. The Excel export's equate suffix is seated
+    the TSN way BEFORE the keys are built (the equate-seat section): TSN
+    declares the relations, `stats` receives the seat counts. The evidence
+    adapter loads through this same pair, so evidence and comparison can never
+    disagree about a row's key."""
+    raw_t, _ = _load_tsmis_raw(tsmis_path)
     rows_n, _ = _load_tsn(tsn_path)
-    return rows_t, rows_n, None
+    seated = seat_equate_suffixes(raw_t, equate_relations(rows_n), stats)
+    return [_tsmis_row(r) for r in seated], rows_n, None
 
 
 def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
@@ -434,10 +639,12 @@ def compare(tsmis_path, tsn_path, out_path, events=None, confirm_overwrite=None,
     """Build the Highway Sequence TSMIS-vs-TSN comparison workbook(s). `tsmis_path`
     is the consolidated TSMIS Highway Sequence workbook; `tsn_path` the normalized
     TSN workbook (from consolidate_tsn_highway_sequence)."""
+    stats = {}          # per-CALL seat counts; resolved when the Summary/Notes are written
     return ctc.run_files_compare(
-        _schema_with_claims(tsn_path), tsmis_path, tsn_path, out_path,
+        _schema_with_claims(tsn_path, disclosure=_equate_seat_disclosure(stats)),
+        tsmis_path, tsn_path, out_path,
         banner="Highway Sequence Comparison — TSMIS vs TSN", has_route=True,
-        loader=_load_pair, deps_ok=_DEPS_OK,
+        loader=lambda a, b: _load_pair(a, b, stats), deps_ok=_DEPS_OK,
         deps_msg="Required components are missing (openpyxl).",
         events=events, confirm_overwrite=confirm_overwrite, mode=mode,
         commit_guard=commit_guard)

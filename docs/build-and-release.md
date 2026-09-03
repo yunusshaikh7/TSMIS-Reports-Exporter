@@ -439,8 +439,11 @@ It NEVER contains the saved login, the Edge profile, failure dumps, exported rep
 data, the compressed comparison payloads (they carry compared ROWS — their names and
 sizes are in the inventory, their bytes are not), the TSN inputs, or the TSN library
 workbooks. The state sweep walks the same folders those artifacts live in, so it
-reads both organized `_state/` entries and legacy sibling entries (normalizing both
-to the same `state/…` ZIP paths), and matches by **exact sidecar suffix/name** — a
+reads both organized `_state/` entries and legacy sibling entries — each under its
+REAL relative path, `_state/` included (2026-09-02: collapsing `_state/` into its parent
+gave an organized sidecar and its legacy sibling one archive name, and the
+duplicate-member guard then refused the whole bundle, so a library carrying both
+shapes yielded NO zip at all) — and matches by **exact sidecar suffix/name** — a
 data workbook, a source PDF or a payload
 chunk cannot match. Packaged via the `evidence` module in `APP_MODULES`; locked by
 `build/check_evidence_bundle.py`, whose fixtures plant report ROW DATA beside the
