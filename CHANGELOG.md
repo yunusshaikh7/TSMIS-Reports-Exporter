@@ -3,7 +3,10 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
-## Unreleased
+## v0.45.1 — 2026-09-25
+
+Intersection Detail compares again: the site changed its Excel export on
+2026-09-25, and every Intersection Detail comparison refused the new files.
 
 - **Intersection Detail compares again after the site's September-2026 export
   change.** The site renamed almost every column heading in the Intersection Detail
