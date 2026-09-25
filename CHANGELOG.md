@@ -3,6 +3,28 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## Unreleased
+
+- **Intersection Detail compares again after the site's September-2026 export
+  change.** The site renamed almost every column heading in the Intersection Detail
+  Excel export and swapped the intersecting route number with its suffix. v0.45.0
+  refused the new exports in every Intersection Detail comparison. Its message also
+  told you to consolidate a fresh export, which would not have helped. The app now
+  recognizes the new layout and reads the route number from its new column. On the
+  2026-09-25 export: vs TSN 5,036 differing cells (July's export gave 5,092), PDF
+  vs Excel identical, and a comparison against the 2026-07-23 day shows only that
+  day's 158 real data changes. Older exports still compare, including against a
+  new one in the cross-environment and Baseline matrices. If the site changes the
+  format again, the message now says the app needs an update. No re-export or
+  re-consolidation is needed: the existing consolidated workbook compares as-is.
+- **Int St Eff-Date differences now count as Major on the Intersection Detail
+  Report View.** TSMIS has matched TSN on over 99% of rows since the site's July
+  data refresh, so the ~100 that still differ are real conflicts, not a date
+  convention. The same rule already moved Date of Record and the INT/Control/Lighting
+  dates into Major. The Notes sheet no longer calls the column structural. On the
+  9/25 export the Report View's Major total goes from 2,454 to 2,558; every
+  comparison count is unchanged.
+
 ## v0.45.0 — 2026-09-02
 
 The ArcGIS tab's main view is now a by-day matrix of every report rendered from

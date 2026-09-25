@@ -369,6 +369,29 @@ the layout is **NOT char-window** (columns are widely spaced, so word-level extr
 
 ### Intersection Detail — TSN
 
+> **⚠ September 2026 site edition (first on the 2026-09-25 ssor-prod pull)** — the
+> Excel export renamed almost every header (`H/G`→`HG`, `R/U`→`RU`, `ML S/M`→`ML SM`,
+> `Inter S`→`Intersecting SM`, `Xing Line Lgth`→`Intersecting Line Lgth`, …) AND made
+> ONE real move: the intersecting route number and its suffix swapped into the print's
+> order (route first). Censused against the 2026-07-23 pull (217 routes, 16,459 paired
+> rows): 532/532 route numbers moved from consolidated position 31 to 30, the 2
+> suffixes from 30 to 31, no other column moved. The PDF print did not change.
+> The comparators now accept THREE editions, each bound to its own position map
+> (`compare_intersection_detail_tsn._TSMIS_LAYOUTS` / `tsmis_positions_for` — the
+> legacy and 2026-07-17 editions share `_TSMIS_POS`, the 2026-09 edition has
+> `_TSMIS_POS_2026_09`); every Intersection Detail loader reads a consolidated workbook
+> through `load_consolidated_tsmis`. Cross-environment / Baseline pairs of a 2026-09
+> day with an older day are merged by `compare_env._id_merge_layouts` (the older side's
+> two cells swapped, shown under the 2026-09 labels). Measured on 9/25: vs TSN **5,036
+> diff cells / 16,201 paired / 260 + 425 one-sided** (Intrte Route 0; read with the old
+> map it would be 273 false diffs); PDF vs Excel **0 / 0**; PDF vs TSN = Excel vs TSN;
+> 9/25 vs 7/23 **158 cells / 2 new rows**, exactly the census's data edits.
+> Also corrected: `Int St Eff-Date` stopped being structural at the 2026-07-17 data
+> refresh — TSMIS matches TSN's `EFF_DATE` (mostly yearly 2020–2024 stamps, not one
+> 2022 stamp) on >99% of rows; the ~100 left are genuine conflicts in both directions.
+> So the owner moved it OUT of the Report View's soft set (2026-09-25): its differences
+> count as Major now (9/25: Major 2,454 → 2,558; Diffs and every count unchanged).
+
 > **⚠ July 2026 site update (v0.22.0)** — the site reshaped this report; the bullets
 > below this block describe the PRE-update history where they conflict. What changed:
 > - **TSMIS export is now 35 columns** (`intersection_detail_columns.HEADER` is the SoT):
@@ -399,7 +422,8 @@ the layout is **NOT char-window** (columns are widely spaced, so word-level extr
 >   the smaller **ML/CS Eff-Date** resurvey gap (~12% / ~3%, TSN carries the LATER date).
 >   TSN's `MAIN_EFF_DATE` (the second ML eff-date TSMIS dropped) is Report-View-only now.
 >   Report View **Major** counts follow the data (user decision 2026-07-08): soft =
->   Int St / ML / CS Eff-Date + Route Suffix; everything else hard.
+>   Int St / ML / CS Eff-Date + Route Suffix; everything else hard. (Int St left the
+>   soft set on 2026-09-25 — see the September block above.)
 > - **New statewide canary (v0.22.0, the 7.8 ground-truth bundle): 21,675 diff cells /
 >   16,199 matched / 260 TSMIS-only / 427 TSN-only** (was 163,310 / 677 pre-update).
 > - **`normalization_version` 2 → 3**: the normalized library takes the new 33-field shape

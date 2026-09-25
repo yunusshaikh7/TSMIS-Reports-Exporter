@@ -23,13 +23,13 @@ flag as differences. The GUI's Compare tab drives these through COMPARE_REPORTS
 from dataclasses import replace
 
 import compare_intersection_detail_tsn as _id
-from compare_tsn_common import (load_consolidated_rows, reject_pdf_source,
+from compare_tsn_common import (reject_pdf_source,
                                 require_pdf_source, run_files_compare,
                                 same_source_render_rows, suggest_route_name)
 
 
-def _tsmis_row_same_source(r):
-    """The same-source (PDF-vs-Excel) row projection: the 045 physical pairing
+def _project_same_source(_field, raw):
+    """The same-source (PDF-vs-Excel) value projection: the 045 physical pairing
     key + Location-derived provenance are IDENTICAL to the vs-TSN projection
     (`_id._tsmis_row_with` owns the one body), but every VALUE cell is
     verbatim (`_id._v`) — the cross-system crosswalks (the control-type J→S
@@ -38,21 +38,16 @@ def _tsmis_row_same_source(r):
     of the SAME report (CMP-AUD-067). The flavor-level
     `same_source_render_rows` still applies the owner-ruled render
     equivalences (OOXML escapes, edge tab padding)."""
-    return _id._tsmis_row_with(r, lambda _f, raw: _id._v(raw))
+    return _id._v(raw)
 
 
 def _load_tsmis_same_source(path):
-    return load_consolidated_rows(
-        path, _id.TSMIS_SHEET,
-        missing_sheet_hint="pick the consolidated TSMIS Intersection Detail workbook.",
-        bad_header_msg="isn't a CONSOLIDATED Intersection Detail workbook in the "
-                       "current (July 2026) site format — a leading 'Route' column "
-                       "and the 'Xing Line Lgth' tail column are expected. "
-                       "Consolidate a fresh post-update export; pre-update exports "
-                       "used the old 36-column layout, which this version doesn't "
-                       "compare.",
-        header_ok=_id._header_ok,
-        row_transform=_tsmis_row_same_source)
+    # Edition-aware like every Intersection Detail loader: the PDF-consolidated
+    # workbook carries the legacy layout while a 2026-09 Excel export has the
+    # intersecting route one column left, so each side is read with its own map.
+    return _id.load_consolidated_tsmis(
+        path, _project_same_source,
+        what="consolidated TSMIS Intersection Detail workbook")
 
 
 class _IntDetailFileCompare:

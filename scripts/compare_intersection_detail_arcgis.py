@@ -43,7 +43,7 @@ from pathlib import Path
 import arcgis_report_intersection_detail as ari
 import compare_intersection_detail_tsn as _id
 import compare_tsn_common as ctc
-from compare_tsn_common import (load_consolidated_rows, run_files_compare,
+from compare_tsn_common import (run_files_compare,
                                 same_source_render_rows, suggest_route_name)
 
 log = logging.getLogger("tsmis.compare")
@@ -71,24 +71,13 @@ def _project(field, raw):
     return _id._v(raw)
 
 
-def _row(r):
-    """One consolidated row. The 045 physical pairing key and the
-    Location-derived provenance come from `_id._tsmis_row_with` — the one body
-    every Intersection Detail flavor shares — so identity cannot drift between
-    this comparison and the others."""
-    return _id._tsmis_row_with(r, _project)
-
-
 def _load(path, what):
-    return load_consolidated_rows(
-        path, _id.TSMIS_SHEET,
-        missing_sheet_hint=f"pick the {what}.",
-        bad_header_msg="isn't a CONSOLIDATED Intersection Detail workbook in the "
-                       "current (July 2026) site format — a leading 'Route' "
-                       "column and the 'Xing Line Lgth' tail column are "
-                       f"expected. Pick the {what}.",
-        header_ok=_id._header_ok,
-        row_transform=_row)
+    """One consolidated workbook through `_id.load_consolidated_tsmis` — the
+    loader every Intersection Detail flavor shares — so the 045 physical
+    pairing key, the Location-derived provenance and the per-edition column
+    positions cannot drift between this comparison and the others. The build
+    writes the legacy layout; the export may be any accepted edition."""
+    return _id.load_consolidated_tsmis(path, _project, what=what)
 
 
 def _load_pair(arcgis_path, tsmis_path):

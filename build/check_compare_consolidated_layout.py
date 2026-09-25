@@ -122,11 +122,73 @@ def test_intersection_detail_accepts_both_editions():
     assert not idt._header_ok(["Route"] + ["x"] * 36)
 
 
+def _id_consolidated(header, cells):
+    """A one-row consolidated Intersection Detail workbook in `header`'s edition,
+    `cells` naming values by that edition's own labels."""
+    row = [""] * len(header)
+    for label, value in cells.items():
+        row[header.index(label)] = value
+    wb = Workbook()
+    ws = wb.active
+    ws.title = idt.TSMIS_SHEET
+    ws.append(list(header))
+    ws.append(row)
+    d = Path(tempfile.mkdtemp(prefix="id_edition_"))
+    p = d / "consolidated.xlsx"
+    wb.save(p)
+    wb.close()
+    return p
+
+
+def test_intersection_detail_2026_09_edition():
+    """The 2026-09 edition (first on the 2026-09-25 pull) is NOT label-only: the
+    intersecting route number and its suffix swapped places. Every Intersection
+    Detail loader must read each edition with its own position map, so the same
+    record in either edition projects to the SAME row. Teeth: reading the
+    2026-09 row with the older map yields the suffix as the route."""
+    import compare_intersection_detail_arcgis as cia
+    import compare_intersection_detail_pdf as cidp
+    sept = list(idt._TSMIS_HEADER_2026_09)
+    cur = list(idt._TSMIS_HEADER)
+    assert idt._header_ok(sept), "the 2026-09 edition must be accepted"
+    assert idt.tsmis_positions_for(sept) is idt._TSMIS_POS_2026_09
+    assert idt.tsmis_positions_for(cur) is idt._TSMIS_POS
+    assert idt._TSMIS_POS_2026_09["Intrte Route"] == sept.index("Intersecting Route")
+    assert idt._TSMIS_POS["Intrte Route"] == cur.index("Intrte Route")
+    common = {"Route": "204", "Post Mile": "004.057", "Location": "06 KER 204",
+              "Description": "NORTH JCT RTE 204", "Int St Eff-Date": "23-01-01"}
+    p_cur = _id_consolidated(cur, {**common, "PP": "", "Intrte S": "S",
+                                   "Intrte Route": "178", "Intrte Post": "S",
+                                   "Intrte Mile": "2.163",
+                                   "Xing Line Lgth": "250"})
+    p_sept = _id_consolidated(sept, {**common, "PP": "", "Intersecting Route": "178",
+                                     "Intersecting Rte S": "S",
+                                     "Intersecting PP": "S",
+                                     "Intersecting Post Mile": "2.163",
+                                     "Intersecting Line Lgth": "250"})
+    route_i = 1 + idt.SHARED_HEADER.index("Intrte Route")
+    for name, load in (("vs-TSN", idt._load_tsmis),
+                       ("PDF-vs-Excel", cidp._load_tsmis_same_source),
+                       ("ArcGIS", lambda p: cia._load(p, "workbook"))):
+        rows_cur, _ = load(str(p_cur))
+        rows_sept, _ = load(str(p_sept))
+        assert rows_cur == rows_sept, (name, "both editions must project identically")
+        assert rows_sept[0][route_i] == "178", (name, rows_sept[0][route_i])
+    # Teeth: the older map on a 2026-09 row reads the SUFFIX as the route.
+    from openpyxl import load_workbook
+    wb = load_workbook(p_sept, read_only=True)
+    raw = list(list(wb[idt.TSMIS_SHEET].iter_rows(values_only=True))[1])
+    wb.close()
+    wrong = idt._tsmis_row_with(raw, idt._project, idt._TSMIS_POS)
+    assert wrong[route_i] == "S", "the older map must mis-read this edition"
+
+
 def main():
     test_predicate_accepts_exact_rejects_drift()
     test_old_gates_accepted_the_junk()
     test_load_tsmis_refuses_a_shifted_workbook_end_to_end()
     test_intersection_detail_accepts_both_editions()
+    test_intersection_detail_2026_09_edition()
     print("OK  consolidated-layout gate (CMP-AUD-034): all four _load_tsmis loaders "
           "bind their exact documented header — relabels, block shifts, insertions, "
           "and deletions are refused (the old width/last-label/PM gates accepted "
