@@ -10,8 +10,8 @@ consolidated workbook errors with a re-export hint instead of being mis-read by
 position), the Y/N<->legacy-1/0 boolean normalization, the control-type crosswalk,
 route-from-LOCATION + PM/date/zero-pad normalization, the position-based TSMIS
 loader, the Report View classification (Date of Record + INT/Ctrl/Light eff-dates
-count as Major now; Int St / ML / CS Eff-Date + Route Suffix stay soft — user
-decision 2026-07-08), and end-to-end that a normalization still produces a MATCH
+count as Major — user decision 2026-07-08 — and Int St Eff-Date too since
+2026-09-25; ML / CS Eff-Date + Route Suffix stay soft), and end-to-end that a normalization still produces a MATCH
 while everything present in both systems IS counted. No Excel; CI-safe.
 
 Run with the build venv:
@@ -178,9 +178,12 @@ def test_schema():
     check("Report View: INT/Ctrl/Light eff-date diffs are Major (the ~1-day-offset "
           "tolerance is retired)",
           idt._rv_classify("Lighting Eff-Date", "1973-10-18", "1973-10-19") == "hard")
-    check("Report View: Int St / ML / CS Eff-Date stay soft (structural)",
-          all(idt._rv_classify(f, "1964-01-01", "2022-01-01") == "soft"
-              for f in ("Int St Eff-Date", "ML Eff-Date", "CS Eff-Date")))
+    check("Report View: ML / CS Eff-Date stay soft (structural)",
+          all(idt._rv_classify(f, "1964-01-01", "1977-01-01") == "soft"
+              for f in ("ML Eff-Date", "CS Eff-Date")))
+    check("Report View: an Int St Eff-Date diff counts as Major (owner 2026-09-25 — it "
+          "matches TSN on >99% of rows since the 2026-07-17 site refresh)",
+          idt._rv_classify("Int St Eff-Date", "2021-06-01", "2021-01-01") == "hard")
     check("Report View: a non-date attribute diff classifies 'hard' (counts as Major)",
           idt._rv_classify("Control Type", "S", "A") == "hard")
     check("Report View: Route Suffix is a compared grid column (next to Route)",

@@ -291,12 +291,86 @@ def test_detail_edition_boundary():
               and res.comparison_outcome.counts.differing_cells == 1)
 
 
+def _id_row_in(header, **over):
+    """A full per-route row in `header`'s edition, overrides by that edition's labels."""
+    row = [""] * len(header)
+    base = {"PP": "R", "Post Mile": "1.000", "Location": "12 ORA 001",
+            "Description": "MAIN ST"}
+    for k, v in {**base, **over}.items():
+        row[header.index(k)] = v
+    return row
+
+
+def test_detail_sept_edition():
+    """The 2026-09 edition (first on the 2026-09-25 pull) swapped the
+    intersecting route number and its suffix, so it is NOT label-only: it
+    canonicalizes to its own header, and a mixed pair (an older day against a
+    2026-09 day — the Baseline matrix's normal case) is merged by putting the
+    older side's two cells in the 2026-09 order. The same record in both
+    editions must MATCH; a real route change must still flag."""
+    print("Detail 2026-09 edition (route/suffix swap bridged, not mis-aligned):")
+    import compare_intersection_detail_tsn as _idt
+    canon = compare_env._id_canonical_header
+    cur = list(_idt._TSMIS_HEADER[1:])
+    sept = list(_idt._TSMIS_HEADER_2026_09[1:])
+    check("the 2026-09 edition canonicalizes to its OWN header",
+          canon(sept) == sept and canon(sept) != canon(cur))
+    check("...with or without a leading Route",
+          canon(["Route"] + sept) == ["Route"] + sept)
+
+    def run(tag, a_hdr, a_row, b_hdr, b_row):
+        root = Path(tempfile.mkdtemp(prefix=f"idsept_{tag}_"))
+        a = root / "2026-09-25 ssor-prod" / "intersection_detail"
+        b = root / "2026-07-23 ssor-prod" / "intersection_detail"
+        a.mkdir(parents=True); b.mkdir(parents=True)
+        _write_id_route_hdr(a, "001", a_hdr, [a_row])
+        _write_id_route_hdr(b, "001", b_hdr, [b_row])
+        out = root / "cmp.xlsx"
+        res = compare_env.INTERSECTION_DETAIL.compare_folders(
+            str(a.parent), str(b.parent), str(out), events=Events(),
+            confirm_overwrite=lambda _p: True, mode="values")
+        return res, out
+
+    new_row = _id_row_in(sept, **{"Intersecting Route": "133",
+                                  "Intersecting Post Mile": "0.000"})
+    old_row = _id_row_in(cur, **{"Intrte Route": "133", "Intrte Mile": "0.000"})
+    res, out = run("same", sept, new_row, cur, old_row)
+    check("a mixed 2026-09 vs 2026-07-17 pair compares (no layout refusal)",
+          res.status == "ok")
+    check("the same record in both editions MATCHES (0 differing cells)",
+          res.comparison_outcome is not None
+          and res.comparison_outcome.counts.differing_cells == 0
+          and res.comparison_outcome.counts.paired_rows == 1)
+    if res.status == "ok":
+        header, _rows = _comparison_rows(out)
+        _blob, sheets = _summary(out)
+        check("the mixed pair is shown under the 2026-09 labels",
+              "Intersecting Route" in header and "Intrte Route" not in header)
+        check("a Notes sheet explains the mixed editions", "Notes" in sheets)
+    changed = _id_row_in(cur, **{"Intrte Route": "134", "Intrte Mile": "0.000"})
+    res, out = run("diff", sept, new_row, cur, changed)
+    ok = res.status == "ok" and res.comparison_outcome is not None
+    check("a real intersecting-route change still flags (exactly 1 cell, "
+          "under Intersecting Route)",
+          ok and res.comparison_outcome.counts.differing_cells == 1
+          and dict(res.comparison_outcome.counts.per_field_counts).get(
+              f"{sept.index('Intersecting Route')}:Intersecting Route") == 1)
+    res, out = run("sept_pair", sept, new_row, sept,
+                   _id_row_in(sept, **{"Intersecting Route": "133",
+                                       "Intersecting Post Mile": "0.000",
+                                       "Description": "OTHER ST"}))
+    check("two 2026-09 sides compare by position (only Description differs)",
+          res.status == "ok" and res.comparison_outcome is not None
+          and res.comparison_outcome.counts.differing_cells == 1)
+
+
 def main():
     test_wiring()
     test_summary_aggregate_compare()
     test_summary_layout_drift_disclosed()
     test_detail_flat_compare()
     test_detail_edition_boundary()
+    test_detail_sept_edition()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

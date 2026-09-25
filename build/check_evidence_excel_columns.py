@@ -63,6 +63,15 @@ def test_intersection_detail():
                 for f in ("Route Suffix", "District", "County")))
     c.check("a junk header refuses every field (the loader's own gate)",
             all(eid.excel_column_for(f, JUNK) is None for f in idt._TSMIS_POS))
+    sept = idt._TSMIS_HEADER_2026_09
+    c.check("2026-09 edition: every field == that edition's own position",
+            all(eid.excel_column_for(f, sept) == idt._TSMIS_POS_2026_09[f]
+                for f in idt._TSMIS_POS_2026_09))
+    c.check("2026-09 edition: the intersecting route resolves one column LEFT "
+            "of the earlier editions (it swapped with its suffix)",
+            eid.excel_column_for("Intrte Route", sept) == 30
+            == sept.index("Intersecting Route")
+            and eid.excel_column_for("Intrte Route", idt._TSMIS_HEADER) == 31)
 
 
 def test_ramp_detail():

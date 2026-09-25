@@ -235,6 +235,23 @@ independent-oracle re-bless of the new edition is the follow-up; this observed c
 plus the label-only-header + real-data-refresh proof, is the current binding note.
 Harness: session scratchpad `id_new_vs_old_canary.py` / `id_whatchanged.py`.
 
+**2026-09 SITE EDITION — first on the 2026-09-25 ssor-prod pull (the owner's
+`_inbox/2026-09-25 ssor-prod.zip`: 217 routes in both editions + the work-PC
+consolidated workbook).** Every header relabelled AND one real move: the intersecting
+route number and its suffix swapped (532/532 route numbers moved from consolidated
+position 31 to 30, the 2 suffixes 30 → 31, nothing else moved — censused cell-for-cell
+against the 2026-07-23 pull, 16,459 paired rows; 2 new rows). v0.45.0 REFUSED the
+edition at the exact-header gate. Now accepted with its own position map
+(`_TSMIS_POS_2026_09`). Observed through the shipped entry points against the 6.19 raw
+TSN extract: **vs TSN 16,201 paired / 260 TSMIS-only / 425 TSN-only / 5,036 differing
+cells** (Intrte Route 0 — the old map would read the suffix and flag 273); control: the
+2026-07-23 pull through the same harness reproduces the 2026-07-17 note's **5,092**
+exactly. PDF vs Excel **16,461 paired / 0 / 0 / 0 cells**; PDF vs TSN identical to Excel
+vs TSN; cross-env 9/25 vs 7/23 **16,459 paired / 2 one-sided / 158 cells**, equal to the
+census's own data edits (HG 56, City Code 55, RU 10, 3 rows × 12 ML/CS cells,
+Description 1). ArcGIS build (as of 2026-09-25) vs 7/23 and vs 9/25: pairing identical
+(15,197), Intrte Route 78 on both.
+
 An independent first/corrected-pass reconciliation proved exactly 142 removed
 artifacts and zero additions. Every removal was field `Intrte Postmile`; exactly two
 rows became fully equal; four removals occurred inside duplicate groups; trace costs

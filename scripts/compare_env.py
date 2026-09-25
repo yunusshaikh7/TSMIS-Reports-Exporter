@@ -1745,9 +1745,8 @@ def _intersection_detail_env_keys(header, key_field):
 
 
 def _id_canonical_header(header):
-    """Map either supported Intersection Detail site edition — the current
-    (2026-07-17) labels or the 7.8/7.9 legacy labels, with or without a leading
-    Route — to ONE canonical header, so a new-vs-old (pre/post July-2026)
+    """Map the 2026-07-17 labels and the 7.8/7.9 legacy labels, with or without
+    a leading Route, to ONE canonical header, so a new-vs-old (pre/post July-2026)
     cross-env / baseline comparison aligns BY POSITION instead of refusing on the
     LABEL-ONLY change. The July-2026 update relabeled only ('P'->'PP', 'S'->'PS',
     the INT Type / INT Eff-Date labels realigned over their own values,
@@ -1756,21 +1755,79 @@ def _id_canonical_header(header):
     exact and any real data change (the Int St Eff-Date refresh, HG, the Location
     suffix) still surfaces as a genuine diff.
 
+    The 2026-09 edition is NOT label-only (its intersecting route number and
+    suffix swapped places), so it canonicalizes to its OWN header: two 2026-09
+    sides compare by position under its labels, and a mixed pair goes through
+    `_id_merge_layouts`.
+
     Any OTHER header is REFUSED (returns None → the header_canonicalizer
     None-branch reports an unrecognized layout), so two identically-malformed or
     obsolete Intersection Detail sides can no longer pair on a trusted-first-file
     header (CMP-AUD-032). Previously such a header was returned unchanged and two
     identical bogus/legacy-non-edition sides compared as valid; pinning to the
-    recognized current/legacy editions closes that. (The two RECOGNIZED editions
-    still align by position for a genuine new-vs-old baseline compare.)"""
+    recognized editions closes that."""
     import compare_intersection_detail_tsn as _idt
     h = [("" if c is None else str(c)).strip() for c in header]
     has_route = bool(h) and h[0] == "Route"
     body = h[1:] if has_route else h
     current, legacy = _idt._TSMIS_HEADER[1:], _idt._TSMIS_HEADER_LEGACY[1:]
+    sept = _idt._TSMIS_HEADER_2026_09[1:]
     if body == list(current) or body == list(legacy):
-        return (["Route"] + list(current)) if has_route else list(current)
-    return None
+        canon = list(current)
+    elif body == list(sept):
+        canon = list(sept)
+    else:
+        return None
+    return (["Route"] + canon) if has_route else canon
+
+
+_ID_MIXED_NOTES_TITLE = "Intersection Detail — mixed export editions: comparison notes"
+_ID_MIXED_NOTES = (
+    "The two sides were exported in different site editions: one before the "
+    "September-2026 site update and one after it. That update renamed most "
+    "column headings and swapped the intersecting route number and its suffix "
+    "into the order the printed report uses (route first). No other column "
+    "moved.",
+    "The earlier side's route number and suffix were put in the newer order, "
+    "and the columns are shown under the newer headings. Every column is "
+    "compared, as for two exports of the same edition.",
+    "Rows are keyed on Route + County + Post Mile, as for any Intersection "
+    "Detail comparison.",
+)
+
+
+def _id_merge_layouts(canon_a, canon_b, rows_a, rows_b):
+    """A MIXED Intersection Detail pair — one side the 2026-09 edition, the
+    other an earlier one (cross-environment and Baseline routinely pair two
+    different days). The 2026-09 edition moved exactly one thing: the
+    intersecting route number and its suffix swapped places. So the earlier
+    side's two cells are swapped into the 2026-09 order and both sides compare
+    by position under the 2026-09 labels, every column counted. None for any
+    other pairing, which keeps the different-layouts refusal."""
+    import compare_intersection_detail_tsn as _idt
+    current = list(_idt._TSMIS_HEADER[1:])
+    sept = list(_idt._TSMIS_HEADER_2026_09[1:])
+    if sorted([list(canon_a), list(canon_b)]) != sorted([current, sept]):
+        return None
+    # Row index == consolidated position (rows are [route, *per-route cells]).
+    lo, hi = sorted((_idt._TSMIS_POS["Intrte Route"],
+                     _idt._TSMIS_POS_2026_09["Intrte Route"]))
+
+    def to_sept(rows):
+        out = []
+        for r in rows:
+            r = list(r)
+            r[lo], r[hi] = r[hi], r[lo]
+            out.append(tuple(r))
+        return tuple(out)
+
+    if list(canon_a) == current:
+        rows_a = to_sept(rows_a)
+    else:
+        rows_b = to_sept(rows_b)
+    extras = {"legend_writer": ctc.make_notes_writer(_ID_MIXED_NOTES_TITLE,
+                                                     _ID_MIXED_NOTES)}
+    return sept, tuple(rows_a), tuple(rows_b), extras
 
 
 INTERSECTION_DETAIL = EnvCompare(
@@ -1778,6 +1835,7 @@ INTERSECTION_DETAIL = EnvCompare(
     sheet_name="Intersection Detail", key_col="Post Mile",
     physical_key_builder=_intersection_detail_env_keys,
     header_canonicalizer=_id_canonical_header,
+    layout_merger=_id_merge_layouts,
     base_schema=CompareSchema(
         report_name="Intersection Detail", header=["Post Mile"],
         id_noun="intersection", id_noun_plural="intersections", pair_noun="postmile"))
