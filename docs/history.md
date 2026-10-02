@@ -6,7 +6,7 @@ app — told from the repository.
 **By the numbers:** 313 commits · 39 pull requests · 51 tagged releases ·
 8 report types · **May 20 → June 29, 2026**.
 
-This is the narrative companion to [`CLAUDE.md`](../CLAUDE.md) (the authoritative
+This is the narrative companion to [`project-guide.md`](project-guide.md) (the authoritative
 "how it works and why") and [`CHANGELOG.md`](../CHANGELOG.md)
 (the user-facing changelog). Where they explain the *what*, this explains the
 *journey* — including the dead ends, the reverts, and the three field failures
@@ -133,7 +133,7 @@ Then **June 10 was the comeback.** A rapid-fire branch shipped `v0.5.0` →
 `v0.7.x` and solved it three ways at once: persistent-profile Edge **recapture**,
 an unmanaged **Built-in Chromium** channel (org policy can't touch it), and
 **silent device sign-in** so exports provision themselves with no saved session.
-The "✅ RESOLVED (v0.5.0)" block still in `CLAUDE.md` is the victory lap.
+The "✅ RESOLVED (v0.5.0)" block still in `project-guide.md` is the victory lap.
 
 ## Chapter 5 — The site moved underneath them (June 10 → 11) · `v0.7.5` → `v0.7.6`
 

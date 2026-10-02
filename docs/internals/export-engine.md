@@ -254,7 +254,7 @@ The IDs are required by the 2026-08 two-mode form. Its postmile `#pm-district` r
 
 `clearResults()` resets the `error` class on each Generate, so `ERROR_JS` only ever reflects the **current** route (no stale-error false positives, `common.py:699-704`).
 
-> **Framing-drift note:** `EXPORT_READY_JS` is a *readiness* signal (the Export button rendered), **not** the no-download detector. CLAUDE.md describes the `EmptyExport` guard as keying on "Export control ready, no download (`EXPORT_READY_JS`)", but the actual detection in `save_via_export_button` is purely the **download-start timeout** — `EXPORT_READY_JS` is not referenced there at all. The topic doc flags the same drift.
+> **Framing-drift note:** `EXPORT_READY_JS` is a *readiness* signal (the Export button rendered), **not** the no-download detector. ../project-guide.md describes the `EmptyExport` guard as keying on "Export control ready, no download (`EXPORT_READY_JS`)", but the actual detection in `save_via_export_button` is purely the **download-start timeout** — `EXPORT_READY_JS` is not referenced there at all. The topic doc flags the same drift.
 
 ---
 
@@ -444,7 +444,7 @@ Write a function `save(page, out_path, timeout_ms=None) -> None` in `exporter.py
 
 ### 13.2 Add a `ReportSpec` (a new report)
 
-`ReportSpec` (`exporter.py:62`) carries `label`, `subdir`, `filename(route)`, `wait_js(route)`, `is_empty(page)`, `save(page, out_path, timeout_ms)`. The full new-report checklist (registry, `.bat` branches, `app.spec` `APP_MODULES`, `.gitkeep`) is in [../architecture.md](../architecture.md) / CLAUDE.md *Extending*. Two engine-level contracts to honor:
+`ReportSpec` (`exporter.py:62`) carries `label`, `subdir`, `filename(route)`, `wait_js(route)`, `is_empty(page)`, `save(page, out_path, timeout_ms)`. The full new-report checklist (registry, `.bat` branches, `app.spec` `APP_MODULES`, `.gitkeep`) is in [../architecture.md](../architecture.md) / ../project-guide.md *Extending*. Two engine-level contracts to honor:
 - **`wait_js(route)` must return a complete arrow-function string** — `_attempt_route` wraps and **invokes** it: `f"() => (({ready_js}))() || ({ERROR_JS})"` (`exporter.py:331`). A bare boolean expression (not an arrow function) will not work; it must be callable.
 - `is_empty(page)` runs **before** the save. It's a fast pre-check; the no-download guard in `save_via_export_button` is the marker-independent backstop, so `is_empty` drifting can't reintroduce the empty-route hang.
 

@@ -1,5 +1,10 @@
 # v0.18.0 Planning — Coordination
 
+> **Historical workflow.** Named participants, paths, and approvals below belong
+> to that completed program. For current work use the [optional contributor
+> prompts](../../agent-prompts.md) and the current task; separate audit roles are only used
+> when requested. Keep historical evidence paths and completion tokens intact.
+
 **Repository:** `TSMIS-Reports-Exporter`
 **Release target:** **v0.18.0** — structural optimization + engineering-overhaul (maintainability,
 architecture, reliability, testing, security, performance, packaging, shipped-app cleanup). Few/no

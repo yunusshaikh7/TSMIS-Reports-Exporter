@@ -1,7 +1,7 @@
 # CODE-REVIEW-PROMPT.md — standard ruthless audit for TSMIS Reports Exporter
 
 A reusable prompt for a deep, **read-only** code review of this repository. Paste
-it to a capable agent (Claude, Codex, …). It is **project-tailored** (file lists,
+it to any capable coding agent. It is **project-tailored** (file lists,
 tech stack, and IT context are specific to this app) but **not** tied to any one
 patch — point it at the current `HEAD` or a specific diff range and go.
 
@@ -22,7 +22,7 @@ patch — point it at the current `HEAD` or a specific diff range and go.
   that depends on the site's DOM, selectors, button text, empty-state strings,
   `CONFIG` shape, or `env/src` params against that source before trusting it —
   contract assumptions are the easiest thing to get wrong from the repo alone.
-- **Output.** One report file at `code-review/AUDIT-<agent>-<short-sha>.md` (create
+- **Output.** One report file at `code-review/AUDIT-<review-id>-<short-sha>.md` (create
   the folder if needed; per-run reports are git-ignored — they quote code and
   internal detail). Distil durable follow-ups into the project roadmap
   ([roadmap.md](roadmap.md)); do not
@@ -50,14 +50,14 @@ patch — point it at the current `HEAD` or a specific diff range and go.
   manufacture P3s to fill sections.
 - An unverified claim asserted as a confirmed bug is itself a defect in this audit.
   When in doubt, demote to "Unproven But Worth Investigating."
-- Treat AI/vibe-coded code as untrusted until proven otherwise. Do not trust
-  comments, release notes, or architecture docs (including `CLAUDE.md`) unless the
+- Verify code regardless of who or what wrote it. Do not trust
+  comments, release notes, or architecture docs (including `project-guide.md`) unless the
   code backs them up.
 
-## Parallelism / subagents (use if your harness supports parallel tasks)
+## Optional parallel review (when authorized and supported)
 
-This audit decomposes cleanly. Fan out the READING + EVIDENCE-GATHERING phase across
-independent risk domains, then synthesize in ONE context. Suggested split:
+When the task authorizes independent agents, divide reading and evidence gathering
+by risk domain, then synthesize the results. Otherwise review these areas sequentially. Suggested split:
 - **Auth / Browser / Environment + automation contract:** `common.py`, `login.py`,
   `exporter.py`, `exporter_parallel.py`, `gui_worker.py` auth paths.
 - **GUI bridge + injection:** `gui_api.py`, `gui_worker.py`, `ui/app.js`, `ui/index.html`.
@@ -211,7 +211,7 @@ unavailable, say so — do not install them.
 
 ## Deliverable format
 
-Write to `code-review/AUDIT-<agent>-<short-sha>.md` (do not commit). Begin with: audited
+Write to `code-review/AUDIT-<review-id>-<short-sha>.md` (do not commit). Begin with: audited
 HEAD SHA, branch, dirty/clean, the latest tag you diffed against, whether you used
 subagents and how you split, and a summary table of ALL findings: `ID | Severity |
 file > symbol | one-line | Confidence`. If the report risks running long, complete every

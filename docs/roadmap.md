@@ -4,94 +4,49 @@ The single forward list — bugs to fix, features to add, and standing concerns.
 (what already shipped, per release) is `CHANGELOG.md`; the narrative is
 [history.md](history.md). This file is what's *left*.
 
-> ### ▶ WHERE THINGS STAND (2026-08-21, after v0.41.2)
+> ### ▶ WHERE THINGS STAND (v0.45.0, reconciled 2026-09-05)
 >
-> **Correctness has nothing open.** All **245** comparison-audit findings are
-> closed — the last, CMP-AUD-245, in v0.39.1. The 13 integrated reports consolidate
-> and compare in every lane their data supports; Highway Detail's correctness
-> backlog closed in v0.38.0 and its two editions now agree statewide (51,327
-> locations, 0 differing cells).
+> **Current release: v0.45.0 (2026-09-02).** The ArcGIS tab now opens on the
+> Reports-vs-layers matrix, the Highway Sequence equate-seat fix has shipped,
+> and the support-bundle sidecar collision is fixed. The comparison-audit ledger
+> records **246 closed findings**; residual follow-ups below remain separate.
 >
-> **The last three releases were all comparison SPEED, with the produced workbook
-> held byte-identical**: v0.40.0 (a per-workbook composite-style cache + a streamed
-> read of the finished package — ~39% off a statewide run), v0.40.1 (both inputs
-> were being read twice — a further 16%), and v0.41.0 (**Counts only**, a
-> `mode="preview"` run that skips the writers entirely — 9.1x, and by design
-> certifies nothing). **That tuning is finished and measured out**: writing is 70%
-> of a comparison, spread across four writers with no hot spot left, and the only
-> lever beyond it changes the output. The record is
-> [planning/vs-tsn-comparison-speed.md](planning/vs-tsn-comparison-speed.md).
+> **The output-audit program is complete.** All six RB bundles are merged;
+> RB-5 shipped in v0.42.0 and RB-6 in v0.44.0. Historical prompts and named
+> participants are records of that program, not a required workflow today.
 >
-> **v0.41.2 made Counts only reachable.** Its checkbox was wired to the generic
-> settings endpoint, which drops keys outside `settings.DEFAULTS` — so the option
-> clicked, reported success, saved nothing and snapped back, and the mode shipped
-> in v0.41.0 could not be turned on at all. Same release: a counts-only run that
-> re-derives a stale cell's existing workbook counts now marks it **counts
-> confirmed** (an accent on the same uncertified state — it confirms the numbers,
-> never the file).
+> **The highest-priority acceptance task remains B1:** run v0.45.0 on the work
+> PC. Changes since v0.32.0 have offline checks but still need that field run.
+> The owner also needs to supply the new Clean Road exports and statewide
+> Highway Summary PDFs before their next integration stages can be verified.
 >
-> **What's next, in order:**
+> **Small code follow-ups:** cancellation during report-form setup, console
+> dual-edition coalescing, and the Unicode representation-only label (E5/E11).
+> The next larger feature work is the remaining ArcGIS report builders (DA4),
+> followed by the Clean Road Intersection/Ramp builds (G1); source evidence
+> determines which can ship.
 >
-> 1. **B1 — the work-PC acceptance run. Owner only**; this dev box cannot reach the
->    TSMIS intranet. Seventeen releases have landed since v0.32.0 and every one of
->    them is offline-verified only. It blocks nothing, but it is the only thing
->    standing between "the checks pass" and "it works in the field."
-> 2. **H — COMPLETE.** The bounded output-audit program merged its last bundle,
->    RB-6, on 2026-09-02 after two independent approvals, and it shipped in
->    v0.44.0. What it leaves behind is owed elsewhere: the one-time vs-TSN
->    re-comparison HF-08 forces after the update (B1) and the VEN-01 vendor
->    defect that only a corrected export can close (C).
-> 3. **G1 — the CA INTERSECTIONS + CA RAMPS clean-road builds**, on the v0.29.0
->    CA HIGHWAYS pattern, with the mappings already censused in
->    [planning/cleanroad-highways.md](planning/cleanroad-highways.md). **Re-targeted
->    2026-09-02:** the site now exports the Clean Road files, so each build lands
->    as a row of the ArcGIS tab's **Reports vs layers matrix** (our build vs the
->    site's export, TSMIS vs TSMIS) rather than a vs-TSN lane; the three rows are
->    already registered and greyed until the builds and the site-export
->    consolidators exist. It needs nothing from the vendor to start.
-> 4. **DA6 → DA1's residual.** Our reconstruction's row boundaries still don't line
->    up with the report's, and the census says ~63% of our extra boundaries are
->    driven by the three block effective dates — which are 79–80% right against the
->    report but only ~60% right against TSN. Chase the columns, not the boundary
->    rule.
-> 5. **DA4 — the other reports rendered from the layers.** **Intersection Detail
->    has landed**, and it settled the open question: the recipe survives a
->    different report SHAPE. Highway Detail is a span report and needs the span
->    engine plus a merge rule; an intersection is a place, so that whole
->    apparatus drops out and what is left is a mapping table and three measured
->    rules. It also did NOT need the CA INTERSECTIONS clean-road build first, so
->    G1 is not a prerequisite for the remaining reports the way it looked.
->    `arcgis_reports.py` is now the registry everything derives from — the next
->    report is a table row plus its two modules. Highway Log, Highway Sequence
->    and the Ramp reports are what's left; the residual on the one just shipped
->    is DA7/DA8. **2026-09-02: the sub-tab became the tab's MAIN view — a by-day
->    MATRIX over every registry report (the unbuilt ones greyed, saying so), ONE
->    layer build per report stamped with the drop it came from.** The order the
->    owner will rank: Highway Log and Highway Summary (projections of Highway
->    Detail's own source table), Intersection Summary (off the ID build), then
->    Highway Sequence, then the Ramp reports with the CA RAMPS build.
+> TSN is frozen at the September-2025 cutover. A newer TSN pull is not a
+> dependency to wait for; comparisons measure migration drift as well as defects.
 >
-> **What is NOT coming, ever:** a fresher TSN pull. TSMIS replaced TSN, so the TSN
-> side of every vs-TSN comparison is frozen at the 09/2025 cutover and the gap to a
-> live export only grows. Read those differing-cell counts as migration drift, not
-> defect (C4 / D5).
->
-> *The older status banners that used to stack here (v0.17.1 → v0.38.0) have been
-> removed. Per-release detail is `CHANGELOG.md` — 92 versions, one section each —
-> and the narrative is [history.md](history.md).*
+> Release history belongs in `CHANGELOG.md`; the inventory below owns current work.
 
 
 ---
 
 ## ▣ OPEN WORK INVENTORY (current as of v0.45.2, 2026-10-02)
 
-**This is the definitive list of what is left.** Everything below is genuinely
-open; anything not here is either shipped (see `CHANGELOG.md`) or a historical
-record. The long themed sections further down keep the detail and rationale — this
-table is the index into them. Re-verify an item against the code before acting on
-it; a stale line here is a bug in this list.
+**This is the index of remaining work.** Open items are listed alongside
+explicitly marked completions so their history stays traceable. The themed
+sections further down hold the detail and rationale; `CHANGELOG.md` records
+what shipped. Re-verify an item against the code before acting on it.
 
-### A. Correctness — **NOTHING OPEN.** All 245 findings are closed (last: v0.39.1)
+### A. Comparison-audit ledger — all 246 findings closed (latest: v0.45.0)
+
+**CMP-AUD-246 (v0.45.0)** — Highway Sequence Excel-vs-TSN equate seating is
+fixed. E10 and the finding ledger hold the measured before/after results.
+This closes that audit finding; it does not close the separately listed
+operational and representation-label follow-ups.
 
 **CMP-AUD-245 (found + fixed 2026-08-19, v0.39.1)** — the Highway Detail vs ArcGIS
 projection counted the HF-01 *unavailable* marker as data and reported COMPLETE over a
@@ -127,7 +82,7 @@ counts as migration drift, not defect — see C4 + D5.
 
 | # | Item | Notes |
 |---|---|---|
-| B1 | **The work-PC acceptance run — now against v0.45.1. THE TOP PRIORITY: everything since v0.32.0 is offline-verified only.** | Comparison + evidence output intentionally differ from v0.26.2/v0.27.x: re-run both sides, never reconcile old against new. TSN libraries rebuild once; PDF-sourced workbooks re-consolidate once. Then the carried v0.30–v0.32 items in [the backlog plan §4](planning/v0.30-owner-backlog-plan.md): Retry Edge sign-in, the PDF vs Excel Matrix, a fast-mode dual-format run, a pre-v0.32 partial resume, one Excel-row evidence run. **New for v0.37.0:** a Highway Summary export → consolidate → vs-TSN run, and one Highway Detail evidence generation (its evidence lane just opened — see D1). **New for v0.38.x:** re-consolidate Highway Detail (PDF) and confirm it reports COMPLETE with a clean PDF-vs-Excel cell; let the TSN Highway Detail library rebuild once (v4) and confirm the Report View's DCR + ADT columns are populated; and run a **both-editions Highway Summary** export to confirm one render saves both files in the right order. **New for v0.38.2:** drag a day COLUMN on each by-day matrix and confirm it moves on screen (it never did before); toggle a report chip on a matrix and confirm it responds instantly; and — the one worth watching on a STOCKED TSN library — confirm the matrices repaint quickly after the first render, now that the raw manifest memoizes instead of re-hashing every raw source each time. **New for v0.40.0–v0.41.0 (all comparison-speed work, offline-verified only):** rebuild a few cells and confirm the workbooks still open and read as before (output is byte-identical by construction, so anything else is a bug); and tick **Counts only** under Comparison output, refresh a matrix, and confirm the cells show `counts only — build to certify` in grey with NO workbooks written, that a zero-difference cell reads `match*` rather than a green tick, and that building one for real replaces the preview with a normal green result. **New for v0.41.2 — and note the v0.41.0 line above was untestable until now**: the Counts only checkbox never persisted, so confirm FIRST that it stays ticked, mirrors onto the by-day matrix, and survives an app restart. Then run it over a STALE cell that already has a workbook and confirm the workbook is left on disk untouched and the cell reads **counts confirmed** with a green left edge when the numbers still agree (grey ground, still offering a build — never a green tick). **New for v0.42.2:** consolidate a statewide Highway Sequence (PDF) export and confirm it reports COMPLETE with no ⚠ unparsed-line note — a single printed row the site renders with a blank Highway Group used to be dropped and take the whole 252-route consolidation to partial with it. **New for v0.44.0:** on the DEV site, export one route of each Clean Road report and confirm a workbook lands with the full legacy header (on prod the trio may still fail fast as "currently unavailable" — expected until prod catches up); run Settings ▸ Capture website source once and confirm the folder holds `index.html` plus every module under its site name with the BUILD_DATE in the manifest; open each matrix's add-day picker and confirm every day lists the reports it holds. **Also new for v0.44.0 — RB-6 rode this release:** after updating, every vs-TSN cell reads STALE once because HF-08 moved each TSN dataset's identity token (deterministic bytes); press Rebuild TSN library where offered, rebuild the cells, and confirm the counts come back unchanged — that is the one acceptance leg the reviews could not run offline. Then re-run one folder comparison against an empty other side and confirm it refuses in under a second with the usual "nothing was exported here" message. **New for v0.45.0:** open the ArcGIS tab and confirm it lands on "Reports vs layers" with the library card naming the staged drop's export date and every report as a row (nine greyed *no build yet*); your existing Highway Detail build should read *from an older drop — rebuild* once — rebuild it from the row's ▤ button (a queued job, ~25–30 min) and confirm the row turns green with the drop's date; add an exported day and build one Highway Detail cell, then open its workbook and confirm the Notes state the build's as-of beside the export day. Rebuild one Highway Sequence Excel-vs-TSN cell and confirm its one-sided counts drop (the equate seat, CMP-AUD-246). Collect a support bundle once and confirm a zip is written. **New for v0.45.1:** build the Intersection Detail cells for an export made on or after 2026-09-25 (the site's September Excel edition) — vs TSN, PDF vs Excel, and vs Baseline against an older day — and confirm each builds instead of refusing (no re-export or re-consolidation needed); open one vs-TSN workbook's Report View and confirm Int St Eff-Date differences now count toward Major. **New for v0.45.2:** on the DEV site, export one route of each Clean Road (PDF) edition together with its Excel edition and confirm both files land, the PDF opening on the cover page with every column on one landscape page width. |
+| B1 | **The work-PC acceptance run — now against v0.45.2. THE TOP PRIORITY: everything since v0.32.0 is offline-verified only.** | Comparison + evidence output intentionally differ from v0.26.2/v0.27.x: re-run both sides, never reconcile old against new. TSN libraries rebuild once; PDF-sourced workbooks re-consolidate once. Then the carried v0.30–v0.32 items in [the backlog plan §4](planning/v0.30-owner-backlog-plan.md): Retry Edge sign-in, the PDF vs Excel Matrix, a fast-mode dual-format run, a pre-v0.32 partial resume, one Excel-row evidence run. **New for v0.37.0:** a Highway Summary export → consolidate → vs-TSN run, and one Highway Detail evidence generation (its evidence lane just opened — see D1). **New for v0.38.x:** re-consolidate Highway Detail (PDF) and confirm it reports COMPLETE with a clean PDF-vs-Excel cell; let the TSN Highway Detail library rebuild once (v4) and confirm the Report View's DCR + ADT columns are populated; and run a **both-editions Highway Summary** export to confirm one render saves both files in the right order. **New for v0.38.2:** drag a day COLUMN on each by-day matrix and confirm it moves on screen (it never did before); toggle a report chip on a matrix and confirm it responds instantly; and — the one worth watching on a STOCKED TSN library — confirm the matrices repaint quickly after the first render, now that the raw manifest memoizes instead of re-hashing every raw source each time. **New for v0.40.0–v0.41.0 (all comparison-speed work, offline-verified only):** rebuild a few cells and confirm the workbooks still open and read as before (output is byte-identical by construction, so anything else is a bug); and tick **Counts only** under Comparison output, refresh a matrix, and confirm the cells show `counts only — build to certify` in grey with NO workbooks written, that a zero-difference cell reads `match*` rather than a green tick, and that building one for real replaces the preview with a normal green result. **New for v0.41.2 — and note the v0.41.0 line above was untestable until now**: the Counts only checkbox never persisted, so confirm FIRST that it stays ticked, mirrors onto the by-day matrix, and survives an app restart. Then run it over a STALE cell that already has a workbook and confirm the workbook is left on disk untouched and the cell reads **counts confirmed** with a green left edge when the numbers still agree (grey ground, still offering a build — never a green tick). **New for v0.42.2:** consolidate a statewide Highway Sequence (PDF) export and confirm it reports COMPLETE with no ⚠ unparsed-line note — a single printed row the site renders with a blank Highway Group used to be dropped and take the whole 252-route consolidation to partial with it. **New for v0.44.0:** on the DEV site, export one route of each Clean Road report and confirm a workbook lands with the full legacy header (on prod the trio may still fail fast as "currently unavailable" — expected until prod catches up); run Settings ▸ Capture website source once and confirm the folder holds `index.html` plus every module under its site name with the BUILD_DATE in the manifest; open each matrix's add-day picker and confirm every day lists the reports it holds. **Also new for v0.44.0 — RB-6 rode this release:** after updating, every vs-TSN cell reads STALE once because HF-08 moved each TSN dataset's identity token (deterministic bytes); press Rebuild TSN library where offered, rebuild the cells, and confirm the counts come back unchanged — that is the one acceptance leg the reviews could not run offline. Then re-run one folder comparison against an empty other side and confirm it refuses in under a second with the usual "nothing was exported here" message. **New for v0.45.0:** open the ArcGIS tab and confirm it lands on "Reports vs layers" with the library card naming the staged drop's export date and every report as a row (nine greyed *no build yet*); your existing Highway Detail build should read *from an older drop — rebuild* once — rebuild it from the row's ▤ button (a queued job, ~25–30 min) and confirm the row turns green with the drop's date; add an exported day and build one Highway Detail cell, then open its workbook and confirm the Notes state the build's as-of beside the export day. Rebuild one Highway Sequence Excel-vs-TSN cell and confirm its one-sided counts drop (the equate seat, CMP-AUD-246). Collect a support bundle once and confirm a zip is written. **New for v0.45.1:** build the Intersection Detail cells for an export made on or after 2026-09-25 (the site's September Excel edition) — vs TSN, PDF vs Excel, and vs Baseline against an older day — and confirm each builds instead of refusing (no re-export or re-consolidation needed); open one vs-TSN workbook's Report View and confirm Int St Eff-Date differences now count toward Major. **New for v0.45.2:** on the DEV site, export one route of each Clean Road (PDF) edition together with its Excel edition and confirm both files land, the PDF opening on the cover page with every column on one landscape page width. |
 
 ### C. Waiting on the vendor / the site
 
@@ -199,12 +154,14 @@ were being counted as differences. Post-fix, exactly four columns move (`LB #Ln`
 | E2 | ~~**33 ruff F401s in `build/check_*.py`**~~ | **CLOSED - already done (v0.38.2); the line was stale.** Verified 2026-08-31: `ruff check --select F401 build` reports **All checks passed**, and `pyproject.toml` selects F401 with per-file ignores only for `scripts/common.py`, `scripts/gui_worker.py` and `scripts/matrix.py` - none for `build/`. So the rule is live there and finds nothing. |
 | E3 | **gh-pages landing-page regen** | Owed since v0.17.0; website only ([website.md](website.md)). |
 | E4 | **Clean-road sliver policy** | The 0.001-mi boundary-calibration class (rows keyed 9.256 vs 9.257) pairs one-sided today; a few hundred statewide. |
-| E5 | The smaller standing items | In the themed sections below: cancel-latency, narrow-mode matrix polish, console `run_cli_multi` coalescing, the shared whitespace-collapse helper, doc/comment line-ref drift. |
+| E5 | The smaller standing items | In the themed sections below: cancel-latency, console `run_cli_multi` coalescing, the wide-layout visual check, the shared whitespace-collapse helper, and doc/comment reference drift. Narrow-mode polish is already closed. |
 | E9 | ~~**`check_updater` had a wall-clock flake that could fail a RELEASE**~~ | **CLOSED - 2026-08-31, found the hard way.** The v0.42.1 `release` workflow failed on `a persistent marker denial is retried within the bounded window` while `checks` passed TWICE on the same commit, so no GitHub release or assets were published until the job was re-run. The test drove `_wait_for_helper_ready` with a 0.01s budget and asserted the bounded loop polls more than once; on a loaded runner the first `read_text` can consume the whole budget, giving exactly one read. Widened to 0.5s against the same 0.001s interval (~500x headroom, still half a second) - test-only, no product change. |
 | E6 | ~~Comparison speed — the two measured leftovers~~ — **CLOSED 2026-08-20 (v0.40.1)** | **(a) DONE.** Both sides were read twice: the loader read the consolidated TSMIS and the TSN workbook, then the Report View re-opened and re-parsed the same two files for its own columns. Those columns now ride the read the comparison already performs, with the projections factored so the capture and the standalone reader share ONE expression, and a fallback re-read whenever a caller doesn't thread the dict. **Interleaved 3 paired rounds on statewide Intersection Detail: 229.2s → 191.7s, 16.4% (1.20x), package digest identical across all six runs.** The re-reads themselves measured 14.0s (ID) and 27.9s (HD). Applies to the two Excel comparators and their two PDF flavors; guarded in `check_compare_{intersection,highway}_detail_tsn` (red-tested: removing the capture fails the gate). **(b) NOT TAKEN, now measured rather than asserted.** The one available lever was swapping openpyxl's pure-Python serializer for `lxml`: it produces **different bytes** (`8bbc51f8…` vs the canonical `4590abe3…`) and is worth **~2%** — it fails the byte-identity bar and buys nothing, besides adding a compiled dependency to the frozen work-PC bundle. An undistorted phase breakdown of the current 129s ID comparison shows why there is no hot spot left: `_write_data_sheet` 31.0s (24%), `_write_snapshot_sheet` 21.9s (17%), `_write_report_view` 20.5s (16%), `_write_comparison` 16.4s (13%), input loading 12.0s (9%), everything else 27.3s (21%). Writing is **70%** of the comparison, spread across four writers each serializing content the workbook must contain. The only remaining lever is writing LESS, which changes the output — see the note below. |
 | E7 | ~~**The startup Edge sign-in check never says whether it WORKED**~~ (owner, 2026-08-20) | **CLOSED - v0.42.1.** `_maybe_active_env_check` announced the check and `_on_active_env_done` closed with a bare "Background sign-in check finished.", outcome-free by design - so the pane confirmed a check ran and never whether the saved session is good, the one thing wanted at startup. It now ends on ONE line built from the fields the check already posts (`via_device` / `signed_in` / `had_file` / `reason`): device sign-in, saved sign-in still works, NOT signed in + why, or stopped early having re-checked nothing. That last case is deliberately NOT phrased as a failed sign-in. UI-neutral per the console-free rule; four outcomes locked in `check_gui_bridge`. |
-| E10 | ~~**Excel vs TSN reports ~311+ PHANTOM one-sided rows from the equate convention**~~ (found 2026-08-31, from an owner question) | **CLOSED - 2026-09-02 (CMP-AUD-246).** Census first, through the shipped loaders on the 2026-08-31 pull: the PDF edition paired **444** TSN keys the Excel edition missed and **444 of 444** were the equate seat (214 annotation rows, 229 `E`-suffixed targets, 1 data row at an annotation postmile the export had seated an `E` on) - the "137 unattributed" were annotation rows the first count had not recognized. TSN declares 998 relations statewide, every one a bare-postmile `EQUATES TO` annotation followed by exactly one `E` row of the same route, none unclaimed. The fix mirrors the self check with TSN in the print's role: `compare_highway_sequence_tsn._load_pair` derives the relations from the loaded TSN rows (`equate_relations`) and seats the export's suffix on the target row BEFORE the keys are built (`seat_equate_suffixes`; fails open - no record, no unique row, or a suffix on both rows leaves the relation as exported; a multi-row target resolves by the row printing TSN's Description). Nothing else moves: the annotation's Description/HG/FT stay compared and counted, so the by-design equate differences stay disclosed. **Bound 7.9 canary pair: 57,072 / 3,422 / 12,732 -> 57,518 / 2,976 / 12,286 (+446 paired per side, 0 pairs lost), differing cells 30,005 -> 30,954** (the newly paired annotations carry their by-design cells); 2026-08-31: 56,613 / 3,366 / 13,191 -> 57,052 / 2,927 / 12,752. Seated 224 (7.9) / 220 (8.31) of 998; the residual PDF-pairs-Excel-misses is 47 / 39, all still equate rows the export lists elsewhere or ambiguously. **PDF-vs-TSN byte-for-byte unchanged** (8.31: 57,035 / 2,943 / 12,769, 29,569 cells before and after). The evidence adapter loads through the same pair loader. Red->green in `check_compare_highway_sequence_tsn` (11 checks fail pre-fix); the Summary + Notes disclose the seat counts per run. Existing Excel-vs-TSN Highway Sequence workbooks keep their old counts until rebuilt - the matrix cannot tell a comparator change from its inputs. |
+| E10 | ~~**Excel vs TSN reports ~311+ PHANTOM one-sided rows from the equate convention**~~ (found 2026-08-31, from an owner question) | **CLOSED - 2026-09-02 (CMP-AUD-246).** Census first, through the shipped loaders on the 2026-08-31 pull: the PDF edition paired **444** TSN keys the Excel edition missed and **444 of 444** were the equate seat (214 annotation rows, 229 `E`-suffixed targets, 1 data row at an annotation postmile the export had seated an `E` on) - the "137 unattributed" were annotation rows the first count had not recognized. TSN declares 998 relations statewide, every one a bare-postmile `EQUATES TO` annotation followed by exactly one `E` row of the same route, none unclaimed. The fix mirrors the self check with TSN in the print's role: `compare_highway_sequence_tsn._load_pair` derives the relations from the loaded TSN rows (`equate_relations`) and seats the export's suffix on the target row BEFORE the keys are built (`seat_equate_suffixes`; fails open - no record, no unique row, or a suffix on both rows leaves the relation as exported; a multi-row target resolves by the row printing TSN's Description). Nothing else moves: the annotation's Description/HG/FT stay compared and counted, so the by-design equate differences stay disclosed. **Bound 7.9 canary pair: 57,072 / 3,422 / 12,732 -> 57,518 / 2,976 / 12,286 (+446 paired per side, 0 pairs lost), differing cells 30,005 -> 30,954** (the newly paired annotations carry their by-design cells); 2026-08-31: 56,613 / 3,366 / 13,191 -> 57,052 / 2,927 / 12,752. Seated 224 (7.9) / 220 (8.31) of 998; the residual PDF-pairs-Excel-misses is 47 / 39, all still equate rows the export lists elsewhere or ambiguously. **PDF-vs-TSN byte-for-byte unchanged** (8.31: 57,035 / 2,943 / 12,769, 29,569 cells before and after). The evidence adapter loads through the same pair loader. Red->green in `check_compare_highway_sequence_tsn` (11 checks fail pre-fix); the Summary + Notes disclose the seat counts per run. Existing workbooks keep their old bytes until rebuilt. The release-version gate in `matrix_state.producer_identity` marks an older release's comparison stale; `check_matrix_producer_version` verifies that upgrade behavior. |
 | E8 | ~~**The support bundle refuses to build when a TSN library carries BOTH sidecar shapes**~~ (found 2026-08-31, during RB-5) | **CLOSED - 2026-09-02.** `evidence._state_entries` no longer collapses `_state/` into its parent: every sidecar is bundled under its REAL relative path, so the organized `consolidated/_state/X.outcome.json` and the legacy sibling `consolidated/X.outcome.json` are two members, the duplicate-member guard stays, and the bundle now also shows whether an install has organized its state. Red->green in `check_evidence_bundle` (`test_both_sidecar_shapes_bundle`: pre-fix the collector returned ok=False and wrote no zip). |
+| E11 | **Unicode representation-only label** (`RB5-R2-FU-001`) | Still open after H2 closed. `compare_core.representation_only` strips non-ASCII letters, so `CAÑON` vs `CAON` is incorrectly labelled representation-only. Verified with synthetic input on 2026-09-05. The difference remains flagged and counted; fix the disclosure classification while preserving comparison truth and totals. |
+
 
 > **Where comparison speed went next — SHIPPED in v0.41.0.** E6(b) closed with
 > "writing is 70% and every byte of it is required", which is only true while the
@@ -242,13 +199,12 @@ whole family is now closed.
 
 ### H. The bounded output-audit program — COMPLETE: RB-6 MERGED 2026-09-02, shipped in v0.44.0
 
-**This group was missing from the inventory until 2026-08-20 and is the largest
-genuinely-open block of work in the repo.** The post-comparison output program
-(`planning/post-comparison-perfection-output-audit/`, entry point
-[START-HERE.md](planning/post-comparison-perfection-output-audit/START-HERE.md))
-ran Stages 1–3 to a jointly-approved plan and has merged five of its six bundles.
+The post-comparison output program
+([START-HERE.md](planning/post-comparison-perfection-output-audit/START-HERE.md))
+completed Stages 1–3 and all six implementation bundles. Its records remain
+available for the evidence and decisions behind the shipped fixes.
 **All six bundles are merged.** RB-5 merged 2026-08-31 after two independent
-Codex approvals and shipped in v0.42.0 (H1 and H2). RB-6 — the last — was
+review approvals and shipped in v0.42.0 (H1 and H2). RB-6 — the last — was
 implemented 2026-08-31 on `hotfix/rb-6-hygiene-and-guards`, returned once for
 the HF-08 post-rebuild evidence (`RB6-R1-EG-001`, supplied), approved by two
 independent reviews and **merged 2026-09-02 (`154e83b`); it shipped in v0.44.0**
@@ -996,7 +952,7 @@ or accept as someday.**
 
 ### Comparison semantics — open questions (verify before changing anything)
 > Observations, **not** confirmed defects. Each needs a code-verification pass FIRST; a change here
-> moves comparison counts, so it rides the `compare_core` rules in `CLAUDE.md` (cell-for-cell proof
+> moves comparison counts, so it rides the `compare_core` rules in `project-guide.md` (cell-for-cell proof
 > against the independent oracle, both workbook flavors, an explained canary re-bless).
 - [ ] **Ramp Detail's `-` null marker may be handled two ways** (noticed 2026-08-08 during the RB-4
   evidence inspection). vs-TSN projects `-` to blank before comparing

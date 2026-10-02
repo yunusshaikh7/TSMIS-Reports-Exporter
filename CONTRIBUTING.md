@@ -1,9 +1,8 @@
 # Contributing
 
-A quick human-facing orientation. The deep knowledge lives in the
+A quick orientation for all contributors. The deep knowledge lives in the
 [`docs/`](docs/INDEX.md) library; the non-negotiable conventions live in
-[`CLAUDE.md`](CLAUDE.md) (written as an AI-session router, but its
-**Conventions** section binds humans too).
+[`docs/project-guide.md`](docs/project-guide.md), shared by human contributors and coding agents.
 
 ## Setup (dev PC)
 
@@ -22,14 +21,17 @@ build\.venv\Scripts\python.exe build\check_<name>.py       # one guard
 ```
 
 Every fix ships with (or extends) a `build/check_*.py` golden. New checks are
-auto-picked-up by `run_checks.py` (glob) but must ALSO be added to
-`.github/workflows/checks.yml` — `check_ci_manifest.py` fails CI until they are.
+automatically discovered by `run_checks.py`; no per-check YAML entry is needed.
+`check_ci_manifest.py` verifies that CI runs the shared runner. The historical
+`check_phase*` audit instruments are excluded and run on demand.
 
 ## The three rules people trip on
 
-- **`compare_core.py` is regression-locked.** Any change to its formula/label
-  text must be proven cell-for-cell identical for the TSMIS-vs-TSN flavor
-  before shipping; new behavior goes through opt-in `CompareSchema` fields.
+- **`compare_core.py` is correctness-locked.** Preserve correct output; prove
+  semantic changes against the approved domain contract, independent oracle,
+  and both workbook flavors. Explain and re-bind deliberate canary changes.
+  Use opt-in `CompareSchema` fields for report-specific behavior; fix shared
+  defects in the shared engine. Performance-only changes remain output-locked.
   See [docs/comparison-engine.md](docs/comparison-engine.md).
 - **TSN normalizer changes bump the catalog version.** The TSN library stores
   already-normalized values; bump `normalization_version` in
@@ -46,5 +48,5 @@ Short version: core modules are console-free (Events sink, no
 print/input/sys.exit); every swallowed exception logs `type(e).__name__` + the
 first message line (or carries a `# silent-ok: <why>` waiver —
 `check_silent_swallows.py` enforces it); name constants over magic values;
-commit messages are short and imperative. `ruff check .` matches CI
-(`pyproject.toml`).
+commit messages are short and imperative. `ruff check .` uses the same rule set as CI
+(`pyproject.toml`; CI currently scopes Ruff to `scripts/`).

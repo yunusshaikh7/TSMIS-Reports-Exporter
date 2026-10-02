@@ -24,8 +24,10 @@ Last updated: 2026-09-02 (RB-6 merge and program closeout)
 > (v0.39.0) and the v0.40–v0.41 comparison-speed work, so a family it names may
 > have grown a sibling it does not.
 
-This is the entry point for every new Codex or Claude chat. Read this file
-before opening the other audit documents. The project deliberately separates
+This is the historical entry point for this completed audit program. For new
+work, start with [../../roadmap.md](../../roadmap.md) and
+[../../project-guide.md](../../project-guide.md). Read this file before studying the
+other audit documents. The project deliberately separates
 independent observation, cross-checking, planning, implementation, and
 approval so that one agent's conclusions do not contaminate another agent's
 first pass.

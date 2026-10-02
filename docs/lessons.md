@@ -7,7 +7,7 @@ owned by another doc — follow the link for the detail.
 
 > Companion docs: the narrative is in [history.md](history.md) (the chapter
 > story + "Three threads that run through all of it"); the authoritative
-> "how it works" is [`../CLAUDE.md`](../CLAUDE.md).
+> "how it works" is [`project-guide.md`](project-guide.md).
 
 ---
 
@@ -128,7 +128,7 @@ Two distinct cautions, learned the same week:
 The reverts aren't hidden. The login wars (Chapter 4) tried five Edge approaches,
 reverted four of them in a cluster on June 5, parked the problem as a documented
 known issue, and beat it properly a week later — and the `✅ RESOLVED (v0.5.0)`
-block in CLAUDE.md still records *what didn't help* (removing mid-login polling,
+block in project-guide.md still records *what didn't help* (removing mid-login polling,
 `--edge-skip-compat-layer-relaunch`, InPrivate; v0.4.2's "default to Chrome"
 regressed Chrome too and was rolled back). The short-lived "dev update channel"
 (v0.10.2–v0.10.3) is likewise recorded as removed, *with the ordering bug that is
@@ -154,8 +154,8 @@ How code is reviewed here (it is read-only, source-backed, and re-verified):
   before guessing site behavior.
 - **Per-finding stable slug IDs.** Findings carry slug IDs
   (`AUTH-TOKEN-IN-LOG-BUNDLE`, `UPDATER-NO-SIGNATURE-VERIFY`,
-  `SHEET-FORMULA-INJECTION`, `COMPARE-SKIPPED-FILES-MATCH`, …) so a Claude audit
-  and a parallel Codex run can be reconciled finding-by-finding, and so the
+  `SHEET-FORMULA-INJECTION`, `COMPARE-SKIPPED-FILES-MATCH`, …) so independent audits
+  can be reconciled finding-by-finding, and so the
   next-patch plan can track each to a fix.
 
 The reusable, generalized audit prompt is
@@ -175,7 +175,7 @@ shared branch is a `git add -A` sweeping the other agent's WIP into a commit, so
 the discipline is: **review the diff at finish-up** — confirm every commit's
 files match its scope before merging. (At merge: no cross-scope contamination,
 all golden checks green, then a fast-forward to main.) Neither agent edited the
-close-out files (CLAUDE.md / version.py / README / UI mock / CHANGELOG) —
+close-out files (project-guide.md / version.py / README / UI mock / CHANGELOG) —
 those are done once, at close-out, by the integrator.
 
 ## 9. Work-PC reality shapes every shippable feature

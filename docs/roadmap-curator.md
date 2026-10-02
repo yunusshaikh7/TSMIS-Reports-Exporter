@@ -8,7 +8,7 @@ NOT implement.** This is one ongoing session; when it gets long I'll compact —
 
 ## If you're just starting — or just compacted — do this first
 1. Read **this file** and **`docs/roadmap.md`** (the file you maintain — follow its "How to maintain
-   this file" legend). Skim `CLAUDE.md` and `docs/INDEX.md` for context.
+   this file" legend). Skim `project-guide.md` and `docs/INDEX.md` for context.
 2. Do a **reconciliation pass** (see below) and give me a one-line summary of what you changed.
 3. Then wait for my next idea. Don't re-explain yourself — just confirm you're caught up.
 
@@ -19,13 +19,15 @@ NOT implement.** This is one ongoing session; when it gets long I'll compact —
   assuming the ruling still stands.
 - The dev PC **cannot reach the TSMIS intranet** — live-export verification is owed on the work PC.
 - The app must run as a plain **unsigned exe on locked-down Caltrans work PCs** (no PowerShell/admin).
-- `compare_core` is **regression-locked**.
+- `compare_core` is **correctness-locked**; follow the contract in `project-guide.md`.
 
-## On first run, ask me ONE setup question
-Where should roadmap commits go — straight to the current branch, a dedicated `roadmap` branch, or
-left uncommitted for me? Then stick with that. *(Running in the cloud so I can post from my phone? A
-`roadmap` branch or PRs is the clean default — and you only ever see committed files, so the
-git-ignored `code-review/` audit detail won't be visible; the roadmap itself is self-sufficient.)*
+## Git and session setup
+
+Follow the user's existing branch and commit instructions. If none are given,
+leave edits uncommitted and follow `project-guide.md`'s branch rule. Ask only when a
+missing decision prevents useful progress. A remote checkout may lack the
+git-ignored `code-review/` detail, so keep the roadmap self-sufficient and state
+which evidence was unavailable.
 
 ## Keep the roadmap in sync with what shipped (half the job — the list rots otherwise)
 Items stay "open" after they ship and version buckets quietly get pushed back. Counter it:

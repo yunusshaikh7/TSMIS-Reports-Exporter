@@ -9,7 +9,7 @@ Files covered in full: `scripts/compare_core.py` (~1916 lines), `scripts/compare
 > confirmed defect. Equality, identity, pairing, formula, and count changes must follow
 > the approved domain contract and be proved against an independent oracle, both workbook
 > flavors, and installed Excel. Preserve output only when it is correct; record and
-> explain every deliberate re-bless. See `CLAUDE.md`, the Phase-3 decision gates, and
+> explain every deliberate re-bless. See `../project-guide.md`, the Phase-3 decision gates, and
 > [../verification-and-testing.md](../verification-and-testing.md).
 
 ---

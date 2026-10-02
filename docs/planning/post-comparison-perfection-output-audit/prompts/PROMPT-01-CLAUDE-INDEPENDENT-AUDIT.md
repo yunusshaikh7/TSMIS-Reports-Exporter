@@ -1,5 +1,10 @@
 # Prompt 01 — Claude Independent Deliverable Audit
 
+> **Historical workflow.** Named participants, paths, and approvals below belong
+> to that completed program. For current work use the [optional contributor
+> prompts](../../../agent-prompts.md) and the current task; separate audit roles are only used
+> when requested. Keep historical evidence paths and completion tokens intact.
+
 Copy and paste everything below into a new Claude chat.
 
 ---

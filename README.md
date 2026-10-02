@@ -48,8 +48,8 @@ of `.bat` scripts for development and as a fallback.
 
 ## Features
 
-- **Eleven report types, any combination.** Eight base reports plus print-layout PDF
-  editions of Highway Log, Intersection Detail, and Highway Detail — export one, several, or
+- **Eleven reports, twenty-two editions, any combination.** Every report the site
+  offers, each in both its Excel and print-layout PDF form — export one, several, or
   all at once. Tick both editions of a report and it's generated once, saved both ways.
 - **One login for everything.** A single SSO + MFA sign-in covers every report.
 - **Pick your routes.** Run all routes by default, or narrow to a subset
@@ -84,16 +84,27 @@ of `.bat` scripts for development and as a fallback.
 | Report | Output format | Output folder |
 |---|---|---|
 | TSAR: Ramp Summary | PDF (Letter) | `output/<date>/ramp_summary/` |
+| TSAR: Ramp Summary (Excel) | XLSX | `output/<date>/ramp_summary_excel/` |
 | TSAR: Ramp Detail | XLSX | `output/<date>/ramp_detail/` |
+| TSAR: Ramp Detail (PDF) | PDF (Letter, landscape) | `output/<date>/ramp_detail_pdf/` |
 | Highway Sequence Listing | XLSX | `output/<date>/highway_sequence/` |
+| Highway Sequence Listing (PDF) | PDF (Letter, portrait) | `output/<date>/highway_sequence_pdf/` |
 | Highway Log | XLSX | `output/<date>/highway_log/` |
 | Highway Log (PDF) | PDF (Letter, landscape) | `output/<date>/highway_log_pdf/` |
 | Intersection Summary | XLSX | `output/<date>/intersection_summary/` |
+| Intersection Summary (PDF) | PDF (Letter, portrait) | `output/<date>/intersection_summary_pdf/` |
 | Intersection Detail | XLSX | `output/<date>/intersection_detail/` |
 | Intersection Detail (PDF) | PDF (Letter, landscape) | `output/<date>/intersection_detail_pdf/` |
 | Highway Detail | XLSX | `output/<date>/highway_detail/` |
 | Highway Detail (PDF) | PDF (Letter, landscape) | `output/<date>/highway_detail_pdf/` |
 | Highway Summary | XLSX | `output/<date>/highway_summary/` |
+| Highway Summary (PDF) | PDF (Letter, portrait) | `output/<date>/highway_summary_pdf/` |
+| Clean Road: Highway / Intersection / Ramp | XLSX | `output/<date>/clean_<kind>/` |
+| Clean Road: Highway / Intersection / Ramp (PDF) | PDF (Letter, landscape) | `output/<date>/clean_<kind>_pdf/` |
+
+Ramp Summary (Excel), Intersection Summary (PDF), Highway Summary (PDF) and all six
+Clean Road editions are **export-only**: the app saves them but does not consolidate
+or compare them. The Clean Road PDFs were added in v0.45.2.
 
 Highway Log, Intersection Detail, and Highway Detail each ship in two editions — the regular
 Excel export and a print-layout **PDF** edition (Intersection Detail's added in v0.18.0,
@@ -252,14 +263,14 @@ scripts/        Core engine (console-free) + console & GUI drivers
 build/          Reproducible PyInstaller build (build.ps1, app.spec, prune, self-test)
 output/         Per-report output folders + consolidated/ + run_reports/
 *.bat           Numbered launchers for the console workflow
-CLAUDE.md       Router → conventions + an index into the docs/ library
+docs/project-guide.md       Router → conventions + an index into the docs/ library
 docs/           In-depth knowledge library (start at docs/INDEX.md)
 ```
 
 A single report catalog (`scripts/report_catalog.py`) is the metadata source of
 truth; `scripts/reports.py` derives the GUI and the multi-report selector from it,
 so the two never drift. For the full design — the `Events`/`ReportSpec` seam, retry
-logic, fast mode, and packaging — see [`CLAUDE.md`](CLAUDE.md) and the
+logic, fast mode, and packaging — see [`docs/project-guide.md`](docs/project-guide.md) and the
 [`docs/`](docs/INDEX.md) knowledge library.
 
 ## Tech stack
@@ -286,7 +297,7 @@ logic, fast mode, and packaging — see [`CLAUDE.md`](CLAUDE.md) and the
 
 Issues and pull requests are welcome. Start with
 [`CONTRIBUTING.md`](CONTRIBUTING.md) (setup, the one-command check suite, the
-three rules people trip on), then [`CLAUDE.md`](CLAUDE.md) — it documents the
+three rules people trip on), then [`docs/project-guide.md`](docs/project-guide.md) — it documents the
 architecture and the conventions that keep the codebase maintainable, notably:
 
 - The core engine is **console-free** — report progress via the `Events` sink and

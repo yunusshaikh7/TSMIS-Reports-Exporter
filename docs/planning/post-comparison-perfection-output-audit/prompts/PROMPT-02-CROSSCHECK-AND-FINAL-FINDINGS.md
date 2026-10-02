@@ -1,5 +1,10 @@
 # Prompt 02 — Cross-Check and Build Final Findings
 
+> **Historical workflow.** Named participants, paths, and approvals below belong
+> to that completed program. For current work use the [optional contributor
+> prompts](../../../agent-prompts.md) and the current task; separate audit roles are only used
+> when requested. Keep historical evidence paths and completion tokens intact.
+
 Use this prompt sequentially with Codex and Claude after both independent
 rounds are complete. The first reviewer populates the joint worksheet; the
 second reviewer challenges every result and closes it.

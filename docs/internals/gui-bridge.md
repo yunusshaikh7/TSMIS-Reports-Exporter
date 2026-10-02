@@ -432,7 +432,7 @@ End-to-end, to add (say) a new long-running task "frobnicate":
 
 **Add a `GuiApi` method without a worker** (pure query, e.g. `report_library_info`): just `@_api_method`, validate, return a dict. No task slot, no `run_started`.
 
-**Add a new compare type / consolidator:** the bridge is generic — `start_compare`/`start_compare_env`/`start_consolidate` already read the registries (`reports.py`), so you only touch `reports.py` + the module (see [../reports.md](../reports.md) and the CLAUDE.md "Extending" section). `get_initial_state` re-derives the UI lists from the registries.
+**Add a new compare type / consolidator:** the bridge is generic — `start_compare`/`start_compare_env`/`start_consolidate` already read the registries (`reports.py`), so you only touch `reports.py` + the module (see [../reports.md](../reports.md) and the ../project-guide.md "Extending" section). `get_initial_state` re-derives the UI lists from the registries.
 
 ---
 

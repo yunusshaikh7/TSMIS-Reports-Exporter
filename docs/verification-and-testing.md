@@ -33,7 +33,7 @@ Cheapest/fastest first; each rung catches what the rung below can't:
 | **Golden `check_*.py`** | engine / GUI-bridge / updater / compare-engine / parsers locked | `build\.venv` python; no login, no browser (except fake-site), no Excel, no network | local + CI (blocking) |
 | **Fake-site selector contract** | the live-site JS/selector predicates still match real DOM | a drivable headless Chromium/Edge (skips cleanly if none) | `check_fake_site.py`, CI |
 | **COM-recalc compare verification** | the formulas/values flavors agree and every SELF-CHECK reads OK after F9 | real Excel installed (dev PC) | `%TEMP%\tsmis_regress\com_verify.ps1` |
-| **`#mock` GUI preview** | `scripts/ui/` renders + behaves without launching the app | preview HTTP server on port 8765 | `Claude_Preview` / browser |
+| **`#mock` GUI preview** | `scripts/ui/` renders + behaves without launching the app | preview HTTP server on port 8765 | Any available browser |
 | **Frozen `-SelfTest`** | the **pruned frozen bundle** still runs every code path | a build (`build.ps1 -SelfTest`) | release gate, CI release.yml |
 | **Live export on the work PC** | the only proof the engine works against the real TSMIS site | the locked-down Caltrans work PC + a login | **STILL OWED** (see below) |
 
@@ -472,8 +472,8 @@ The per-route format is locked to the approved **Route-1** sample:
 
 **969** is the current approved figure (was **971** before the v0.11.0 TSN
 totals-block fix removed Route-1's 2 leak-caused Description false positives).
-(The `comparison-verification-flow` memory claims CLAUDE.md "still says 971 and
-is stale", but the current CLAUDE.md already reads 969 — the memory note is the
+(The `comparison-verification-flow` memory claims project-guide.md "still says 971 and
+is stale", but the current project-guide.md already reads 969 — the memory note is the
 stale one.)
 
 ### Correctness/re-bless harness (`%TEMP%\tsmis_regress\`)
@@ -539,27 +539,23 @@ independent oracle, before/after workbook harness, and installed-Excel tier. Use
 Verify `scripts/ui/` changes without launching the real app, via a preview HTTP
 server. The pywebview traps + the GUI threading model are owned by [gui.md](gui.md).
 
-- **Mock server:** `.claude/launch.json` defines `ui-mock` (Python `http.server`
-  on **port 8765** serving `scripts/ui`). Start it (`preview_start("ui-mock")`),
-  then navigate to **`/index.html#mock`** — the `#mock` hash engages the built-in
-  mock API (`app.js` `WANT_MOCK`). Without it the page waits for the real
-  pywebview bridge and shows a fatal banner. The mock must **never auto-start**
-  (a silent mock fallback inside the real app would show fake exports).
+- **Mock server:** from the repository root, run
+  `python -m http.server 8765 --bind 127.0.0.1 --directory scripts/ui`, then open
+  `http://127.0.0.1:8765/index.html#mock` in an available browser. Use the project's
+  Python interpreter if `python` does not resolve to it. The `#mock` hash enables
+  the built-in mock API; without it the page waits for the real pywebview bridge.
+  Keep mock mode explicit so the packaged app cannot silently display fake exports.
+  An editor's local preview launcher is optional.
 - **Bare `S`, not `window.S`:** app state is `const S` at module scope and does
-  NOT attach to `window`. In `preview_eval`, reference **`S.st` / `S.init`**
+  NOT attach to `window`. In a browser-console evaluation, reference **`S.st` / `S.init`**
   directly — `window.S` is always `undefined` (false-negative "not booted").
-- **Screenshot service is flaky:** `preview_screenshot` intermittently hangs
-  (30 s timeout) while `preview_eval` / `inspect` / `snapshot` keep working.
-  Verify via **DOM-state evals** (classes, computed styles, geometry) — they're
-  conclusive. Restarting the server sometimes recovers screenshots; don't fight it.
-- **Headless freezes CSS transitions + the media query:** the preview renderer
-  reports `innerWidth: 0` until you `preview_resize` to an explicit width (then the
-  `≥980px` two-column layout engages), and it does **not** advance CSS transitions
-  (a property with a `transition` reads its START value forever). To verify
-  transitioned layout/colour (e.g. the matrix `flex-grow` widen, the theme fade),
-  set the element's `transition='none'` inline and re-toggle to read the END state,
-  and confirm the rule applies (`getComputedStyle(...).animationName`, computed
-  values). Watch the actual motion only in the real WebView2 window.
+- **If screenshots stall:** inspect DOM state, classes, computed styles, and
+  geometry with the browser's available inspection tools. Record which visual
+  checks could not be completed; a screenshot-tool failure is not an app failure.
+- **Headless viewport and transitions:** set an explicit viewport before
+  checking responsive layouts. Some headless renderers do not advance CSS
+  transitions; disable transitions temporarily in the inspected page to check
+  final computed values, and check actual motion in the real WebView2 window.
 - **Cache / stale page:** the browser caches `app.js` **and `app.css`**; a
   `?cb=`/`#mock` cache-bust on the URL only reloads `index.html`, not the linked
   stylesheet — after a CSS edit, force-refresh it too:
@@ -568,8 +564,7 @@ server. The pywebview traps + the GUI threading model are owned by [gui.md](gui.
   fail while down); confirm fresh code with `typeof <a-newly-added-fn> !== 'undefined'`,
   else navigate cache-busted:
   `location.replace('/index.html?v='+Math.floor(performance.now())+'#mock')`.
-  `Date.now()` / `Math.random()` are fine in `preview_eval` (it's the page, not a
-  Workflow script).
+  `Date.now()` / `Math.random()` are fine in a browser-console evaluation (they execute in the inspected page).
 - **Async confirms:** clicking `#btnStartExport` shows the "No saved login"
   confirm asynchronously — click Start, then in a **separate** eval click the
   "Start anyway" button, then check `S.st.task`. A single combined eval finds no

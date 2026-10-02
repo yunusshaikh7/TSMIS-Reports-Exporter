@@ -550,7 +550,7 @@ off synthetic renders.
       `APP_MODULES`; `scripts/ui/mock.js` report list; `output/<subdir>/.gitkeep` +
       `.gitignore`; `build/check_report_catalog.py` frozen baseline (+
       `check_stable_ids`).
-- [ ] Docs: the catalog table here + CLAUDE.md's table + CHANGELOG.
+- [ ] Docs: the catalog table here + project-guide.md's table + CHANGELOG.
 
 **Tier 1 — Consolidate** ([recipe](#recipe-add-a-new-consolidator)):
 - [ ] `scripts/consolidate_<name>.py` — console-free, day-aware
@@ -619,7 +619,7 @@ edition + TSN prints; → [comparison-engine.md](comparison-engine.md) §13):
 4. List the new export module **and** any new flat module in `APP_MODULES` in `build/app.spec` (lazy imports need it; `check_app_modules` enforces completeness).
 5. Add the report's fixtures to `scripts/ui/mock.js` (the `#mock` GUI preview reads its report lists from there, **not** `app.js`; `check_report_catalog` checks mock parity).
 6. Add `output/<name>/.gitkeep`, whitelist in `.gitignore`.
-7. Document in the table at the top of this doc (and CLAUDE.md's Supported Reports table).
+7. Document in the table at the top of this doc (and project-guide.md's Supported Reports table).
 
 For a PDF print-edition of an existing report (like Highway Log (PDF) / Intersection Detail (PDF)), keep the dropdown `label` of the Excel report, give it a distinct `subdir` + menu label, **append it LAST** in the catalog (so existing export-op keys keep their manifest-v1 positions — CR-002-RM4), and mirror every PDF-edition special-case in `matrix.py` / `day_matrix.py` / `gui_worker.py` (not just the labels).
 

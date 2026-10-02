@@ -12,7 +12,7 @@
 > Seventeen releases have landed since v0.32.0 and every one of them is
 > offline-verified only. The current, maintained checklist — what to run and what
 > each recent release added to it — lives in
-> [roadmap.md](roadmap.md) B1 and [`../CLAUDE.md`](../CLAUDE.md), not here.
+> [roadmap.md](roadmap.md) B1 and [`project-guide.md`](project-guide.md), not here.
 >
 > Nothing about the work-PC *reality* has changed: no PowerShell, cmd, admin, temp
 > scripts, or scheduled tasks; only an unsigned exe from a user-writable folder.

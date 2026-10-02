@@ -52,5 +52,5 @@ Status: **DRAFT**
 
 | Planner | Decision | Commit / date |
 |---|---|---|
-| Codex | NOT STARTED | PENDING |
-| Claude | NOT STARTED | PENDING |
+| Planner 1 | NOT STARTED | PENDING |
+| Planner 2 | NOT STARTED | PENDING |

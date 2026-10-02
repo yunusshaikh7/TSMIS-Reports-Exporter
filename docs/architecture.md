@@ -93,8 +93,10 @@ Four data structures:
 
 **`EXPORT_REPORTS`** — `(menu label, format hint, ReportSpec)`. Console menu numbering
 follows this order; the **GUI picker** order is the catalog's `_PICKER_ORDER` (website-style
-grouping, v0.18.1 — see [reports.md](reports.md)). Every report except Highway Summary
-consolidates AND compares (Highway Detail joined in v0.20.0):
+grouping, v0.18.1 — see [reports.md](reports.md)). The table below is the v0.19.x
+core; the later editions (v0.24.0 → v0.45.2, ending with the Clean Road print
+editions at stable ids 20/21/22) and each one's current consolidate/compare status
+are in [reports.md](reports.md), which is authoritative:
 
 | Label | Format | Notes |
 |---|---|---|

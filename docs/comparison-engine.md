@@ -83,7 +83,7 @@ workbooks (the real Route-1 + consolidated pairs, both flavors).
 **Historical Route-1 sample counts** were **299 both / 18 (TSMIS-only) / 69 (TSN-only) /
 221 diff rows / 969 diff cells**.
 The 969 was **971** before the v0.11.0 TSN totals-block fix dropped Route-1's 2 leak-caused
-Description false positives. (CLAUDE.md / older notes that still say 971 are stale — 969 is
+Description false positives. (project-guide.md / older notes that still say 971 are stale — 969 is
 current.)
 
 **The harness** lives OUTSIDE the repo at `%TEMP%\tsmis_regress\` (regenerate `before/` from a

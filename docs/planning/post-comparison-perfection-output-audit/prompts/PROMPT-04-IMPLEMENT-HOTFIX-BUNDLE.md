@@ -4,7 +4,7 @@ Before using, replace:
 
 - `<BUNDLE_ID>` with the agreed **RB implementation-bundle ID**, for example
   `RB-1`. HF IDs are work-item specs and are not invoked separately.
-- `<IMPLEMENTER>` with `Codex` or `Claude`.
+- `<IMPLEMENTER>` with the contributor's role or review identifier.
 
 ---
 

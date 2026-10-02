@@ -185,7 +185,7 @@ Shipped in the **v0.11.1 hotfix** (commit `0622b80`). Re-audited 2026-06-17
   Normalizing in the converter too would duplicate that logic (DRY) and reduce
   PDF fidelity. **If you change this, you must also keep `_medwid_norm` and
   re-verify the regression-locked compare samples.**
-- **Column x-windows: NOT touched** (CLAUDE.md: "don't re-derive the windows";
+- **Column x-windows: NOT touched** (../project-guide.md: "don't re-derive the windows";
   audit proved them correct).
 - **Med TCB** 3-char `B7Z/J7Z` vs TSMIS mixed = genuine representational/data
   difference, faithfully transcribed. Not a bug.
