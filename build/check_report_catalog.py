@@ -67,6 +67,9 @@ from export_route_history import SPEC as _S_route_history
 from export_clean_road import HIGHWAY_SPEC as _S_clean_highway
 from export_clean_road import INTERSECTION_SPEC as _S_clean_intersection
 from export_clean_road import RAMP_SPEC as _S_clean_ramp
+from export_clean_road import HIGHWAY_PDF_SPEC as _S_clean_highway_pdf
+from export_clean_road import INTERSECTION_PDF_SPEC as _S_clean_intersection_pdf
+from export_clean_road import RAMP_PDF_SPEC as _S_clean_ramp_pdf
 import consolidate_ramp_summary as _con_ramp_summary
 import consolidate_ramp_detail as _con_ramp_detail
 import consolidate_highway_sequence as _con_highway_sequence
@@ -138,6 +141,10 @@ _EXPORT = [  # (key, label, fmt, expected ReportSpec)
     ("clean_intersection", "Clean Road: Intersection", "Excel", _S_clean_intersection),
     ("clean_ramp", "Clean Road: Ramp", "Excel", _S_clean_ramp),
     ("highway_summary_pdf", "Highway Summary (PDF)", "PDF", _S_highway_summary_pdf),
+    # v0.45.2: the Clean Road print editions at ids 20/21/22 (append-only).
+    ("clean_highway_pdf", "Clean Road: Highway (PDF)", "PDF", _S_clean_highway_pdf),
+    ("clean_intersection_pdf", "Clean Road: Intersection (PDF)", "PDF", _S_clean_intersection_pdf),
+    ("clean_ramp_pdf", "Clean Road: Ramp (PDF)", "PDF", _S_clean_ramp_pdf),
 ]
 _CONSOLIDATE = [  # (key, label, expected module)
     ("cons:ramp_summary", "TSAR: Ramp Summary", _con_ramp_summary),

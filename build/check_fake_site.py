@@ -143,6 +143,13 @@ _REPORTS = [
      "clean_road_data.html", "clean_road_empty.html"),
     (clean_road.RAMP_SPEC, "Clean Road: Ramp",
      "clean_road_data.html", "clean_road_empty.html"),
+    # The print editions share their Excel sibling's render (same dropdown option).
+    (clean_road.HIGHWAY_PDF_SPEC, "Clean Road: Highway (PDF)",
+     "clean_road_data.html", "clean_road_empty.html"),
+    (clean_road.INTERSECTION_PDF_SPEC, "Clean Road: Intersection (PDF)",
+     "clean_road_data.html", "clean_road_empty.html"),
+    (clean_road.RAMP_PDF_SPEC, "Clean Road: Ramp (PDF)",
+     "clean_road_data.html", "clean_road_empty.html"),
 ]
 
 
@@ -528,6 +535,49 @@ def test_intersection_detail_pdf_save(page):
           isinstance(raised, ReportError))
 
 
+def test_clean_road_pdf_save(page):
+    print("Clean Road PDF saves: invoke each Print layout and write a real PDF:")
+    from exporter import (save_clean_highway_pdf, save_clean_intersection_pdf,
+                          save_clean_ramp_pdf, EmptyExport)
+    from common import ReportError
+    for save, fn in ((save_clean_highway_pdf, "clh_printAll"),
+                     (save_clean_intersection_pdf, "cli_printAll"),
+                     (save_clean_ramp_pdf, "clr_printAll")):
+        page.goto(_fixture_url("clean_road_print.html"))
+        out = Path(tempfile.gettempdir()) / f"_{fn}_check.pdf"
+        if out.exists():
+            out.unlink()
+        save(page, out)
+        data = out.read_bytes() if out.exists() else b""
+        check(f"{fn}: a non-empty PDF was written", data[:4] == b"%PDF" and len(data) > 800)
+        # The print root is still in the DOM -- proof window.print() was
+        # neutralized so the post-print rebuild didn't run.
+        kept = page.evaluate("() => !!document.querySelector('#rampResults .clh-print-root .rs-cover')")
+        check(f"{fn}: the print layout was built (rebuild skipped)", kept)
+        if out.exists():
+            out.unlink()
+
+    page.goto(_fixture_url("blank.html"))      # no clh_printAll
+    raised = None
+    try:
+        save_clean_highway_pdf(page, Path(tempfile.gettempdir()) / "_clh_pdf_none.pdf")
+    except Exception as e:  # noqa: BLE001
+        raised = e
+    check("missing clh_printAll -> ReportError (no silent PDF)", isinstance(raised, ReportError))
+
+    page.goto(_fixture_url("clean_road_print.html") + "?empty=1")
+    out_e = Path(tempfile.gettempdir()) / "_clh_pdf_empty.pdf"
+    if out_e.exists():
+        out_e.unlink()
+    raised = None
+    try:
+        save_clean_highway_pdf(page, out_e)
+    except Exception as e:  # noqa: BLE001
+        raised = e
+    check("no table rows -> EmptyExport (no cover-only PDF)", isinstance(raised, EmptyExport))
+    check("no PDF written for the empty layout", not out_e.exists())
+
+
 def test_ramp_summary_pdf_empty(page):
     print("Ramp Summary PDF empty backstop (action bar present == has data):")
     from exporter import save_pdf_letter, EmptyExport
@@ -582,6 +632,7 @@ def main():
             test_highway_log_pdf_save(page)
             test_intersection_detail_pdf_save(page)
             test_ramp_summary_pdf_empty(page)
+            test_clean_road_pdf_save(page)
         finally:
             try:
                 browser.close()

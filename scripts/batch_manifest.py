@@ -53,6 +53,9 @@ _V017_EXPORT_ORDER = (
     # v0.38.0 — the Highway Summary print edition at 19 (same rule: never
     # insert/reorder).
     "highway_summary_pdf",
+    # v0.45.2 — the Clean Road print editions at 20/21/22 (same rule: never
+    # insert/reorder).
+    "clean_highway_pdf", "clean_intersection_pdf", "clean_ramp_pdf",
 )
 
 # Poison sentinel for a structurally-invalid saved entry. It is never a real export

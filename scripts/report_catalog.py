@@ -49,6 +49,9 @@ from export_clean_road import (
     HIGHWAY_SPEC as _CLEAN_HIGHWAY_SPEC,
     INTERSECTION_SPEC as _CLEAN_INTERSECTION_SPEC,
     RAMP_SPEC as _CLEAN_RAMP_SPEC,
+    HIGHWAY_PDF_SPEC as _CLEAN_HIGHWAY_PDF_SPEC,
+    INTERSECTION_PDF_SPEC as _CLEAN_INTERSECTION_PDF_SPEC,
+    RAMP_PDF_SPEC as _CLEAN_RAMP_PDF_SPEC,
 )
 
 import consolidate_ramp_summary as _c_ramp_summary
@@ -222,6 +225,19 @@ EXPORT = (
     ExportEntry("highway_summary_pdf", "Highway Summary (PDF)", "PDF",
                 _HIGHWAY_SUMMARY_PDF_SPEC, group="Highway",
                 short_label="Summary (PDF)", export_only=True),
+    # The Clean Road print editions, v0.45.2 — the same three dropdown options
+    # saved via the site's Print layout (clh_/cli_/clr_printAll). Appended LAST
+    # (stable ids 20/21/22; batch positions 0–19 frozen). EXPORT-ONLY like their
+    # Excel siblings; each coalesces with its sibling (shared data_value).
+    ExportEntry("clean_highway_pdf", "Clean Road: Highway (PDF)", "PDF",
+                _CLEAN_HIGHWAY_PDF_SPEC, group="Clean Road",
+                short_label="Highway (PDF)", export_only=True),
+    ExportEntry("clean_intersection_pdf", "Clean Road: Intersection (PDF)", "PDF",
+                _CLEAN_INTERSECTION_PDF_SPEC, group="Clean Road",
+                short_label="Intersection (PDF)", export_only=True),
+    ExportEntry("clean_ramp_pdf", "Clean Road: Ramp (PDF)", "PDF",
+                _CLEAN_RAMP_PDF_SPEC, group="Clean Road",
+                short_label="Ramp (PDF)", export_only=True),
 )
 
 # Consolidate tab. The three Highway Log consolidators split by source/format
@@ -675,7 +691,9 @@ _PICKER_ORDER = (
     # The Clean Road group, greyed until the site un-greys it. The SITE lists it
     # ABOVE the TSAR groups (right after the flat options); it renders last here
     # so the working reports stay at the top of the picker.
-    "clean_highway", "clean_intersection", "clean_ramp",
+    # Each print edition sits next to its Excel sibling.
+    "clean_highway", "clean_highway_pdf", "clean_intersection",
+    "clean_intersection_pdf", "clean_ramp", "clean_ramp_pdf",
 )
 
 
@@ -700,6 +718,8 @@ _SHORT_CODES = {
     "highway_summary": "HS", "highway_summary_pdf": "HS-PDF",
     "route_history": "RH",
     "clean_highway": "CR-HWY", "clean_intersection": "CR-INT", "clean_ramp": "CR-RMP",
+    "clean_highway_pdf": "CR-HWY-PDF", "clean_intersection_pdf": "CR-INT-PDF",
+    "clean_ramp_pdf": "CR-RMP-PDF",
 }
 
 

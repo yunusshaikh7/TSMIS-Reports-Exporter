@@ -31,8 +31,10 @@ Run-time note: the reports reuse the site's Highway Log / Intersection Detail /
 Ramp Detail query pipelines (Clean Highway runs the WHOLE Highway Log builder
 plus four extra layer lookups per route), so expect Highway-Log-class times.
 
-Print editions (`*_printAll`: cover page + landscape scale-to-fit) exist on the
-site but are deliberately NOT wired: there is no real print to census a parser
+Print editions (v0.45.2): `*_printAll` (cover page + landscape scale-to-fit)
+saved as PDF -- the `*_PDF_SPEC`s below share their Excel sibling's dropdown
+option (`data_value`), so selecting both editions coalesces into one render.
+EXPORT-ONLY like the Excel editions: there is no real print to census a parser
 against yet (the HSL / RD-PDF sequence -- ship the export, census real work-PC
 output, then integrate). Consolidating / comparing these SITE exports is the
 same later tier. The TSN side is already staged: `report_catalog.TSN` carries
@@ -57,7 +59,8 @@ except ImportError:
     raise
 
 from common import EXPORT_READY_JS
-from exporter import ReportSpec, save_via_export_button
+from exporter import (ReportSpec, save_clean_highway_pdf, save_clean_intersection_pdf,
+                      save_clean_ramp_pdf, save_via_export_button)
 
 # The loose no-results phrase (`*_showResults('none')` renders "No results found
 # in this segment."), the fallback behind the structural `.ramp-empty` marker so
@@ -84,24 +87,34 @@ def _is_empty(page):
             or bool(_EMPTY_RE.search(page.inner_text("body"))))
 
 
-def _spec(key, label):
+def _spec(key, label, save=save_via_export_button, subdir=None, ext="xlsx"):
     """One Clean Road spec. `key` is the site's stable #customReport data-value
-    AND the app's export key / output subdir; `label` is the site's data-label
-    (the exact text of the hidden #reportSelect option)."""
+    AND the Excel edition's export key / output subdir; `label` is the site's
+    data-label (the exact text of the hidden #reportSelect option). A print
+    edition passes its own `save` / `subdir` / `ext` and shares everything else,
+    so the two editions can never disagree about readiness or emptiness."""
+    subdir = subdir or key
     return ReportSpec(
         label=label,
-        subdir=key,
+        subdir=subdir,
         data_value=key,                   # stable #customReport id (dev site 9.1)
-        filename=lambda route, key=key: f"{key}_route_{route}.xlsx",
+        filename=lambda route, key=key, ext=ext: f"{key}_route_{route}.{ext}",
         wait_js=_wait_js,
         is_empty=_is_empty,
-        save=save_via_export_button,
+        save=save,
     )
 
 
 HIGHWAY_SPEC = _spec("clean_highway", "Clean Road File Highway")
 INTERSECTION_SPEC = _spec("clean_intersection", "Clean Road File Intersection")
 RAMP_SPEC = _spec("clean_ramp", "Clean Road File Ramp")
+
+HIGHWAY_PDF_SPEC = _spec("clean_highway", "Clean Road File Highway",
+                         save_clean_highway_pdf, "clean_highway_pdf", "pdf")
+INTERSECTION_PDF_SPEC = _spec("clean_intersection", "Clean Road File Intersection",
+                              save_clean_intersection_pdf, "clean_intersection_pdf", "pdf")
+RAMP_PDF_SPEC = _spec("clean_ramp", "Clean Road File Ramp",
+                      save_clean_ramp_pdf, "clean_ramp_pdf", "pdf")
 
 if __name__ == "__main__":
     from cli import run_cli

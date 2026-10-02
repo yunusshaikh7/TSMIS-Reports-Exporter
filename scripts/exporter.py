@@ -562,6 +562,69 @@ def save_highway_summary_pdf(page, out_path, timeout_ms=None):
     _verify_saved_file(out_path)
 
 
+def _save_clean_road_pdf(page, out_path, print_fn):
+    """Render one Clean Road File report to a Landscape PDF, the way the site's
+    Print button lays it out.
+
+    The three reports share one print body (dev site 9.1, `clean_*.js`):
+    `clh_/cli_/clr_printAll()` wraps the on-screen report in `.clh-print-root`
+    — a cover page (`.rs-cover`) plus `.clh-print-body`, zoomed so every column
+    fits one landscape sheet width — then calls `printWithTitle(...)` and
+    rebuilds the live view in an `afterprint` listener. We override
+    `window.print` to raise FIRST, so no dialog opens and the afterprint rebuild
+    never fires, and the print layout stays in the DOM for `page.pdf()`. The
+    margins match the site's `@page clh-landscape` (0.35in), which its zoom
+    targets.
+
+    is_empty ran first, so this is never an empty route. At least one table row
+    under `.clh-print-body` is the marker-independent backstop (EmptyExport, not
+    a cover-only PDF). Fails loudly with ReportError if the Print function is
+    gone/renamed."""
+    built = page.evaluate(
+        """(fn) => {
+            if (typeof window[fn] !== 'function') return {status: 'no-print-fn', rows: 0};
+            window.print = () => { throw new Error('skip-print'); };
+            try { window[fn](); } catch (e) { /* the throw skips the afterprint rebuild */ }
+            const box = document.getElementById('rampResults');
+            if (!box || !box.querySelector('.clh-print-root .rs-cover')
+                    || !box.querySelector('.clh-print-body .clh-table'))
+                return {status: 'no-layout', rows: 0};
+            return {status: 'ok',
+                    rows: box.querySelectorAll('.clh-print-body .clh-table tbody tr').length};
+        }""", print_fn)
+    status = built.get("status") if isinstance(built, dict) else built
+    if status != "ok":
+        raise ReportError(
+            "Couldn't build the Clean Road print layout for the PDF "
+            f"(the site's Print control changed: {print_fn} {status}).")
+    if not (built.get("rows") if isinstance(built, dict) else 0):
+        log.info("clean road PDF: no table rows for %s; treating as empty", out_path.name)
+        raise EmptyExport()
+    page.pdf(
+        path=str(out_path),
+        format="Letter",
+        landscape=True,
+        print_background=True,
+        margin={"top": "0.35in", "bottom": "0.35in", "left": "0.35in", "right": "0.35in"},
+    )
+    _verify_saved_file(out_path)
+
+
+def save_clean_highway_pdf(page, out_path, timeout_ms=None):
+    """Clean Road File — Highway print edition (see _save_clean_road_pdf)."""
+    _save_clean_road_pdf(page, out_path, "clh_printAll")
+
+
+def save_clean_intersection_pdf(page, out_path, timeout_ms=None):
+    """Clean Road File — Intersection print edition (see _save_clean_road_pdf)."""
+    _save_clean_road_pdf(page, out_path, "cli_printAll")
+
+
+def save_clean_ramp_pdf(page, out_path, timeout_ms=None):
+    """Clean Road File — Ramp print edition (see _save_clean_road_pdf)."""
+    _save_clean_road_pdf(page, out_path, "clr_printAll")
+
+
 def save_ramp_detail_pdf(page, out_path, timeout_ms=None):
     """Render the FULL Ramp Detail to a Landscape PDF, the way the site's Print
     button lays it out.
@@ -636,6 +699,8 @@ _PAGE_REBUILDING_SAVES = frozenset({
     # #rampResults's innerHTML (the Export button element is re-created) — order
     # them after the DOM-preserving Export-button save all the same.
     save_intersection_summary_pdf, save_highway_summary_pdf,
+    # clh_/cli_/clr_printAll wrap the whole report in the print root.
+    save_clean_highway_pdf, save_clean_intersection_pdf, save_clean_ramp_pdf,
 })
 
 

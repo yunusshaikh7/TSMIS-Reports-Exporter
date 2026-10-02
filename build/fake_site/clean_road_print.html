@@ -1,0 +1,51 @@
+<!doctype html>
+<!-- Synthetic reconstruction of the Clean Road File PRINT contract (not a copy of
+     the Caltrans source). Carries only what _save_clean_road_pdf depends on:
+       * GLOBAL clh_/cli_/clr_printAll() that wrap #rampResults in
+         .clh-print-root = a .rs-cover page + .clh-print-body (the on-screen
+         report, zoomed), call window.print(), and rebuild the live view
+         AFTERWARDS (the live site does it in an afterprint listener), and
+       * an @media print rule that shows #rampResults,
+     as clean_highway.js / clean_intersection.js / clean_ramp.js + styles.css
+     do on dev site 9.1. ?empty=1 renders a table with NO body rows. -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @media print { #rampResults { display: block !important; } }
+  @media screen { .clh-print-root { display: contents; } }
+</style>
+</head>
+<body>
+  <div id="rampResults" class="ramp-results" style="display:block;"></div>
+  <script>
+    const EMPTY = location.search.includes('empty=1');
+    function renderPage() {
+      let rows = '';
+      if (!EMPTY) for (let i = 0; i < 80; i++)
+        rows += '<tr><td>' + i + '.000</td><td>ORA</td><td>JCT. RTE. 5</td></tr>';
+      document.getElementById('rampResults').innerHTML =
+          '<div class="report-action-bar">'
+        + '<button class="export-btn" onclick="clh_exportToExcel()">Export</button>'
+        + '<div class="report-title"><div class="report-title-line2">Clean Road File</div></div>'
+        + '<button class="export-btn" onclick="clh_printAll()">Print</button></div>'
+        + '<div class="clh-table-wrap"><table class="clh-table"><thead><tr>'
+        + '<th>BEGIN</th><th>COUNTY</th><th>LANDMARK</th></tr></thead>'
+        + '<tbody>' + rows + '</tbody></table></div>';
+    }
+    function printAll(title) {
+      const box = document.getElementById('rampResults');
+      const saved = box.innerHTML;
+      box.innerHTML = '<div class="clh-print-root"><div class="rs-cover">' + title + '</div>'
+        + '<div class="clh-print-body" style="zoom:1">' + saved + '</div></div>';
+      window.print();          // the live site rebuilds in afterprint...
+      renderPage();            // ...so an overridden window.print() that throws skips this
+    }
+    function clh_exportToExcel() { /* no-op for the fixture */ }
+    function clh_printAll() { printAll('Clean Road File — Highway'); }
+    function cli_printAll() { printAll('Clean Road File — Intersection'); }
+    function clr_printAll() { printAll('Clean Road File — Ramp'); }
+    renderPage();
+  </script>
+</body>
+</html>

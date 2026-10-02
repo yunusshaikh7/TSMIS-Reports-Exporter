@@ -54,9 +54,13 @@ function makeMockApi() {
     // 2026-07-22: the dev site 7.21 "Clean Road Files" group (ids 16/17/18) —
     // reserved + greyed until the dev site 9.1 capture un-greyed them; export
     // ENABLED 2026-09-02.
+    // v0.45.2: each Clean Road print edition (clh_/cli_/clr_printAll, ids 20/21/22) sits next to its Excel sibling.
     { key: "clean_highway", label: "Clean Road: Highway", fmt: "Excel", group: "Clean Road", short: "Highway", export_only: true },
+    { key: "clean_highway_pdf", label: "Clean Road: Highway (PDF)", fmt: "PDF", group: "Clean Road", short: "Highway (PDF)", export_only: true },
     { key: "clean_intersection", label: "Clean Road: Intersection", fmt: "Excel", group: "Clean Road", short: "Intersection", export_only: true },
+    { key: "clean_intersection_pdf", label: "Clean Road: Intersection (PDF)", fmt: "PDF", group: "Clean Road", short: "Intersection (PDF)", export_only: true },
     { key: "clean_ramp", label: "Clean Road: Ramp", fmt: "Excel", group: "Clean Road", short: "Ramp", export_only: true },
+    { key: "clean_ramp_pdf", label: "Clean Road: Ramp (PDF)", fmt: "PDF", group: "Clean Road", short: "Ramp (PDF)", export_only: true },
   ];
   // The Consolidate radios carry each row's stable `cons:*` key (P3) — this list
   // matches reports.CONSOLIDATE_REPORTS (9 rows as of CR-002: both Intersection

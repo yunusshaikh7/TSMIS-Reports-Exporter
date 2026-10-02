@@ -3,6 +3,19 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.45.2 — 2026-10-02
+
+Clean Road reports can now be saved as PDFs.
+
+- **Clean Road: Highway / Intersection / Ramp (PDF).** Three new export editions
+  save each Clean Road report through the site's own Print layout: the cover page,
+  then the whole table scaled to fit one landscape page width, as the site's Print
+  button produces it. Files land in `clean_highway_pdf/`, `clean_intersection_pdf/`
+  and `clean_ramp_pdf/`. Tick a PDF edition next to its Excel one and each route
+  renders once and saves both files. Like the Excel editions, the PDFs are
+  export-only: the app does not consolidate or compare them yet. Verified offline
+  against the dev site 9.1 print code; the work-PC run is still owed.
+
 ## v0.45.1 — 2026-09-25
 
 Intersection Detail compares again: the site changed its Excel export on
