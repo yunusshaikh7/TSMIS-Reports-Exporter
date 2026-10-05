@@ -214,7 +214,7 @@ function makeMockApi() {
     highway_log:         { label: "TSN Highway Log", raw_kind: "district_pdfs", raw_count: 0, present: false, cons: false, current: false },          // no raw
   };
   const MOCK_TSN_ROOT = "C:\\Tools\\TSMIS Exporter\\data\\tsn_library";
-  // The manually-stocked ArcGIS layer drop-zone (staged only — nothing reads it yet).
+  // The ArcGIS layer library's Settings path line (managed on ArcGIS ▸ Layers).
   const MOCK_ARCGIS = {
     root: "C:\\Tools\\TSMIS Exporter\\data\\arcgis_layers",
     count: 41,
@@ -724,6 +724,125 @@ function makeMockApi() {
     const r = MOCK_AG_ROWS.find((x) => x.key === rk);
     return r ? r.label : rk;
   }
+  // ---- ArcGIS ▸ Layers (v0.46.0): the 40-layer library (the 2026-08-19
+  // manual drop's row counts) + ArcGIS Pro's status. Parity with
+  // arcgis_refresh.library_status() + arcgis_pro.status().
+  const _HD = ["Highway Detail", "Clean Road: Highway"];
+  const _ALL = ["Intersection Detail", "Highway Detail", "Clean Road: Highway"];
+  const _ID = ["Intersection Detail"];
+  const MOCK_AGL_LAYERS = [
+    ["Traffic Volume Ramps", 75022, []], ["SHS Route Break", 969, _HD],
+    ["SHS Ramp Pt", 83131, []], ["SHS Landmark", 81681, _HD],
+    ["IM Intersection Point", 38920, []], ["Equation Points", 1570, _HD],
+    ["SHS Travel Way R", 49297, _HD], ["SHS Travel Way L", 55554, _HD],
+    ["Traffic Volume Segments", 84533, _HD], ["Terrain Type", 12004, _HD],
+    ["SHS Tolls", 27, _HD], ["SHS Surface Type R", 55478, _HD],
+    ["SHS Surface Type L", 62313, _HD], ["SHS Special Feature R", 20958, _HD],
+    ["SHS Special Feature L", 24009, _HD], ["SHS Ramp", 17752, []],
+    ["SHS Population", 12706, _ALL], ["SHS O Shld Width R", 56563, _HD],
+    ["SHS O Shld Width L", 65236, _HD], ["SHS Non Add Mileage", 285, _HD],
+    ["SHS Median", 51122, _HD], ["SHS Inv Network Date", 11847, _HD],
+    ["SHS I Shld Width R", 30024, _HD], ["SHS I Shld Width L", 33722, _HD],
+    ["SHS Highway Group", 24342, _ALL], ["SHS Forest HWY", 409, _HD],
+    ["SHS District", 7013, []], ["SHS Design Speed", 15058, _HD],
+    ["SHS Curb Landscape", 16877, _HD], ["SHS Barrier", 30975, _HD],
+    ["SHS Access Control", 13296, _HD], ["County Code", 826353, []], ["City", 484260, _ALL],
+    ["IM Complex Intersection Cross Reference", 24883, []],
+    ["IM Complex Intersection Influence Segments", 58865, []],
+    ["IM Intersection Approach Detail", 143389, _ID],
+    ["IM Intersection Approach Segments", 143389, _ID],
+    ["IM Intersection Detail", 38914, _ID], ["IM Intersection Route Table", 160785, []],
+    ["Route Direction", 291, []],
+  ];
+  const MOCK_AGL_SERVICE = "https://rhapps-prod.dot.ca.gov/server/rest/services/TSMIS/lrs_tsmis/FeatureServer";
+  const mockAgl = {
+    pro: { python: "C:\\Program Files\\ArcGIS\\Pro\\bin\\Python\\envs\\arcgispro-py3\\python.exe",
+           how: "detected", found: true, chosen: "", chosen_missing: false },
+    layers: MOCK_AGL_LAYERS.map(([name, rows, users], i) => ({
+      name, file: `${String(i + 1).padStart(2, "0")}_${name}.xlsx`, present: true, rows,
+      fields: 32, size: Math.round(rows * 190 + 9000), exported_at: "2026-08-19T12:14:14",
+      exported_by: null, source: `${MOCK_AGL_SERVICE};VERSION=sde.DEFAULT/0`, used_by: users,
+      last: null })),
+    last_run: null, last_probe: null,
+  };
+  // County Code is staged but missing in the preview, so the "missing" row state shows.
+  Object.assign(mockAgl.layers.find((l) => l.name === "County Code"),
+                { present: false, file: null, rows: null, size: null, exported_at: null });
+  function mockAglInfo() {
+    const present = mockAgl.layers.filter((l) => l.present);
+    const cur = st.matrix_current;
+    return {
+      root: "C:\\Tools\\TSMIS Exporter\\data\\arcgis_layers", service: MOCK_AGL_SERVICE,
+      layers: mockAgl.layers.map((l) => ({ ...l })), present: present.length,
+      expected: mockAgl.layers.length,
+      missing: mockAgl.layers.filter((l) => !l.present).map((l) => l.name),
+      unknown: ["99_Scratch Export.xlsx"], index_present: true,
+      size: present.reduce((n, l) => n + (l.size || 0), 0),
+      backup: !!mockAgl.last_run, last_run: mockAgl.last_run, last_probe: mockAgl.last_probe,
+      pro: { ...mockAgl.pro },
+      running: cur && (cur.kind === "arcgis_refresh" || cur.kind === "arcgis_probe") ? cur.kind : null,
+      queued: (st.matrix_queue || []).filter((j) => j.kind === "arcgis_refresh" || j.kind === "arcgis_probe").length,
+    };
+  }
+  function mockNowIso() {
+    const d = new Date(), p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  }
+  // The mock's layer job: step through the layers on a timer (st.matrix carries
+  // the layer being exported, like the real ('matrix_cell', …) stream), then end
+  // the job in the production order (run_ended -> state -> matrix_refresh).
+  function mockRunLayerJob(job) {
+    const names = job.kind === "arcgis_probe" ? [] : (job.layers || mockAgl.layers.map((l) => l.name));
+    let i = 0;
+    const started = Date.now();
+    const finish = () => {
+      if (job.kind === "arcgis_probe") {
+        mockAgl.last_probe = { when: mockNowIso(), ok: true, rows: 27, fields: 33,
+          message: "ArcGIS Pro read and exported SHS Tolls (27 rows, 33 columns) in 6.4 s.",
+          library_match: true, dialect: "labels",
+          facts: { arcgis_version: "3.3.5", portal: "https://rhapps-prod.dot.ca.gov/portal/", signed_in: true } };
+        push({ t: "log", text: mockAgl.last_probe.message });
+      } else {
+        const failed = names.includes("Route Direction") ? ["Route Direction"] : [];
+        names.forEach((n) => {
+          const l = mockAgl.layers.find((x) => x.name === n);
+          if (failed.includes(n)) {
+            l.last = { name: n, status: "failed", message: "ERROR 000732: Input Rows: Dataset …/304 does not exist or is not supported" };
+            return;
+          }
+          Object.assign(l, { present: true, file: l.file || `32_${n}.xlsx`, rows: l.rows || 826353,
+            size: l.size || 161000000, exported_at: mockNowIso(),
+            exported_by: "TSMIS Exporter 0.46.0 · ArcGIS Pro 3.3.5",
+            last: { name: n, status: "exported", seconds: 4.2 } });
+        });
+        const msg = failed.length
+          ? `Refreshed ${names.length - failed.length} of ${names.length} layer(s); 1 failed: Route Direction. Refresh them again to retry.`
+          : `Refreshed ${names.length} layer(s).`;
+        mockAgl.last_run = { status: failed.length ? "partial" : "ok", message: msg,
+                             service: MOCK_AGL_SERVICE, started: mockNowIso(), finished: mockNowIso() };
+        push({ t: "log", text: msg });
+      }
+      st.task = null; st.matrix = null; st.matrix_current = null;
+      push({ t: "run_ended" });
+      pushState();
+      push({ t: "matrix_refresh" });
+      mockTryStartNext();
+    };
+    const step = () => {
+      if (i >= names.length) { finish(); return; }
+      st.matrix = { phase: "layers", row: names[i], cell: null, done: i, total: names.length,
+                    elapsed_s: (Date.now() - started) / 1000 };
+      push({ t: "log", text: `Exporting ${names[i]} (${i + 1} of ${names.length})…` });
+      pushState();
+      i++;
+      setTimeout(step, 220);
+    };
+    if (job.kind === "arcgis_probe") {
+      st.matrix = { phase: "probe", row: null, cell: null, done: 0, total: 1 };
+      pushState();
+      setTimeout(finish, 1200);
+    } else step();
+  }
   function mockAgMatrixSnapshot() {
     const source = st.arcgis_matrix_source || "ssor-prod";
     const days = st.arcgis_matrix_days || [];
@@ -774,7 +893,7 @@ function makeMockApi() {
     mockJobSeq++;
     const job = { id: mockJobSeq, kind, scope, label, status: "queued",
                   fast: !!opts.fast, total: opts.total || 1,
-                  which: opts.which || "env",
+                  which: opts.which || "env", layers: opts.layers || null,
                   mode: kind === "export" ? "export" : "consolidate" };
     st.matrix_queue = [...(st.matrix_queue || []), job];
     if (st.task || st.matrix_current) {
@@ -789,6 +908,12 @@ function makeMockApi() {
     const job = st.matrix_queue.shift();
     st.task = "matrix";
     st.matrix_current = { ...job, status: "running" };
+    if (job.kind === "arcgis_refresh" || job.kind === "arcgis_probe") {
+      push({ t: "run_started", mode: job.mode, label: job.label, workers: 1 },
+           { t: "log", text: job.label });
+      mockRunLayerJob(job);
+      return;
+    }
     if (job.kind !== "export") {
       st.matrix = { phase: "comparing", row: null, cell: null, done: 0, total: job.total };
     }
@@ -2117,6 +2242,34 @@ function makeMockApi() {
       return { ok: true };
     },
     open_arcgis_reports_folder: async () => push({ t: "log", text: "(mock) would open the arcgis_reports builds folder" }),
+    // ---- the ArcGIS tab: Layers (v0.46.0) ----
+    arcgis_layers_info: async () => mockAglInfo(),
+    refresh_arcgis_layers: async (names) => {
+      if (!mockAgl.pro.found) return { error: "ArcGIS Pro was not found on this PC." };
+      const all = mockAgl.layers.map((l) => l.name);
+      const pick = (names || []).length ? all.filter((n) => names.includes(n)) : all;
+      if ((names || []).some((n) => !all.includes(n))) return { error: "Unknown layer." };
+      const every = pick.length === all.length;
+      return mockEnqueue("arcgis_refresh", "cell",
+        every ? "Refresh all ArcGIS layers" : `Refresh ${pick.length} ArcGIS layer${pick.length === 1 ? "" : "s"}`,
+        { which: "arcgis", total: pick.length, layers: every ? null : pick });
+    },
+    check_arcgis_pro: async () => {
+      if (!mockAgl.pro.found) return { error: "ArcGIS Pro was not found on this PC." };
+      return mockEnqueue("arcgis_probe", "cell", "Check ArcGIS Pro", { which: "arcgis", total: 1 });
+    },
+    choose_arcgis_python: async () => {
+      Object.assign(mockAgl.pro, { python: "D:\\ArcGIS\\Pro\\bin\\Python\\envs\\arcgispro-py3\\python.exe",
+                                   how: "chosen", found: true, chosen: "D:\\ArcGIS\\Pro\\bin\\Python\\envs\\arcgispro-py3\\python.exe" });
+      push({ t: "log", text: "ArcGIS Pro's Python set to D:\\ArcGIS\\Pro\\bin\\Python\\envs\\arcgispro-py3\\python.exe." });
+      return { ok: true, pro: { ...mockAgl.pro } };
+    },
+    clear_arcgis_python: async () => {
+      Object.assign(mockAgl.pro, { python: "C:\\Program Files\\ArcGIS\\Pro\\bin\\Python\\envs\\arcgispro-py3\\python.exe",
+                                   how: "detected", found: true, chosen: "" });
+      push({ t: "log", text: "ArcGIS Pro's Python: finding it automatically again." });
+      return { ok: true, pro: { ...mockAgl.pro } };
+    },
     // ---- the ArcGIS tab: Clean Road vs TSN (v0.29.0) ----
     arcgis_status: async () => ({
       root: "C:\\Tools\\TSMIS Exporter\\data\\arcgis_layers",

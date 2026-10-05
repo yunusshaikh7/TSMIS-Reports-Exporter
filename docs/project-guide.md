@@ -127,14 +127,17 @@ its MAIN view, a by-day MATRIX** (`arcgis_matrix.py`, §12d): rows = every repor
 the `arcgis_reports` registry (the two rendered so far; the rest greyed *no build
 yet* with the reason; the three Clean Road files are rows too, owner decision),
 columns = exported days, each cell = the report's ONE layer build vs that day's
-consolidated export. **One build per report, like the TSN library** — the layers
-are exported by hand and rarely — and every build stamps the DROP it came from
-(`arcgis_layers.drop_info`: the `00_INDEX.xlsx` manifest's own export timestamp +
-a content fingerprint over the folder) into its marker sheet and sidecar, so a
-fresher drop reads the row stale. The as-of defaults to the drop's export date,
-never the TSN extract's (that default belongs to the Clean Road sub-tab only); a
-build gates on its own `REQUIRED_LAYERS`. Both sub-tabs build from the same
-manually-stocked `arcgis_layers/` library, which never touches the site.
+consolidated export. **One build per report, like the TSN library**, and every
+build stamps the DROP it came from (`arcgis_layers.drop_info`: the oldest layer's
+export time from the `00_INDEX.xlsx` manifest + a content fingerprint over the
+`.xlsx` files) into its marker sheet and sidecar, so a fresher drop reads the row
+stale. The as-of defaults to the oldest export date among the layers the report
+reads, never the TSN extract's (that default belongs to the Clean Road sub-tab
+only); a build gates on its own `REQUIRED_LAYERS`. Everything builds from the
+`arcgis_layers/` library, which the **Layers** sub-tab (first, v0.46.0) refreshes
+in-app: ArcGIS Pro's own Python runs `arcgis_worker/export_layers.py` (ArcPy can't
+ship in the bundle), and `arcgis_refresh` checks and swaps each exported layer in.
+The owner's manual export is retired; a manual drop in the same shape still reads.
 
 **Clean Road (v0.29.0) builds the HIGHWAY clean-road file**: our
 own CA HIGHWAYS table from the owner's per-layer ArcGIS exports in
@@ -543,7 +546,10 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   matrix.py                  the matrix FACADE (patch matrix.<name>) over matrix_state.py + matrix_build.py
   matrix_state.py matrix_build.py day_matrix.py summary_layout.py   matrix reads / builds + by-day + summary
   tsn_library.py tsn_load_*.py   the canonical TSN library (versioned normalization, D2) + its loaders
-  arcgis_layers.py           the manually-stocked ArcGIS layer drop-zone (staging only, no parser)
+  arcgis_layers.py           the ArcGIS layer library: folder, 00_INDEX manifest (every column), export-file checks, drop identity
+  arcgis_pro.py arcgis_refresh.py   find ArcGIS Pro's Python + run the worker; the in-app layer refresh + ArcGIS Pro check (v0.46.0)
+  arcgis_worker/export_layers.py    the worker ArcGIS Pro's own Python runs (shipped as a .py data file, stdlib + ArcPy only)
+  arcgis_selftest.py         the stand-in ArcPy the frozen self-test + check_arcgis_refresh drive the shipped worker with
   arcgis_reports.py          the "Reports vs layers" REGISTRY — one row per report
                              (build + comparator + the export consolidators that can
                              supply the TSMIS side; None = not rendered yet, and the
@@ -584,7 +590,7 @@ CHANGELOG.md                 user-facing changelog (one section per version; sou
 tools/                       dev utilities (not shipped) — screenshots.py regenerates the site/README shots
 docs/                        the knowledge library (start at docs/INDEX.md)
 output/                      generated data (git-ignored except .gitkeep stubs)
-tsn_library/ arcgis_layers/   manually-stocked source libraries (git-ignored, local-only;
+tsn_library/ arcgis_layers/   source libraries (git-ignored, local-only; tsn_library is stocked by hand, arcgis_layers by the Layers tab;
                              TSN district PDFs live in tsn_library/<report>/raw/ — input/ retired v0.30.0)
 ```
 

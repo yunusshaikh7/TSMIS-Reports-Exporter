@@ -181,18 +181,21 @@ class GuiMatrixMixin:
         return f"{verb} all comparisons"
 
     def _make_job(self, kind, scope, label, row=None, env=None, subdir=None,
-                  fast=False, which="env", force=False, origin=None, asof=None):
+                  fast=False, which="env", force=False, origin=None, asof=None,
+                  layers=None):
         # `which` ("env" = Everything matrix, "day" = Compare by-day matrix,
         # "baseline" / "pdf_vs_excel" / "arcgis" the other by-day matrices) lets
         # ONE queue serve every matrix; for day jobs `env` carries the date.
         # `force` rebuilds the persistent consolidated even when it looks fresh.
         # `origin` ("canonical"/"legacy") routes a tsn_consolidate job (CMP-AUD-010).
         # `asof` is an arcgis_build job's reconstruction date (None = the drop's).
+        # `layers` is an arcgis_refresh job's layer names (None = all of them).
         jid = self._coord.next_seq()
         return {"id": jid, "kind": kind, "scope": scope, "label": label,
                 "row": row, "env": env, "subdir": subdir, "fast": bool(fast),
                 "which": which, "force": bool(force), "origin": origin,
-                "asof": asof, "status": "queued"}
+                "asof": asof, "layers": list(layers) if layers else None,
+                "status": "queued"}
 
     def _enqueue_matrix_job(self, job):
         """Append a Job and try to start it (or leave it queued behind the
@@ -255,6 +258,10 @@ class GuiMatrixMixin:
             return self._dispatch_tsn_consolidate_job(job)
         if kind == "arcgis_build":
             return self._dispatch_arcgis_build_job(job)
+        if kind == "arcgis_refresh":
+            return self._dispatch_arcgis_refresh_job(job)
+        if kind == "arcgis_probe":
+            return self._dispatch_arcgis_probe_job(job)
         return False
 
     # CMP-AUD-088: only an EXPORT re-authenticates + launches a browser. compare /
@@ -2151,18 +2158,20 @@ class GuiMatrixMixin:
             took = f" in {m}m{s}s" if m else f" in {s}s"
         else:
             took = ""
+        # The ArcGIS layer jobs name themselves ("Layer refresh" / "ArcGIS Pro
+        # check"); every other matrix job is a comparison run.
+        noun = payload.get("label") or "Comparison run"
         if isinstance(attempted, int) and unclean:
-            stopped = ("Comparison run stopped" if payload.get("cancelled")
-                       else "Comparison run finished")
+            stopped = f"{noun} stopped" if payload.get("cancelled") else f"{noun} finished"
             self._emit_log(f"{stopped}{took} — {attempted} of {total} attempted: "
                            + ", ".join(parts) + " (see the log).")
         elif payload.get("cancelled"):
-            self._emit_log(f"Comparison run stopped{took} — {done} of {total} done.")
+            self._emit_log(f"{noun} stopped{took} — {done} of {total} done.")
         elif errs:
-            self._emit_log(f"Comparison run finished{took} — {done} of {total} done; "
+            self._emit_log(f"{noun} finished{took} — {done} of {total} done; "
                            f"{errs} could not be built (see the log).")
         else:
-            self._emit_log(f"Comparison run finished{took} — {done} of {total} done.")
+            self._emit_log(f"{noun} finished{took} — {done} of {total} done.")
         # Nudge only when the WHOLE queue has drained (not after every auto-
         # advancing job), matching exports/consolidations honoring notify_on_finish.
         if not self._queue:

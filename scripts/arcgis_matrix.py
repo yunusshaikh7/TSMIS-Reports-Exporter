@@ -496,9 +496,12 @@ def build_report(row_key, events, asof=None, confirm_overwrite=None):
     layers as exported — never the TSN extract's date (that default belongs to
     the Clean Road vs TSN lane only).
 
-    Gates on the report's OWN required layers, not the whole manifest. Returns
-    the build's ConsolidateResult; raises ValueError for a row the lane cannot
-    build, missing layers, or an unknown as-of."""
+    Gates on the report's OWN required layers, not the whole manifest. The
+    default as-of is the OLDEST export date among those layers (v0.46.0: a
+    partly refreshed library records each layer's own export time) — never a
+    date later than one of its layers was read. Returns the build's
+    ConsolidateResult; raises ValueError for a row the lane cannot build,
+    missing layers, or an unknown as-of."""
     s = _require_row(row_key)
     if s.build is None:
         raise ValueError(f"{s.label} cannot be built from the layers yet ({s.why}).")
@@ -508,12 +511,12 @@ def build_report(row_key, events, asof=None, confirm_overwrite=None):
         raise ValueError(
             "The ArcGIS layer library is missing the layer(s) this report is "
             "built from:\n\n  " + "\n  ".join(missing)
-            + "\n\nDrop those layer exports into the arcgis_layers folder and "
-              "build again.")
+            + "\n\nRefresh them on the ArcGIS ▸ Layers tab and build again.")
     drop = arcgis_layers.drop_info()
-    asof = (asof or "").strip() or drop.get("exported")
+    asof = (asof or "").strip() or arcgis_layers.consistent_asof(
+        s.build.REQUIRED_LAYERS, drop)
     if not asof:
-        raise ValueError("The staged drop's export date is unknown — enter an "
+        raise ValueError("The layer library's export date is unknown — enter an "
                          "as-of date (YYYY-MM-DD) to build.")
     events.on_log(f"Building {s.label} from the ArcGIS layers as of {asof}"
                   + (f" (drop exported {drop['exported']})"

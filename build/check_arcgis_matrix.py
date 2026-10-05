@@ -139,10 +139,18 @@ def test_drop_info():
               info["exported"] == expected_local and info["exported_source"] == "index")
         check("three files counted, INDEX present",
               info["files"] == 3 and info["index_present"] is True)
-        check("fingerprint is the v2 content identity",
-              isinstance(info["fingerprint"], str) and info["fingerprint"].startswith("v2:"))
+        check("fingerprint is the content identity over the .xlsx files",
+              isinstance(info["fingerprint"], str) and info["fingerprint"].startswith("xlsx1:3:"))
         again = arcgis_layers.drop_info(tmp)
         check("fingerprint is stable across reads", again["fingerprint"] == info["fingerprint"])
+        # v0.46.0: the README, the app's working folders and in-flight temps are
+        # not the drop — a cosmetic README rewrite must not stale every build.
+        (tmp / "_README - where ArcGIS layer exports go.txt").write_text("note", encoding="utf-8")
+        (tmp / "_refresh").mkdir()
+        (tmp / "_refresh" / "last_run.json").write_text("{}", encoding="utf-8")
+        (tmp / "00_INDEX.xlsx.tmp-123").write_text("partial", encoding="utf-8")
+        check("README / _refresh / temp files leave the fingerprint alone",
+              arcgis_layers.drop_info(tmp)["fingerprint"] == info["fingerprint"])
         _wb(tmp / "02_City.xlsx", [["b"], [3]])          # a layer's bytes change
         changed = arcgis_layers.drop_info(tmp)
         check("a changed layer changes the fingerprint",

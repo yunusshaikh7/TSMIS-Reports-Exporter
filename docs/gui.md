@@ -409,13 +409,47 @@ proved the wiring — a new matrix cost a table row per report instead of a fift
 if-chain. Lives in `pdf_excel_matrix.py`; the sub-tab renders through the same
 `ui-matrix.js` as the other three.
 
-### The ArcGIS tab (v0.29.0; the "Reports vs layers" MATRIX is the main view since 2026-09-02)
+### The ArcGIS tab (v0.29.0; the Layers sub-tab and the in-app refresh since v0.46.0)
 
-The one tab that never touches the TSMIS site. Both sub-tabs build from the
-manually-stocked `arcgis_layers/` library; `gui_arcgis_api.py` owns the endpoints
-and `ui-arcgis.js` renders them:
+The one tab that never touches the TSMIS site. Everything builds from the
+`arcgis_layers/` library, which the app now refreshes itself; `gui_arcgis_api.py`
+(the matrix + Clean Road) and `gui_arcgis_layers_api.py` (Layers) own the endpoints
+and `ui-arcgis.js` renders them. Three sub-tabs, Layers first (and the default):
 
-- **Reports vs layers** (the default sub-tab) — a by-day **matrix**: rows = every
+- **Layers** (v0.46.0) — replaces the owner's manual per-layer export.
+  - **ArcGIS Pro card** — where ArcGIS Pro's `arcgispro-py3` python.exe was found
+    (`arcgis_pro.find_python`: the `SOFTWARE\ESRI\ArcGISPro\InstallDir` registry
+    value, then the default install folders), a **Choose python.exe…** override
+    (persisted as `arcgis_python`) with **Find it automatically** to clear it, and
+    **Check ArcGIS Pro**: a queued job that starts ArcPy, reads + exports the
+    27-row SHS Tolls layer and compares that file with the library's copy (same
+    columns? domain labels or codes?). The last check's result stays on the card.
+  - **Layer library card** — the 40 library layers as a table: name with the builds
+    that read it (`arcgis_refresh.layer_users`, from the registry's
+    `REQUIRED_LAYERS`), rows, exported (each layer's own time), size, and the last
+    refresh's per-layer outcome. **Refresh all layers** (confirms first) or tick
+    layers and **Refresh selected**; both queue an `arcgis_refresh` job on the
+    shared matrix queue, so builds/comparisons line up behind it and never read a
+    half-swapped library. Progress shows the layer being exported; Cancel stops
+    the worker.
+  - **How a refresh runs** — the app cannot carry ArcPy, so
+    `arcgis_worker/export_layers.py` (shipped as a plain `.py` data file) runs in
+    ArcGIS Pro's own Python, launched directly (no shell), without a window, with
+    a clean environment and the frozen app's DLL directory reset — the pattern the
+    TSMIS Project Inspector proved on the work PC. The worker reads each layer
+    straight from the `lrs_tsmis` FeatureServer by URL (ArcGIS Pro's sign-in is the
+    credential; the service's layer list, read once with `arcpy.GetSigninToken()`,
+    matches layers by NAME, with the 2026-08-19 ids as the fallback) and writes it
+    with ArcGIS's **Table To Excel** (field names as headers, coded domains as their
+    descriptions — the manual export's dialect). It appends JSON events to a file;
+    `arcgis_refresh` checks each finished file (header readable, data rows counted
+    from the sheet XML, never fewer than ArcGIS's server count), swaps it in under
+    its existing library name (the replaced file goes to `_previous/`), and
+    rewrites `00_INDEX.xlsx` with two new columns — *Exported At* (that layer's
+    export start) and *Exported By*. If the manifest can't be written (open in
+    Excel) the swap is undone. Limits: 10 min for ArcPy to start, 90 min per layer.
+    `arcgis_layers/_refresh/last_run.json` / `last_probe.json` feed the card.
+- **Reports vs layers** — a by-day **matrix**: rows = every
   TSMIS report the `arcgis_reports` registry lists (the two rendered so far plus the
   rows still waiting on a build, greyed *no build yet* with the reason on hover),
   columns = exported days you add, each cell = the report's ONE layer build compared
@@ -428,9 +462,10 @@ and `ui-arcgis.js` renders them:
   (`which:"arcgis"` compares → `ArcgisMatrixCompareWorker`; `kind:"arcgis_build"`
   builds → `ArcgisReportBuildWorker`).
   - **One build per report, like the TSN library** (owner decision 2026-09-02). The
-    **library card** above the grid names the staged drop — the export date read
-    from the `00_INDEX.xlsx` manifest's own timestamp, a content fingerprint over
-    every file, the layer count vs the manifest — and each **row header** carries
+    **library card** above the grid names the staged drop — its export date (the
+    OLDEST layer's *Exported At*, or a manual manifest's own timestamp), a content
+    fingerprint over the `.xlsx` files (v0.46.0: the README and the app's working
+    folders don't count), the layer count vs the manifest — and each **row header** carries
     its build's state on a second line: *not built* / *built as of D · N rows ·
     current drop* (green) / *built … from the 2026-07-22 drop — rebuild* (warning
     colour) / *outcome unknown — rebuild*, with a ▤ build button and an open
@@ -438,10 +473,12 @@ and `ui-arcgis.js` renders them:
     same ▤. Every build stamps the drop it came from into its marker sheet and
     outcome sidecar (`layer_drop` under the module's `SIDECAR_KEY`), so a fresher
     drop makes the row read stale without anyone re-checking by hand.
-  - **The as-of date** defaults to the drop's own export date (the layers as
-    exported), never the TSN extract's — that default belongs to the Clean Road
-    sub-tab only. The "Build as of" box on the library card overrides it for one
-    build; the comparison's Notes state the build's as-of beside the export day.
+  - **The as-of date** defaults to the OLDEST export date among the layers that
+    report reads (`arcgis_layers.consistent_asof`; for a fully refreshed library
+    that is simply the refresh date), never the TSN extract's — that default
+    belongs to the Clean Road sub-tab only. The "Build as of" box on the library
+    card overrides it for one build; the comparison's Notes state the build's
+    as-of beside the export day.
   - A build gates on the report's OWN required layers (`REQUIRED_LAYERS`), not
     the whole 40-layer manifest.
 - **Clean Road vs TSN** — builds our own CA HIGHWAYS table from the layers as-of a
@@ -460,7 +497,10 @@ modules (`arcgis_reports.py`); the matrix, the endpoints, the `#mock` preview an
 `check_arcgis_matrix` derive from the registry. Read
 [planning/cleanroad-highways.md](planning/cleanroad-highways.md) first for the
 measured build rules, and don't re-derive them. Mock + bridge exercised at
-`/index.html#mock` (ArcGIS ▸ Reports vs layers).
+`/index.html#mock` (ArcGIS ▸ Layers / Reports vs layers). The refresh is proven
+offline by `check_arcgis_refresh` and the frozen `--self-test`, both of which run
+the SHIPPED worker against the stand-in ArcPy in `arcgis_selftest.py`; real ArcPy
+only exists on the work PC.
 
 ### Matrix cell states, and the one that is deliberately not green
 

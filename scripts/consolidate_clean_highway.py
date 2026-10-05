@@ -1542,7 +1542,8 @@ def _consolidate(events, confirm_overwrite, *, asof, lib_root, out_path, routes,
             status="error",
             message=("The ArcGIS layer library is missing the highway "
                      "layer(s): " + ", ".join(needed_missing)
-                     + f"\n\nDrop the per-layer .xlsx exports into:\n{lib_root}"))
+                     + "\n\nRefresh them on the ArcGIS ▸ Layers tab (library: "
+                     + f"{lib_root})."))
     index = crl.read_index(lib_root)
     asof_date = _resolve_asof(asof)
     asof_serial = crl.to_serial(asof_date)
