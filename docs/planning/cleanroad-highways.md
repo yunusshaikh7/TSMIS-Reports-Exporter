@@ -201,6 +201,15 @@ reason to re-source it. Three tiers:
 
 ## The layer export list = the IN-APP INPUT CONTRACT (CA HIGHWAYS)
 
+> **v0.46.0: the app produces this library itself** (ArcGIS ▸ Layers ▸ Refresh):
+> ArcGIS Pro's own Python reads each of the 40 layers below straight from the
+> `lrs_tsmis` FeatureServer (default version) and writes it with Table To Excel —
+> field names as headers, coded domains as descriptions, `NN_<Layer Name>.xlsx` plus
+> `00_INDEX.xlsx` (now with per-layer Exported At / Exported By). The contract below
+> is unchanged and a manual export in the same shape still reads; the owner no longer
+> exports by hand. One difference from the manual drop: Route Direction comes from
+> its own service layer, without the map join's extra columns (no build reads them).
+
 **Owner direction (2026-07-22): the app input is ONE .xlsx PER LAYER**, dropped
 into `arcgis_layers/`, re-exported by the owner from this list. **The COMPLETE
 library manifest covers ALL THREE clean-road files — 40 layers, in the ArcGIS

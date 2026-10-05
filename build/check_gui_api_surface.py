@@ -64,7 +64,13 @@ def _src(mod):
 #     / open_arcgis_report): the card compared one report against one day; the
 #     matrix compares every registry report against every exported day off ONE
 #     layer build per report.
+#   * the ArcGIS ▸ Layers tab (v0.46.0, gui_arcgis_layers_api) — five endpoints
+#     for the in-app layer refresh that replaced the manual export: the tab's
+#     payload, the refresh and ArcGIS Pro check jobs, and choosing / clearing
+#     ArcGIS Pro's python.exe. No existing endpoint answers any of them.
 FROZEN_API = {
+    "arcgis_layers_info", "refresh_arcgis_layers", "check_arcgis_pro",
+    "choose_arcgis_python", "clear_arcgis_python",
     "open_arcgis_reports_folder",
     "arcgis_matrix_info", "set_arcgis_matrix_source", "add_arcgis_matrix_day",
     "remove_arcgis_matrix_day", "set_arcgis_matrix_report",

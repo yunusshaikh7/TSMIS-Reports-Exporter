@@ -673,8 +673,7 @@ def _consolidate(events, confirm_overwrite, out_path, asof, lib_root):
         raise ValueError(
             "The ArcGIS layer library is missing the layer(s) this report is "
             "built from:\n\n  " + "\n  ".join(missing)
-            + "\n\nDrop those layer exports into the arcgis_layers folder and "
-              "build again.")
+            + "\n\nRefresh them on the ArcGIS ▸ Layers tab and build again.")
 
     index = crl.read_index(lib_root)
     # One date resolver for both builds: a second copy of "None means the

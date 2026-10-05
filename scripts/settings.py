@@ -999,6 +999,25 @@ def set_arcgis_matrix_formulas(on):
     return _set_flag("arcgis_matrix_formulas", on)
 
 
+def get_arcgis_python():
+    """ArcGIS Pro's python.exe as chosen on the ArcGIS ▸ Layers tab ("" = find
+    it automatically). Used only when the file still exists."""
+    raw = _read_file().get("arcgis_python")
+    return raw.strip() if isinstance(raw, str) else ""
+
+
+def set_arcgis_python(path):
+    data = dict(_read_file())
+    path = (path or "").strip()
+    if path:
+        data["arcgis_python"] = path
+    else:
+        data.pop("arcgis_python", None)
+    _atomic_write(data)
+    log.info("settings: arcgis_python -> %s", path or "(detect)")
+    return get_arcgis_python()
+
+
 # ---- Compare-tab "vs Baseline" matrix ---------------------------------------
 # Same shape as the by-day matrix: a source, picked day-columns, hidden rows, a
 # row order, and its own formulas toggle — plus the picked BASELINE id

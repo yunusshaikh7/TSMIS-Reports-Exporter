@@ -69,6 +69,7 @@ from gui_auth_api import GuiAuthMixin
 from gui_compare_api import GuiCompareMixin
 from gui_settings_api import GuiSettingsMixin
 from gui_arcgis_api import GuiArcgisMixin
+from gui_arcgis_layers_api import GuiArcgisLayersMixin
 
 log = logging.getLogger("tsmis.gui")
 # Everything shown in the GUI's log pane is mirrored here, so tsmis.log
@@ -197,7 +198,8 @@ def _report_list_payload():
 
 
 class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
-             GuiArcgisMixin, GuiSettingsMixin, GuiUpdateMixin, GuiMatrixMixin):
+             GuiArcgisMixin, GuiArcgisLayersMixin, GuiSettingsMixin, GuiUpdateMixin,
+             GuiMatrixMixin):
     """State + bridge behind the WebView UI. Public methods = the JS api."""
 
     def __init__(self):
@@ -275,7 +277,7 @@ class GuiApi(GuiExportMixin, GuiAuthMixin, GuiCompareMixin,
         except Exception as e:                                  # noqa: BLE001
             log.info("tsn_library.ensure_layout skipped: %s: %s",
                      type(e).__name__, (str(e).splitlines() or [""])[0])
-        # Same for the manually-stocked ArcGIS layer drop-zone (root + README).
+        # Same for the ArcGIS layer library (root + README).
         try:
             import arcgis_layers
             arcgis_layers.ensure_layout()

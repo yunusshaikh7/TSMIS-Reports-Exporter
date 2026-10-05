@@ -31,10 +31,24 @@ change. The handout omits the §8 audit P-codes / threat model on purpose.
 | The Caltrans ArcGIS **portal / Azure AD IdP** (the page's `CONFIG.oauthAuthorizeUrl` host) | During sign-in only | Standard OAuth/SAML sign-in; the access token comes back in the URL fragment and lives only in page memory (~120 min) | Caltrans SSO / Windows device account |
 | `api.github.com` + GitHub's release-asset CDN (a `*.githubusercontent.com` host, resolved at download time) | The one-click **update check** (launch + when the version chip is clicked) and download | Read the latest release tag; download the update zip + its `.sha256` | None — public repo, read-only |
 | Playwright's Chromium CDN | **Only** the `.bat` first-time setup, or the optional Settings ▸ "Download Built-in Chromium" | Fetch the bundled-browser binary | None |
+| The TSMIS ArcGIS feature service (`rhapps-prod.dot.ca.gov/server/rest/services/TSMIS/lrs_tsmis/FeatureServer`) | **Only** ArcGIS ▸ Layers ▸ Refresh / Check ArcGIS Pro (v0.46.0) | Read the TSMIS layers' attribute tables — made by **ArcGIS Pro's own Python** (a separate process, below), not by the app | The user's ArcGIS Pro sign-in (its own credential store; the app never sees or stores it) |
 
 It makes **no other outbound connections** — no analytics, no telemetry, no
 crash-reporting service, no license server. The default `win64` build does not
 download a browser at all (it drives the machine's existing Edge/Chrome).
+
+**The one other program it starts (v0.46.0).** ArcGIS ▸ Layers runs
+`arcgis_worker\export_layers.py` (a plain Python file inside the app's
+`_internal\arcgis_worker\`) with **ArcGIS Pro's own** `python.exe`
+(`…\ArcGIS\Pro\bin\Python\envs\arcgispro-py3\python.exe`, found through ArcGIS
+Pro's `SOFTWARE\ESRI\ArcGISPro\InstallDir` registry value, or chosen by the user).
+It is launched directly as an argument list — never through `cmd`/PowerShell — with
+no console window, a clean environment (the app's own `PYTHON*` variables removed)
+and no bytecode written into ArcGIS Pro's folder; it only reads layers and writes
+Excel files into the app's `arcgis_layers\_refresh\staging` folder, and the app
+stops it on Cancel or when it exceeds its time limits. Nothing is installed into
+ArcGIS Pro's environment. The TSMIS Project Inspector uses the same pattern on the
+same PCs.
 
 TLS for the update check/download uses the **Windows certificate store**
 (`ssl.create_default_context()` in `scripts/updater.py`), so corporate TLS

@@ -77,7 +77,10 @@ _DYNAMIC_REPORT_MODULES = ("matrix", "day_matrix", "pdf_excel_matrix",
                            "arcgis_report_highway_detail",
                            "compare_highway_detail_arcgis",
                            "arcgis_report_intersection_detail",
-                           "compare_intersection_detail_arcgis")
+                           "compare_intersection_detail_arcgis",
+                           # v0.46.0: the in-app layer refresh (the Layers tab).
+                           "arcgis_pro", "arcgis_refresh", "arcgis_selftest",
+                           "gui_arcgis_layers_api", "gui_worker_arcgis")
 
 
 def run(emit=None):
@@ -171,6 +174,16 @@ def _exercise(tmp, emit):
     for m in _DYNAMIC_REPORT_MODULES:
         importlib.import_module(m)
     emit(f"dynamic report modules import: {', '.join(_DYNAMIC_REPORT_MODULES)} ok")
+
+    # 5b. The ArcGIS layer refresh (v0.46.0): the worker ships as a plain .py data
+    #     file that ArcGIS Pro's own Python runs, so nothing above proves it is in
+    #     the bundle. Run the SHIPPED script against the stand-in ArcPy into a temp
+    #     library and read the result back with the builds' own reader.
+    import arcgis_pro
+    import arcgis_selftest
+    assert arcgis_pro.worker_script().is_file(), \
+        f"layer export worker missing: {arcgis_pro.worker_script()}"
+    arcgis_selftest.run(tmp / "arcgis", emit)
 
     # 6. GUI bridge: js_api + initial state + bundled ui/ assets MUST work (these
     #    catch a prune/exclude that broke pywebview/pythonnet or lost the ui/ assets).

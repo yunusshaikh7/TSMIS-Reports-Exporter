@@ -256,15 +256,22 @@ cares whether it's a dev script or the packaged exe. Resolved once at import tim
 
 Derived paths: `OUTPUT_ROOT = DATA_ROOT/output`, `INPUT_ROOT = DATA_ROOT/input`
 (user-supplied input — currently TSN district PDFs; TSMIS reports never read from
-here). Two MANUALLY-STOCKED libraries sit beside them, both git-ignored and never
-written by an export run: `TSN_LIBRARY_ROOT = DATA_ROOT/tsn_library` (the
-report-shaped TSN ground truth — §v0.17.0 below) and `ARCGIS_LAYERS_ROOT =
-DATA_ROOT/arcgis_layers` (`scripts/arcgis_layers.py`, 2026-07-22 — the owner's own
-per-layer exports of the TSMIS ArcGIS layers, which is what every TSMIS report is
-ultimately made of; since v0.29.0 the agreed shape is ONE `.xlsx` per layer named
-`NN_<Layer Name>.xlsx` beside the export's own `00_INDEX.xlsx` manifest — the
+here). Two libraries sit beside them, both git-ignored and never written by an
+export run: `TSN_LIBRARY_ROOT = DATA_ROOT/tsn_library` (the report-shaped TSN
+ground truth, stocked by hand — §v0.17.0 below) and `ARCGIS_LAYERS_ROOT =
+DATA_ROOT/arcgis_layers` (`scripts/arcgis_layers.py`, 2026-07-22 — the TSMIS
+ArcGIS layers, which is what every TSMIS report is ultimately made of; ONE `.xlsx`
+per layer named `NN_<Layer Name>.xlsx` beside a `00_INDEX.xlsx` manifest — the
 filename is the identity because Excel truncates sheet names at 31 chars, and the
-INDEX carries each layer's row/field counts + FeatureServer source for audit).
+INDEX carries each layer's row/field counts + FeatureServer source for audit, plus
+since v0.46.0 each layer's Exported At / Exported By). Stocked by hand until
+v0.46.0; since then the **ArcGIS ▸ Layers** tab refreshes it in-app:
+`arcgis_pro.py` finds ArcGIS Pro's own `arcgispro-py3` python.exe and runs
+`scripts/arcgis_worker/export_layers.py` in it (ArcPy cannot ship in the bundle,
+so the worker is a plain `.py` data file run as a separate process — the Project
+Inspector's proven pattern), and `arcgis_refresh.py` checks each exported layer,
+swaps it in (replaced files → `arcgis_layers/_previous/`) and rewrites the INDEX —
+see [gui.md](gui.md) "The ArcGIS tab".
 Since **v0.29.0 the ArcGIS TAB consumes it**: `clean_road_layers.py` verifies the
 drop against the 40-layer manifest + the INDEX row counts,
 `consolidate_clean_highway.py` builds OUR own 74-column CA HIGHWAYS clean-road
@@ -275,8 +282,9 @@ the TSN extract — see [comparison-engine.md](comparison-engine.md) §9j and
 2026-09-02 the tab's MAIN view is the **Reports vs layers matrix**
 (`arcgis_matrix.py`, §12d): every report in the `arcgis_reports` registry rendered
 from the layers — ONE build per report under `output/arcgis_reports/`, stamped
-with the drop it came from (`arcgis_layers.drop_info`: the manifest's own export
-timestamp + a content fingerprint) — and compared against each exported day. App-private data (`_PRIVATE` = `DATA_ROOT/data` when frozen, else `DATA_ROOT`):
+with the drop it came from (`arcgis_layers.drop_info`: the oldest layer's export
+time + a content fingerprint over the `.xlsx` files) — and compared against each
+exported day. App-private data (`_PRIVATE` = `DATA_ROOT/data` when frozen, else `DATA_ROOT`):
 `AUTH`, `LOG_DIR`, `FAILURES_DIR`, `CONFIG_FILE`, `UPDATE_DIR`,
 `EDGE_LOGIN_PROFILE_DIR`, `WEBVIEW_PROFILE_DIR`, `DOWNLOADED_BROWSERS_DIR`. The
 frozen auth file is `data/tsmis_auth.json`; the dev auth file is
@@ -532,7 +540,7 @@ record of how the structure was built; this is what the structure now holds.
 | **Consolidate** | Turns a run folder's per-route exports into one workbook, per report; also the entry point for the PDF-sourced consolidations. | [reports.md](reports.md) |
 | **Compare** | Every file/folder comparison, in generated sub-tabs: cross-environment, vs TSN, the **vs TSN Matrix** (by day), the **vs Baseline Matrix** (a day against an earlier pull of the same report), and the **PDF vs Excel Matrix** (each dual-edition family self-checked inside one run folder). | [comparison-engine.md](comparison-engine.md) §9, §12b–§12c |
 | **Everything** | Two sub-tabs — the always-current batch store (report types × environments into one undated destination, stage-and-swap) and the **Everything comparison matrix** over it. | [comparison-engine.md](comparison-engine.md) §12 |
-| **ArcGIS** | Two sub-tabs, both built from the manually-stocked `arcgis_layers/` library and neither touching the site: **Reports vs layers** (the main view since 2026-09-02 — a by-day MATRIX of every TSMIS report *rendered* from the layers and diffed against our own export of it; ONE build per report, each stamped with the layer drop it came from) and **Clean Road vs TSN** (our own CA HIGHWAYS table, compared vs the TSN extract). | [comparison-engine.md](comparison-engine.md) §9j–§9l + §12d, [planning/cleanroad-highways.md](planning/cleanroad-highways.md) |
+| **ArcGIS** | Three sub-tabs, none touching the site: **Layers** (v0.46.0 — the `arcgis_layers/` library and its in-app refresh through ArcGIS Pro's own Python, replacing the manual export), **Reports vs layers** (the main view since 2026-09-02 — a by-day MATRIX of every TSMIS report *rendered* from the layers and diffed against our own export of it; ONE build per report, each stamped with the layer drop it came from) and **Clean Road vs TSN** (our own CA HIGHWAYS table, compared vs the TSN extract). | [comparison-engine.md](comparison-engine.md) §9j–§9l + §12d, [planning/cleanroad-highways.md](planning/cleanroad-highways.md) |
 | **Settings** | Site/browser targets, timeouts, TSN datasets, comparison output options (including **Counts only**), the support bundle, updates. | [gui.md](gui.md), [build-and-release.md](build-and-release.md) |
 
 ### Three source lanes, deliberately separate
@@ -544,8 +552,9 @@ record of how the structure was built; this is what the structure now holds.
    **Frozen**: TSMIS replaced TSN at the 09/2025 cutover, so this lane cannot be
    refreshed and vs-TSN measures migration drift rather than present-day
    agreement.
-3. **The ArcGIS layer library** (`arcgis_layers/`) — manually dropped per-layer
-   exports, from which we build our own tables and render reports as-of a chosen
+3. **The ArcGIS layer library** (`arcgis_layers/`) — per-layer exports of the
+   TSMIS layers, refreshed in-app with ArcGIS Pro since v0.46.0 (hand-dropped
+   before), from which we build our own tables and render reports as-of a chosen
    date. Never touches the site.
 
 ### The rule that holds it together

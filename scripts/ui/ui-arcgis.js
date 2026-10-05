@@ -1,5 +1,11 @@
 // ArcGIS tab module (v0.29.0, split like the other ui-*.js — same global scope).
-// Two sub-tabs; "Reports vs layers" is the main one since 2026-09-02:
+// Three sub-tabs:
+//   LAYERS (v0.46.0, first) — the app's own copy of the 40 TSMIS layers and the
+//                       in-app refresh that replaced the manual export: ArcGIS
+//                       Pro's status + a quick check, every layer with its rows /
+//                       export time / the builds that read it, and Refresh all /
+//                       Refresh selected (a matrix-queue job; each finished layer
+//                       is swapped in while the next one exports).
 //   REPORTS VS LAYERS — every TSMIS report rendered from the layer library and
 //                       diffed against our own export of it, as a by-day MATRIX
 //                       (rows = the registry's reports, columns = exported days).
@@ -16,8 +22,12 @@
 
 let AG = null;                 // the last arcgis_status payload (Clean Road)
 let AGM = null;                // the last arcgis_matrix_info payload
-let agSub = "reports";         // which sub-tab is showing
+let AGL = null;                // the last arcgis_layers_info payload (Layers)
+let agSub = "layers";          // which sub-tab is showing
 let _agRenderSeq = 0;
+let _aglRenderSeq = 0;
+const aglSelected = new Set(); // layer names ticked for "Refresh selected"
+let _aglSeen = null;           // the refresh progress the table last showed
 
 // Read by applyMatrixWide (ui-compare.js): the matrix sub-tab goes full-width
 // with its own config corner, like the other four matrices.
@@ -89,13 +99,15 @@ function syncArcgisLock() {
     compare.disabled = locked || !canCompare;
   }
   if (agSub === "reports") updateArcgisMatrixProgress();
+  if (agSub === "layers") updateArcgisLayersProgress();
 }
 
 // The tab's one entry point: render whichever sub-tab is showing (and apply
 // the full-width matrix layout when it is the matrix).
 function renderArcgisTab() {
   if (typeof applyMatrixWide === "function") applyMatrixWide();
-  if (agSub === "reports") renderArcgisMatrix();
+  if (agSub === "layers") renderArcgisLayers();
+  else if (agSub === "reports") renderArcgisMatrix();
   else renderArcgis();
 }
 
@@ -108,12 +120,243 @@ function setArcgisSub(which) {
     el.classList.toggle("active", is);
     el.setAttribute("aria-selected", String(is));
   };
+  on("subAgLayers", which === "layers");
   on("subAgCleanRoad", which === "cleanroad");
   on("subAgReports", which === "reports");
-  const cr = $("agCleanRoad"), rp = $("agReports");
+  const ly = $("agLayers"), cr = $("agCleanRoad"), rp = $("agReports");
+  if (ly) ly.classList.toggle("hidden", which !== "layers");
   if (cr) cr.classList.toggle("hidden", which !== "cleanroad");
   if (rp) rp.classList.toggle("hidden", which !== "reports");
   renderArcgisTab();
+}
+
+// ---- "Layers": the layer library + the in-app refresh (v0.46.0) ----------- //
+function aglJobRunning() {
+  const cur = S.st && S.st.matrix_current;
+  return !!(cur && (cur.kind === "arcgis_refresh" || cur.kind === "arcgis_probe"));
+}
+
+function aglWhen(iso) {                // "2026-10-02T14:05:33" -> "2026-10-02 14:05"
+  return iso ? String(iso).replace("T", " ").slice(0, 16) : "";
+}
+
+function aglSize(n) {
+  if (typeof n !== "number" || !Number.isFinite(n)) return "";
+  return n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+}
+
+function aglProgressText(m) {
+  if (m.phase === "probe") return "Checking ArcGIS Pro…";
+  const at = Math.min((m.done || 0) + (m.row ? 1 : 0), m.total || 0);
+  const el = typeof m.elapsed_s === "number" && m.elapsed_s >= 1 ? ` · ${fmtDur(m.elapsed_s)} elapsed` : "";
+  return `Refreshing ${at} of ${m.total}${m.row ? " — " + m.row : ""}${el}`;
+}
+
+async function renderArcgisLayers() {
+  const table = $("agLayersTable");
+  if (!table) return;
+  const seq = ++_aglRenderSeq;
+  let info;
+  try { info = await api.arcgis_layers_info(); } catch (e) {
+    $("agLayersHint").textContent = "Status unavailable: " + e;
+    return;
+  }
+  if (seq !== _aglRenderSeq || !info) return;   // a newer render started
+  if (info.error) { $("agLayersHint").textContent = info.error; return; }
+  AGL = info;
+  const names = new Set((info.layers || []).map((l) => l.name));
+  [...aglSelected].forEach((n) => { if (!names.has(n)) aglSelected.delete(n); });
+  renderArcgisPro(info);
+  renderArcgisLayerLibrary(info);
+  renderArcgisLayerTable(info);
+  updateArcgisLayersProgress();
+}
+
+function renderArcgisPro(info) {
+  const pro = info.pro || {}, probe = info.last_probe;
+  $("agProMeta").textContent = pro.found ? (pro.how === "chosen" ? "chosen python.exe" : "found") : "not found";
+  let hint;
+  if (pro.found) {
+    hint = `The refresh runs in ArcGIS Pro's own Python: ${pro.python}`
+      + (pro.how === "chosen" ? " (chosen by you)." : " (found automatically).");
+    if (pro.chosen_missing) hint += " The python.exe chosen earlier is gone, so the one found automatically is used.";
+  } else {
+    hint = "ArcGIS Pro wasn't found on this PC. The refresh runs in ArcGIS Pro's own Python, "
+      + "so it needs ArcGIS Pro installed and signed in. If it's installed somewhere unusual, "
+      + "choose its python.exe (…\\bin\\Python\\envs\\arcgispro-py3\\python.exe).";
+  }
+  $("agProHint").textContent = hint;
+  const chk = $("agProCheck");
+  chk.className = "hint";
+  if (!probe) {
+    chk.textContent = pro.found ? "Not checked yet — Check ArcGIS Pro reads one small layer end to end (about a minute)." : "";
+  } else {
+    let t = `Last check ${aglWhen(probe.when)}: ${probe.message || (probe.ok ? "OK" : "failed")}`;
+    const f = probe.facts || {};
+    if (probe.ok) {
+      if (f.portal) t += ` Signed in to ${f.portal}.`;
+      if (probe.library_match === false) {
+        const d = probe.library_diff || {};
+        t += " Its columns differ from the library's copy"
+          + ((d.added || []).length ? ` (new: ${d.added.join(", ")})` : "")
+          + ((d.missing || []).length ? ` (gone: ${d.missing.join(", ")})` : "") + ".";
+      }
+      if (probe.dialect === "codes") t += " It writes domain codes rather than labels — the builds read both.";
+    }
+    chk.textContent = t;
+    chk.classList.add(probe.ok ? "agl-ok" : "agl-err");
+  }
+  $("btnAgProAuto").classList.toggle("hidden", !pro.chosen);
+}
+
+function renderArcgisLayerLibrary(info) {
+  const layers = info.layers || [];
+  const stamps = layers.filter((l) => l.present && l.exported_at).map((l) => l.exported_at).sort();
+  const meta = `${info.present || 0}/${info.expected || 0} layers` + (info.size ? ` · ${aglSize(info.size)}` : "");
+  $("agLayersMeta").textContent = meta;
+  let hint;
+  if (!info.present) {
+    hint = "No layers yet. Refresh all layers exports every TSMIS layer with ArcGIS Pro into this library.";
+  } else {
+    const oldest = aglWhen(stamps[0]), newest = aglWhen(stamps[stamps.length - 1]);
+    hint = !stamps.length ? "The layers' export time is unknown."
+      : (oldest.slice(0, 10) === newest.slice(0, 10) ? `Layers exported ${oldest}.`
+        : `Layers exported between ${oldest} and ${newest} — a build reads as of its oldest layer.`);
+  }
+  hint += ` Refresh exports from ${info.service} with ArcGIS Pro and swaps each layer in as it `
+    + "finishes; builds made from the old layers then read stale on Reports vs layers.";
+  $("agLayersHint").textContent = hint;
+  const foot = [];
+  const run = info.last_run;
+  if (run && run.status && run.status !== "running") {
+    foot.push(`Last refresh ${aglWhen(run.finished || run.started)}: ${String(run.message || run.status).split("\n")[0]}`);
+  }
+  if (info.present && !info.index_present) foot.push("00_INDEX.xlsx is missing — refresh the layers to write it.");
+  if ((info.unknown || []).length) foot.push(`Not library layers (ignored): ${info.unknown.join(", ")}`);
+  if (info.backup) foot.push("The files the last refresh replaced are kept in the _previous folder until the next refresh.");
+  $("agLayersFoot").textContent = foot.join("  ·  ");
+}
+
+function aglStatus(l, m) {
+  if (m && m.phase === "layers" && m.row === l.name && aglJobRunning())
+    return { text: "exporting…", cls: "warn" };
+  const last = l.last;
+  if (!l.present && (!last || last.status !== "failed"))
+    return { text: "missing — refresh it", cls: "warn" };
+  if (!last) return { text: "", cls: "" };
+  if (last.status === "exported") {
+    const secs = typeof last.seconds === "number" ? ` in ${fmtDur(last.seconds) || "1s"}` : "";
+    return { text: `refreshed${secs}` + (last.message ? ` · ${last.message}` : ""), cls: "ok" };
+  }
+  if (last.status === "failed") return { text: `failed: ${last.message || "see the log"}`, cls: "err" };
+  if (last.status === "cancelled") return { text: "cancelled before it exported", cls: "warn" };
+  if (last.status === "queued" || last.status === "exporting")
+    return aglJobRunning() ? { text: "waiting…", cls: "" } : { text: "not finished — refresh it again", cls: "warn" };
+  return { text: last.status, cls: "" };
+}
+
+function renderArcgisLayerTable(info) {
+  const table = $("agLayersTable");
+  const layers = info.layers || [];
+  const locked = !!(S.st && S.st.task);
+  const m = S.st && S.st.matrix;
+  table.textContent = "";
+  const cellDiv = (cls, text, title) => {
+    const d = document.createElement("div");
+    if (cls) d.className = cls;
+    if (text != null) d.textContent = text;
+    if (title) d.title = title;
+    return d;
+  };
+  const head = document.createElement("div");
+  head.className = "agl-row agl-head";
+  const allBox = document.createElement("input");
+  allBox.type = "checkbox";
+  allBox.className = "agl-box";
+  allBox.title = "Select every layer";
+  allBox.checked = layers.length > 0 && layers.every((l) => aglSelected.has(l.name));
+  allBox.disabled = locked;
+  allBox.onchange = () => {
+    layers.forEach((l) => (allBox.checked ? aglSelected.add(l.name) : aglSelected.delete(l.name)));
+    renderArcgisLayerTable(AGL);
+    updateArcgisLayersProgress();
+  };
+  const hc = cellDiv("agl-check");
+  hc.appendChild(allBox);
+  head.append(hc, cellDiv("", "Layer · read by"), cellDiv("num", "Rows"),
+    cellDiv("", "Exported"), cellDiv("num", "Size"), cellDiv("", "Last refresh"));
+  table.appendChild(head);
+  layers.forEach((l) => {
+    const row = document.createElement("div");
+    const st = aglStatus(l, m);
+    row.className = "agl-row" + (l.present ? "" : " missing")
+      + (m && m.phase === "layers" && m.row === l.name && aglJobRunning() ? " active" : "");
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.className = "agl-box";
+    box.checked = aglSelected.has(l.name);
+    box.disabled = locked;
+    box.title = `Select ${l.name}`;
+    box.onchange = () => {
+      if (box.checked) aglSelected.add(l.name); else aglSelected.delete(l.name);
+      allBox.checked = layers.every((x) => aglSelected.has(x.name));
+      updateArcgisLayersProgress();
+    };
+    const cc = cellDiv("agl-check");
+    cc.appendChild(box);
+    const users = (l.used_by || []).join(", ");
+    const layer = cellDiv("agl-layer");
+    layer.append(
+      cellDiv("agl-name", l.name, l.file ? `${l.file}${l.source ? "\n" + l.source : ""}` : "not in the library"),
+      cellDiv("agl-users", users || "not read by a build yet"));
+    row.append(
+      cc, layer,
+      cellDiv("num", Number.isFinite(Number(l.rows)) && l.present ? Number(l.rows).toLocaleString() : ""),
+      cellDiv("agl-when", aglWhen(l.exported_at), l.exported_by || ""),
+      cellDiv("num", aglSize(l.size)),
+      cellDiv("agl-status" + (st.cls ? " " + st.cls : ""), st.text, st.text));
+    table.appendChild(row);
+  });
+}
+
+// Called on every state push while the Layers sub-tab shows (no API call):
+// the live progress line, the Cancel button, the lock-sensitive controls, and
+// a table re-read whenever a layer finishes or the exporting layer changes.
+function updateArcgisLayersProgress() {
+  const locked = !!(S.st && S.st.task);
+  const running = aglJobRunning();
+  const m = (S.st && S.st.matrix) || null;
+  const prog = $("agLayersProgress");
+  if (prog) {
+    const show = running && m && (m.phase === "layers" || m.phase === "probe");
+    prog.hidden = !show;
+    if (show) prog.textContent = aglProgressText(m);
+  }
+  const cancel = $("btnAgLayersCancel");
+  if (cancel) { cancel.classList.toggle("hidden", !running); cancel.disabled = !running; }
+  const all = $("btnAgRefreshAll"), sel = $("btnAgRefreshSel");
+  if (all) all.disabled = locked;
+  if (sel) {
+    sel.disabled = locked || aglSelected.size === 0;
+    sel.lastChild.textContent = aglSelected.size ? `Refresh selected (${aglSelected.size})` : "Refresh selected";
+  }
+  ["btnAgProCheck", "btnAgProChoose", "btnAgProAuto"].forEach((id) => {
+    const b = $(id);
+    if (b) b.disabled = locked;
+  });
+  document.querySelectorAll("#agLayersTable .agl-box").forEach((b) => { b.disabled = locked; });
+  const seen = running && m ? `${m.phase}:${m.done}:${m.row || ""}` : "idle";
+  if (AGL && seen !== _aglSeen) {
+    const first = _aglSeen === null;
+    _aglSeen = seen;
+    if (!first) renderArcgisLayers();
+  }
+}
+
+async function aglRefresh(names) {
+  const r = await api.refresh_arcgis_layers(names);
+  if (r && r.error) { showMessage("error", "Can't refresh", r.error); return false; }
+  return true;
 }
 
 // ---- "Reports vs layers": the library card ------------------------------- //
@@ -130,12 +373,13 @@ function renderArcgisLibrary(lib) {
   const fp = drop.fingerprint ? String(drop.fingerprint) : "";
   let hint;
   if (!staged) {
-    hint = "Drop the per-layer .xlsx exports plus the export's 00_INDEX.xlsx manifest in the layers folder.";
+    hint = "No layers yet — refresh them on the Layers tab.";
   } else {
     hint = drop.exported
-      ? `Staged drop exported ${drop.exported_at || drop.exported}`
+      ? `Layers exported ${aglWhen(drop.exported_at) || drop.exported}`
+        + (drop.mixed && drop.newest_at ? ` to ${aglWhen(drop.newest_at)} (a build reads as of its oldest layer)` : "")
         + (drop.exported_source === "files" ? " (from the file dates — the manifest carries no timestamp)" : "")
-      : "The staged drop's export date is unknown";
+      : "The layers' export date is unknown";
     hint += (fp ? ` · fingerprint …${fp.slice(-10)}` : "")
       + ". Every build records the drop it came from; a row built from another drop reads stale.";
   }
@@ -426,6 +670,7 @@ function updateArcgisMatrixProgress() {
       el.hidden = false;
       el.textContent = m.phase === "building"
         ? `Building from the layers${m.row ? " — " + m.row : ""}…`
+        : (m.phase === "layers" || m.phase === "probe") ? aglProgressText(m)
         : mxProgressText(m);
     } else el.hidden = true;
   }
@@ -448,8 +693,39 @@ function updateArcgisMatrixProgress() {
 }
 
 function bindArcgis() {
+  $("subAgLayers").onclick = () => setArcgisSub("layers");
   $("subAgCleanRoad").onclick = () => setArcgisSub("cleanroad");
   $("subAgReports").onclick = () => setArcgisSub("reports");
+  $("btnAgRefreshAll").onclick = async () => {
+    const n = (AGL && AGL.expected) || 40;
+    const ok = await showConfirm({
+      title: `Refresh all ${n} layers?`,
+      message: "ArcGIS Pro exports every TSMIS layer from the service and the app swaps each one "
+        + "in as it finishes — the largest layers take several minutes each. Builds made from "
+        + "the current layers read stale afterwards; rebuild them on Reports vs layers.",
+      confirmLabel: "Refresh",
+    });
+    if (ok) await aglRefresh([]);
+  };
+  $("btnAgRefreshSel").onclick = async () => {
+    if (!aglSelected.size) return;
+    if (await aglRefresh([...aglSelected])) { aglSelected.clear(); renderArcgisLayers(); }
+  };
+  $("btnAgProCheck").onclick = async () => {
+    const r = await api.check_arcgis_pro();
+    if (r && r.error) showMessage("error", "Can't check ArcGIS Pro", r.error);
+  };
+  $("btnAgProChoose").onclick = async () => {
+    const r = await api.choose_arcgis_python();
+    if (r && r.error) showMessage("error", "Not ArcGIS Pro's Python", r.error);
+    if (r && !r.cancelled) renderArcgisLayers();
+  };
+  $("btnAgProAuto").onclick = async () => {
+    await api.clear_arcgis_python();
+    renderArcgisLayers();
+  };
+  $("btnAgLayersOpen").onclick = () => api.open_arcgis_layers_folder();
+  $("btnAgLayersCancel").onclick = () => api.cancel_run();
   $("btnAgRepOpenOut").onclick = () => api.open_arcgis_reports_folder();
   $("btnAgOpenLayers").onclick = () => api.open_arcgis_layers_folder();
   $("btnAgOpenOut").onclick = () => api.open_arcgis_output_folder();

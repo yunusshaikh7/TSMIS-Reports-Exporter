@@ -91,10 +91,10 @@ class GuiSettingsMixin:
         }
 
     def _arcgis_layers_status(self):
-        """What the Settings tab's ArcGIS layers section shows: the drop-zone
-        path and what the owner has staged there. Best-effort — the section is
-        informational (nothing consumes the layers yet), so a probe failure
-        degrades to an empty listing rather than breaking the whole payload."""
+        """What the Settings tab's paths list shows for the ArcGIS layer library:
+        its folder and how many workbooks it holds (the library itself is managed
+        on ArcGIS ▸ Layers). Best-effort — the line is informational, so a probe
+        failure degrades to an empty listing rather than breaking the payload."""
         try:
             import arcgis_layers                # lazy: keeps get_settings cheap
             return arcgis_layers.status()

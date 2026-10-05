@@ -27,12 +27,11 @@ function fillSettings() {
   $("btnRevert").classList.toggle("hidden", meta.update_support !== "ok");
   const paths = $("setPaths");
   paths.textContent = "";
-  // The manually-stocked ArcGIS layer drop-zone: path + how many workbooks are
-  // staged. Nothing consumes them yet, so it lives here (a location you need to
-  // know) rather than in a panel of its own.
+  // The ArcGIS layer library's location + how many workbooks it holds. It is
+  // managed on ArcGIS ▸ Layers (v0.46.0); this line is just where it lives.
   const ag = s.arcgis_layers || {};
   const agLine = ag.root
-    ? `${ag.root}   (${ag.count || 0} staged)`
+    ? `${ag.root}   (${ag.count || 0} files — refresh them on ArcGIS ▸ Layers)`
     : null;
   [["Data folder", meta.data_root], ["Output folder", meta.output_root],
    ["ArcGIS layers", agLine],

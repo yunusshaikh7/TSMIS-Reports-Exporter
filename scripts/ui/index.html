@@ -718,25 +718,79 @@
         </div><!-- /pveMatrixSection -->
       </div>
 
-      <!-- ArcGIS pane: everything built FROM the layer library, in two sub-tabs.
-           REPORTS VS LAYERS (the main view) renders every TSMIS report from the
-           layers and diffs it against our own export of it as a by-day MATRIX —
-           TSMIS vs TSMIS, so the two sides should agree; one build per report,
-           like the TSN library, each stamped with the layer drop it came from.
-           CLEAN ROAD VS TSN is the CA HIGHWAYS overlay build + the ArcGIS-vs-TSN
-           comparison (kept for when the TSN extract needs re-checking). -->
+      <!-- ArcGIS pane: the layer library and everything built FROM it, in three
+           sub-tabs. LAYERS (v0.46.0, first) manages the app's own copy of the
+           TSMIS layers and refreshes it with ArcGIS Pro — no manual export.
+           REPORTS VS LAYERS renders every TSMIS report from the layers and diffs
+           it against our own export of it as a by-day MATRIX — TSMIS vs TSMIS,
+           so the two sides should agree; one build per report, like the TSN
+           library, each stamped with the layer drop it came from. CLEAN ROAD VS
+           TSN is the CA HIGHWAYS overlay build + the ArcGIS-vs-TSN comparison
+           (kept for when the TSN extract needs re-checking). -->
       <div class="card pane hidden mx-host" id="paneArcgis">
         <div class="subtabs" role="tablist">
-          <button class="subtab active" id="subAgReports" role="tab" aria-selected="true">
+          <button class="subtab active" id="subAgLayers" role="tab" aria-selected="true">
+            <svg class="ic"><use href="#i-layers"/></svg>Layers
+          </button>
+          <button class="subtab" id="subAgReports" role="tab" aria-selected="false">
             <svg class="ic"><use href="#i-compare"/></svg>Reports vs layers
           </button>
           <button class="subtab" id="subAgCleanRoad" role="tab" aria-selected="false">
-            <svg class="ic"><use href="#i-layers"/></svg>Clean Road vs TSN
+            <svg class="ic"><use href="#i-grid"/></svg>Clean Road vs TSN
           </button>
         </div>
 
-        <!-- Sub-tab 1 (default): the layer library + the by-day matrix -->
-        <div id="agReports" class="mx-pane">
+        <!-- Sub-tab 1 (default): the layer library — ArcGIS Pro + the 40 layers -->
+        <div id="agLayers">
+        <div class="card-section" id="agProSection">
+          <div class="section-head">
+            <span class="section-label">ArcGIS Pro</span>
+            <span class="section-meta" id="agProMeta">—</span>
+          </div>
+          <p class="hint" id="agProHint">Looking for ArcGIS Pro…</p>
+          <p class="hint" id="agProCheck"></p>
+          <div class="actions-row">
+            <button class="btn btn-standard btn-small" id="btnAgProCheck">
+              <svg class="ic"><use href="#i-check"/></svg>Check ArcGIS Pro
+            </button>
+            <button class="btn btn-subtle btn-small" id="btnAgProChoose">
+              <svg class="ic"><use href="#i-folder-open"/></svg>Choose python.exe…
+            </button>
+            <button class="btn btn-subtle btn-small hidden" id="btnAgProAuto">
+              <svg class="ic"><use href="#i-search"/></svg>Find it automatically
+            </button>
+          </div>
+        </div>
+
+        <div class="card-section">
+          <div class="section-head">
+            <span class="section-label">Layer library</span>
+            <span class="section-meta" id="agLayersMeta">—</span>
+          </div>
+          <p class="hint" id="agLayersHint">Reading the layer library…</p>
+          <div class="actions-row agl-actions">
+            <button class="btn btn-accent" id="btnAgRefreshAll">
+              <svg class="ic"><use href="#i-refresh"/></svg>Refresh all layers
+            </button>
+            <button class="btn btn-standard" id="btnAgRefreshSel" disabled>
+              <svg class="ic"><use href="#i-refresh"/></svg>Refresh selected
+            </button>
+            <span class="hint agl-progress" id="agLayersProgress" hidden></span>
+            <span class="spacer"></span>
+            <button class="btn btn-subtle btn-small hidden" id="btnAgLayersCancel">
+              <svg class="ic"><use href="#i-x"/></svg>Cancel
+            </button>
+            <button class="btn btn-subtle btn-small" id="btnAgLayersOpen">
+              <svg class="ic"><use href="#i-folder-open"/></svg>Open layers folder
+            </button>
+          </div>
+          <div class="agl-table" id="agLayersTable" role="table" aria-label="ArcGIS layers"></div>
+          <p class="hint" id="agLayersFoot"></p>
+        </div>
+        </div><!-- /agLayers -->
+
+        <!-- Sub-tab 2: the layer builds + the by-day matrix -->
+        <div id="agReports" class="mx-pane hidden">
         <div class="card-section" id="agLibSection">
           <div class="section-head">
             <span class="section-label">ArcGIS layer library</span>
@@ -797,7 +851,7 @@
         </div>
         </div><!-- /agReports -->
 
-        <!-- Sub-tab 2: the clean-road files vs the TSN extract -->
+        <!-- Sub-tab 3: the clean-road files vs the TSN extract -->
         <div id="agCleanRoad" class="hidden">
         <div class="card-section">
           <div class="section-head">

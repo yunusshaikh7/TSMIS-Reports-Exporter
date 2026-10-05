@@ -98,6 +98,11 @@ APP_MODULES = [
     "arcgis_report_intersection_detail",  # the IM layers rendered as Intersection Detail
     "compare_intersection_detail_arcgis",  # the ArcGIS-vs-TSMIS Intersection Detail comparison
     "gui_arcgis_api",                    # the ArcGIS tab endpoints
+    # v0.46.0 — the in-app layer refresh: ArcGIS Pro discovery + worker sessions,
+    # the refresh/probe orchestration, its GUI workers, and the stand-in ArcPy
+    # the frozen --self-test drives the shipped worker with.
+    "arcgis_pro", "arcgis_refresh", "gui_worker_arcgis", "arcgis_selftest",
+    "gui_arcgis_layers_api",             # the ArcGIS ▸ Layers tab endpoints
     "export_multi",
     "highway_log_columns", "intersection_detail_columns",   # the corrected/canonical column headers
     "highway_detail_columns",                                # Highway Detail labels + legend (v0.20.0)
@@ -191,6 +196,10 @@ _UI_ASSET_EXTS = {".html", ".htm", ".css", ".js", ".mjs", ".svg",
 datas += [(os.path.join(UI_DIR, f), "ui") for f in os.listdir(UI_DIR)
           if os.path.isfile(os.path.join(UI_DIR, f))
           and os.path.splitext(f)[1].lower() in _UI_ASSET_EXTS]
+
+# v0.46.0: the layer export worker ships as a plain .py DATA file, never a
+# compiled module — ArcGIS Pro's own Python runs it (arcgis_pro.worker_script).
+datas += [(os.path.join(SCRIPTS, "arcgis_worker", "export_layers.py"), "arcgis_worker")]
 
 # pywebview (Edge WebView2 GUI shell) + its Windows backend: pythonnet/clr need
 # their package data (Python.Runtime.dll, the netstandard facade DLLs, the

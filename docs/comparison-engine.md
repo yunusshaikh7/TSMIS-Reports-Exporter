@@ -1593,19 +1593,25 @@ export** (either edition — Excel preferred — consolidated from its run folde
 shared `matrix._ensure_consolidated`). Both sides are TSMIS, so they should agree.
 
 - **One build per report, like the TSN library** (owner decision 2026-09-02). The layers
-  are exported by hand and rarely, so every day column compares against the same built
+  are refreshed rarely (by hand until v0.46.0, from the ArcGIS ▸ Layers tab since), so
+  every day column compares against the same built
   workbook (`build_mod.OUT_PATH`; HD and ID under `output/arcgis_reports/`, Clean Road
   Highway under `output/arcgis_cleanroad/`). `build_report` builds it — gating on the
-  report's OWN `REQUIRED_LAYERS`, with the as-of defaulting to the DROP's export date and
-  never the TSN extract's — and the build stamps the drop it came from into its marker
+  report's OWN `REQUIRED_LAYERS`, with the as-of defaulting to the OLDEST export date
+  among those layers (`arcgis_layers.consistent_asof`; v0.46.0 — a partly refreshed
+  library records each layer's own export time) and never the TSN extract's — and the
+  build stamps the drop it came from into its marker
   sheet and sidecar (`layer_drop: {fingerprint, exported}` under the module's
   `SIDECAR_KEY`).
-- **The drop's identity** (`arcgis_layers.drop_info`): the v2 content fingerprint over
-  every file in `arcgis_layers/` (`artifact_store.fingerprint`, memoized per file in
-  process — the 350 MB drop hashes once per session) plus the export date read from the
-  `00_INDEX.xlsx` manifest's own `created` timestamp (openpyxl stamps it in UTC; shown as
-  the local date), falling back to the newest file date and saying so. The manifest has
-  no date column; the timestamp is the drop's export moment.
+- **The drop's identity** (`arcgis_layers.drop_info`): a content fingerprint over the
+  `.xlsx` files in `arcgis_layers/` (names + `artifact_store.content_digest`, memoized
+  per file in process — the 350 MB drop hashes once per session; since v0.46.0 the
+  README, the app's `_refresh/` and `_previous/` folders and in-flight temps never
+  count, so the fingerprint changed shape once and every build read stale once) plus
+  the export date: the OLDEST layer's *Exported At* when the manifest records it (the
+  in-app refresh writes it per layer; `mixed`/`newest_at` say when layers span days), a
+  manual manifest's own `created` timestamp (openpyxl stamps it in UTC; shown as the
+  local date) otherwise, and the newest file date as the last fallback, saying so.
 - **`build_state` / `library_snapshot`**: per row — available (a build module exists),
   built, trusted (the outcome sidecar is current), `comparable_now` (trusted AND
   `outcome.comparable`), the as-of, the record count, and `drop_current` (the recorded
