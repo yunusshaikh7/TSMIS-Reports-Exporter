@@ -12,7 +12,7 @@ touching.
 
 ## Current status and work
 
-**Current release: v0.45.2 (2026-10-02).** The comparison-audit ledger records
+**Current release: v0.46.0 (2026-10-05).** The comparison-audit ledger records
 246 closed findings. Confirm release state in `version.py` and `CHANGELOG.md`;
 the roadmap tracks remaining acceptance, follow-ups, and feature work.
 
@@ -90,6 +90,7 @@ points), every claim anchored to `file:symbol`.
 - **Golden checks / how to verify / test-data locations** → verification-and-testing.md
 - **Adding a report / consolidator / comparison** → reports.md
 - **ArcGIS layers / Clean Road / rendering a report from the layers / the Reports-vs-layers matrix** → planning/cleanroad-highways.md + comparison-engine.md §9j–§9l and §12d + gui.md (the ArcGIS tab)
+- **Refreshing the layer library / ArcGIS Pro's Python / the export worker (v0.46.0)** → gui.md "The ArcGIS tab" (Layers) + it-and-security.md §1 (the one other program the app starts); code: `arcgis_pro.py`, `arcgis_refresh.py`, `arcgis_worker/export_layers.py`; proof: `check_arcgis_refresh` + `arcgis_selftest.py`
 - **Making a comparison faster (and the rules that keep it output-locked)** → comparison-engine.md §2b–§2c + planning/vs-tsn-comparison-speed.md
 
 ## Conventions, archive, and external resources

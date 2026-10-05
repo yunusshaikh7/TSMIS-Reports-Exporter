@@ -3,6 +3,40 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.46.0 — 2026-10-05
+
+The app now refreshes the ArcGIS layers itself, so there is no more manual
+export.
+
+- **ArcGIS ▸ Layers.** A new sub-tab, ahead of Reports vs layers, lists the 40
+  TSMIS layers the reports are built from: each layer's rows, when it was
+  exported, its size, which builds read it, and how its last refresh went.
+  **Refresh all layers** (or tick some and **Refresh selected**) exports them
+  with ArcGIS Pro and swaps each one in as it finishes. ArcGIS Pro must be
+  installed and signed in on the PC; the app finds its Python automatically, and
+  **Choose python.exe…** covers a PC where it doesn't.
+- **Check ArcGIS Pro.** One button proves the whole path in about a minute: it
+  starts ArcGIS Pro's Python, reads and exports the small SHS Tolls layer, and
+  checks the file matches the library's copy. When something is wrong (signed
+  out, a different portal active) it says what to fix.
+- **The same files as the manual export.** Each layer is read from the TSMIS
+  feature service and written with ArcGIS's own Table To Excel tool, field names
+  as headers and coded values as their descriptions, under its existing file
+  name. A layer is only swapped in after its row count is checked against
+  ArcGIS's own count; the file it replaces is kept in `arcgis_layers\_previous`
+  until the next refresh, and 00_INDEX.xlsx now records when each layer was
+  exported. A manual export in the same shape still works.
+- **Builds use the right date.** A layer build's default "as of" is now the
+  oldest export date among the layers that report reads, so a partial refresh
+  never makes a build claim a date one of its layers hasn't seen.
+- After updating, every layer build on Reports vs layers reads *stale* once (the
+  library's fingerprint now counts only the layer files, so a note file can no
+  longer stale them). Refresh the layers, then rebuild.
+
+Verified offline against a stand-in for ArcGIS (the real export worker runs in a
+separate process, including a crash, a stall, cancel and a truncated export);
+the first real ArcGIS Pro run on the work PC is still owed.
+
 ## v0.45.2 — 2026-10-02
 
 Clean Road reports can now be saved as PDFs.
