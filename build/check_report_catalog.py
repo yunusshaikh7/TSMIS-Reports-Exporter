@@ -98,6 +98,19 @@ import compare_highway_sequence_pdf as _chslp
 import compare_highway_detail_tsn as _chd_tsn
 import compare_highway_detail_pdf as _chdp
 import compare_highway_summary_tsn as _chstsn
+# v0.48.0: the nine second editions.
+import consolidate_ramp_summary_excel as _con_rs_excel
+import consolidate_tsmis_intersection_summary_pdf as _con_tsmis_is_pdf
+import consolidate_tsmis_highway_summary_pdf as _con_tsmis_hs_pdf
+import consolidate_clean_road_highway as _con_cr_hwy
+import consolidate_clean_road_intersection as _con_cr_inx
+import consolidate_clean_road_ramp as _con_cr_ram
+import consolidate_tsmis_clean_highway_pdf as _con_tsmis_cr_hwy_pdf
+import consolidate_tsmis_clean_intersection_pdf as _con_tsmis_cr_inx_pdf
+import consolidate_tsmis_clean_ramp_pdf as _con_tsmis_cr_ram_pdf
+import compare_env_editions as _ce2
+import compare_summary_editions as _cse
+import compare_clean_road_tsn as _ccr
 
 _fail = []
 
@@ -165,6 +178,16 @@ _CONSOLIDATE = [  # (key, label, expected module)
     ("cons:highway_detail_pdf", "TSMIS Highway Detail (PDF)", _con_tsmis_highway_detail_pdf),
     # v0.37.0: Highway Summary, appended (the vendor released it 2026-08-17).
     ("cons:highway_summary", "Highway Summary", _con_highway_summary),
+    # v0.48.0: the nine second editions, appended.
+    ("cons:ramp_summary_excel", "TSAR: Ramp Summary (Excel)", _con_rs_excel),
+    ("cons:intersection_summary_pdf", "TSMIS Intersection Summary (PDF)", _con_tsmis_is_pdf),
+    ("cons:highway_summary_pdf", "TSMIS Highway Summary (PDF)", _con_tsmis_hs_pdf),
+    ("cons:clean_highway", "Clean Road: Highway", _con_cr_hwy),
+    ("cons:clean_highway_pdf", "TSMIS Clean Road: Highway (PDF)", _con_tsmis_cr_hwy_pdf),
+    ("cons:clean_intersection", "Clean Road: Intersection", _con_cr_inx),
+    ("cons:clean_intersection_pdf", "TSMIS Clean Road: Intersection (PDF)", _con_tsmis_cr_inx_pdf),
+    ("cons:clean_ramp", "Clean Road: Ramp", _con_cr_ram),
+    ("cons:clean_ramp_pdf", "TSMIS Clean Road: Ramp (PDF)", _con_tsmis_cr_ram_pdf),
 ]
 _COMPARE = [  # (key, label, kind, group, expected adapter)
     ("cmp:ramp_summary:env", "TSAR: Ramp Summary — between environments", "folders", "env", _ce.RAMP_SUMMARY),
@@ -185,6 +208,16 @@ _COMPARE = [  # (key, label, kind, group, expected adapter)
     # v0.37.0: the Highway Summary env row, appended likewise (its ONLY comparison —
     # no TSN Highway Summary source exists yet, so there is no `:tsn` row below).
     ("cmp:highway_summary:env", "Highway Summary — between environments", "folders", "env", _ce.HIGHWAY_SUMMARY),
+    # v0.48.0: the nine second editions' env rows, after the existing env rows.
+    ("cmp:ramp_summary_excel:env", "TSAR: Ramp Summary (Excel) — between environments", "folders", "env", _ce2.RAMP_SUMMARY_EXCEL),
+    ("cmp:intersection_summary_pdf:env", "Intersection Summary (PDF) — between environments", "folders", "env", _ce2.INTERSECTION_SUMMARY_PDF),
+    ("cmp:highway_summary_pdf:env", "Highway Summary (PDF) — between environments", "folders", "env", _ce2.HIGHWAY_SUMMARY_PDF),
+    ("cmp:clean_highway:env", "Clean Road: Highway — between environments", "folders", "env", _ce2.CLEAN_HIGHWAY),
+    ("cmp:clean_highway_pdf:env", "Clean Road: Highway (PDF) — between environments", "folders", "env", _ce2.CLEAN_HIGHWAY_PDF),
+    ("cmp:clean_intersection:env", "Clean Road: Intersection — between environments", "folders", "env", _ce2.CLEAN_INTERSECTION),
+    ("cmp:clean_intersection_pdf:env", "Clean Road: Intersection (PDF) — between environments", "folders", "env", _ce2.CLEAN_INTERSECTION_PDF),
+    ("cmp:clean_ramp:env", "Clean Road: Ramp — between environments", "folders", "env", _ce2.CLEAN_RAMP),
+    ("cmp:clean_ramp_pdf:env", "Clean Road: Ramp (PDF) — between environments", "folders", "env", _ce2.CLEAN_RAMP_PDF),
     ("cmp:highway_log:tsn", "Highway Log — TSMIS vs TSN", "files", "tsn", _chl),
     ("cmp:highway_log:pdf_vs_tsn", "Highway Log — TSMIS (PDF) vs TSN (PDF)", "files", "tsn", _chlp.TSMIS_PDF_VS_TSN),
     ("cmp:highway_log:pdf_vs_excel", "Highway Log — TSMIS (PDF) vs TSMIS (Excel)", "files", "self", _chlp.TSMIS_PDF_VS_EXCEL),
@@ -207,6 +240,22 @@ _COMPARE = [  # (key, label, kind, group, expected adapter)
     ("cmp:ramp_detail:pdf_vs_excel", "TSAR: Ramp Detail — TSMIS (PDF) vs TSMIS (Excel)", "files", "self", _crdp.TSMIS_PDF_VS_EXCEL),
     # v0.37.0: the Highway Summary vs-TSN row (AGGREGATE), appended LAST.
     ("cmp:highway_summary:tsn", "Highway Summary — TSMIS vs TSN", "files", "tsn", _chstsn),
+    # v0.48.0: the second editions' vs-TSN + PDF-vs-Excel file rows, appended.
+    ("cmp:ramp_summary:excel_vs_tsn", "TSAR: Ramp Summary — TSMIS (Excel) vs TSN", "files", "tsn", _cse.RAMP_SUMMARY_EXCEL_VS_TSN),
+    ("cmp:ramp_summary:pdf_vs_excel", "TSAR: Ramp Summary — TSMIS (PDF) vs TSMIS (Excel)", "files", "self", _cse.RAMP_SUMMARY_PDF_VS_EXCEL),
+    ("cmp:intersection_summary:pdf_vs_tsn", "Intersection Summary — TSMIS (PDF) vs TSN", "files", "tsn", _cse.INTERSECTION_SUMMARY_PDF_VS_TSN),
+    ("cmp:intersection_summary:pdf_vs_excel", "Intersection Summary — TSMIS (PDF) vs TSMIS (Excel)", "files", "self", _cse.INTERSECTION_SUMMARY_PDF_VS_EXCEL),
+    ("cmp:highway_summary:pdf_vs_tsn", "Highway Summary — TSMIS (PDF) vs TSN", "files", "tsn", _cse.HIGHWAY_SUMMARY_PDF_VS_TSN),
+    ("cmp:highway_summary:pdf_vs_excel", "Highway Summary — TSMIS (PDF) vs TSMIS (Excel)", "files", "self", _cse.HIGHWAY_SUMMARY_PDF_VS_EXCEL),
+    ("cmp:clean_highway:tsn", "Clean Road: Highway — TSMIS vs TSN", "files", "tsn", _ccr.HIGHWAY_VS_TSN),
+    ("cmp:clean_highway:pdf_vs_tsn", "Clean Road: Highway — TSMIS (PDF) vs TSN", "files", "tsn", _ccr.HIGHWAY_PDF_VS_TSN),
+    ("cmp:clean_highway:pdf_vs_excel", "Clean Road: Highway — TSMIS (PDF) vs TSMIS (Excel)", "files", "self", _ccr.HIGHWAY_PDF_VS_EXCEL),
+    ("cmp:clean_intersection:tsn", "Clean Road: Intersection — TSMIS vs TSN", "files", "tsn", _ccr.INTERSECTION_VS_TSN),
+    ("cmp:clean_intersection:pdf_vs_tsn", "Clean Road: Intersection — TSMIS (PDF) vs TSN", "files", "tsn", _ccr.INTERSECTION_PDF_VS_TSN),
+    ("cmp:clean_intersection:pdf_vs_excel", "Clean Road: Intersection — TSMIS (PDF) vs TSMIS (Excel)", "files", "self", _ccr.INTERSECTION_PDF_VS_EXCEL),
+    ("cmp:clean_ramp:tsn", "Clean Road: Ramp — TSMIS vs TSN", "files", "tsn", _ccr.RAMP_VS_TSN),
+    ("cmp:clean_ramp:pdf_vs_tsn", "Clean Road: Ramp — TSMIS (PDF) vs TSN", "files", "tsn", _ccr.RAMP_PDF_VS_TSN),
+    ("cmp:clean_ramp:pdf_vs_excel", "Clean Road: Ramp — TSMIS (PDF) vs TSMIS (Excel)", "files", "self", _ccr.RAMP_PDF_VS_EXCEL),
 ]
 _AUTO_CONS = {
     "ramp_summary": _con_ramp_summary, "ramp_detail": _con_ramp_detail,
@@ -214,6 +263,10 @@ _AUTO_CONS = {
     "intersection_summary": _con_int_summary, "intersection_detail": _con_int_detail,
     "highway_detail": _con_highway_detail,
     "highway_summary": _con_highway_summary,          # v0.37.0
+    # v0.48.0: the Excel second editions.
+    "ramp_summary_excel": _con_rs_excel,
+    "clean_highway": _con_cr_hwy, "clean_intersection": _con_cr_inx,
+    "clean_ramp": _con_cr_ram,
 }
 _TSN = [
     ("highway_log", "TSN Highway Log", "*.pdf", "district_pdfs",
@@ -353,7 +406,7 @@ def test_golden_equivalence():
     self_keys = {c.key for c in cat.COMPARE if c.group == "self"}
     pdf_vs_excel_keys = {c.key for c in cat.COMPARE if c.key.endswith(":pdf_vs_excel")}
     check("every :pdf_vs_excel comparison is in the 'self' group (none left in env/tsn)",
-          self_keys == pdf_vs_excel_keys and len(self_keys) == 5)
+          self_keys == pdf_vs_excel_keys and len(self_keys) == 11)
     check("TSN descriptors == baseline",
           [(t.subdir, t.label, t.raw_glob, t.raw_kind, t.consolidated_name, t.builder)
            for t in cat.TSN] == _TSN)
@@ -689,7 +742,7 @@ def test_family_prefix_convention():
 def test_input_profiles():
     """CMP-AUD-073/074: the classic file pickers' per-recipe input profiles are
     registry-owned and match the census of the real loaders — only the 3 Highway
-    Log recipes accept a per-route file, only the 3 Summary-vs-TSN recipes offer a
+    Log recipes accept a per-route file, only the 6 Summary-vs-TSN recipes offer a
     raw TSN PDF, and every folders recipe has no profile / a safe Excel-only
     fallback."""
     print("INPUT PROFILES: per-recipe file-picker extensions + shapes (CMP-AUD-073/074):")
@@ -697,7 +750,11 @@ def test_input_profiles():
     # v0.37.0: Highway Summary joined the AGGREGATE summaries, so its TSN side
     # likewise takes the raw statewide print or the normalized workbook.
     summary_keys = {"cmp:ramp_summary:tsn", "cmp:intersection_summary:tsn",
-                    "cmp:highway_summary:tsn"}
+                    "cmp:highway_summary:tsn",
+                    # v0.48.0: the three second-edition Summary vs-TSN flavors.
+                    "cmp:ramp_summary:excel_vs_tsn",
+                    "cmp:intersection_summary:pdf_vs_tsn",
+                    "cmp:highway_summary:pdf_vs_tsn"}
     per_route = "a per-route workbook (one route) or a consolidated workbook (all routes)"
     consolidated = "a consolidated workbook (all routes)"
     tsn_shape = "the raw statewide TSN PDF, or the normalized TSN workbook"
@@ -724,7 +781,7 @@ def test_input_profiles():
     def _offers_pdf(key, side):
         return any(".pdf" in e.lower() for e in cat.compare_input_extensions(key, side))
     pdf_sides = {(c.key, side) for c in files for side in ("tsmis", "tsn") if _offers_pdf(c.key, side)}
-    check("exactly the 3 Summary-vs-TSN recipes' TSN side offers a raw PDF filter",
+    check("exactly the 6 Summary-vs-TSN recipes' TSN side offers a raw PDF filter",
           pdf_sides == {(k, "tsn") for k in summary_keys})
     check("no TSMIS (side-A) picker ever offers a PDF filter",
           all(not _offers_pdf(c.key, "tsmis") for c in files))
@@ -745,7 +802,7 @@ def test_input_profiles():
     check("every files side accepts .xlsx (case-insensitive)",
           all(acc(c.key, s, ".xlsx") and acc(c.key, s, ".XLSX")
               for c in files for s in ("tsmis", "tsn")))
-    check("exactly the 3 Summary-vs-TSN recipes' TSN side accepts .pdf",
+    check("exactly the 6 Summary-vs-TSN recipes' TSN side accepts .pdf",
           {(c.key, s) for c in files for s in ("tsmis", "tsn")
            if acc(c.key, s, ".pdf")} == {(k, "tsn") for k in summary_keys})
     check("no files side accepts an unrelated type (.txt)",

@@ -9,7 +9,7 @@ Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- 
 | # | Report | Output | Folder |
 |---|---|---|---|
 | 1 | TSAR: Ramp Summary | PDF (Letter) | `output/<run>/ramp_summary/` |
-| 1b | TSAR: Ramp Summary (Excel) | XLSX (export-only) | `output/<run>/ramp_summary_excel/` |
+| 1b | TSAR: Ramp Summary (Excel) | XLSX | `output/<run>/ramp_summary_excel/` |
 | 2 | TSAR: Ramp Detail | XLSX | `output/<run>/ramp_detail/` |
 | 2b | TSAR: Ramp Detail (PDF) | PDF (Letter, landscape) | `output/<run>/ramp_detail_pdf/` |
 | 3 | Highway Sequence Listing | XLSX | `output/<run>/highway_sequence/` |
@@ -17,16 +17,16 @@ Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- 
 | 4 | Highway Log | XLSX | `output/<run>/highway_log/` |
 | 4b | Highway Log (PDF) | PDF (Letter, landscape) | `output/<run>/highway_log_pdf/` |
 | 5 | Intersection Summary | XLSX | `output/<run>/intersection_summary/` |
-| 5b | Intersection Summary (PDF) | PDF (Letter, portrait; export-only) | `output/<run>/intersection_summary_pdf/` |
+| 5b | Intersection Summary (PDF) | PDF (Letter, portrait) | `output/<run>/intersection_summary_pdf/` |
 | 6 | Intersection Detail | XLSX | `output/<run>/intersection_detail/` |
 | 6b | Intersection Detail (PDF) | PDF (Letter, landscape) | `output/<run>/intersection_detail_pdf/` |
 | 7 | Highway Detail | XLSX | `output/<run>/highway_detail/` |
 | 7b | Highway Detail (PDF) | PDF (Letter, landscape) | `output/<run>/highway_detail_pdf/` |
 | 8 | Highway Summary | XLSX | `output/<run>/highway_summary/` |
-| 8b | Highway Summary (PDF) | PDF (Letter, portrait; export-only) | `output/<run>/highway_summary_pdf/` |
+| 8b | Highway Summary (PDF) | PDF (Letter, portrait) | `output/<run>/highway_summary_pdf/` |
 | — | Route History Table | *(none — greyed reserved placeholder, v0.25.1)* | — |
-| 9–11 | Clean Road: Highway / Intersection / Ramp | XLSX (export-only) | `output/<run>/clean_<kind>/` |
-| 9b–11b | Clean Road: … (PDF) | PDF (Letter, landscape; export-only, v0.45.2) | `output/<run>/clean_<kind>_pdf/` |
+| 9–11 | Clean Road: Highway / Intersection / Ramp | XLSX | `output/<run>/clean_<kind>/` |
+| 9b–11b | Clean Road: … (PDF) | PDF (Letter, landscape; v0.45.2) | `output/<run>/clean_<kind>_pdf/` |
 
 `<run>` is a run folder, `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`) -- see [engine-and-reliability.md](engine-and-reliability.md) for run-folder mechanics.
 
@@ -35,14 +35,14 @@ The catalog (`scripts/report_catalog.py`) is the single source of truth for repo
 ## Capability matrix — what the app can do with each report
 
 The at-a-glance status of every export type across the app's capability tiers, as of
-**v0.26.0**. Derived from `report_catalog.py` (EXPORT / CONSOLIDATE / COMPARE / TSN) +
+**v0.48.0**. Derived from `report_catalog.py` (EXPORT / CONSOLIDATE / COMPARE / TSN) +
 `visual_evidence._ADAPTER_MODULES` — when a tier lands or a report is added, update this
 table in the same change.
 
 | # | Export type (stable key) | Saves as | Consolidate | vs TSN | PDF↔Excel self-check | Cross-env | Matrix rows | Evidence images |
 |---|---|---|---|---|---|---|---|---|
-| 1 | TSAR: Ramp Summary (`ramp_summary`) | PDF | ✓ (parses its own PDFs) | ✓ aggregate | n/a | ✓ | ✓ | — (aggregate ⁵) |
-| 1b | TSAR: Ramp Summary (Excel) (`ramp_summary_excel`) | XLSX | — ¹ | — ¹ | — ¹ | — ¹ | — ¹ | — |
+| 1 | TSAR: Ramp Summary (`ramp_summary`) | PDF | ✓ (parses its own PDFs) | ✓ aggregate | ✓ ¹ | ✓ | ✓ | — (aggregate ⁵) |
+| 1b | TSAR: Ramp Summary (Excel) (`ramp_summary_excel`) | XLSX | ✓ ¹ (count tables) | ✓ aggregate | n/a | ✓ aggregate | ✓ | — (aggregate ⁵) |
 | 2 | TSAR: Ramp Detail (`ramp_detail`) | XLSX | ✓ | ✓ flat | n/a | ✓ | ✓ | ✓ |
 | 2b | TSAR: Ramp Detail (PDF) (`ramp_detail_pdf`) | PDF | ✓ | ✓ (+ the print-only On/Off + Ramp Type ²) | ✓ | ✓ | ✓ | ✓ |
 | 3 | Highway Sequence Listing (`highway_sequence`) | XLSX | ✓ | ✓ flat, county+PM key | n/a | ✓ | ✓ | ✓ |
@@ -50,18 +50,18 @@ table in the same change.
 | 4 | Highway Log (`highway_log`) | XLSX | ✓ | ✓ flat, roadbed/ditto-aware | n/a | ✓ | ✓ | ✓ |
 | 4b | Highway Log (PDF) (`highway_log_pdf`) | PDF | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | 5 | Intersection Summary (`intersection_summary`) | XLSX | ✓ (category counts) | ✓ aggregate | n/a | ✓ | ✓ | — (aggregate ⁵) |
-| 5b | Intersection Summary (PDF) (`intersection_summary_pdf`) | PDF | — ¹ | — ¹ | — ¹ | — ¹ | — ¹ | — (aggregate ⁵) |
+| 5b | Intersection Summary (PDF) (`intersection_summary_pdf`) | PDF | ✓ ¹ (parses its own prints) | ✓ aggregate | ✓ | ✓ aggregate | ✓ | — (aggregate ⁵) |
 | 6 | Intersection Detail (`intersection_detail`) | XLSX | ✓ | ✓ flat | n/a | ✓ | ✓ | ✓ |
 | 6b | Intersection Detail (PDF) (`intersection_detail_pdf`) | PDF | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | 7 | Highway Detail (`highway_detail`) | XLSX | ✓ | ✓ flat, canonical roadbed key | n/a | ✓ | ✓ | ✓ |
 | 7b | Highway Detail (PDF) (`highway_detail_pdf`) | PDF | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | 8 | Highway Summary (`highway_summary`) | XLSX | ✓ (category miles) | ✓ aggregate ³ | n/a | ✓ aggregate | ✓ | — (aggregate ⁵) |
-| 8b | Highway Summary (PDF) (`highway_summary_pdf`) | PDF | — ¹ | — ¹ | — ¹ | — ¹ | — ¹ | — (aggregate ⁵) |
+| 8b | Highway Summary (PDF) (`highway_summary_pdf`) | PDF | ✓ ¹ (parses its own prints) | ✓ aggregate | ✓ | ✓ aggregate | ✓ | — (aggregate ⁵) |
 | — | Route History Table (`route_history`) | — ⁶ | — | — | — | — | — | — |
-| 9 | Clean Road: Highway (`clean_highway`) | XLSX | — ⁷ | — ⁷ | n/a | — ⁷ | — ⁷ | — |
-| 10 | Clean Road: Intersection (`clean_intersection`) | XLSX | — ⁷ | — ⁷ | n/a | — ⁷ | — ⁷ | — |
-| 11 | Clean Road: Ramp (`clean_ramp`) | XLSX | — ⁷ | — ⁷ | n/a | — ⁷ | — ⁷ | — |
-| 9b–11b | Clean Road: … (PDF) (`clean_highway_pdf` / `clean_intersection_pdf` / `clean_ramp_pdf`) | PDF | — ⁷ | — ⁷ | n/a | — ⁷ | — ⁷ | — |
+| 9 | Clean Road: Highway (`clean_highway`) | XLSX | ✓ ⁷ | ✓ flat, county+PM key | n/a | ✓ | ✓ | — ⁷ |
+| 10 | Clean Road: Intersection (`clean_intersection`) | XLSX | ✓ ⁷ | ✓ flat, county+PM key | n/a | ✓ | ✓ | — ⁷ |
+| 11 | Clean Road: Ramp (`clean_ramp`) | XLSX | ✓ ⁷ | ✓ flat, county+PM key | n/a | ✓ | ✓ | — ⁷ |
+| 9b–11b | Clean Road: … (PDF) (`clean_highway_pdf` / `clean_intersection_pdf` / `clean_ramp_pdf`) | PDF | ✓ ⁷ (reads the print's table) | ✓ | ✓ | ✓ | ✓ | — ⁷ |
 
 Plus one **consolidate-only source** (not an export type): **TSN Highway Log (PDF)**
 (`cons:tsn_highway_log`) — TSN district prints the user drops into
@@ -70,13 +70,17 @@ retired the separate `input/` folder).
 
 **Footnotes — the current gaps, each with its unlock:**
 
-1. **The v0.25.1 editions are export-only for now.** Ramp Summary (Excel) (id 13, the
-   site's `rs_exportToExcel` — an AOA workbook of the same count tables the PDF
-   consolidator already extracts) and Intersection Summary (PDF) (id 14,
-   `ints_printAll`) ship as exports; consolidate-side integration waits for real
-   work-PC files to verify against (Lesson 13), and is low-value until someone needs
-   it — both reports' counts already consolidate + compare through their sibling
-   editions.
+1. **The three second editions of the summaries are fully integrated — v0.48.0.**
+   Ramp Summary (Excel) (id 13, the site's `rs_exportToExcel` — an AOA workbook of the
+   same count tables the PDF consolidator extracts), Intersection Summary (PDF) (id 14,
+   `ints_printAll`) and Highway Summary (PDF) (`hs_printAll`) were export-only until
+   the 2026-10-02 statewide delivery (`ground-truth/All Reports 10.2`) gave real files
+   to verify against (Lesson 13). Each now has a consolidator that writes the SAME
+   workbook shape as its sibling edition (equal counts on every route of the
+   delivery), vs TSN against
+   the sibling's TSN dataset, cross-environment, and a PDF-vs-Excel self-check on the
+   PDF row — which for Ramp Summary is row 1, because there the PDF is the base
+   edition.
 2. **Ramp Detail (PDF) graduated to fully integrated in v0.26.0** (the Highway
    Sequence (PDF) path: export v0.24.0 → the rest off the first real work-PC print
    set, `ground-truth/All Reports 7.9`). The print carries TWO columns the Excel
@@ -117,11 +121,15 @@ retired the separate `input/` folder).
    `clean_*.js` module** behind them — exactly where Highway Detail/Summary sat
    on the 6.26 capture), then un-greyed on the dev site 9.1 capture (BUILD_DATE
    2026-08-19), which ships `clean_highway.js` / `clean_intersection.js` /
-   `clean_ramp.js`. `export_clean_road.py` now carries real Excel-sibling specs
-   (the Clean Road section under Per-report specifics); they are **export-only**
-   — no consolidator or comparison for the SITE exports until real per-route
-   files are censused — and prod lags dev, so where prod still greys one
-   `select_report` fails fast. **Since v0.29.0 the HIGHWAY file has a
+   `clean_ramp.js`. `export_clean_road.py` carries real Excel-sibling specs
+   (the Clean Road section under Per-report specifics). **v0.48.0 integrates the
+   SITE exports** off the 2026-10-02 statewide delivery: consolidators for both
+   editions (the print is read with pypdfium2 straight off the site's print table —
+   [Clean Road site exports](#clean-road-site-exports--consolidate-and-compare-v0480)),
+   vs TSN against the TSN `CA HIGHWAYS` / `CA INTERSECTIONS` / `CA RAMPS` extracts
+   (the columns the site has no source for are context, never counted),
+   PDF-vs-Excel, and cross-environment. **Evidence images are not wired** for these
+   prints yet. Where prod still greys one, `select_report` fails fast. **Since v0.29.0 the HIGHWAY file has a
    different, live path that doesn't need the site at all — the ArcGIS tab**:
    the owner's per-layer ArcGIS exports in `arcgis_layers/` build OUR own
    74-column CA HIGHWAYS table (`consolidate_clean_highway`), the staged TSN
@@ -144,8 +152,8 @@ for matrix-queued edition steps since v0.32.0); **dated per-route filenames**
 (v0.32.0 — run-folder identity front-anchored, legacy names honored on resume;
 see [engine-and-reliability.md](engine-and-reliability.md));
 **auto-consolidate on export finish** (the
-seven `_AUTO_CONSOLIDATOR` families — the PDF editions consolidate via the matrix
-instead, needing a scratch convert dir); the **Everything matrix** + **Compare by-day
+twelve `_AUTO_CONSOLIDATOR` families — the PDF editions consolidate via the matrix
+instead, needing a scratch convert dir; Ramp Summary's native PDF is the exception); the **Everything matrix** + **Compare by-day
 matrix** (one row per comparison-integrated family; env / vs-TSN / vs-Excel modes per
 row); **on-demand per-cell evidence cameras** on built, fresh vs-TSN cells (the
 evidence-capable rows above).
@@ -156,13 +164,21 @@ normalizes each raw source once and caches it — see
 
 | TSN dataset | Raw source | Norm ver | Evidence prints |
 |---|---|---|---|
-| `highway_log` | exactly one internally claimed D01–D12 PDF | 4 | the same `raw/` prints (`_TSN_PDFS_IN_RAW`) |
-| `ramp_detail` | statewide XLSX | 2 | — |
-| `ramp_summary` | statewide PDF | 2 | — |
-| `intersection_summary` | statewide PDF | 2 | — |
-| `intersection_detail` | statewide XLSX | 3 | `pdf/` drop: the ONE statewide TASAS print |
-| `highway_sequence` | exactly one internally claimed D01–D12 PDF | 3 | the same `raw/` prints (`_TSN_PDFS_IN_RAW`) |
-| `highway_detail` | statewide XLSX | 2 | `pdf/` drop: the 12 district prints |
+| `highway_log` | exactly one internally claimed D01–D12 PDF | 5 | the same `raw/` prints (`_TSN_PDFS_IN_RAW`) |
+| `ramp_detail` | statewide XLSX | 5 | `pdf/` drop: the ONE statewide TASAS print |
+| `ramp_summary` | statewide PDF | 3 | — |
+| `intersection_summary` | statewide PDF | 3 | — |
+| `intersection_detail` | statewide XLSX | 5 | `pdf/` drop: the ONE statewide TASAS print |
+| `highway_sequence` | exactly one internally claimed D01–D12 PDF | 4 | the same `raw/` prints (`_TSN_PDFS_IN_RAW`) |
+| `highway_detail` | statewide XLSX | 4 | `pdf/` drop: the 12 district prints |
+| `highway_summary` | statewide PDF | 2 | — |
+| `clean_highway` | statewide XLSX (`CA HIGHWAYS`) | 1 | — |
+| `clean_intersection` | statewide XLSX (`CA INTERSECTIONS`) | 1 | — |
+| `clean_ramp` | statewide XLSX (`CA RAMPS`) | 1 | — |
+
+Each edition of a report reads its family's ONE dataset (`tsn_subdir` on the matrix row):
+Ramp Summary (Excel) reads `ramp_summary`, the summary PDFs read their Excel sibling's,
+and both Clean Road editions read `clean_<kind>`.
 
 ## `ReportSpec` -- what makes one report differ from another
 
@@ -203,7 +219,7 @@ All `wait_js` predicates also match a no-results phrase so the loop never stalls
 - **Same dropdown option as #1** -- `label="TSAR: Ramp Summary"` -- saved as an Excel workbook via the site's Export button instead of capturing the inline page as a PDF. The INVERSE of the print editions: the Excel sibling of a natively-PDF report. Module `export_ramp_summary_excel.py`; `subdir="ramp_summary_excel"`, `filename=tsar_ramp_summary_route_<ROUTE>.xlsx`. The registry's **menu label** is `"TSAR: Ramp Summary (Excel)"` (display only).
 - `wait_js` / `is_empty` are identical to the PDF Ramp Summary (inline render; `Route <route>` or `No ramps found`).
 - `save=save_via_export_button` -- the action bar's Export button calls the shared `exportToExcel()` dispatcher, which routes `Ramp_Summary` to `rs_exportToExcel()` (an `XLSX.writeFile` download of the count tables). The engine's no-download fast-fail is the empty backstop (`rs_exportToExcel` no-ops without a summary).
-- **Export-only** -- no consolidator yet (the PDF edition's consolidator already extracts the same counts); coalesces with #1 automatically (shared `data_value`).
+- **Consolidate + compare (v0.48.0)** -- `consolidate_ramp_summary_excel` reads the count tables with the SAME record shape as the PDF parser (`parse_xlsx`; the title lines are whitelisted and any unknown row refuses the file as a changed layout) and writes `tsar_ramp_summary_excel_consolidated.xlsx`; its counts equal the PDF edition's on every route of the 2026-10-02 delivery. It compares vs the `ramp_summary` TSN dataset (the same aggregate as #1), between environments, and against the PDF in the Ramp Summary PDF-vs-Excel self-check. Coalesces with #1 automatically (shared `data_value`).
 
 ### Report 2 -- TSAR: Ramp Detail (XLSX)
 - `label="TSAR: Ramp Detail"`, `subdir="ramp_detail"`, `filename=tsar_ramp_detail_route_<ROUTE>.xlsx`.
@@ -263,7 +279,7 @@ All `wait_js` predicates also match a no-results phrase so the loop never stalls
 - **Same dropdown option as #5** -- `label="Intersection Summary"` -- saved as a PDF via the page's own Print layout. Module `export_intersection_summary_pdf.py`; `subdir="intersection_summary_pdf"`; Letter, **portrait** (count tables, like the native Ramp Summary PDF). The registry's **menu label** is `"Intersection Summary (PDF)"` (display only).
 - `wait_js` / `is_empty` are identical to the Excel Intersection Summary (`.ints-total` / `Total Intersections = 0`); `is_empty` runs BEFORE save.
 - `save=save_intersection_summary_pdf` (in `exporter.py`). UNLIKE the paginated row reports, the Intersection Summary renders fully INLINE, so the site's `ints_printAll()` merely **prepends a cover page** (`.rs-cover`) to the on-screen report, calls `window.print()`, and restores in an `afterprint` listener. The save overrides `window.print` to raise (no dialog; the afterprint restore never fires), verifies the cover + `.ints-total`, re-reads the total as the marker-independent empty backstop, then `page.pdf()` captures cover + report. In `_PAGE_REBUILDING_SAVES` (the innerHTML reassignment re-creates the Export button), so a coalesced run saves the Excel edition first.
-- **Export-only** -- no consolidator/comparisons yet (the Excel edition's aggregate comparison covers the counts); coalesces with #5 automatically (shared `data_value`).
+- **Consolidate + compare (v0.48.0)** -- `consolidate_tsmis_intersection_summary_pdf` reads the print's word positions (columns anchored on the `NUMBER` headers, so both the July and the October layouts read) into the Excel edition's exact workbook shape; its counts equal the Excel edition's on every route of the 2026-10-02 delivery. It compares vs the `intersection_summary` TSN dataset, between environments, and against the Excel edition in its PDF-vs-Excel self-check. Coalesces with #5 automatically (shared `data_value`).
 
 ### Report 6b -- Intersection Detail (PDF)
 
@@ -298,7 +314,7 @@ The site added two more TSAR reports, **Highway Detail** and **Highway Summary**
 - **Real modules** `export_highway_detail.py` / `export_highway_summary.py` — each a genuine `ReportSpec` modeled on the Excel siblings (`save = save_via_export_button`). Confirmed against the **7.7 dev capture** (`highway_detail.js` live, action bar wires `hd_exportToExcel()` + `hd_printAll()`): empty = `td.hl-empty` / "No results found in this segment.", matched loosely (`td.hl-empty` OR "No … found"). Highway Detail was un-greyed on 7.7 and Highway Summary was still `cs-disabled` there (its export fail-fasted with `ReportUnavailableError`); **the vendor released BOTH on 2026-08-17**, so neither greys now.
 - **Highway Detail (PDF)** — `export_highway_detail_pdf.py`, `subdir="highway_detail_pdf"`, `data_value="highway_detail"` (same dropdown option), `save=save_highway_detail_pdf` (in `exporter.py`). The twin of `save_highway_log_pdf`: `hd_printAll()` builds the SAME `.hl-print-section` print layout; `window.print` is overridden to raise so the on-screen restore never runs, then `page.pdf()` captures it (Letter, **landscape**, 27 roadbed-grouped columns). Empty backstop counts `.hd-row1` data rows (HD's grouped columns put colspan on real rows, so Highway Log's non-colspan heuristic doesn't apply). **Appended LAST** — stable id **10** (`batch_manifest._V017_EXPORT_ORDER` stays `== EXPORT_KEYS`); `_PICKER_ORDER` places it next to its Excel sibling.
 - **The export gate holds one reserved placeholder** (`reports.DISABLED_EXPORT_SUBDIRS = {'route_history'}`): Route History (stable id 15) has no export flow, so it's greyed; every OTHER report — the Clean Road Files trio (ids 16/17/18) included since 2026-09-02 — is pickable in the Export picker and ticked in Export Everything. Where the **live site** still `cs-disabled`s a report, `select_report` fails fast instead of stalling.
-- **Highway Detail** consolidates + compares like every other report as of **v0.20.0**; **Highway Summary** joined Consolidate, Compare and the env matrix in **v0.37.0** (the env matrix is 13 rows). Locked by `check_intersection_gate` (empty gate), `check_report_recipe`, `check_stable_ids` (append-only 8/9/10), `check_report_catalog`, and `check_report_wiring`.
+- **Highway Detail** consolidates + compares like every other report as of **v0.20.0**; **Highway Summary** joined Consolidate, Compare and the env matrix in **v0.37.0**; the nine editions that were still export-only (Ramp Summary Excel, Intersection Summary PDF, Highway Summary PDF and the six Clean Road editions) joined in **v0.48.0** (the env matrix is 22 rows). Locked by `check_intersection_gate` (empty gate), `check_report_recipe`, `check_stable_ids` (append-only 8/9/10), `check_report_catalog`, and `check_report_wiring`.
 
 Highway Summary's vs-TSN leg landed in **v0.37.0** and is the clearest proof the plug-in contract works as documented: adding `compare_highway_summary_tsn` + `tsn_load_highway_summary`, a `cmp:highway_summary:tsn` COMPARE entry, a `report_catalog.TSN` descriptor, and `tsn_key` on the existing `MatrixEntry` was the WHOLE change — `matrix.tsn_supported()` and `day_matrix._day_rows()` flipped the row's cells on by themselves, with no per-report special case anywhere.
 
@@ -337,7 +353,7 @@ Highway Summary is the app's first **miles-measured** aggregate report. Its per-
 
 **Bound result** (2026-08-17 TSMIS export vs the 2025-09-15 print — ~11 months apart, so most mileage legitimately moved): **92 categories in both, 0 TSN-only, 4 TSMIS-only, 89 differing / 3 identical**. The familiar `Summary by Category` sheet renders miles to three decimals via `summary_layout`'s opt-in measure mode.
 
-### Highway Summary (PDF) — the print edition, EXPORT-ONLY (v0.38.0)
+### Highway Summary (PDF) — the print edition (export v0.38.0, the rest v0.48.0)
 
 `export_highway_summary_pdf.py` saves the SAME "Highway Summary" dropdown option through
 the site's own Print layout instead of the Excel Export button — the exact parallel of
@@ -358,10 +374,19 @@ a `document.title` swap plus `window.print()`.
 - **Shares the Excel edition's `data_value`, `wait_js` and `is_empty`**, so selecting both
   editions coalesces (one render, two files) and the two can never disagree about whether
   a route had data.
-- **EXPORT-ONLY, deliberately.** The vendor's 2026-08-17 release delivered the Excel
-  edition only, so there is no real statewide print to verify a parser against. The
-  consolidator + PDF-vs-Excel self-check land once prints exist — the same sequence
-  Highway Sequence (PDF) and Ramp Detail (PDF) followed.
+- **Consolidate + compare (v0.48.0).** The vendor's 2026-08-17 release delivered the
+  Excel edition only; the 2026-10-02 statewide delivery brought the first real prints
+  (252 routes). `consolidate_tsmis_highway_summary_pdf` reads each print's word
+  positions — sections by their printed names, the `CODE` column as the anchor, the
+  cover's `ROUTE` line as the route claim — into the Excel edition's exact 97-column
+  workbook, so both editions share the miles reader's rules: an unknown, duplicated
+  or missing category refuses the file. Two print-only shapes are handled by name:
+  RURAL-URBAN's `- O -` rows bind to the `R-`/`U-` row above them, and the
+  `MEDIAN TYPE (UNDIVIDED)` / `(DIVIDED)` group headers (printed without a figure)
+  read as `0.000`, exactly what the Excel edition writes. The miles equal the Excel
+  edition's on all 252 routes. It compares vs the `highway_summary` TSN dataset,
+  between environments, and against the Excel edition in its PDF-vs-Excel self-check —
+  the same sequence Highway Sequence (PDF) and Ramp Detail (PDF) followed.
 
 ### The Highway Detail family (v0.20.0)
 
@@ -497,8 +522,59 @@ The dev site's **"Clean Road Files"** group (`data_value` `clean_highway` / `cle
 - `label` = the site's `data-label` ("Clean Road File Highway" …), `data_value` = the stable id; `subdir` = the id, `filename` = `<id>_route_<ROUTE>.xlsx`. The options are FLAT `cs-option cs-sub` rows under a `cs-header` — indented, but NOT fly-out leaves — so `select_report` needs no submenu reveal (`check_fake_site` covers the shape, including the visible text "Highway" coinciding with a TSAR fly-out parent's).
 - `wait_js` = `EXPORT_READY_JS` OR the empty marker; `is_empty` = the structural `#rampResults .ramp-empty` (`*_showResults('none')` renders `<span class="ramp-empty">No results found in this segment.</span>` with NO action bar) with the loose "No … found" text as the fallback; `save = save_via_export_button` (`clh_/cli_/clr_exportToExcel()` → a client-side `XLSX.writeFile`, one sheet "Clean Road Highway" / "… Intersection" / "… Ramp"; the engine's no-download fast-fail is the backstop).
 - The reports reuse the site's Highway Log / Intersection Detail / Ramp Detail query pipelines — Clean Highway runs the WHOLE Highway Log builder plus four extra layer lookups (functional class 91, forest 115, `SegOrderId` 122, route breaks 133) — so expect **Highway-Log-class run times**, not Ramp-Detail ones.
-- **Export-only** — declared `export_only=True` in the catalog (PCOA-FINAL-018), so the picker says so and `check_report_wiring` holds the app to it. The site's `*_printAll()` print editions (landscape, cover page, scale-to-fit) are wired as export-only PDF editions since **v0.45.2** (`clean_<kind>_pdf`, stable ids 20/21/22; `exporter._save_clean_road_pdf` neutralizes `window.print`, keeps the `.clh-print-root` layout, writes Letter landscape at the site's 0.35in `@page` margins, and raises EmptyExport when the print body has no rows). Each shares its Excel sibling's `data_value`, so ticking both coalesces into one render. There is no consolidator/comparison for the SITE exports in either format: that waits for real work-PC files to census first (Lesson 13). The TSN side is staged (`report_catalog.TSN` slots + `tsn_load_clean_road`), and the app's OWN Clean Road Highway build lives on the ArcGIS tab (footnote 7 above). Since 2026-09-02 all three Clean Road files are ROWS of that tab's Reports-vs-layers matrix (`arcgis_reports.py`), greyed until a consolidator for the site's export exists — the comparison is then our build vs the site's export, TSMIS vs TSMIS, with vs TSN still possible off the same builds.
+- **Print editions.** The site's `*_printAll()` print editions (landscape, cover page, scale-to-fit) are wired since **v0.45.2** (`clean_<kind>_pdf`, stable ids 20/21/22; `exporter._save_clean_road_pdf` neutralizes `window.print`, keeps the `.clh-print-root` layout, writes Letter landscape at the site's 0.35in `@page` margins, and raises EmptyExport when the print body has no rows). Each shares its Excel sibling's `data_value`, so ticking both coalesces into one render.
+- **Consolidate + compare since v0.48.0** — both editions, off the 2026-10-02 statewide delivery: see [Clean Road site exports](#clean-road-site-exports--consolidate-and-compare-v0480) below. The app's OWN Clean Road Highway build lives on the ArcGIS tab (footnote 7 above); all three Clean Road files are ROWS of that tab's Reports vs ArcGIS matrix (`arcgis_reports.py`), which stays greyed for them until the build-vs-export comparator is written (the site's exports consolidate now; the comparator does not exist yet).
 - **Verified offline against the REAL captured site source, not only fixtures:** the shipped `select_report` was driven over every dropdown option on the 9.1 capture (each arms, County fans to ALL, Route + Generate present) and on the 8.10 capture (the five reports greyed there raise `ReportUnavailableError`); on 9.1, Generate with every ArcGIS query stubbed empty renders the `.ramp-empty` state each spec recognises. Live data and the download are work-PC only (roadmap B1).
+
+### Clean Road site exports — consolidate and compare (v0.48.0)
+
+The 2026-10-02 statewide delivery (`ground-truth/All Reports 10.2`) carried both
+editions of all three Clean Road files, which turned the census Lesson 13 asks for into
+real material. `clean_road_columns.py` is the column contract for both editions: the
+site's sheet names, the full TASAS headers (74 / 55 / 34), the columns the site has no
+source for (22 / 10 / 13 — present, blank, and printed nowhere), and each report's
+route / county / postmile columns.
+
+- **Excel editions** (`consolidate_clean_road_highway` / `_intersection` / `_ramp`)
+  consolidate like every flat report: `clean_road_<kind>_consolidated.xlsx`, Route +
+  the full header, one row per record. They auto-consolidate on export finish.
+- **PDF editions** (`consolidate_tsmis_clean_<kind>_pdf`) are read by
+  `clean_road_print.py` with **pypdfium2**, because the print is one scaled-to-fit
+  HTML table whose type is tiny (Highway prints at 1.4–1.7 pt). The reader takes the
+  cover's `LOCATION CRITERIA: ROUTE <r>` line as the route claim (reconciled against
+  the file name, CMP-AUD-049), finds the header cells from the table frame's top
+  edge, and maps each printed label back to its column by the site's own header rule
+  (prefix stripped, `PREFIX`→`PFX`, `SUFFIX`→`SFX`, split at the underscore). Only
+  the sourced columns are printed, so the unsourced ones come back blank — exactly
+  what the Excel edition holds. It REFUSES a print whose header differs between
+  pages, a label it does not know, or text outside every column, so a layout change
+  fails loudly instead of shifting values.
+- **vs TSN** (`compare_clean_road_tsn`) compares each edition against the TSN
+  extract of the same name — `CA HIGHWAYS` (09/08/2025), `CA INTERSECTIONS`
+  (09/03/2025), `CA RAMPS` (09/08/2025) — which the TSN library normalizes once
+  (`tsn_load_clean_road`). Rows pair on the physical location: route + county +
+  postmile prefix + begin postmile + roadbed (`R`/`L`/`X`; the site's equation marker
+  `E` is not a roadbed). The unsourced columns are context, never counted. The values
+  are normalized only where the two systems spell the same fact differently: dates to
+  ISO, the TSN `I`/`R` design-code prefix, a trailing period on the county, a blank
+  toll/forest flag as `0`, the Intersection control code through the Intersection
+  Detail rule, and the Ramp on/off code `Z` as `OTH`.
+- **PDF vs Excel** pairs the two editions record for record, and all three match on
+  the delivery. The site's Excel file writes 4 Ramp descriptions with a trailing
+  `_x000d_` (an escaped carriage return — route 010's Cactus City rest-area ramps,
+  the same four Ramp Detail carries); the print cannot carry it, so the self-check
+  decodes it away like every PDF-vs-Excel flavor (CMP-AUD-197). The vs-TSN flavors
+  read it decoded, the way installed Excel shows the cell, and the carriage return
+  still compares.
+- **Bound result** (the 2026-10-02 export vs the September 2025 extracts — migration
+  drift, D5): Ramp 15,204 rows paired, 10 TSMIS-only, 206 TSN-only, 15,993 differing
+  cells (14,954 of them `RAM_BEGIN_DATE`); Intersection 16,201 paired, 260 / 425
+  one-sided, 5,599 cells; Highway 47,746 paired, 3,989 / 12,337 one-sided, 141,593
+  cells.
+- **Cross-environment** keys every row on the file's route token, the identity the
+  engine requires, and reads the PDF edition through the same print reader.
+
+Evidence images are not wired for these prints.
 
 ### Coalescing both editions of a report (v0.19.2)
 
@@ -653,10 +729,9 @@ COMPARE_GROUPS = [
     ("self", "Self-consistency"),
 ]
 ```
-- `group="env"` -- every report's **between-environments** comparison (Ramp Summary/Detail, Highway Sequence, Highway Log, **Intersection Summary/Detail**, **Highway Detail**, and the **PDF editions** — Highway Log (PDF) + Intersection Detail (PDF) + Highway Detail (PDF) + Highway Sequence (PDF) + Ramp Detail (PDF)). Folder-to-folder only.
-- `group="tsn"` -- the file-based **TSMIS-vs-TSN** comparisons. 13 of them, COMPLETE for all comparison-integrated editions (Highway Log Excel/PDF, Ramp Detail Excel/PDF, Ramp Summary, Intersection Summary, Intersection Detail Excel/PDF, Highway Sequence Excel/PDF, Highway Detail Excel/PDF — the Highway Detail pair v0.20.0, the Highway Sequence (PDF) v0.25.0, the Ramp Detail (PDF) v0.26.0). (Highway Summary joined this list in **v0.37.0** — the AGGREGATE statewide-miles
-comparator, once the owner supplied the statewide TSN print. That makes it 13.)
-- `group="self"` -- the five **PDF-vs-Excel** consistency self-checks (Highway Log, Intersection Detail, Highway Detail, Highway Sequence, Ramp Detail): a report's PDF render vs its Excel render, one system in one environment — neither cross-environment nor vs-TSN, so its own sub-tab (CMP-AUD-014, formerly mislabeled under `env`).
+- `group="env"` -- every report's **between-environments** comparison (Ramp Summary/Detail, Highway Sequence, Highway Log, **Intersection Summary/Detail**, **Highway Detail**, **Highway Summary**, the **Clean Road** trio, and the **other editions** — Highway Log (PDF) + Intersection Detail (PDF) + Highway Detail (PDF) + Highway Sequence (PDF) + Ramp Detail (PDF) + Ramp Summary (Excel) + Intersection Summary (PDF) + Highway Summary (PDF) + the three Clean Road (PDF) editions). Folder-to-folder only.
+- `group="tsn"` -- the file-based **TSMIS-vs-TSN** comparisons. 22 of them, one for EVERY comparison-integrated edition (Highway Log Excel/PDF, Ramp Detail Excel/PDF, Ramp Summary PDF/Excel, Intersection Summary Excel/PDF, Intersection Detail Excel/PDF, Highway Sequence Excel/PDF, Highway Detail Excel/PDF, Highway Summary Excel/PDF, Clean Road Highway/Intersection/Ramp Excel/PDF — the Highway Detail pair v0.20.0, the Highway Sequence (PDF) v0.25.0, the Ramp Detail (PDF) v0.26.0, Highway Summary v0.37.0, and the remaining nine editions v0.48.0). Route History has no export, so it has no comparisons at all.
+- `group="self"` -- the eleven **PDF-vs-Excel** consistency self-checks (Highway Log, Intersection Detail, Highway Detail, Highway Sequence, Ramp Detail, and since v0.48.0 Ramp Summary, Intersection Summary, Highway Summary and the three Clean Road reports): a report's PDF render vs its Excel render, one system in one environment — neither cross-environment nor vs-TSN, so its own sub-tab (CMP-AUD-014, formerly mislabeled under `env`).
 - The GUI also appends a **third** sub-tab on its own, the day-keyed **"vs TSN Matrix"** (group id `tsn_by_day`) — not a registry comparison type.
 
 A new cross-environment comparison is `group="env"`; a new TSMIS-vs-TSN one is `group="tsn"`; a brand-new family can add its own sub-tab by appending to `COMPARE_GROUPS`. `group` is independent of `kind`, so the files/folders input plumbing is untouched. (v0.16.1 staging moved HL's cross-env row from the old `highway_log` group to `env` and renamed that sub-tab to `tsn`.)
@@ -688,6 +763,15 @@ are the PDF-vs-Excel self-checks (CMP-AUD-014, moved out of `env`).
 | Highway Sequence Listing (PDF) — between environments | `compare_env.HIGHWAY_SEQUENCE_PDF` | folders | env |
 | TSAR: Ramp Detail (PDF) — between environments | `compare_env.RAMP_DETAIL_PDF` | folders | env |
 | Highway Summary — between environments | `compare_env.HIGHWAY_SUMMARY` | folders | env |
+| TSAR: Ramp Summary (Excel) — between environments | `compare_env_editions.RAMP_SUMMARY_EXCEL` | folders | env |
+| Intersection Summary (PDF) — between environments | `compare_env_editions.INTERSECTION_SUMMARY_PDF` | folders | env |
+| Highway Summary (PDF) — between environments | `compare_env_editions.HIGHWAY_SUMMARY_PDF` | folders | env |
+| Clean Road: Highway — between environments | `compare_env_editions.CLEAN_HIGHWAY` | folders | env |
+| Clean Road: Highway (PDF) — between environments | `compare_env_editions.CLEAN_HIGHWAY_PDF` | folders | env |
+| Clean Road: Intersection — between environments | `compare_env_editions.CLEAN_INTERSECTION` | folders | env |
+| Clean Road: Intersection (PDF) — between environments | `compare_env_editions.CLEAN_INTERSECTION_PDF` | folders | env |
+| Clean Road: Ramp — between environments | `compare_env_editions.CLEAN_RAMP` | folders | env |
+| Clean Road: Ramp (PDF) — between environments | `compare_env_editions.CLEAN_RAMP_PDF` | folders | env |
 | Highway Log — TSMIS vs TSN | `compare_highway_log` | files | tsn |
 | Highway Log — TSMIS (PDF) vs TSN (PDF) | `compare_highway_log_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
 | Highway Log — TSMIS (PDF) vs TSMIS (Excel) | `compare_highway_log_pdf.TSMIS_PDF_VS_EXCEL` | files | self |
@@ -706,10 +790,25 @@ are the PDF-vs-Excel self-checks (CMP-AUD-014, moved out of `env`).
 | TSAR: Ramp Detail — TSMIS (PDF) vs TSN | `compare_ramp_detail_pdf.TSMIS_PDF_VS_TSN` | files | tsn |
 | TSAR: Ramp Detail — TSMIS (PDF) vs TSMIS (Excel) | `compare_ramp_detail_pdf.TSMIS_PDF_VS_EXCEL` | files | self |
 | Highway Summary — TSMIS vs TSN | `compare_highway_summary_tsn` | files | tsn |
+| TSAR: Ramp Summary — TSMIS (Excel) vs TSN | `compare_summary_editions.RAMP_SUMMARY_EXCEL_VS_TSN` | files | tsn |
+| TSAR: Ramp Summary — TSMIS (PDF) vs TSMIS (Excel) | `compare_summary_editions.RAMP_SUMMARY_PDF_VS_EXCEL` | files | self |
+| Intersection Summary — TSMIS (PDF) vs TSN | `compare_summary_editions.INTERSECTION_SUMMARY_PDF_VS_TSN` | files | tsn |
+| Intersection Summary — TSMIS (PDF) vs TSMIS (Excel) | `compare_summary_editions.INTERSECTION_SUMMARY_PDF_VS_EXCEL` | files | self |
+| Highway Summary — TSMIS (PDF) vs TSN | `compare_summary_editions.HIGHWAY_SUMMARY_PDF_VS_TSN` | files | tsn |
+| Highway Summary — TSMIS (PDF) vs TSMIS (Excel) | `compare_summary_editions.HIGHWAY_SUMMARY_PDF_VS_EXCEL` | files | self |
+| Clean Road: Highway — TSMIS vs TSN | `compare_clean_road_tsn.HIGHWAY_VS_TSN` | files | tsn |
+| Clean Road: Highway — TSMIS (PDF) vs TSN | `compare_clean_road_tsn.HIGHWAY_PDF_VS_TSN` | files | tsn |
+| Clean Road: Highway — TSMIS (PDF) vs TSMIS (Excel) | `compare_clean_road_tsn.HIGHWAY_PDF_VS_EXCEL` | files | self |
+| Clean Road: Intersection — TSMIS vs TSN | `compare_clean_road_tsn.INTERSECTION_VS_TSN` | files | tsn |
+| Clean Road: Intersection — TSMIS (PDF) vs TSN | `compare_clean_road_tsn.INTERSECTION_PDF_VS_TSN` | files | tsn |
+| Clean Road: Intersection — TSMIS (PDF) vs TSMIS (Excel) | `compare_clean_road_tsn.INTERSECTION_PDF_VS_EXCEL` | files | self |
+| Clean Road: Ramp — TSMIS vs TSN | `compare_clean_road_tsn.RAMP_VS_TSN` | files | tsn |
+| Clean Road: Ramp — TSMIS (PDF) vs TSN | `compare_clean_road_tsn.RAMP_PDF_VS_TSN` | files | tsn |
+| Clean Road: Ramp — TSMIS (PDF) vs TSMIS (Excel) | `compare_clean_road_tsn.RAMP_PDF_VS_EXCEL` | files | self |
 
 **Don't hand-roll workbook output**: build a `CompareSchema` and call `compare_core.run_compare` -- that's the approved workbook style for free, and the core's text/formulas are regression-locked. See [comparison-engine.md](comparison-engine.md) (engine + regression-lock harness) and [highway_log/comparison-study.md](highway_log/comparison-study.md) (the PDF-vs-Excel/TSN findings).
 
-**Extra steps for a `group="tsn"` (vs-TSN) report (v0.17.0):** beyond the `COMPARE_REPORTS` row + `APP_MODULES`, (1) register the report's TSN source by adding a `TsnEntry` to `report_catalog.py` (its raw format + a `build_into` builder; `tsn_library._REPORTS` derives from it) so the matrices resolve it from the canonical library; (2) add the golden check (`check_compare_<report>_tsn.py`) to the blocking loop in `.github/workflows/checks.yml`; (3) reconcile both raw files by hand FIRST and lock the approved counts in [tsn-parsers.md](tsn-parsers.md). `compare_ramp_detail_tsn` is the **FLAT** reference: a `"files"` adapter whose two loaders project each side's own shape onto one shared, PM-keyed header, with the TSN-only columns marked `context_fields` (shown, never counted). `compare_ramp_summary_tsn` is the **AGGREGATE** reference: each side reduces to one statewide `{category: count}` table compared with `has_route=False` (key = category, field = count), and a familiar "Summary by Category" sheet is appended via `extra_sheet_writer=summary_layout.make_extra_sheet_writer(SPEC)` — the pattern the Intersection Summary will reuse. `compare_highway_sequence_tsn` shows the **composite-key** variant: when the natural key isn't unique (CA postmiles are county-relative), a `key_normalizer` returns a `"COUNTY POSTMILE"` token while County stays its own visible column — the same mechanism Highway Log uses for roadbed-canonical locations. To light a vs-TSN report up in BOTH matrices, the only required code step is adding it to `matrix.tsn_comparator_for(row_key)`.
+**Extra steps for a `group="tsn"` (vs-TSN) report (v0.17.0):** beyond the `COMPARE_REPORTS` row + `APP_MODULES`, (1) register the report's TSN source by adding a `TsnEntry` to `report_catalog.py` (its raw format + a `build_into` builder; `tsn_library._REPORTS` derives from it) so the matrices resolve it from the canonical library; (2) add the golden check (`build/check_compare_<report>_tsn.py`; `build/run_checks.py` picks up every `check_*.py`, CI included); (3) reconcile both raw files by hand FIRST and lock the approved counts in [tsn-parsers.md](tsn-parsers.md). `compare_ramp_detail_tsn` is the **FLAT** reference: a `"files"` adapter whose two loaders project each side's own shape onto one shared, PM-keyed header, with the TSN-only columns marked `context_fields` (shown, never counted). `compare_ramp_summary_tsn` is the **AGGREGATE** reference: each side reduces to one statewide `{category: count}` table compared with `has_route=False` (key = category, field = count), and a familiar "Summary by Category" sheet is appended via `extra_sheet_writer=summary_layout.make_extra_sheet_writer(SPEC)` — the pattern the Intersection Summary will reuse. `compare_highway_sequence_tsn` shows the **composite-key** variant: when the natural key isn't unique (CA postmiles are county-relative), a `key_normalizer` returns a `"COUNTY POSTMILE"` token while County stays its own visible column — the same mechanism Highway Log uses for roadbed-canonical locations. To light a vs-TSN report up in BOTH matrices, the only required code step is adding it to `matrix.tsn_comparator_for(row_key)`.
 
 ## Verification
 

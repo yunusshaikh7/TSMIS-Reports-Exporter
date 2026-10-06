@@ -80,15 +80,21 @@ def main():
 
         print("matrix_info + snapshot key:")
         info = a.matrix_info()
-        check("rows are all twelve comparable reports (both HL + both Intersection + "
-              "both Highway Detail + both Highway Sequence + both Ramp Detail "
-              "formats, cross-env; Highway Summary appended LAST, v0.37.0)",
+        check("rows are all twenty-two comparable editions (both formats of every "
+              "report, cross-env; Highway Summary v0.37.0, the nine second editions "
+              "v0.48.0)",
               info["rows"] == ["ramp_summary", "ramp_detail", "highway_sequence",
                                "highway_log", "intersection_summary",
                                "intersection_detail", "highway_log_pdf",
                                "intersection_detail_pdf", "highway_detail",
                                "highway_detail_pdf", "highway_sequence_pdf",
-                               "ramp_detail_pdf", "highway_summary"])
+                               "ramp_detail_pdf", "highway_summary",
+                               # v0.48.0: the nine second editions, appended.
+                               "ramp_summary_excel", "intersection_summary_pdf",
+                               "highway_summary_pdf", "clean_highway",
+                               "clean_highway_pdf", "clean_intersection",
+                               "clean_intersection_pdf", "clean_ramp",
+                               "clean_ramp_pdf"])
         check("baseline defaults to ssor-prod", info["baseline"] == "ssor-prod")
 
         print("set_matrix_report (show/hide rows):")
@@ -99,18 +105,13 @@ def main():
         check("show puts it back",
               a.set_matrix_report("highway_log", True).get("ok")
               and "highway_log" in a.matrix_info()["rows"])
-        # can't hide them all (13 rows: hide 12, the 13th hide is rejected)
-        for k in ("ramp_summary", "ramp_detail", "highway_sequence", "highway_log",
-                  "intersection_summary", "intersection_detail", "highway_log_pdf",
-                  "intersection_detail_pdf", "highway_detail", "highway_detail_pdf",
-                  "highway_sequence_pdf", "ramp_detail_pdf"):
+        # can't hide them all (22 rows: hide 21, the 22nd hide is rejected)
+        _all = [k for k in a.matrix_info()["rows"]]
+        for k in _all[:-1]:
             a.set_matrix_report(k, False)
-        last = a.set_matrix_report("highway_summary", False)
+        last = a.set_matrix_report(_all[-1], False)
         check("can't hide the last remaining row", bool(last.get("error")))
-        for k in ("ramp_summary", "ramp_detail", "highway_sequence", "highway_log",
-                  "intersection_summary", "intersection_detail", "highway_log_pdf",
-                  "intersection_detail_pdf", "highway_detail", "highway_detail_pdf",
-                  "highway_sequence_pdf", "ramp_detail_pdf"):
+        for k in _all[:-1]:
             a.set_matrix_report(k, True)
         snap0 = a._state_snapshot()
         check("snapshot carries the 'matrix' key (None idle)",

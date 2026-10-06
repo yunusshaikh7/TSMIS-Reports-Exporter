@@ -905,6 +905,23 @@ def _pdf_store_consolidator(subdir):
     if subdir == "ramp_detail_pdf":
         import consolidate_tsmis_ramp_detail_pdf as _m
         return _m
+    # v0.48.0: the summary prints parse straight to records (they accept and
+    # ignore converted_dir); the Clean Road prints convert like the others.
+    if subdir == "intersection_summary_pdf":
+        import consolidate_tsmis_intersection_summary_pdf as _m
+        return _m
+    if subdir == "highway_summary_pdf":
+        import consolidate_tsmis_highway_summary_pdf as _m
+        return _m
+    if subdir == "clean_highway_pdf":
+        import consolidate_tsmis_clean_highway_pdf as _m
+        return _m
+    if subdir == "clean_intersection_pdf":
+        import consolidate_tsmis_clean_intersection_pdf as _m
+        return _m
+    if subdir == "clean_ramp_pdf":
+        import consolidate_tsmis_clean_ramp_pdf as _m
+        return _m
     return None
 
 

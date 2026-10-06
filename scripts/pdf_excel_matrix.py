@@ -63,7 +63,11 @@ def _pve_rows():
     for m in report_catalog.matrix_rows_meta():
         if m.fmt != "pdf" or m.self_other is None:
             continue
-        out.append((m.row_key, labels.get(m.self_other, m.row_key),
+        # The family label is its BASE edition's: the Excel sibling's for the
+        # '<family>_pdf' rows, the PDF row's own for Ramp Summary (whose print
+        # holds the base key and whose sibling is 'ramp_summary_excel').
+        base = m.row_key[:-4] if m.row_key.endswith("_pdf") else m.row_key
+        out.append((m.row_key, labels.get(base, labels.get(m.self_other, m.row_key)),
                     m.row_key, m.self_other))
     return out
 

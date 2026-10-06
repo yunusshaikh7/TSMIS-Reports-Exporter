@@ -1348,6 +1348,13 @@ _TSN_DATASET_ALIASES = {
     "highway_detail_pdf": "highway_detail",
     "highway_sequence_pdf": "highway_sequence",
     "ramp_detail_pdf": "ramp_detail",
+    # v0.48.0: every second edition reads its family's one TSN dataset.
+    "ramp_summary_excel": "ramp_summary",
+    "intersection_summary_pdf": "intersection_summary",
+    "highway_summary_pdf": "highway_summary",
+    "clean_highway_pdf": "clean_highway",
+    "clean_intersection_pdf": "clean_intersection",
+    "clean_ramp_pdf": "clean_ramp",
 }
 
 

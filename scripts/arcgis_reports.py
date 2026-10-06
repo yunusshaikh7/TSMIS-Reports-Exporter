@@ -32,8 +32,8 @@ comparator per report serves both.
 The three Clean Road files are rows too (owner decision 2026-09-02): the site
 now exports them, so "our layer build vs the site's export" is TSMIS vs TSMIS
 exactly like the report rows. Clean Road Highway already has its build (the
-CA HIGHWAYS workbook); its comparison waits on a consolidator for the site's
-export, which waits on real per-route files.
+CA HIGHWAYS workbook), and the site's export of every Clean Road file
+consolidates since v0.48.0; the comparator between the two is not written yet.
 """
 from collections import OrderedDict, namedtuple
 from functools import lru_cache
@@ -44,8 +44,7 @@ Edition = namedtuple("Edition",
                      "key family label code subdir consolidator comparable why")
 
 _NO_BUILD = "no ArcGIS build of this report yet"
-_NO_COMPARE = ("no comparison yet — the site's export has no consolidator "
-               "until real per-route files are censused")
+_NO_COMPARE = "no comparison of the ArcGIS build against the site's export yet"
 _NO_EDITION = "this edition is not consolidated yet, so it cannot be compared"
 
 # key -> (build module, compare module)

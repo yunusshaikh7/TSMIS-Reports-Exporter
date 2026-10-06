@@ -72,11 +72,11 @@ partial run never leaves one route with two files, and the end-anchored
 **Current export state.** Every enabled report exports from the **production** site
 (the 2026-07-09 prod rollout; the dev site — Settings ▸ "Use development site" — is
 only needed for Route History testing), and every enabled on-site report exports in
-**BOTH formats** the site offers. **1b/5b are export-only by design** (their siblings
-already consolidate + compare); **8 (Highway Summary) is FULLY INTEGRATED as of v0.37.0** — consolidate +
-cross-environment (v0.37.0) + **vs TSN** (v0.37.0, off the owner's statewide print);
-the vendor un-greyed the report 2026-08-17 and both its schema and the print are
-verified.
+**BOTH formats** the site offers. **8 (Highway Summary) is FULLY INTEGRATED as of
+v0.37.0** — consolidate + cross-environment + **vs TSN** (off the owner's statewide
+print); the vendor un-greyed the report 2026-08-17 and both its schema and the print
+are verified. **1b / 5b / 8b and the six Clean Road editions joined in v0.48.0**
+(off the 2026-10-02 statewide export), so no edition is export-only any more.
 **Selecting both editions of one report
 coalesces** — the route is generated ONCE and both files saved off that render — on
 the standard path (v0.19.2), in fast mode, and for matrix-queued edition steps (both
@@ -85,14 +85,16 @@ stalling. The dev site's **Route History Table** is a greyed reserved placeholde
 (stable id 15). The **Clean Road Files** group (`clean_highway` /
 `clean_intersection` / `clean_ramp`, stable ids 16/17/18) is **EXPORT-ENABLED since
 2026-09-02** off the dev site 9.1 capture (real Excel-sibling specs in
-`export_clean_road.py`; export-only until real files are censused; prod may still
-grey them, in which case `select_report` fails fast). Their print editions
-(`clean_<kind>_pdf`, stable ids 20/21/22) export since **v0.45.2** through the
-site's `clh_/cli_/clr_printAll`, also export-only.
+`export_clean_road.py`; prod may still grey them, in which case `select_report`
+fails fast). Their print editions (`clean_<kind>_pdf`, stable ids 20/21/22) export
+since **v0.45.2** through the site's `clh_/cli_/clr_printAll`. Both editions
+consolidate and compare since **v0.48.0** — the print read with pypdfium2, vs TSN
+against the TSN `CA HIGHWAYS` / `CA INTERSECTIONS` / `CA RAMPS` extracts.
 
-**The 13 fully-integrated export types consolidate AND compare vs TSN** — each has a
-vs-TSN comparator and lives in the Everything, by-day, and (for the 5 dual-edition
-families) PDF-vs-Excel matrices. Highway Summary became the 13th in v0.37.0. Per-report schemas + locked canaries:
+**All 22 export types consolidate AND compare vs TSN** (Route History, which has no
+export, is the only report without) — each has a vs-TSN comparator and lives in the
+Everything, by-day, and (for the 11 dual-edition families) PDF-vs-Excel matrices.
+Highway Summary became the 13th in v0.37.0; the last nine joined in v0.48.0. Per-report schemas + locked canaries:
 [docs/reports.md](reports.md) / [docs/tsn-parsers.md](tsn-parsers.md);
 exact counts and hashes:
 [comparison-canary-bindings.md](planning/comparison-perfection/comparison-canary-bindings.md).
@@ -200,12 +202,12 @@ warning colour and the Notes sheet leads with it.
 
 **Consolidate-only sources**: TSN Highway Log district PDFs (dropped into
 `tsn_library/highway_log/raw/` — the one drop location since v0.30.0 retired
-`input/`) and the app's own five PDF editions. The **Compare** tab diffs every report
+`input/`) and the app's own PDF editions. The **Compare** tab diffs every report
 TSMIS-vs-TSN (each PDF edition also offers a PDF-vs-Excel self-check), runs
 cross-environment comparisons, and hosts three matrices beyond the Everything one:
 the **by-day** vs-TSN matrix, the **vs Baseline Matrix** (any exported day vs an
 EARLIER pull of the same report; `baseline_matrix.py`, §12c), and the **PDF vs Excel
-Matrix** (v0.31.0 — the 5 dual-edition families × exported days, each cell that day's
+Matrix** (v0.31.0 — the 11 dual-edition families × exported days, each cell that day's
 PDF export self-checked against its Excel export from the SAME run folder;
 `pdf_excel_matrix.py`).
 

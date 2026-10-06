@@ -147,6 +147,16 @@ APP_MODULES = [
     "compare_intersection_detail_tsn", "compare_intersection_detail_pdf",
     "compare_highway_sequence_tsn", "compare_highway_sequence_pdf",
     "compare_highway_detail_tsn", "compare_highway_detail_pdf",
+    # v0.48.0 — the nine second editions: the Summary readers (Ramp Summary
+    # Excel, Intersection / Highway Summary prints), the site Clean Road
+    # contract + print reader + consolidators, and their comparisons.
+    "consolidate_ramp_summary_excel", "consolidate_tsmis_intersection_summary_pdf",
+    "consolidate_tsmis_highway_summary_pdf",
+    "clean_road_columns", "clean_road_print", "clean_road_consolidate",
+    "consolidate_clean_road_highway", "consolidate_clean_road_intersection",
+    "consolidate_clean_road_ramp", "consolidate_tsmis_clean_highway_pdf",
+    "consolidate_tsmis_clean_intersection_pdf", "consolidate_tsmis_clean_ramp_pdf",
+    "compare_clean_road_tsn", "compare_summary_editions", "compare_env_editions",
     # v0.21.0 visual evidence: the report-agnostic engine + the per-report
     # adapters (lazy-imported by matrix_build/gui_api, so they MUST be declared).
     "visual_evidence", "evidence_highway_detail", "evidence_intersection_detail",

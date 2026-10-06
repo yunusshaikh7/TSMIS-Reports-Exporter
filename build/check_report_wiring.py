@@ -90,9 +90,15 @@ def test_dual_edition_families():
               m.self_other in export_keys, f"self_other={m.self_other!r}")
         check(f"{m.row_key}: has a self (PDF-vs-Excel) comparator", m.self_key is not None)
         check(f"{m.row_key}: has a vs-TSN comparator", m.tsn_key is not None)
+        # The PDF row reads the SAME TSN dataset as its Excel sibling row —
+        # derived from the sibling's own entry (Ramp Summary's sibling is
+        # 'ramp_summary_excel', whose dataset is named for the PDF key).
+        sib = report_catalog.matrix_entry(m.self_other)
+        sib_tsn = (sib.tsn_subdir or sib.row_key) if sib is not None else m.self_other
+        own_tsn = m.tsn_subdir or m.row_key
         check(f"{m.row_key}: shares its Excel sibling's TSN dataset",
-              m.tsn_subdir == m.self_other and m.tsn_subdir in tsn_subdirs,
-              f"tsn_subdir={m.tsn_subdir!r}, self_other={m.self_other!r}")
+              own_tsn == sib_tsn and own_tsn in tsn_subdirs,
+              f"tsn_subdir={own_tsn!r}, sibling's={sib_tsn!r}")
 
 
 def test_day_matrix_agrees():
@@ -128,12 +134,19 @@ def test_reset_covers_every_export():
               subdir in legacy_dirs,
               f"add {subdir!r} to gui_worker_maint._LEGACY_OUTPUT_DIRS")
     print("...and every wired PDF report's consolidated workbook:")
+    mods = report_catalog.consolidator_by_export_subdir()
     for m in report_catalog.matrix_rows_meta():
         if m.fmt != "pdf":
             continue
-        wb = f"tsmis_{m.row_key}_consolidated.xlsx"
+        mod = mods.get(m.row_key)
+        wb = getattr(mod, "FILENAME", None)
+        legacy = getattr(mod, "OUT_PATH", None)
+        # Removable either by name at the output root, or because its legacy
+        # location sits inside a Reset directory (Ramp Summary's lives in
+        # consolidated/, like every Excel consolidation).
+        in_dir = legacy is not None and legacy.parent.name in legacy_dirs
         check(f"{m.row_key}: its consolidated workbook ({wb}) is a Reset target",
-              wb in legacy_files,
+              wb is not None and (wb in legacy_files or in_dir),
               f"add {wb!r} to gui_worker_maint._LEGACY_CONSOLIDATED_FILES")
 
 

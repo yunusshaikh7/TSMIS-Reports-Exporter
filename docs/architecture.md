@@ -141,7 +141,7 @@ PDF parsers.
 `("self", "Self-consistency")` (the GUI appends two more — the "vs TSN Matrix",
 and since v0.26.0 the "vs Baseline Matrix", the day-vs-baseline matrix over
 `baseline_matrix.py`). Cross-env folder compares sit in `env`; the file-based
-TSMIS-vs-TSN compares sit in `tsn`; the five PDF-vs-Excel self-checks (a report's
+TSMIS-vs-TSN compares sit in `tsn`; the eleven PDF-vs-Excel self-checks (a report's
 PDF render vs its Excel render — one system, one environment, neither
 cross-environment nor vs-TSN) sit in their own `self` group. Every report is wired
 as of v0.17.0/v0.18.0.
@@ -393,7 +393,7 @@ structural level:
 - **Completion notification** (default on) — taskbar flash via
   `gui_api._flash_taskbar` (`FlashWindowEx`); toggled by `notify_on_finish`.
 - **Compare sub-tabs** (`COMPARE_GROUPS`): Cross-environment (default), vs TSN,
-  and Self-consistency (the five PDF-vs-Excel self-checks; CMP-AUD-014).
+  and Self-consistency (the eleven PDF-vs-Excel self-checks; CMP-AUD-014).
 - **Revert to the previous version** (Settings ▸ Debugging) — reinstalls the newest
   full release strictly older than this build through the same SHA-verified
   download→stage→swap pipeline. Owned by

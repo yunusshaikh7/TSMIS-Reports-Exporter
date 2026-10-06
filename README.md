@@ -102,9 +102,11 @@ of `.bat` scripts for development and as a fallback.
 | Clean Road: Highway / Intersection / Ramp | XLSX | `output/<date>/clean_<kind>/` |
 | Clean Road: Highway / Intersection / Ramp (PDF) | PDF (Letter, landscape) | `output/<date>/clean_<kind>_pdf/` |
 
-Ramp Summary (Excel), Intersection Summary (PDF), Highway Summary (PDF) and all six
-Clean Road editions are **export-only**: the app saves them but does not consolidate
-or compare them. The Clean Road PDFs were added in v0.45.2.
+Since v0.48.0 every edition consolidates and compares — between environments, vs
+TSN, and (for the eleven reports with both editions) PDF vs Excel. Ramp Summary
+(Excel), Intersection Summary (PDF), Highway Summary (PDF) and all six Clean Road
+editions were the last to join, off the 2026-10-02 statewide export. The Clean Road
+PDFs were added in v0.45.2.
 
 Highway Log, Intersection Detail, and Highway Detail each ship in two editions — the regular
 Excel export and a print-layout **PDF** edition (Intersection Detail's added in v0.18.0,

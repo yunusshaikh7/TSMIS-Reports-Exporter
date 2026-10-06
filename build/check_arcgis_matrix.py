@@ -144,9 +144,14 @@ def test_rows_from_registry():
           == ("highway_detail", "highway_detail_pdf"))
     check("the default report is comparable", arcgis_reports.can_compare(arcgis_reports.DEFAULT_KEY))
     # An edition the app does not consolidate cannot compare even when its report
-    # has a build and a comparator: give Highway Summary both (its PDF edition has
-    # no consolidator) and the derivation must say so for that edition alone.
+    # has a build and a comparator. Every enabled edition consolidates since
+    # v0.48.0, so give Highway Summary a build + comparator and WITHHOLD its PDF
+    # edition's consolidator: the derivation must say so for that edition alone.
     saved = arcgis_reports._REPORTS["highway_summary"]
+    saved_catalog = arcgis_reports._catalog
+    _labels, _codes, _cons, _subs, _order = saved_catalog()
+    _cons = {k: v for k, v in _cons.items() if k != "highway_summary_pdf"}
+    arcgis_reports._catalog = lambda: (_labels, _codes, _cons, _subs, _order)
     arcgis_reports._REPORTS["highway_summary"] = ("arcgis_report_highway_detail",
                                                   "compare_highway_detail_arcgis")
     arcgis_reports.editions.cache_clear()
@@ -158,6 +163,7 @@ def test_rows_from_registry():
               and "not consolidated" in hs_pdf.why)
     finally:
         arcgis_reports._REPORTS["highway_summary"] = saved
+        arcgis_reports._catalog = saved_catalog
         arcgis_reports.editions.cache_clear()
 
 

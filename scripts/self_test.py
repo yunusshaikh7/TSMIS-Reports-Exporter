@@ -46,6 +46,25 @@ HTML = """
 </table>
 """
 
+# A miniature Clean Road print (v0.48.0) in the site's own print structure — a
+# cover with its ROUTE line, then the header row + data rows as table cells — so
+# the frozen bundle proves the pypdfium2 TEXT + path calls clean_road_print makes
+# (the evidence step below only rasterizes with pdfium).
+CLEAN_ROAD_HTML = """
+<style>html,body{margin:0;background:#fff;font-family:Arial,sans-serif}
+.cover{page-break-after:always}
+table.t{border-collapse:collapse;font-size:8px;white-space:nowrap}
+table.t th{background:#fff;border-bottom:1px solid #ccc;padding:2px 5px}
+table.t td{padding:2px 5px;border-bottom:1px solid #eee}
+table.t tbody tr:nth-child(even){background:#eef0f2;-webkit-print-color-adjust:exact}</style>
+<div class="cover"><div>LOCATION CRITERIA:</div><div>ROUTE 005S</div></div>
+<table class="t"><thead><tr><th>NETWORK<br>ID</th><th>ON_OFF<br>CODE</th>
+<th>DESCRIPTION</th></tr></thead><tbody>
+<tr><td>2</td><td>ON</td><td>005/NB ON FR MAIN ST</td></tr>
+<tr><td>2</td><td>OFF</td><td>005/SB OFF TO EL CAMINO REAL</td></tr>
+</tbody></table>
+"""
+
 # Flat modules the app imports DYNAMICALLY (the matrix tab loads them lazily) that
 # a frozen bundle MUST carry -- the F6 trio. Importing them here is the runtime
 # half of build/check_app_modules.py's offline packaging contract: if the bundle
@@ -67,6 +86,18 @@ _DYNAMIC_REPORT_MODULES = ("matrix", "day_matrix", "pdf_excel_matrix",
                            "evidence_ramp_detail",
                            "consolidate_tsmis_ramp_detail_pdf",
                            "compare_ramp_detail_pdf",
+                           # v0.48.0: the second editions' PDF consolidators the
+                           # matrix resolves lazily, the pdfium-based Clean Road
+                           # print reader behind three of them, and the new
+                           # comparison modules.
+                           "consolidate_tsmis_intersection_summary_pdf",
+                           "consolidate_tsmis_highway_summary_pdf",
+                           "consolidate_tsmis_clean_highway_pdf",
+                           "consolidate_tsmis_clean_intersection_pdf",
+                           "consolidate_tsmis_clean_ramp_pdf",
+                           "clean_road_print",
+                           "compare_clean_road_tsn", "compare_summary_editions",
+                           "compare_env_editions",
                            # The ArcGIS reports + "Reports vs ArcGIS" lane: every
                            # module here is imported INSIDE a GUI endpoint, so
                            # nothing else in the frozen bundle proves it resolves.
@@ -123,6 +154,12 @@ def _exercise(tmp, emit):
         with page.expect_download() as dl:
             page.click("#d")
         dl.value.save_as(str(tmp / "x.txt"))
+        cr_pdf = tmp / "clean_road.pdf"
+        page.set_content(CLEAN_ROAD_HTML)
+        page.pdf(path=str(cr_pdf), format="Letter", landscape=True,
+                 print_background=True,
+                 margin={"top": "0.35in", "bottom": "0.35in",
+                         "left": "0.35in", "right": "0.35in"})
         browser.close()
     assert pdf_path.stat().st_size > 0, "page.pdf produced nothing"
     emit(f"chromium: PDF {pdf_path.stat().st_size} bytes, download ok")
@@ -167,6 +204,21 @@ def _exercise(tmp, emit):
     emit(f"evidence render stack: page->PNG {png.stat().st_size} bytes, "
          "highlight + workbook embed ok")
     emit(f"cryptography loaded (required by pdfminer): {'cryptography' in sys.modules}")
+
+    # 4b. The Clean Road print reader (v0.48.0): read the miniature print back
+    #     through pypdfium2's text + path APIs exactly as the consolidators do.
+    import clean_road_columns as crc
+    import clean_road_print as crp
+    read = crp.read_print(cr_pdf, crc.RAMP)
+    col = {k: i for i, k in enumerate(crc.RAMP.header)}
+    got = [(r[col["RAM_NETWORK_ID"]], r[col["RAM_ON_OFF_CODE"]], r[col["RAM_DESCRIPTION"]])
+           for r in read.rows]
+    assert got == [("2", "ON", "005/NB ON FR MAIN ST"),
+                   ("2", "OFF", "005/SB OFF TO EL CAMINO REAL")], \
+        f"clean road print read back wrong: {got}"
+    assert read.route_claim == "005S", f"clean road print route claim: {read.route_claim!r}"
+    emit(f"clean road print reader: {len(read.rows)} rows, {len(read.printed)} columns, "
+         f"route {read.route_claim} ok")
 
     # 5. The F6 trio: prove the frozen bundle carries the dynamically-imported
     #    matrix modules (precise failure here beats a confusing gui_api ImportError).

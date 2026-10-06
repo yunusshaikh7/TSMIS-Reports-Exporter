@@ -1,5 +1,5 @@
-"""TSN Clean Road library builders — Highway is LIVE (v0.29.0); Intersection
-and Ramp stay staged skeletons.
+"""TSN Clean Road library builders — Highway LIVE since v0.29.0, Intersection
+and Ramp since v0.48.0.
 
 The owner's three TSN "clean road" extracts (2026-07-20 delivery) are the
 UNDERLYING tables, not the TSAR report projections the rest of the TSN library
@@ -20,10 +20,13 @@ load (the RD v4+ discipline: the library never edits source text). The
 CMP-AUD-037 marker stamps the normalization version so the direct path can
 refuse a stale copy.
 
-**Intersection / Ramp** remain typed refusals: their comparisons don't exist
-yet, so inventing a projection would bake in a guess. Integrating one follows
-the highway pattern here plus its comparator + a `normalization_version` in
-`report_catalog.TSN`.
+**Intersection / Ramp** (v0.48.0) follow the same verbatim pattern: the site
+now exports its own Clean Road Intersection / Ramp files, and
+`compare_clean_road_tsn` compares those against these extracts, so each slot
+projects its raw extract (exact 55 / 32-column header, the route / county /
+postmile identity claims non-blank) into the normalized copy, stamped with
+that module's NORMALIZATION_VERSION. The comparator owns every format
+normalization at load; the library never edits source text.
 
 Console-free: returns results, never prints.
 """
@@ -34,19 +37,15 @@ except ImportError:
     _DEPS_OK = False
 
 import clean_highway_columns as chc
+import clean_road_columns as crc
 import compare_clean_highway_tsn as cht
+import compare_clean_road_tsn as crt
 import compare_tsn_common as ctc
 import outcome
 import tsn_library
 from events import ConsolidateResult
 
 RAW_GLOB = "*.xlsx"
-
-# The label shown in the "not integrated yet" message, per staged slot.
-_LABELS = {
-    "clean_intersection": "Intersection",
-    "clean_ramp": "Ramp",
-}
 
 
 def _project_highway(raw_path):
@@ -95,24 +94,59 @@ def build_into_highway(raw_dir, out_path, events=None, confirm_overwrite=None):
         marker_version=cht.NORMALIZATION_VERSION)
 
 
-def _not_integrated(key):
-    label = _LABELS[key]
-    return ConsolidateResult(
-        status="error",
-        message=(
-            f"TSN Clean Road {label}: the files are staged, but this report "
-            "has no normalizer yet — its ArcGIS-side build and comparison "
-            "haven't been integrated (Highway went first). The raw files stay "
-            "where you put them and are counted here."),
-    )
+def _project_site_kind(spec):
+    """The verbatim projection for the Intersection / Ramp extract of `spec`."""
+    report = f"Clean Road {spec.tsn_label}"
+
+    def project(raw_path):
+        with ctc.exact_raw_rows(
+                raw_path, crc.TSN_RAW_SHEET, spec.tsn_header, report,
+                required_nonblank=crt.required_identity(spec)) as (_header, rows_in):
+            rows = [list(r) for r in rows_in]
+        routes = {(str(r[spec.tsn_header.index(spec.route_col)]),
+                   str(r[spec.tsn_header.index(spec.suffix_col)] or ""))
+                  for r in rows}
+
+        def make_result(out_name):
+            return ConsolidateResult(
+                status="ok",
+                message=(f"Normalized {len(rows):,} TSN {spec.label} rows "
+                         f"({len(routes)} routes)."),
+                summary_lines=[f"TSN {spec.label}: {len(rows):,} rows, "
+                               f"{len(routes)} routes -> {out_name}"],
+                completion=outcome.COMPLETE, skipped_inputs=0, failed_inputs=0)
+
+        return rows, make_result
+
+    return project
+
+
+def _build_site_kind(spec, raw_dir, out_path, events, confirm_overwrite):
+    return tsn_library.build_normalized(
+        raw_dir, out_path, events=events, confirm_overwrite=confirm_overwrite,
+        glob=RAW_GLOB, deps_ok=_DEPS_OK,
+        deps_msg="Required components are missing (openpyxl).",
+        no_raw_what=f"TSN {spec.tsn_label} clean-road .xlsx",
+        no_raw_hint=f"Import the '{spec.tsn_label}' TSN clean-road extract first.",
+        log_label=f"TSN {spec.label}",
+        sheet=spec.normalized_sheet,
+        header=list(spec.tsn_header),
+        header_align={"horizontal": "center", "vertical": "center",
+                      "wrap_text": True},
+        project=_project_site_kind(spec),
+        marker_version=crt.NORMALIZATION_VERSION)
 
 
 def build_into_intersection(raw_dir, out_path, events=None,
                             confirm_overwrite=None):
-    """Reserved: no TSN Clean Road Intersection normalization exists yet."""
-    return _not_integrated("clean_intersection")
+    """Project the raw TSN CA INTERSECTIONS extract into the normalized
+    library workbook (verbatim 55 columns + the CMP-AUD-037 marker)."""
+    return _build_site_kind(crc.INTERSECTION, raw_dir, out_path, events,
+                            confirm_overwrite)
 
 
 def build_into_ramp(raw_dir, out_path, events=None, confirm_overwrite=None):
-    """Reserved: no TSN Clean Road Ramp normalization exists yet."""
-    return _not_integrated("clean_ramp")
+    """Project the raw TSN CA RAMPS extract into the normalized library
+    workbook (verbatim 32 columns + the CMP-AUD-037 marker)."""
+    return _build_site_kind(crc.RAMP, raw_dir, out_path, events,
+                            confirm_overwrite)

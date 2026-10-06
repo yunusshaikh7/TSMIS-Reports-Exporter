@@ -27,13 +27,22 @@ echo     11. TSN Highway Log (PDF)     (district PDFs from tsn_library\highway_l
 echo     12. Highway Detail            (XLSX -^> XLSX)
 echo     13. TSMIS Highway Detail (PDF) (PDF export from output\...\highway_detail_pdf -^> XLSX)
 echo     14. Highway Summary           (XLSX -^> XLSX)
+echo     15. TSAR: Ramp Summary (Excel) (XLSX -^> XLSX)
+echo     16. TSMIS Intersection Summary (PDF) (PDF export from output\...\intersection_summary_pdf -^> XLSX)
+echo     17. TSMIS Highway Summary (PDF) (PDF export from output\...\highway_summary_pdf -^> XLSX)
+echo     18. Clean Road: Highway (XLSX -^> XLSX)
+echo     19. TSMIS Clean Road: Highway (PDF) (PDF export from output\...\clean_highway_pdf -^> XLSX)
+echo     20. Clean Road: Intersection (XLSX -^> XLSX)
+echo     21. TSMIS Clean Road: Intersection (PDF) (PDF export from output\...\clean_intersection_pdf -^> XLSX)
+echo     22. Clean Road: Ramp (XLSX -^> XLSX)
+echo     23. TSMIS Clean Road: Ramp (PDF) (PDF export from output\...\clean_ramp_pdf -^> XLSX)
 echo.
 echo     Q.  Quit
 echo.
 echo ================================================================
 echo.
 set "choice="
-set /p choice="Enter your choice [1-14, Q]: "
+set /p choice="Enter your choice [1-23, Q]: "
 
 if /i "%choice%"=="1" goto ramp_summary
 if /i "%choice%"=="2" goto ramp_detail
@@ -49,10 +58,19 @@ if /i "%choice%"=="11" goto tsn_highway_log
 if /i "%choice%"=="12" goto highway_detail
 if /i "%choice%"=="13" goto tsmis_highway_detail_pdf
 if /i "%choice%"=="14" goto highway_summary
+if /i "%choice%"=="15" goto ramp_summary_excel
+if /i "%choice%"=="16" goto tsmis_intersection_summary_pdf
+if /i "%choice%"=="17" goto tsmis_highway_summary_pdf
+if /i "%choice%"=="18" goto clean_road_highway
+if /i "%choice%"=="19" goto tsmis_clean_highway_pdf
+if /i "%choice%"=="20" goto clean_road_intersection
+if /i "%choice%"=="21" goto tsmis_clean_intersection_pdf
+if /i "%choice%"=="22" goto clean_road_ramp
+if /i "%choice%"=="23" goto tsmis_clean_ramp_pdf
 if /i "%choice%"=="Q" exit /b 0
 if /i "%choice%"=="quit" exit /b 0
 echo.
-echo Invalid choice "%choice%". Please pick 1-14, or Q.
+echo Invalid choice "%choice%". Please pick 1-23, or Q.
 echo.
 pause
 goto menu
@@ -124,5 +142,50 @@ exit /b 0
 
 :highway_summary
 python scripts\consolidate_highway_summary.py
+pause
+exit /b 0
+
+:ramp_summary_excel
+python scripts\consolidate_ramp_summary_excel.py
+pause
+exit /b 0
+
+:tsmis_intersection_summary_pdf
+python scripts\consolidate_tsmis_intersection_summary_pdf.py
+pause
+exit /b 0
+
+:tsmis_highway_summary_pdf
+python scripts\consolidate_tsmis_highway_summary_pdf.py
+pause
+exit /b 0
+
+:clean_road_highway
+python scripts\consolidate_clean_road_highway.py
+pause
+exit /b 0
+
+:tsmis_clean_highway_pdf
+python scripts\consolidate_tsmis_clean_highway_pdf.py
+pause
+exit /b 0
+
+:clean_road_intersection
+python scripts\consolidate_clean_road_intersection.py
+pause
+exit /b 0
+
+:tsmis_clean_intersection_pdf
+python scripts\consolidate_tsmis_clean_intersection_pdf.py
+pause
+exit /b 0
+
+:clean_road_ramp
+python scripts\consolidate_clean_road_ramp.py
+pause
+exit /b 0
+
+:tsmis_clean_ramp_pdf
+python scripts\consolidate_tsmis_clean_ramp_pdf.py
 pause
 exit /b 0

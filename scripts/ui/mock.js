@@ -37,12 +37,12 @@ function makeMockApi() {
     { key: "route_history", label: "Route History Table", fmt: "SSRS", disabled: true },
     { key: "ramp_summary", label: "TSAR: Ramp Summary", fmt: "PDF", group: "Ramp", short: "Summary" },
     // v0.25.1: Ramp Summary's Excel sibling (the site's rs_exportToExcel, id 13).
-    { key: "ramp_summary_excel", label: "TSAR: Ramp Summary (Excel)", fmt: "Excel", group: "Ramp", short: "Summary (Excel)", export_only: true },
+    { key: "ramp_summary_excel", label: "TSAR: Ramp Summary (Excel)", fmt: "Excel", group: "Ramp", short: "Summary (Excel)" },
     { key: "ramp_detail", label: "TSAR: Ramp Detail", fmt: "Excel", group: "Ramp", short: "Detail" },
     { key: "ramp_detail_pdf", label: "TSAR: Ramp Detail (PDF)", fmt: "PDF", group: "Ramp", short: "Detail (PDF)" },
     { key: "intersection_summary", label: "Intersection Summary", fmt: "Excel", group: "Intersection", short: "Summary" },
     // v0.25.1: Intersection Summary's print edition (ints_printAll, id 14).
-    { key: "intersection_summary_pdf", label: "Intersection Summary (PDF)", fmt: "PDF", group: "Intersection", short: "Summary (PDF)", export_only: true },
+    { key: "intersection_summary_pdf", label: "Intersection Summary (PDF)", fmt: "PDF", group: "Intersection", short: "Summary (PDF)" },
     { key: "intersection_detail", label: "Intersection Detail", fmt: "Excel", group: "Intersection", short: "Detail" },
     { key: "intersection_detail_pdf", label: "Intersection Detail (PDF)", fmt: "PDF", group: "Intersection", short: "Detail (PDF)" },
     // The "Highway" TSAR group — export enabled v0.19.1 (Detail/Summary) + the Highway
@@ -50,17 +50,17 @@ function makeMockApi() {
     { key: "highway_detail", label: "Highway Detail", fmt: "Excel", group: "Highway", short: "Detail" },
     { key: "highway_detail_pdf", label: "Highway Detail (PDF)", fmt: "PDF", group: "Highway", short: "Detail (PDF)" },
     { key: "highway_summary", label: "Highway Summary", fmt: "Excel", group: "Highway", short: "Summary" },
-    { key: "highway_summary_pdf", label: "Highway Summary (PDF)", fmt: "PDF", group: "Highway", short: "Summary (PDF)", export_only: true },
+    { key: "highway_summary_pdf", label: "Highway Summary (PDF)", fmt: "PDF", group: "Highway", short: "Summary (PDF)" },
     // 2026-07-22: the dev site 7.21 "Clean Road Files" group (ids 16/17/18) —
     // reserved + greyed until the dev site 9.1 capture un-greyed them; export
     // ENABLED 2026-09-02.
     // v0.45.2: each Clean Road print edition (clh_/cli_/clr_printAll, ids 20/21/22) sits next to its Excel sibling.
-    { key: "clean_highway", label: "Clean Road: Highway", fmt: "Excel", group: "Clean Road", short: "Highway", export_only: true },
-    { key: "clean_highway_pdf", label: "Clean Road: Highway (PDF)", fmt: "PDF", group: "Clean Road", short: "Highway (PDF)", export_only: true },
-    { key: "clean_intersection", label: "Clean Road: Intersection", fmt: "Excel", group: "Clean Road", short: "Intersection", export_only: true },
-    { key: "clean_intersection_pdf", label: "Clean Road: Intersection (PDF)", fmt: "PDF", group: "Clean Road", short: "Intersection (PDF)", export_only: true },
-    { key: "clean_ramp", label: "Clean Road: Ramp", fmt: "Excel", group: "Clean Road", short: "Ramp", export_only: true },
-    { key: "clean_ramp_pdf", label: "Clean Road: Ramp (PDF)", fmt: "PDF", group: "Clean Road", short: "Ramp (PDF)", export_only: true },
+    { key: "clean_highway", label: "Clean Road: Highway", fmt: "Excel", group: "Clean Road", short: "Highway" },
+    { key: "clean_highway_pdf", label: "Clean Road: Highway (PDF)", fmt: "PDF", group: "Clean Road", short: "Highway (PDF)" },
+    { key: "clean_intersection", label: "Clean Road: Intersection", fmt: "Excel", group: "Clean Road", short: "Intersection" },
+    { key: "clean_intersection_pdf", label: "Clean Road: Intersection (PDF)", fmt: "PDF", group: "Clean Road", short: "Intersection (PDF)" },
+    { key: "clean_ramp", label: "Clean Road: Ramp", fmt: "Excel", group: "Clean Road", short: "Ramp" },
+    { key: "clean_ramp_pdf", label: "Clean Road: Ramp (PDF)", fmt: "PDF", group: "Clean Road", short: "Ramp (PDF)" },
   ];
   // The Consolidate radios carry each row's stable `cons:*` key (P3) — this list
   // matches reports.CONSOLIDATE_REPORTS (9 rows as of CR-002: both Intersection
@@ -82,6 +82,15 @@ function makeMockApi() {
     { key: "cons:highway_detail", label: "Highway Detail" },
     { key: "cons:highway_detail_pdf", label: "TSMIS Highway Detail (PDF)" },
     { key: "cons:highway_summary", label: "Highway Summary" },
+    { key: "cons:ramp_summary_excel", label: "TSAR: Ramp Summary (Excel)" },
+    { key: "cons:intersection_summary_pdf", label: "TSMIS Intersection Summary (PDF)" },
+    { key: "cons:highway_summary_pdf", label: "TSMIS Highway Summary (PDF)" },
+    { key: "cons:clean_highway", label: "Clean Road: Highway" },
+    { key: "cons:clean_highway_pdf", label: "TSMIS Clean Road: Highway (PDF)" },
+    { key: "cons:clean_intersection", label: "Clean Road: Intersection" },
+    { key: "cons:clean_intersection_pdf", label: "TSMIS Clean Road: Intersection (PDF)" },
+    { key: "cons:clean_ramp", label: "Clean Road: Ramp" },
+    { key: "cons:clean_ramp_pdf", label: "TSMIS Clean Road: Ramp (PDF)" },
   ];
   // Mock selection travels by KEY too (P3), so the preview exercises the same
   // bridge contract as production. These map a key back to its mock row.
@@ -184,10 +193,13 @@ function makeMockApi() {
         intersection_detail_pdf: "intersection_detail",
         ramp_detail_pdf: "ramp_detail",
       },
-      unsupported: ["TSAR: Ramp Summary", "TSAR: Ramp Detail",
-                    "Highway Sequence Listing", "Highway Log",
-                    "Intersection Summary", "Intersection Detail",
-                    "Highway Detail"],
+      // Parity with gui_api._evidence_view: every matrix row without evidence support.
+      unsupported: ["TSAR: Ramp Summary", "TSAR: Ramp Detail", "Highway Sequence Listing",
+                    "Highway Log", "Intersection Summary", "Intersection Detail",
+                    "Highway Detail", "Highway Summary", "TSAR: Ramp Summary (Excel)",
+                    "Intersection Summary (PDF)", "Highway Summary (PDF)", "Clean Road: Highway",
+                    "Clean Road: Highway (PDF)", "Clean Road: Intersection", "Clean Road: Intersection (PDF)",
+                    "Clean Road: Ramp", "Clean Road: Ramp (PDF)"],
     },
   };
   const mockSettings = {
@@ -310,6 +322,13 @@ function makeMockApi() {
       { id: "tsn", label: "vs TSN", kind: "tsn", supported: true },
       { id: "vs_excel", label: "vs TSMIS Excel", kind: "self", supported: true }];
     if (rk === "ramp_detail_pdf") return [           // v0.26.0: the HSL-PDF parallel
+      { id: "env", label: "Cross-environment", kind: "env", supported: true },
+      { id: "tsn", label: "vs TSN", kind: "tsn", supported: true },
+      { id: "vs_excel", label: "vs TSMIS Excel", kind: "self", supported: true }];
+    // v0.48.0: the summary prints, the Clean Road prints and Ramp Summary's
+    // native-PDF base row carry the self-check too (11 in all).
+    if (["ramp_summary", "intersection_summary_pdf", "highway_summary_pdf",
+         "clean_highway_pdf", "clean_intersection_pdf", "clean_ramp_pdf"].indexOf(rk) >= 0) return [
       { id: "env", label: "Cross-environment", kind: "env", supported: true },
       { id: "tsn", label: "vs TSN", kind: "tsn", supported: true },
       { id: "vs_excel", label: "vs TSMIS Excel", kind: "self", supported: true }];
@@ -481,8 +500,9 @@ function makeMockApi() {
     if (withToday) out[MOCK_TODAY] = [];          // today: always offered, nothing pulled yet
     return out;
   }
-  // The 12 matrix report rows (shared by the by-day and vs-Baseline mocks —
-  // parity with reports.matrix_rows(): Highway Detail included since v0.20.0).
+  // The 22 matrix report rows (shared by the by-day and vs-Baseline mocks —
+  // parity with reports.matrix_rows(): Highway Summary since v0.37.0, the last
+  // nine editions since v0.48.0).
   const MOCK_DAY_ROWS = [
     { key: "highway_log", label: "Highway Log", supported: true },
     { key: "highway_log_pdf", label: "Highway Log (PDF)", supported: true },
@@ -496,6 +516,16 @@ function makeMockApi() {
     { key: "intersection_summary", label: "Intersection Summary", supported: true },
     { key: "intersection_detail", label: "Intersection Detail", supported: true },
     { key: "intersection_detail_pdf", label: "Intersection Detail (PDF)", supported: true },
+    { key: "highway_summary", label: "Highway Summary", supported: true },
+    { key: "ramp_summary_excel", label: "TSAR: Ramp Summary (Excel)", supported: true },
+    { key: "intersection_summary_pdf", label: "Intersection Summary (PDF)", supported: true },
+    { key: "highway_summary_pdf", label: "Highway Summary (PDF)", supported: true },
+    { key: "clean_highway", label: "Clean Road: Highway", supported: true },
+    { key: "clean_highway_pdf", label: "Clean Road: Highway (PDF)", supported: true },
+    { key: "clean_intersection", label: "Clean Road: Intersection", supported: true },
+    { key: "clean_intersection_pdf", label: "Clean Road: Intersection (PDF)", supported: true },
+    { key: "clean_ramp", label: "Clean Road: Ramp", supported: true },
+    { key: "clean_ramp_pdf", label: "Clean Road: Ramp (PDF)", supported: true },
   ];
   function mockDayMatrixSnapshot() {
     const source = st.day_matrix_source || "ssor-prod";
@@ -630,7 +660,7 @@ function makeMockApi() {
              baseline_options: mockBaselineOptions(source) };
   }
 
-  // M2-B "PDF vs Excel" matrix mock — 5 dual-edition families × day columns; each
+  // M2-B "PDF vs Excel" matrix mock — 11 dual-edition families × day columns; each
   // cell self-checks the day's PDF export vs its Excel export (both from one run
   // folder). Every cell with BOTH editions present is buildable (no baseline).
   const MOCK_PVE_ROWS = [
@@ -639,6 +669,12 @@ function makeMockApi() {
     { key: "highway_detail_pdf", label: "Highway Detail", supported: true },
     { key: "highway_sequence_pdf", label: "Highway Sequence Listing", supported: true },
     { key: "ramp_detail_pdf", label: "TSAR: Ramp Detail", supported: true },
+    { key: "ramp_summary", label: "TSAR: Ramp Summary", supported: true },
+    { key: "intersection_summary_pdf", label: "Intersection Summary", supported: true },
+    { key: "highway_summary_pdf", label: "Highway Summary", supported: true },
+    { key: "clean_highway_pdf", label: "Clean Road: Highway", supported: true },
+    { key: "clean_intersection_pdf", label: "Clean Road: Intersection", supported: true },
+    { key: "clean_ramp_pdf", label: "Clean Road: Ramp", supported: true },
   ];
 
   function mockPveMatrixSnapshot() {
@@ -685,12 +721,12 @@ function makeMockApi() {
                          exported_at: "2026-10-05T17:39:59", newest_at: "2026-10-05T19:03:05",
                          exported_source: "index", files: 41, index_present: true };
   const _NO_BUILD = "no ArcGIS build of this report yet";
-  const _NO_CMP = "no comparison yet — the site's export has no consolidator until real per-route files are censused";
+  const _NO_CMP = "no comparison of the ArcGIS build against the site's export yet";
   const _NO_ED = "this edition is not consolidated yet, so it cannot be compared";
   // [key, label, code, buildable, comparable, editions: [key, label, code, consolidated]]
   const MOCK_AG_FAMILIES = [
     ["ramp_summary", "TSAR: Ramp Summary", "RS", false, false,
-     [["ramp_summary", "TSAR: Ramp Summary", "RS", true], ["ramp_summary_excel", "TSAR: Ramp Summary (Excel)", "RS-XLSX", false]]],
+     [["ramp_summary", "TSAR: Ramp Summary", "RS", true], ["ramp_summary_excel", "TSAR: Ramp Summary (Excel)", "RS-XLSX", true]]],
     ["ramp_detail", "TSAR: Ramp Detail", "RD", false, false,
      [["ramp_detail", "TSAR: Ramp Detail", "RD", true], ["ramp_detail_pdf", "TSAR: Ramp Detail (PDF)", "RD-PDF", true]]],
     ["highway_sequence", "Highway Sequence Listing", "HSL", false, false,
@@ -698,19 +734,19 @@ function makeMockApi() {
     ["highway_log", "Highway Log", "HL", false, false,
      [["highway_log", "Highway Log", "HL", true], ["highway_log_pdf", "Highway Log (PDF)", "HL-PDF", true]]],
     ["intersection_summary", "Intersection Summary", "IS", false, false,
-     [["intersection_summary", "Intersection Summary", "IS", true], ["intersection_summary_pdf", "Intersection Summary (PDF)", "IS-PDF", false]]],
+     [["intersection_summary", "Intersection Summary", "IS", true], ["intersection_summary_pdf", "Intersection Summary (PDF)", "IS-PDF", true]]],
     ["intersection_detail", "Intersection Detail", "ID", true, true,
      [["intersection_detail", "Intersection Detail", "ID", true], ["intersection_detail_pdf", "Intersection Detail (PDF)", "ID-PDF", true]]],
     ["highway_detail", "Highway Detail", "HD", true, true,
      [["highway_detail", "Highway Detail", "HD", true], ["highway_detail_pdf", "Highway Detail (PDF)", "HD-PDF", true]]],
     ["highway_summary", "Highway Summary", "HS", false, false,
-     [["highway_summary", "Highway Summary", "HS", true], ["highway_summary_pdf", "Highway Summary (PDF)", "HS-PDF", false]]],
+     [["highway_summary", "Highway Summary", "HS", true], ["highway_summary_pdf", "Highway Summary (PDF)", "HS-PDF", true]]],
     ["clean_highway", "Clean Road: Highway", "CR-HWY", true, false,
-     [["clean_highway", "Clean Road: Highway", "CR-HWY", false], ["clean_highway_pdf", "Clean Road: Highway (PDF)", "CR-HWY-PDF", false]]],
+     [["clean_highway", "Clean Road: Highway", "CR-HWY", true], ["clean_highway_pdf", "Clean Road: Highway (PDF)", "CR-HWY-PDF", true]]],
     ["clean_intersection", "Clean Road: Intersection", "CR-INT", false, false,
-     [["clean_intersection", "Clean Road: Intersection", "CR-INT", false], ["clean_intersection_pdf", "Clean Road: Intersection (PDF)", "CR-INT-PDF", false]]],
+     [["clean_intersection", "Clean Road: Intersection", "CR-INT", true], ["clean_intersection_pdf", "Clean Road: Intersection (PDF)", "CR-INT-PDF", true]]],
     ["clean_ramp", "Clean Road: Ramp", "CR-RMP", false, false,
-     [["clean_ramp", "Clean Road: Ramp", "CR-RMP", false], ["clean_ramp_pdf", "Clean Road: Ramp (PDF)", "CR-RMP-PDF", false]]],
+     [["clean_ramp", "Clean Road: Ramp", "CR-RMP", true], ["clean_ramp_pdf", "Clean Road: Ramp (PDF)", "CR-RMP-PDF", true]]],
   ];
   const MOCK_AG_ROWS = [];
   MOCK_AG_FAMILIES.forEach(([fam, _l, _c, buildable, comparable, eds]) => {
@@ -1225,14 +1261,23 @@ function makeMockApi() {
         { key: "cons:highway_sequence", label: "Highway Sequence Listing", group: null, short: null, fmt: "Excel" },
         { key: "cons:highway_sequence_pdf", label: "TSMIS Highway Sequence (PDF)", group: null, short: null, fmt: "PDF" },
         { key: "cons:ramp_summary", label: "TSAR: Ramp Summary", group: "Ramp", short: "Summary", fmt: "PDF" },
+        { key: "cons:ramp_summary_excel", label: "TSAR: Ramp Summary (Excel)", group: "Ramp", short: "Summary (Excel)", fmt: "Excel" },
         { key: "cons:ramp_detail", label: "TSAR: Ramp Detail", group: "Ramp", short: "Detail", fmt: "Excel" },
         { key: "cons:ramp_detail_pdf", label: "TSMIS Ramp Detail (PDF)", group: "Ramp", short: "Detail (PDF)", fmt: "PDF" },
         { key: "cons:intersection_summary", label: "Intersection Summary", group: "Intersection", short: "Summary", fmt: "Excel" },
+        { key: "cons:intersection_summary_pdf", label: "TSMIS Intersection Summary (PDF)", group: "Intersection", short: "Summary (PDF)", fmt: "PDF" },
         { key: "cons:intersection_detail", label: "Intersection Detail", group: "Intersection", short: "Detail", fmt: "Excel" },
         { key: "cons:intersection_detail_pdf", label: "TSMIS Intersection Detail (PDF)", group: "Intersection", short: "Detail (PDF)", fmt: "PDF" },
         { key: "cons:highway_detail", label: "Highway Detail", group: "Highway", short: "Detail", fmt: "Excel" },
         { key: "cons:highway_detail_pdf", label: "TSMIS Highway Detail (PDF)", group: "Highway", short: "Detail (PDF)", fmt: "PDF" },
         { key: "cons:highway_summary", label: "Highway Summary", group: "Highway", short: "Summary", fmt: "Excel" },
+        { key: "cons:highway_summary_pdf", label: "TSMIS Highway Summary (PDF)", group: "Highway", short: "Summary (PDF)", fmt: "PDF" },
+        { key: "cons:clean_highway", label: "Clean Road: Highway", group: "Clean Road", short: "Highway", fmt: "Excel" },
+        { key: "cons:clean_highway_pdf", label: "TSMIS Clean Road: Highway (PDF)", group: "Clean Road", short: "Highway (PDF)", fmt: "PDF" },
+        { key: "cons:clean_intersection", label: "Clean Road: Intersection", group: "Clean Road", short: "Intersection", fmt: "Excel" },
+        { key: "cons:clean_intersection_pdf", label: "TSMIS Clean Road: Intersection (PDF)", group: "Clean Road", short: "Intersection (PDF)", fmt: "PDF" },
+        { key: "cons:clean_ramp", label: "Clean Road: Ramp", group: "Clean Road", short: "Ramp", fmt: "Excel" },
+        { key: "cons:clean_ramp_pdf", label: "TSMIS Clean Road: Ramp (PDF)", group: "Clean Road", short: "Ramp (PDF)", fmt: "PDF" },
       ],
       compare_groups: [
         { id: "env", label: "Cross-environment" },
@@ -1245,37 +1290,61 @@ function makeMockApi() {
       // stable `cmp:*` key (P3), so selection/routing resolves by key — the order just
       // mirrors the registry for display parity.
       compare_reports: [
-        { key: "cmp:highway_log:env", label: "Highway Log — between environments", kind: "folders", group: "env", family_group: null, subdir: "highway_log", file_a_label: "TSMIS", file_b_label: "TSN" },
-        { key: "cmp:highway_log_pdf:env", label: "Highway Log (PDF) — between environments", kind: "folders", group: "env", family_group: null, subdir: "highway_log_pdf", file_a_label: "TSMIS", file_b_label: "TSN" },
+        { key: "cmp:highway_log:env", label: "Highway Log — between environments", kind: "folders", group: "env", family_group: null, subdir: "highway_log", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
+        { key: "cmp:highway_log_pdf:env", label: "Highway Log (PDF) — between environments", kind: "folders", group: "env", family_group: null, subdir: "highway_log_pdf", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
         { key: "cmp:highway_log:tsn", label: "Highway Log — TSMIS vs TSN", kind: "files", group: "tsn", family_group: null, subdir: null, file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: "a per-route workbook (one route) or a consolidated workbook (all routes)", file_b_shape: "a per-route workbook (one route) or a consolidated workbook (all routes)" },
         { key: "cmp:highway_log:pdf_vs_tsn", label: "Highway Log — TSMIS (PDF) vs TSN (PDF)", kind: "files", group: "tsn", family_group: null, subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSN (PDF)", file_a_shape: "a per-route workbook (one route) or a consolidated workbook (all routes)", file_b_shape: "a per-route workbook (one route) or a consolidated workbook (all routes)" },
         { key: "cmp:highway_log:pdf_vs_excel", label: "Highway Log — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "self", family_group: null, subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)", file_a_shape: "a per-route workbook (one route) or a consolidated workbook (all routes)", file_b_shape: "a per-route workbook (one route) or a consolidated workbook (all routes)" },
-        { key: "cmp:highway_sequence:env", label: "Highway Sequence Listing — between environments", kind: "folders", group: "env", family_group: null, subdir: "highway_sequence", file_a_label: "TSMIS", file_b_label: "TSN" },
+        { key: "cmp:highway_sequence:env", label: "Highway Sequence Listing — between environments", kind: "folders", group: "env", family_group: null, subdir: "highway_sequence", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
         { key: "cmp:highway_sequence:tsn", label: "Highway Sequence Listing — TSMIS vs TSN", kind: "files", group: "tsn", family_group: null, subdir: null, file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
         { key: "cmp:highway_sequence:pdf_vs_tsn", label: "Highway Sequence Listing — TSMIS (PDF) vs TSN", kind: "files", group: "tsn", family_group: null, subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
         { key: "cmp:highway_sequence:pdf_vs_excel", label: "Highway Sequence Listing — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "self", family_group: null, subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
-        { key: "cmp:highway_sequence_pdf:env", label: "Highway Sequence Listing (PDF) — between environments", kind: "folders", group: "env", family_group: null, subdir: "highway_sequence_pdf", file_a_label: "TSMIS", file_b_label: "TSN" },
-        { key: "cmp:ramp_summary:env", label: "TSAR: Ramp Summary — between environments", kind: "folders", group: "env", family_group: "Ramp", subdir: "ramp_summary", file_a_label: "TSMIS", file_b_label: "TSN" },
+        { key: "cmp:highway_sequence_pdf:env", label: "Highway Sequence Listing (PDF) — between environments", kind: "folders", group: "env", family_group: null, subdir: "highway_sequence_pdf", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
+        { key: "cmp:ramp_summary:env", label: "TSAR: Ramp Summary — between environments", kind: "folders", group: "env", family_group: "Ramp", subdir: "ramp_summary", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
         { key: "cmp:ramp_summary:tsn", label: "TSAR: Ramp Summary — TSMIS vs TSN", kind: "files", group: "tsn", family_group: "Ramp", subdir: null, file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "the raw statewide TSN PDF, or the normalized TSN workbook" },
-        { key: "cmp:ramp_detail:env", label: "TSAR: Ramp Detail — between environments", kind: "folders", group: "env", family_group: "Ramp", subdir: "ramp_detail", file_a_label: "TSMIS", file_b_label: "TSN" },
+        { key: "cmp:ramp_summary:excel_vs_tsn", label: "TSAR: Ramp Summary — TSMIS (Excel) vs TSN", kind: "files", group: "tsn", family_group: "Ramp", subdir: null, file_a_label: "TSMIS (Excel)", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "the raw statewide TSN PDF, or the normalized TSN workbook" },
+        { key: "cmp:ramp_summary:pdf_vs_excel", label: "TSAR: Ramp Summary — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "self", family_group: "Ramp", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
+        { key: "cmp:ramp_summary_excel:env", label: "TSAR: Ramp Summary (Excel) — between environments", kind: "folders", group: "env", family_group: "Ramp", subdir: "ramp_summary_excel", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
+        { key: "cmp:ramp_detail:env", label: "TSAR: Ramp Detail — between environments", kind: "folders", group: "env", family_group: "Ramp", subdir: "ramp_detail", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
         { key: "cmp:ramp_detail:tsn", label: "TSAR: Ramp Detail — TSMIS vs TSN", kind: "files", group: "tsn", family_group: "Ramp", subdir: null, file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
         { key: "cmp:ramp_detail:pdf_vs_tsn", label: "TSAR: Ramp Detail — TSMIS (PDF) vs TSN", kind: "files", group: "tsn", family_group: "Ramp", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
         { key: "cmp:ramp_detail:pdf_vs_excel", label: "TSAR: Ramp Detail — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "self", family_group: "Ramp", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
-        { key: "cmp:ramp_detail_pdf:env", label: "TSAR: Ramp Detail (PDF) — between environments", kind: "folders", group: "env", family_group: "Ramp", subdir: "ramp_detail_pdf", file_a_label: "TSMIS", file_b_label: "TSN" },
-        { key: "cmp:intersection_summary:env", label: "Intersection Summary — between environments", kind: "folders", group: "env", family_group: "Intersection", subdir: "intersection_summary", file_a_label: "TSMIS", file_b_label: "TSN" },
+        { key: "cmp:ramp_detail_pdf:env", label: "TSAR: Ramp Detail (PDF) — between environments", kind: "folders", group: "env", family_group: "Ramp", subdir: "ramp_detail_pdf", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
+        { key: "cmp:intersection_summary:env", label: "Intersection Summary — between environments", kind: "folders", group: "env", family_group: "Intersection", subdir: "intersection_summary", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
         { key: "cmp:intersection_summary:tsn", label: "Intersection Summary — TSMIS vs TSN", kind: "files", group: "tsn", family_group: "Intersection", subdir: null, file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "the raw statewide TSN PDF, or the normalized TSN workbook" },
-        { key: "cmp:intersection_detail:env", label: "Intersection Detail — between environments", kind: "folders", group: "env", family_group: "Intersection", subdir: "intersection_detail", file_a_label: "TSMIS", file_b_label: "TSN" },
+        { key: "cmp:intersection_summary:pdf_vs_tsn", label: "Intersection Summary — TSMIS (PDF) vs TSN", kind: "files", group: "tsn", family_group: "Intersection", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "the raw statewide TSN PDF, or the normalized TSN workbook" },
+        { key: "cmp:intersection_summary:pdf_vs_excel", label: "Intersection Summary — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "self", family_group: "Intersection", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
+        { key: "cmp:intersection_summary_pdf:env", label: "Intersection Summary (PDF) — between environments", kind: "folders", group: "env", family_group: "Intersection", subdir: "intersection_summary_pdf", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
+        { key: "cmp:intersection_detail:env", label: "Intersection Detail — between environments", kind: "folders", group: "env", family_group: "Intersection", subdir: "intersection_detail", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
         { key: "cmp:intersection_detail:tsn", label: "Intersection Detail — TSMIS vs TSN", kind: "files", group: "tsn", family_group: "Intersection", subdir: null, file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
         { key: "cmp:intersection_detail:pdf_vs_tsn", label: "Intersection Detail — TSMIS (PDF) vs TSN", kind: "files", group: "tsn", family_group: "Intersection", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
         { key: "cmp:intersection_detail:pdf_vs_excel", label: "Intersection Detail — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "self", family_group: "Intersection", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
-        { key: "cmp:intersection_detail_pdf:env", label: "Intersection Detail (PDF) — between environments", kind: "folders", group: "env", family_group: "Intersection", subdir: "intersection_detail_pdf", file_a_label: "TSMIS", file_b_label: "TSN" },
-        { key: "cmp:highway_detail:env", label: "Highway Detail — between environments", kind: "folders", group: "env", family_group: "Highway", subdir: "highway_detail", file_a_label: "TSMIS", file_b_label: "TSN" },
+        { key: "cmp:intersection_detail_pdf:env", label: "Intersection Detail (PDF) — between environments", kind: "folders", group: "env", family_group: "Intersection", subdir: "intersection_detail_pdf", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
+        { key: "cmp:highway_detail:env", label: "Highway Detail — between environments", kind: "folders", group: "env", family_group: "Highway", subdir: "highway_detail", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
         { key: "cmp:highway_detail:tsn", label: "Highway Detail — TSMIS vs TSN", kind: "files", group: "tsn", family_group: "Highway", subdir: null, file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
         { key: "cmp:highway_detail:pdf_vs_tsn", label: "Highway Detail — TSMIS (PDF) vs TSN", kind: "files", group: "tsn", family_group: "Highway", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
         { key: "cmp:highway_detail:pdf_vs_excel", label: "Highway Detail — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "self", family_group: "Highway", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
-        { key: "cmp:highway_detail_pdf:env", label: "Highway Detail (PDF) — between environments", kind: "folders", group: "env", family_group: "Highway", subdir: "highway_detail_pdf", file_a_label: "TSMIS", file_b_label: "TSN" },
-        { key: "cmp:highway_summary:env", label: "Highway Summary — between environments", kind: "folders", group: "env", family_group: "Highway", subdir: "highway_summary", file_a_label: "TSMIS", file_b_label: "TSN" },
+        { key: "cmp:highway_detail_pdf:env", label: "Highway Detail (PDF) — between environments", kind: "folders", group: "env", family_group: "Highway", subdir: "highway_detail_pdf", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
+        { key: "cmp:highway_summary:env", label: "Highway Summary — between environments", kind: "folders", group: "env", family_group: "Highway", subdir: "highway_summary", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
         { key: "cmp:highway_summary:tsn", label: "Highway Summary — TSMIS vs TSN", kind: "files", group: "tsn", family_group: "Highway", subdir: null, file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "the raw statewide TSN PDF, or the normalized TSN workbook" },
+        { key: "cmp:highway_summary:pdf_vs_tsn", label: "Highway Summary — TSMIS (PDF) vs TSN", kind: "files", group: "tsn", family_group: "Highway", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "the raw statewide TSN PDF, or the normalized TSN workbook" },
+        { key: "cmp:highway_summary:pdf_vs_excel", label: "Highway Summary — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "self", family_group: "Highway", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
+        { key: "cmp:highway_summary_pdf:env", label: "Highway Summary (PDF) — between environments", kind: "folders", group: "env", family_group: "Highway", subdir: "highway_summary_pdf", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
+        { key: "cmp:clean_highway:env", label: "Clean Road: Highway — between environments", kind: "folders", group: "env", family_group: "Clean Road", subdir: "clean_highway", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
+        { key: "cmp:clean_highway:tsn", label: "Clean Road: Highway — TSMIS vs TSN", kind: "files", group: "tsn", family_group: "Clean Road", subdir: null, file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
+        { key: "cmp:clean_highway:pdf_vs_tsn", label: "Clean Road: Highway — TSMIS (PDF) vs TSN", kind: "files", group: "tsn", family_group: "Clean Road", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
+        { key: "cmp:clean_highway:pdf_vs_excel", label: "Clean Road: Highway — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "self", family_group: "Clean Road", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
+        { key: "cmp:clean_highway_pdf:env", label: "Clean Road: Highway (PDF) — between environments", kind: "folders", group: "env", family_group: "Clean Road", subdir: "clean_highway_pdf", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
+        { key: "cmp:clean_intersection:env", label: "Clean Road: Intersection — between environments", kind: "folders", group: "env", family_group: "Clean Road", subdir: "clean_intersection", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
+        { key: "cmp:clean_intersection:tsn", label: "Clean Road: Intersection — TSMIS vs TSN", kind: "files", group: "tsn", family_group: "Clean Road", subdir: null, file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
+        { key: "cmp:clean_intersection:pdf_vs_tsn", label: "Clean Road: Intersection — TSMIS (PDF) vs TSN", kind: "files", group: "tsn", family_group: "Clean Road", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
+        { key: "cmp:clean_intersection:pdf_vs_excel", label: "Clean Road: Intersection — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "self", family_group: "Clean Road", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
+        { key: "cmp:clean_intersection_pdf:env", label: "Clean Road: Intersection (PDF) — between environments", kind: "folders", group: "env", family_group: "Clean Road", subdir: "clean_intersection_pdf", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
+        { key: "cmp:clean_ramp:env", label: "Clean Road: Ramp — between environments", kind: "folders", group: "env", family_group: "Clean Road", subdir: "clean_ramp", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
+        { key: "cmp:clean_ramp:tsn", label: "Clean Road: Ramp — TSMIS vs TSN", kind: "files", group: "tsn", family_group: "Clean Road", subdir: null, file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
+        { key: "cmp:clean_ramp:pdf_vs_tsn", label: "Clean Road: Ramp — TSMIS (PDF) vs TSN", kind: "files", group: "tsn", family_group: "Clean Road", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSN", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
+        { key: "cmp:clean_ramp:pdf_vs_excel", label: "Clean Road: Ramp — TSMIS (PDF) vs TSMIS (Excel)", kind: "files", group: "self", family_group: "Clean Road", subdir: null, file_a_label: "TSMIS (PDF)", file_b_label: "TSMIS (Excel)", file_a_shape: "a consolidated workbook (all routes)", file_b_shape: "a consolidated workbook (all routes)" },
+        { key: "cmp:clean_ramp_pdf:env", label: "Clean Road: Ramp (PDF) — between environments", kind: "folders", group: "env", family_group: "Clean Road", subdir: "clean_ramp_pdf", file_a_label: "TSMIS", file_b_label: "TSN", file_a_shape: null, file_b_shape: null },
       ],
       batch_resume: null,
       batch_dest: "C:\\Tools\\TSMIS Exporter\\output\\All Reports (current)",
