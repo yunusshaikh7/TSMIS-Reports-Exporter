@@ -27,11 +27,12 @@ builds):
 
 Everything below is **measured** — no column mapping is assumed. The original
 census ran against the 2026-07-20 layer export and the 2025-09-08 TSN extract;
-the library was refreshed on 2026-08-19 (40 layers, `_inbox/Cleanroad/All Layers
-8.19/`) and the rules re-measured against the real 2026-08-17 export. Census
-scripts and exact numbers live locally beside the data in
-`Downloads\TSMIS\_inbox\Cleanroad\_analysis\` (see its README; local-only, like
-all real data).
+the library was refreshed on 2026-08-19 (40 layers, `ground-truth/Clean Road and
+ArcGIS layers/All Layers 8.19/`) and the rules re-measured against the real
+2026-08-17 export. Census scripts and exact numbers live locally beside the data in
+`Downloads\TSMIS\ground-truth\Clean Road and ArcGIS layers\_analysis\` (see its
+README; local-only, like all real data; filed there from `_inbox\Cleanroad\` on
+2026-10-05).
 
 > **The as-of does NOT follow the layer library.** `resolve_default_asof()` takes
 > it from the staged TSN extract, so a default build off fresh layers still

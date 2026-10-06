@@ -6,9 +6,10 @@ DERIVED EMPIRICALLY on 2026-07-22 by co-locating the layer's as-of SHS city
 spans with the statewide CA HIGHWAYS extract's city-coded rows (county + PM;
 21,906 rows voted; 99.92% agreement; the one sub-90% vote — ALHAMBRA, whose
 boundary rows bleed into SPAS/PAS/LA — resolved to its 67% majority ALH).
-Derivation script: the local corpus _inbox/Cleanroad/_analysis/
-derive_city_codes.py. An unmapped name passes through verbatim so it
-SURFACES in a comparison instead of vanishing.
+Derivation script: the local corpus
+ground-truth/Clean Road and ArcGIS layers/_analysis/derive_city_codes.py.
+An unmapped name passes through verbatim so it SURFACES in a comparison
+instead of vanishing.
 """
 
 CITY_CODES = {
