@@ -3,6 +3,39 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.47.0 — 2026-10-05
+
+The ArcGIS tab is now laid out end to end: the layers, the reports built from
+them, and every export compared against those reports.
+
+- **ArcGIS ▸ ArcGIS reports.** A new sub-tab, between Layers and the comparison,
+  lists every TSMIS report the app renders from the layers: Intersection Detail,
+  Highway Detail and Clean Road: Highway today, with the other eight listed greyed
+  until their builds land. Each row shows what its build is as of, when it was
+  built, its rows, whether it came from the layers in the library now, and which
+  exports are compared against it. **Refresh all reports** rebuilds them from the
+  current layers, one after another, as one queued job; each row has its own
+  **Refresh**, and the **As of** box rebuilds a past date. A refresh that fails or
+  is cancelled stays on its row, with the reason, until a later one succeeds.
+- **Reports vs layers is now Reports vs ArcGIS, and it compares both editions.**
+  Each report's Excel export and its PDF edition are separate rows, and both are
+  compared against the report's one ArcGIS build, which each row picks up by
+  itself — the matrix no longer has its own build button or as-of box. Highway
+  Detail (PDF) and Intersection Detail (PDF) are compared for the first time;
+  before, a day with both editions compared only the Excel. Rows that can't be
+  compared yet stay listed, greyed and compact, with the reason on hover.
+- **Big layers get more time.** The first real refresh on the work PC
+  (2026-10-05) exported all 40 layers cleanly, but County Code used 54 minutes of
+  its 90-minute limit. A layer's limit now grows with its row count, so County
+  Code gets about 2¾ hours. (That run's "columns changed" notes were one-time
+  renames of the manually exported files — same values — and don't come back.)
+- After updating, your Reports vs ArcGIS rows, order and comparisons carry over;
+  the PDF rows are new. ArcGIS reports built from the 2026-08-19 layers read
+  *built from older layers* — refresh them.
+
+Verified offline and in the preview; refreshing the reports from the new layers
+and comparing a day on the work PC is next (roadmap B1).
+
 ## v0.46.0 — 2026-10-05
 
 The app now refreshes the ArcGIS layers itself, so there is no more manual
