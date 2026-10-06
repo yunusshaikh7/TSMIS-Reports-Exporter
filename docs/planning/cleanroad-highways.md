@@ -303,7 +303,8 @@ empty-in-export SHS layers.
 
 **Re-target (2026-09-02).** The site now exports all three Clean Road files
 (v0.44.0), so the CA INTERSECTIONS and CA RAMPS builds above land as ROWS of the
-ArcGIS tab's **Reports vs layers matrix** (`arcgis_reports.py` already lists
+ArcGIS tab's **Reports vs ArcGIS matrix** (*Reports vs layers* until v0.47.0; their
+builds go on the **ArcGIS reports** tab; `arcgis_reports.py` already lists
 `clean_highway` / `clean_intersection` / `clean_ramp`, greyed until their builds and
 the site-export consolidators exist): our build vs the site's export, TSMIS vs
 TSMIS, one build per file stamped with the layer drop it came from. The vs-TSN

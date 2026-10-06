@@ -153,9 +153,26 @@ def start_external(command, **kwargs):
 # Excel is one call), so it gets a generous wall-clock limit; outside a layer
 # the worker's heartbeat must keep arriving.
 START_LIMIT_S = 600            # launch -> ArcPy imported and the run under way
-LAYER_LIMIT_S = 90 * 60        # one layer's export
+LAYER_LIMIT_S = 90 * 60        # one layer's export (the floor; big layers get more)
 IDLE_LIMIT_S = 600             # no event at all, outside a layer
 _POLL_S = 0.25
+# The export time grows faster than the row count: the first real refresh
+# (2026-10-05) took 54 min for County Code's 824,914 rows (3.9 ms a row) and
+# 17 min for City's 484,986, against seconds for the 30,000-row layers. So once
+# the worker has counted a layer, its limit is 3x that slowest measured rate
+# per row whenever that is more than the flat limit — County Code gets about
+# 2 h 45 min instead of 90 min.
+LAYER_SECONDS_PER_ROW = 0.012
+
+
+def layer_limit_for(rows, base=LAYER_LIMIT_S, per_row=LAYER_SECONDS_PER_ROW):
+    """The wall-clock limit for one layer's export: the flat `base`, or more for
+    a big layer (`rows` is the worker's own count of it)."""
+    try:
+        n = int(rows)
+    except (TypeError, ValueError):
+        return base
+    return max(base, n * per_row) if n > 0 else base
 
 
 class _ProcessHandle:
@@ -229,11 +246,13 @@ def _clear_session(folder):
 
 def run_worker(session, request, on_event, cancel_event, python, launcher=None,
                start_limit=START_LIMIT_S, layer_limit=LAYER_LIMIT_S,
-               idle_limit=IDLE_LIMIT_S):
+               idle_limit=IDLE_LIMIT_S, layer_seconds_per_row=LAYER_SECONDS_PER_ROW):
     """Run one worker request in `session` (an app-owned folder, emptied
     first), feeding every event to `on_event(dict)` as it arrives. Returns a
     SessionOutcome. The worker is stopped on cancel and on any time limit; its
     request, events and console output stay in the folder for diagnosis.
+    `layer_limit` is the per-layer floor; a layer the worker counted as big
+    gets `layer_limit_for` its rows instead.
 
     `launcher(python, script, request_path, events_path, log_path)` returns a
     handle with poll()/stop()/close(); the default runs ArcGIS Pro's python.exe
@@ -249,7 +268,8 @@ def run_worker(session, request, on_event, cancel_event, python, launcher=None,
     if not script.is_file():
         return SessionOutcome(fatal=f"The layer export worker is missing from the app ({script}).")
     out = SessionOutcome()
-    clock = {"last": time.monotonic(), "started": False, "layer": None}
+    clock = {"last": time.monotonic(), "started": False, "layer": None,
+             "limit": layer_limit}
 
     def take(line):
         try:
@@ -263,6 +283,10 @@ def run_worker(session, request, on_event, cancel_event, python, launcher=None,
             clock["started"] = True
         if kind == "layer_start":
             clock["layer"] = time.monotonic()
+            clock["limit"] = layer_limit
+        elif kind == "layer_count":
+            clock["limit"] = layer_limit_for(ev.get("rows"), layer_limit,
+                                             layer_seconds_per_row)
         elif kind in ("layer_done", "layer_failed"):
             clock["layer"] = None
         elif kind == "fatal":
@@ -294,9 +318,9 @@ def run_worker(session, request, on_event, cancel_event, python, launcher=None,
                     out.timed_out = ("ArcGIS Pro's Python did not start the run within "
                                      f"{max(start_limit // 60, 1)} minutes")
                     break
-                if clock["layer"] is not None and now - clock["layer"] > layer_limit:
-                    out.timed_out = (f"one layer took longer than {max(layer_limit // 60, 1)} "
-                                     "minutes")
+                if clock["layer"] is not None and now - clock["layer"] > clock["limit"]:
+                    out.timed_out = ("one layer took longer than "
+                                     f"{max(int(clock['limit'] // 60), 1)} minutes")
                     break
                 if (clock["layer"] is None and clock["started"]
                         and now - clock["last"] > idle_limit):

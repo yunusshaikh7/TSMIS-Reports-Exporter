@@ -182,7 +182,7 @@ class GuiMatrixMixin:
 
     def _make_job(self, kind, scope, label, row=None, env=None, subdir=None,
                   fast=False, which="env", force=False, origin=None, asof=None,
-                  layers=None):
+                  layers=None, rows=None):
         # `which` ("env" = Everything matrix, "day" = Compare by-day matrix,
         # "baseline" / "pdf_vs_excel" / "arcgis" the other by-day matrices) lets
         # ONE queue serve every matrix; for day jobs `env` carries the date.
@@ -190,11 +190,13 @@ class GuiMatrixMixin:
         # `origin` ("canonical"/"legacy") routes a tsn_consolidate job (CMP-AUD-010).
         # `asof` is an arcgis_build job's reconstruction date (None = the drop's).
         # `layers` is an arcgis_refresh job's layer names (None = all of them).
+        # `rows` is an arcgis_build job's reports, built one after another.
         jid = self._coord.next_seq()
         return {"id": jid, "kind": kind, "scope": scope, "label": label,
                 "row": row, "env": env, "subdir": subdir, "fast": bool(fast),
                 "which": which, "force": bool(force), "origin": origin,
                 "asof": asof, "layers": list(layers) if layers else None,
+                "rows": list(rows) if rows else None,
                 "status": "queued"}
 
     def _enqueue_matrix_job(self, job):

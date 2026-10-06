@@ -1156,8 +1156,9 @@ both flavors, context-never-counts).
 The first comparison where **both sides are TSMIS**. Side A is OUR Highway Detail,
 rendered from the ArcGIS layer library by `arcgis_report_highway_detail`; side B is the
 app's own consolidated Highway Detail export for a chosen day. It lives on the **ArcGIS
-tab's "Reports vs layers" matrix** (§12d, since 2026-09-02; a single-report card before
-that), not in `COMPARE_REPORTS` or the Compare-tab matrices.
+tab's "Reports vs ArcGIS" matrix** (§12d, since 2026-09-02 — called *Reports vs layers*
+until v0.47.0; a single-report card before that), not in `COMPARE_REPORTS` or the
+Compare-tab matrices; the build itself is refreshed on the **ArcGIS reports** tab.
 
 **Side A has its OWN build (v0.39.2).** It shares the span engine with Clean Road but
 not that build's output, because the two reproduce different things: Clean Road
@@ -1582,27 +1583,50 @@ PDF baseline.
   workbook — and the gui_api bridge incl. the shared queue). **Owed on the work PC:** two real days
   vs a real baseline end-to-end.
 
-### 12d. The ArcGIS-tab "Reports vs layers" matrix (`scripts/arcgis_matrix.py`, 2026-09-02)
+### 12d. The ArcGIS-tab "Reports vs ArcGIS" matrix (`scripts/arcgis_matrix.py`, 2026-09-02; editions + rename v0.47.0)
 
-The **fifth** matrix, and the ArcGIS tab's main view — the other four live under Compare
-and Everything. **Rows = every report in the `arcgis_reports` registry** (the site's
-report order: the two rendered so far, the rows still waiting on a build greyed with the
-reason, and the three Clean Road files, owner decision 2026-09-02), **columns = exported
-days you add, each cell = the report's ONE layer build vs that day's consolidated
-export** (either edition — Excel preferred — consolidated from its run folder through the
-shared `matrix._ensure_consolidated`). Both sides are TSMIS, so they should agree.
+The **fifth** matrix — the other four live under Compare and Everything. Called
+*Reports vs layers* until v0.47.0. **Rows = every EXPORT EDITION of every report in the
+`arcgis_reports` registry** — the Excel export and the print (PDF) edition are separate
+rows (`arcgis_reports.editions()`, derived from `report_catalog.EXPORT`: a print
+edition's key is its family's plus `_pdf`, Ramp Summary's Excel sibling `_excel`; the
+report's own key leads), in the site's report order, the reports still waiting on a
+build listed greyed with the reason, and the three Clean Road files (owner decision
+2026-09-02). **Columns = exported days you add; each cell = that day's export of the
+row's edition, consolidated from its run folder through the shared
+`matrix._ensure_consolidated`, vs the report's ONE ArcGIS build.** Both sides are TSMIS,
+so they should agree. Until v0.47.0 a row was a report and its cell read whichever
+edition a day had (Excel preferred), so a day with both compared only the Excel; now
+both editions compare against the same build — the shape the owner set on 2026-10-05
+("all the ArcGIS builds will be Excel; both PDF and Excel exports compare with that one
+version"). An edition is comparable when its report has a build and a comparator AND
+the app consolidates that edition (both editions consolidate to the same shape — each
+report's PDF-vs-Excel self-check proves it — so one comparator per report serves both).
 
-- **One build per report, like the TSN library** (owner decision 2026-09-02). The layers
-  are refreshed rarely (by hand until v0.46.0, from the ArcGIS ▸ Layers tab since), so
-  every day column compares against the same built
-  workbook (`build_mod.OUT_PATH`; HD and ID under `output/arcgis_reports/`, Clean Road
-  Highway under `output/arcgis_cleanroad/`). `build_report` builds it — gating on the
-  report's OWN `REQUIRED_LAYERS`, with the as-of defaulting to the OLDEST export date
-  among those layers (`arcgis_layers.consistent_asof`; v0.46.0 — a partly refreshed
-  library records each layer's own export time) and never the TSN extract's — and the
-  build stamps the drop it came from into its marker
-  sheet and sidecar (`layer_drop: {fingerprint, exported}` under the module's
-  `SIDECAR_KEY`).
+- **One build per report, refreshed in place** (owner decisions 2026-09-02 /
+  2026-10-05). The builds live on the **ArcGIS ▸ ArcGIS reports** tab (v0.47.0): every
+  row of a report — both editions, every day — compares against `arcgis_side(report)`,
+  the newest (and only) build of that report, so nothing on the matrix picks or builds
+  it (`build_mod.OUT_PATH`; HD and ID under `output/arcgis_reports/`, Clean Road
+  Highway under `output/arcgis_cleanroad/`). `build_report(report)` builds it — gating
+  on the report's OWN `REQUIRED_LAYERS`, with the as-of defaulting to the OLDEST export
+  date among those layers (`arcgis_layers.consistent_asof`; v0.46.0 — a partly
+  refreshed library records each layer's own export time) and never the TSN extract's —
+  and the build stamps the drop it came from into its marker sheet and sidecar
+  (`layer_drop: {fingerprint, exported}` under the module's `SIDECAR_KEY`). The tab's
+  refresh is ONE `kind:"arcgis_build"` job over several reports (`rows`), and a refresh
+  that did not land (failed / cancelled) is recorded per report in the shared attempts
+  overlay under `output/arcgis_reports/_state/` (`record_build_attempt`; a refresh
+  that lands clears it) so the tab can say why.
+- **Rebuilding a past date from newer layers is close, not exact.** The as-of
+  reconstruction reads each layer's LRS dates, but the server edits its own history:
+  between the 2026-08-19 and 2026-10-05 drops it removed retired rows from the SHS
+  layers and 5,560 blank intersections created in one load on 2026-07-24, and some
+  edits were back-dated. CA HIGHWAYS as of 2026-08-17 built from the two drops agrees
+  on 57,047 of 57,747 rows; the rest differ on 17 routes — mostly median values (type,
+  width, barrier, effective date) edited after 8/19 but dated earlier — and the newer
+  drop yields 88 more rows (route 125 alone +51). A same-date comparison is best made
+  from layers exported that day.
 - **The drop's identity** (`arcgis_layers.drop_info`): a content fingerprint over the
   `.xlsx` files in `arcgis_layers/` (names + `artifact_store.content_digest`, memoized
   per file in process — the 350 MB drop hashes once per session; since v0.46.0 the
@@ -1612,45 +1636,57 @@ shared `matrix._ensure_consolidated`). Both sides are TSMIS, so they should agre
   in-app refresh writes it per layer; `mixed`/`newest_at` say when layers span days), a
   manual manifest's own `created` timestamp (openpyxl stamps it in UTC; shown as the
   local date) otherwise, and the newest file date as the last fallback, saying so.
-- **`build_state` / `library_snapshot`**: per row — available (a build module exists),
-  built, trusted (the outcome sidecar is current), `comparable_now` (trusted AND
-  `outcome.comparable`), the as-of, the record count, and `drop_current` (the recorded
-  fingerprint equals the staged drop's). A build from another drop reads `stale`
-  (`drop_changed`) — the row header says *rebuild* — but stays comparable; a build with
-  no trusted outcome record is not comparable and its cells read *needs build*.
+- **`build_state` / `library_snapshot` / `reports_snapshot`**: per REPORT — available
+  (a build module exists), built, trusted (the outcome sidecar is current),
+  `comparable_now` (trusted AND `outcome.comparable`), the as-of, the record count, the
+  layers it reads, its editions (with whether each compares), the last refresh that did
+  not land, and `drop_current` (the recorded fingerprint equals the staged drop's). A
+  build from another drop reads `stale` (`drop_changed`) — *built from older layers —
+  refresh it* — but stays comparable; a build with no trusted outcome record is not
+  comparable and its rows' cells read *needs ArcGIS*. The matrix snapshot carries
+  `row_family` (which report's build each row compares against) beside the library.
 - **Cell state** rides the shared `matrix._cmp_state` with two sources: `layers` (the
-  build — present only when comparable_now, its mtime, and its content identity via
-  `artifact_store.content_digest`) and `export` (the day's edition folder, fingerprinted
-  like every other matrix). A rebuilt layer build therefore reads every cell stale
-  (`layers_newer` / `source_identity_changed`); `missing_side` gains the value
-  **`layers`** ("needs build"), and a row the lane cannot compare yet renders
-  `supported: False` with its `why`.
+  report's ArcGIS build — present only when comparable_now, its mtime, and its content
+  identity via `artifact_store.content_digest`) and `export` (the day's folder of the
+  row's edition, fingerprinted like every other matrix). A refreshed build therefore
+  reads every cell of that report stale, both editions (`layers_newer` /
+  `source_identity_changed`); `missing_side` gains the value **`layers`** ("needs
+  ArcGIS"), and a row the lane cannot compare yet renders `supported: False` with its
+  `why`. (The source keeps its pre-rename name so the caches recorded before v0.47.0
+  still match.)
 - **Store:** `output/comparisons/arcgis-by-day/<date src-env>/<row>_vs_layers <date>
-  <source>.xlsx`, counts cached in that tree's `_state/_results.json` (identity
-  `arcgis-by-day`, per-cell input fingerprint, generation id, producer versions, and
-  `source_identities.layers`), the attempts overlay beside it.
+  <source>.xlsx` (the row is the edition key; the file name kept its pre-rename form so
+  earlier comparisons stay valid), counts cached in that tree's `_state/_results.json`
+  (identity `arcgis-by-day`, per-cell input fingerprint, generation id, producer
+  versions, and `source_identities.layers`), the attempts overlay beside it.
 - **One queue, five matrices:** compare Jobs carry `which:"arcgis"` →
-  `ArcgisMatrixCompareWorker`; a report build is a `kind:"arcgis_build"` Job (its
-  `asof` on the job) → `ArcgisReportBuildWorker`, so a build lines up with the
-  comparisons that need it and is cancellable the same way. Bridge:
-  `arcgis_matrix_info` / `set_arcgis_matrix_source` / `add_/remove_arcgis_matrix_day` /
+  `ArcgisMatrixCompareWorker`; a report refresh is ONE `kind:"arcgis_build"` Job (its
+  `rows` and `asof` on the job) → `ArcgisReportBuildWorker` (`gui_worker_arcgis.py`), so
+  builds line up with the comparisons that read them and are cancellable the same way.
+  Bridge: `arcgis_reports_info` / `refresh_arcgis_reports` / `build_arcgis_report` (one
+  report; a matrix row's edition key maps to its report) / `open_arcgis_report` /
+  `open_arcgis_reports_folder` for the reports tab, and `arcgis_matrix_info` /
+  `set_arcgis_matrix_source` / `add_/remove_arcgis_matrix_day` /
   `set_arcgis_matrix_report` / `set_arcgis_matrix_row_order` /
   `set_arcgis_matrix_day_order` / `set_arcgis_matrix_formulas` /
-  `build_arcgis_matrix_cell` / `rebuild_arcgis_matrix` / `build_arcgis_report` /
-  `open_arcgis_report` / `open_arcgis_cell_comparison` /
-  `open_arcgis_comparisons_folder`. Settings: `arcgis_matrix_source/days/hidden/
-  row_order/formulas`. The single-report card that preceded it
-  (`arcgis_report_status` / `start_arcgis_report_build` / `start_arcgis_report_compare`)
-  is gone.
+  `build_arcgis_matrix_cell` / `rebuild_arcgis_matrix` / `open_arcgis_cell_comparison` /
+  `open_arcgis_comparisons_folder` for the matrix. Settings:
+  `arcgis_matrix_source/days/hidden/row_order/formulas` — edition keys; a report's own
+  key is still its established row, so lists saved before v0.47.0 keep applying. The
+  single-report card that preceded the matrix (`arcgis_report_status` /
+  `start_arcgis_report_build` / `start_arcgis_report_compare`) is gone.
 - **Vintage** is still the first thing to read: the build is as-of the drop's export
   date, the column is an export day, and across a gap the comparison measures network
   change on top of any real difference. The Notes state both dates; nothing blocks on it.
-- **Locked by** `build/check_arcgis_matrix.py` (registry-derived rows, the drop identity
-  on a synthetic library incl. the fingerprint changing with a layer's bytes, the build
-  states, the needs-build / needs-export / buildable / stale cell states, the scoped
-  rebuild list, `build_cell` end to end over the shared primitives with a stub
-  comparator — cache record, identity, the cell reading stale after a rebuilt build,
-  zero evidence artifacts — and `build_report`'s guards + as-of default).
+- **Locked by** `build/check_arcgis_matrix.py` (the edition rows — both editions, the
+  report's own key first, an unconsolidated edition of a comparable report saying so —
+  the drop identity on a synthetic library incl. the fingerprint changing with a layer's
+  bytes, the build states incl. the last-attempt record, the needs-ArcGIS / needs-export
+  / buildable / stale cell states for both editions, the scoped rebuild list,
+  `build_cell` end to end over the shared primitives with a stub comparator for the
+  Excel AND the PDF edition against the same build — cache record, identity, the cell
+  reading stale after a rebuilt build, zero evidence artifacts — `build_report`'s guards
+  + as-of default, and the reports endpoints + the multi-report worker).
 
 ## 13. Visual evidence (`scripts/visual_evidence.py` + the per-report adapters, v0.21.0; Intersection Detail joined in v0.22.0, Highway Log in v0.24.0, Highway Sequence in v0.25.0, Ramp Detail in v0.26.0; the exact-source rebuild + the cross-environment lane in RB-4/HF-05+HF-10)
 

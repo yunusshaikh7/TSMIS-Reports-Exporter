@@ -122,22 +122,26 @@ pairs county-blind by decision with the exposure measured and disclosed in the N
 (524 of 59,457 keys carry >1 row; 438 of those span counties = 976 rows, 1.6%).
 **Never infer a county.**
 
-**The ArcGIS tab has TWO sub-tabs — and since 2026-09-02 "Reports vs layers" is
-its MAIN view, a by-day MATRIX** (`arcgis_matrix.py`, §12d): rows = every report in
-the `arcgis_reports` registry (the two rendered so far; the rest greyed *no build
-yet* with the reason; the three Clean Road files are rows too, owner decision),
-columns = exported days, each cell = the report's ONE layer build vs that day's
-consolidated export. **One build per report, like the TSN library**, and every
-build stamps the DROP it came from (`arcgis_layers.drop_info`: the oldest layer's
-export time from the `00_INDEX.xlsx` manifest + a content fingerprint over the
-`.xlsx` files) into its marker sheet and sidecar, so a fresher drop reads the row
-stale. The as-of defaults to the oldest export date among the layers the report
-reads, never the TSN extract's (that default belongs to the Clean Road sub-tab
-only); a build gates on its own `REQUIRED_LAYERS`. Everything builds from the
-`arcgis_layers/` library, which the **Layers** sub-tab (first, v0.46.0) refreshes
+**The ArcGIS tab has FOUR sub-tabs, in the order the work flows (v0.47.0):
+Layers → ArcGIS reports → Reports vs ArcGIS → Clean Road vs TSN.** Everything builds
+from the `arcgis_layers/` library, which **Layers** (first, v0.46.0) refreshes
 in-app: ArcGIS Pro's own Python runs `arcgis_worker/export_layers.py` (ArcPy can't
 ship in the bundle), and `arcgis_refresh` checks and swaps each exported layer in.
 The owner's manual export is retired; a manual drop in the same shape still reads.
+**ArcGIS reports** holds every report in the `arcgis_reports` registry rendered from
+those layers — **ONE build per report, refreshed in place** (owner decisions
+2026-09-02 / 2026-10-05; the reports with no build yet listed greyed) — and every
+build stamps the DROP it came from (`arcgis_layers.drop_info`: the oldest layer's
+export time from the `00_INDEX.xlsx` manifest + a content fingerprint over the
+`.xlsx` files) into its marker sheet and sidecar, so refreshed layers read the
+build out of date. The as-of defaults to the oldest export date among the layers
+the report reads, never the TSN extract's (that default belongs to the Clean Road
+sub-tab only); a build gates on its own `REQUIRED_LAYERS`. **Reports vs ArcGIS**
+(*Reports vs layers* until v0.47.0) is a by-day MATRIX (`arcgis_matrix.py`, §12d):
+rows = every EXPORT EDITION of those reports — Excel and PDF are separate rows —
+columns = exported days, each cell = that day's consolidated export vs the report's
+one ArcGIS build, which the row picks up by itself (`arcgis_side`). The ArcGIS
+builds are Excel, so BOTH editions compare against the same build.
 
 **Clean Road (v0.29.0) builds the HIGHWAY clean-road file**: our
 own CA HIGHWAYS table from the owner's per-layer ArcGIS exports in
@@ -156,11 +160,12 @@ in [docs/comparison-engine.md](comparison-engine.md) §9j. `tsn_load_clean_road`
 normalizes CA HIGHWAYS verbatim (marker v1); the Intersection/Ramp slots stay
 deliberately normalizer-less until their builds land on the same pattern.
 
-**Reports vs layers (v0.39.0) renders a TSMIS REPORT from those same layers and diffs
-it against our own export of it** — TSMIS vs TSMIS, so the two sides SHOULD agree.
-**`arcgis_reports.py` is the registry**: one row per report (label + build + comparator +
-the export consolidators that can supply the TSMIS side), and the GUI endpoints, the
-sub-tab's picker and the checks all derive from it — adding a report needs no endpoint edit.
+**The ArcGIS reports (v0.39.0) render a TSMIS REPORT from those same layers, and
+Reports vs ArcGIS diffs it against our own export of it** — TSMIS vs TSMIS, so the two
+sides SHOULD agree. **`arcgis_reports.py` is the registry**: one row per report (label +
+build + comparator), its export editions DERIVED from the catalog (an edition compares
+once the app consolidates it), and both sub-tabs, the GUI endpoints and the checks all
+derive from it — adding a report needs no endpoint edit.
 **Intersection Detail is the second** (`arcgis_report_intersection_detail` +
 `compare_intersection_detail_arcgis`) and it is a POINT report, so it has NO segmentation
 and no merge rule: `IM Intersection Detail` already holds one row per intersection. Its
@@ -550,13 +555,15 @@ scripts/                     the engine (console-free) + console & GUI drivers +
   arcgis_pro.py arcgis_refresh.py   find ArcGIS Pro's Python + run the worker; the in-app layer refresh + ArcGIS Pro check (v0.46.0)
   arcgis_worker/export_layers.py    the worker ArcGIS Pro's own Python runs (shipped as a .py data file, stdlib + ArcPy only)
   arcgis_selftest.py         the stand-in ArcPy the frozen self-test + check_arcgis_refresh drive the shipped worker with
-  arcgis_reports.py          the "Reports vs layers" REGISTRY — one row per report
-                             (build + comparator + the export consolidators that can
-                             supply the TSMIS side; None = not rendered yet, and the
-                             row says why); the matrix/endpoints/mock/checks derive
-  arcgis_matrix.py           the ArcGIS tab's by-day MATRIX engine (2026-09-02): one
-                             layer build per report, stamped with the drop it came
-                             from; each cell = that build vs a day's export
+  arcgis_reports.py          the ArcGIS report REGISTRY — one row per report (build +
+                             comparator; None = not rendered yet, and the row says
+                             why) + its export EDITIONS derived from the catalog; the
+                             ArcGIS reports tab, the matrix rows, endpoints, mock and
+                             checks all derive from it
+  arcgis_matrix.py           the ArcGIS reports library (one build per report, stamped
+                             with the drop it came from, last failed refresh) + the
+                             Reports-vs-ArcGIS by-day MATRIX engine: each cell = a
+                             day's export of one edition vs its report's build
   arcgis_report_highway_detail.py   the CA HIGHWAYS build PROJECTED onto a report's own
                              shape (Highway Detail first, v0.39.0) — the mapping + the
                              merge/description rules that make it a build, not a rename

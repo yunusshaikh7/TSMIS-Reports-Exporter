@@ -1,10 +1,14 @@
-"""Golden check for the ArcGIS-tab "Reports vs layers" matrix (scripts/arcgis_matrix.py,
-2026-09-02): the registry-derived rows, the layer DROP identity, the library's
-per-report build state (built / trusted / from the staged drop), the snapshot's
-cell states (needs build / needs export / buildable / stale), the scoped rebuild
-list, build_cell's orchestration + cache recording via the SHARED primitives
-(stubbed so no real report data is needed), build_report's guards + as-of default,
-and the boundary validation.
+"""Golden check for the ArcGIS tab's "ArcGIS reports" library + "Reports vs
+ArcGIS" matrix (scripts/arcgis_matrix.py; 2026-09-02, editions + the reports tab
+v0.47.0): the registry-derived EDITION rows (Excel and PDF each a row, both
+compared against their report's ONE ArcGIS build), the layer DROP identity, the
+library's per-report build state (built / trusted / from the staged drop / the
+last refresh that did not land), the snapshot's cell states (needs ArcGIS build /
+needs export / buildable / stale), the scoped rebuild list, build_cell's
+orchestration + cache recording via the SHARED primitives (stubbed so no real
+report data is needed) for both editions, build_report's guards + as-of default,
+the ArcGIS reports endpoints + the multi-report refresh worker, and the boundary
+validation.
 
 openpyxl only — no browser/network. Run with the build venv:
     build\\.venv\\Scripts\\python.exe build\\check_arcgis_matrix.py
@@ -93,24 +97,68 @@ def _full_inventory(_lib_root=None):
 
 # --------------------------------------------------------------------------- #
 def test_rows_from_registry():
-    print("rows derive from arcgis_reports (every report, buildable/comparable flagged):")
+    print("rows are every report's export EDITIONS (Excel and PDF), each tied to its report:")
     rows = agm._ag_rows()
-    check("one row per registry key, in registry order",
-          [r[0] for r in rows] == list(arcgis_reports.KEYS))
-    comparable = {r[0] for r in rows if r[5]}
-    buildable = {r[0] for r in rows if r[4]}
-    check("the two rendered reports compare",
-          comparable == {"intersection_detail", "highway_detail"})
-    check("Clean Road Highway builds but does not compare yet",
-          buildable == comparable | {"clean_highway"})
-    check("every row carries a label and a code",
-          all(r[1] and r[2] for r in rows))
+    check("one row per edition, in registry order",
+          [r.key for r in rows] == list(arcgis_reports.edition_keys()))
+    seen = []
+    for r in rows:
+        if r.family not in seen:
+            seen.append(r.family)
+    check("...grouped report by report in registry order", seen == list(arcgis_reports.KEYS))
+    check("each report's own key leads its editions",
+          all(arcgis_reports.editions_of(k)[0].key == k for k in arcgis_reports.KEYS))
+    check("both editions of a report are rows (22 in all, Route History excluded)",
+          len(rows) == 22 and "highway_detail_pdf" in agm.row_keys()
+          and "route_history" not in agm.row_keys())
+    check("Ramp Summary's row is its PDF edition, its Excel sibling follows",
+          [e.key for e in arcgis_reports.editions_of("ramp_summary")]
+          == ["ramp_summary", "ramp_summary_excel"])
+    comparable = {r.key for r in rows if r.comparable}
+    buildable = {r.key for r in rows if r.buildable}
+    check("both editions of the two rendered reports compare",
+          comparable == {"intersection_detail", "intersection_detail_pdf",
+                         "highway_detail", "highway_detail_pdf"})
+    check("Clean Road Highway builds but neither edition compares yet",
+          buildable == comparable | {"clean_highway", "clean_highway_pdf"})
+    check("every row carries a label and a code", all(r.label and r.code for r in rows))
     check("every row that cannot compare says why",
-          all(r[6] for r in rows if not r[5]) and all(not r[6] for r in rows if r[5]))
-    check("comparable rows name their export editions, preferred first",
-          agm._row_lookup()["highway_detail"][3] == ("highway_detail", "highway_detail_pdf"))
-    check("row_keys is the registry set", agm.row_keys() == set(arcgis_reports.KEYS))
+          all(r.why for r in rows if not r.comparable)
+          and all(not r.why for r in rows if r.comparable))
+    look = agm._row_lookup()
+    check("a comparable row reads its ONE edition's folder",
+          look["highway_detail"].subdirs == ("highway_detail",)
+          and look["highway_detail_pdf"].subdirs == ("highway_detail_pdf",))
+    check("...and is compared against its report's build",
+          look["highway_detail_pdf"].family == "highway_detail")
+    check("row_keys is the edition set", agm.row_keys() == set(arcgis_reports.edition_keys()))
+    check("label_of names editions and reports",
+          arcgis_reports.label_of("highway_detail_pdf") == "Highway Detail (PDF)"
+          and arcgis_reports.label_of("highway_detail") == "Highway Detail")
+    check("family_of maps an edition to its report, and nothing else",
+          arcgis_reports.family_of("intersection_detail_pdf") == "intersection_detail"
+          and arcgis_reports.family_of("ramp_summary_excel") == "ramp_summary"
+          and arcgis_reports.family_of("route_history") is None)
+    check("the report's spec keeps the consolidated editions, its own first",
+          arcgis_reports.spec("highway_detail").subdirs
+          == ("highway_detail", "highway_detail_pdf"))
     check("the default report is comparable", arcgis_reports.can_compare(arcgis_reports.DEFAULT_KEY))
+    # An edition the app does not consolidate cannot compare even when its report
+    # has a build and a comparator: give Highway Summary both (its PDF edition has
+    # no consolidator) and the derivation must say so for that edition alone.
+    saved = arcgis_reports._REPORTS["highway_summary"]
+    arcgis_reports._REPORTS["highway_summary"] = ("arcgis_report_highway_detail",
+                                                  "compare_highway_detail_arcgis")
+    arcgis_reports.editions.cache_clear()
+    try:
+        hs, hs_pdf = (arcgis_reports.edition("highway_summary"),
+                      arcgis_reports.edition("highway_summary_pdf"))
+        check("an unconsolidated edition of a comparable report says so, the other compares",
+              hs.comparable and not hs_pdf.comparable
+              and "not consolidated" in hs_pdf.why)
+    finally:
+        arcgis_reports._REPORTS["highway_summary"] = saved
+        arcgis_reports.editions.cache_clear()
 
 
 def test_drop_info():
@@ -201,11 +249,34 @@ def test_library_and_snapshot_states():
                   set(snap) >= {"source", "days", "rows", "row_labels", "cells",
                                 "all_rows", "library"} and "tsn_meta" not in snap)
             hd = cells["highway_detail"][DAY]
-            check("export present + no build -> needs the layers side",
+            check("export present + no build -> needs the ArcGIS side",
                   hd["export"]["present"] and hd["cmp"]["missing_side"] == "layers"
                   and not matrix.cell_buildable(hd["cmp"]))
-            check("the reason the Build button gives names the layers",
-                  "layers" in matrix.cell_unbuildable_reason(hd["cmp"]))
+            check("the reason the Build button gives says where to build it",
+                  "ArcGIS reports" in matrix.cell_unbuildable_reason(hd["cmp"]))
+            check("every row says which report's build it compares against",
+                  snap["row_family"]["highway_detail_pdf"] == "highway_detail"
+                  and snap["row_family"]["ramp_summary_excel"] == "ramp_summary")
+            check("a report's build state lists its editions",
+                  [e["key"] for e in bs["highway_detail"]["editions"]]
+                  == ["highway_detail", "highway_detail_pdf"]
+                  and all(e["comparable"] for e in bs["highway_detail"]["editions"]))
+            rep = agm.reports_snapshot()
+            check("the ArcGIS reports snapshot: every report in registry order, counts",
+                  [r["key"] for r in rep["reports"]] == list(arcgis_reports.KEYS)
+                  and rep["buildable"] == 3 and rep["built"] == 0
+                  and rep["reports_root"] == str(tmp / "arcgis_reports"))
+            check("a buildable report lists the layers it reads",
+                  "SHS Landmark" in rep["builds"]["highway_detail"]["layers"])
+            # The last refresh that did not land stays on the report until one does.
+            agm.record_build_attempt("highway_detail", "error", "the layers refused\nmore")
+            b = agm.library_snapshot()["builds"]["highway_detail"]
+            check("a failed refresh is remembered, first line only",
+                  (b.get("last_attempt") or {}).get("status") == "error"
+                  and b["last_attempt"]["reason"] == "the layers refused")
+            agm.record_build_attempt("highway_detail", agm.BUILD_OK)
+            check("...and a refresh that lands clears it",
+                  "last_attempt" not in agm.library_snapshot()["builds"]["highway_detail"])
             idc = cells["intersection_detail"][DAY]
             check("no export + no build -> both sides missing",
                   idc["cmp"]["missing_side"] == "both" and not idc["export"]["present"])
@@ -240,6 +311,19 @@ def test_library_and_snapshot_states():
                   agm.cells_to_rebuild(snap, scope="all", row="intersection_detail") == []
                   and agm.cells_to_rebuild(snap, scope="all", date=DAY)
                   == [(DAY, "highway_detail")])
+            # The PDF edition exported the same day is its own row against the SAME build.
+            _touch_export(day, "highway_detail_pdf")
+            snap = agm.ag_matrix_snapshot(SRC, [DAY], today="2099-01-01")
+            pdf = snap["cells"]["highway_detail_pdf"][DAY]
+            check("the PDF edition's export is its own cell, buildable off the same build",
+                  pdf["export"]["present"] and pdf["export"]["subdir"] == "highway_detail_pdf"
+                  and matrix.cell_buildable(pdf["cmp"]))
+            check("both editions are listed to rebuild",
+                  agm.cells_to_rebuild(snap, scope="stale")
+                  == [(DAY, "highway_detail"), (DAY, "highway_detail_pdf")])
+            check("the add-day tags name both editions",
+                  agm.available_day_reports(SRC) == {DAY: ["HD", "HD-PDF"]})
+            shutil.rmtree(day / "highway_detail_pdf")
 
             # a build from ANOTHER drop: still comparable, but the row says rebuild
             _stub_build(hd_build, "v2:3:olderdrop")
@@ -355,8 +439,23 @@ def test_build_cell_records_cache():
             planted.unlink()
             check("the silence probe can SEE an evidence artifact when one exists",
                   found == [planted.name])
-            check("the Reports-vs-layers lane writes ZERO evidence artifacts",
+            check("the Reports-vs-ArcGIS lane writes ZERO evidence artifacts",
                   not list(tree.rglob("*evidence*")))
+
+            # The PDF edition: its own consolidation, the SAME ArcGIS build as side A.
+            _touch_export(day, "highway_detail_pdf")
+            result = agm.build_cell(SRC, DAY, "highway_detail_pdf", Events())
+            pdf_out = agm.day_out_path(DAY, SRC, "highway_detail_pdf")
+            check("the PDF edition's comparison builds under its own name",
+                  result.status == "ok" and pdf_out.exists()
+                  and pdf_out.name == f"highway_detail_pdf_vs_layers {DAY} {SRC}.xlsx")
+            check("...from its own consolidated export",
+                  "highway_detail_pdf" in consolidated
+                  and seen[-1][1] == str(consolidated["highway_detail_pdf"]))
+            check("...against the same ArcGIS build as the Excel edition",
+                  seen[-1][0] == str(hd_build))
+            check("...cached under its own row",
+                  agm.load_results().get(f"{DAY} {SRC}|highway_detail_pdf") is not None)
     finally:
         paths.OUTPUT_ROOT = saved_root
         shutil.rmtree(tmp, ignore_errors=True)
@@ -384,13 +483,16 @@ def test_guards():
                   _raises(lambda: agm.build_cell(SRC, DAY, "nonesuch", Events()), "unknown"))
             check("build_cell: a row with no comparison yet refuses with its reason",
                   _raises(lambda: agm.build_cell(SRC, DAY, "ramp_summary", Events()),
-                          "not rendered"))
+                          "no arcgis build"))
+            check("build_cell: a REPORT key that is not an edition row is unknown",
+                  _raises(lambda: agm.build_cell(SRC, DAY, "route_history", Events()),
+                          "unknown"))
             check("build_cell: invalid date",
                   _raises(lambda: agm.build_cell(SRC, "not-a-date", "highway_detail", Events()),
                           "invalid"))
-            check("build_cell: not built yet",
-                  _raises(lambda: agm.build_cell(SRC, DAY, "highway_detail", Events()),
-                          "build highway detail from the layers first"))
+            check("build_cell: not built yet (says where to build it)",
+                  _raises(lambda: agm.build_cell(SRC, DAY, "highway_detail_pdf", Events()),
+                          "build the highway detail arcgis report first"))
             _stub_build(hd_build, DROP["fingerprint"])
             check("build_cell: built but no export that day",
                   _raises(lambda: agm.build_cell(SRC, DAY, "highway_detail", Events()),
@@ -412,6 +514,8 @@ def test_guards():
                       captured.get("asof") == "2026-01-02")
             check("build_report: unknown row",
                   _raises(lambda: agm.build_report("nonesuch", Events()), "unknown"))
+            check("build_report takes a REPORT, never an edition row",
+                  _raises(lambda: agm.build_report("highway_detail_pdf", Events()), "unknown"))
             check("build_report: a row with no build yet refuses",
                   _raises(lambda: agm.build_report("ramp_summary", Events()),
                           "cannot be built"))
@@ -430,13 +534,153 @@ def test_guards():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+class _Coord:
+    n = 0
+
+    def next_seq(self):
+        self.n += 1
+        return self.n
+
+
+def _gui_host():
+    """Just enough of GuiApi for the ArcGIS endpoints: the job factory, a queue
+    that records what it is handed, and no-op emitters."""
+    import threading
+
+    import gui_arcgis_api as gaa
+    import gui_matrix
+
+    class _Host(gaa.GuiArcgisMixin):
+        _make_job = gui_matrix.GuiMatrixMixin._make_job
+
+        def __init__(self):
+            self._coord = _Coord()
+            self._lock = threading.RLock()
+            self._current_job = None
+            self._queue = []
+            self._matrix = None
+            self.cancel_event = threading.Event()
+            self.jobs = []
+
+        def _enqueue_matrix_job(self, job):
+            self.jobs.append(job)
+            return {"ok": True, "job_id": job["id"]}
+
+        def _emit_log(self, _m):
+            pass
+
+        def _set_dot(self, *_a):
+            pass
+
+        def _emit(self, _e):
+            pass
+
+        def _gated_queue(self):
+            return "Q"
+
+    return _Host()
+
+
+def test_reports_endpoints_and_worker():
+    print("the ArcGIS reports endpoints, the one-job refresh, the worker's messages:")
+    import queue as _queue
+    import threading
+
+    import gui_api
+    import gui_arcgis_api as gaa
+    import gui_worker_arcgis as gwa
+
+    for name in ("arcgis_reports_info", "refresh_arcgis_reports", "build_arcgis_report"):
+        check(f"GuiApi exposes {name}", callable(getattr(gui_api.GuiApi, name, None)))
+    host = _gui_host()
+    r = host.refresh_arcgis_reports()
+    job = host.jobs[-1] if host.jobs else {}
+    check("Refresh all queues ONE build job over every buildable report, in order",
+          r.get("ok") and job.get("kind") == "arcgis_build"
+          and job.get("rows") == ["intersection_detail", "highway_detail", "clean_highway"]
+          and job.get("label") == "Refresh every ArcGIS report")
+    host.build_arcgis_report("highway_detail_pdf", "2026-08-17")
+    job = host.jobs[-1]
+    check("a matrix row's build button refreshes its REPORT, as of the date given",
+          job.get("rows") == ["highway_detail"] and job.get("asof") == "2026-08-17"
+          and "Highway Detail" in job.get("label", ""))
+    n = len(host.jobs)
+    check("a report with no build yet is refused, nothing queued",
+          "cannot be built" in host.refresh_arcgis_reports(["ramp_summary"]).get("error", "")
+          and len(host.jobs) == n)
+    check("an unknown report is refused",
+          "Unknown report" in host.refresh_arcgis_reports(["nonesuch"]).get("error", ""))
+    check("a bad as-of date is refused",
+          "as-of" in host.refresh_arcgis_reports([], "yesterday").get("error", ""))
+
+    started = []
+
+    class _StubWorker:
+        def __init__(self, *args):
+            started.append(args)
+
+        def start(self):
+            pass
+
+    with _patch(gaa, "ArcgisReportBuildWorker", _StubWorker):
+        ok = host._dispatch_arcgis_build_job(host.jobs[0])
+    check("dispatch starts the worker with every report of the job",
+          ok and started and started[-1][0] == ["intersection_detail", "highway_detail",
+                                                "clean_highway"])
+    check("dispatch sets the building phase, first report, total",
+          host._matrix == {"phase": "building", "row": "Intersection Detail", "cell": None,
+                           "done": 0, "total": 3})
+
+    # The real worker over a stubbed build: one fails, the rest land; one terminal.
+    tmp = Path(tempfile.mkdtemp(prefix="agbw_"))
+    saved_root = paths.OUTPUT_ROOT
+    try:
+        paths.OUTPUT_ROOT = tmp
+
+        def _fake_build(key, events, asof=None, confirm_overwrite=None):
+            if key == "intersection_detail":
+                raise ValueError("The ArcGIS layer library is missing the layer(s)")
+            return ConsolidateResult(status="ok", output_path=str(tmp / f"{key}.xlsx"),
+                                     completion=oc.PARTIAL if key == "clean_highway"
+                                     else oc.COMPLETE)
+        q = _queue.Queue()
+        with _patch(agm, "build_report", _fake_build):
+            w = gwa.ArcgisReportBuildWorker(["intersection_detail", "highway_detail",
+                                             "clean_highway"], None, q, threading.Event())
+            w.start()
+            w.join(timeout=30)
+        msgs = []
+        while not q.empty():
+            msgs.append(q.get())
+        kinds = [k for k, _p in msgs]
+        done = [p for k, p in msgs if k == "matrix_done"]
+        check("exactly one matrix_done ends the job",
+              kinds.count("matrix_done") == 1 and kinds[-1] == "matrix_done")
+        check("it names the job and counts every report's outcome",
+              done and done[0]["label"] == "ArcGIS report refresh" and done[0]["total"] == 3
+              and done[0]["succeeded"] == 2 and done[0]["failed"] == 1
+              and done[0]["partial_cells"] == 1)
+        check("progress names each report as it starts",
+              [p["row"] for k, p in msgs if k == "matrix_cell"]
+              == ["Intersection Detail", "Highway Detail", "Clean Road: Highway"])
+        attempts = agm.load_build_attempts()
+        check("the failed report keeps its reason for the tab; the others are clear",
+              (attempts.get("intersection_detail") or {}).get("status") == "error"
+              and "missing the layer" in attempts["intersection_detail"]["reason"]
+              and "highway_detail" not in attempts and "clean_highway" not in attempts)
+    finally:
+        paths.OUTPUT_ROOT = saved_root
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main():
-    print("=== ArcGIS Reports-vs-layers matrix ===")
+    print("=== ArcGIS reports + Reports-vs-ArcGIS matrix ===")
     test_rows_from_registry()
     test_drop_info()
     test_library_and_snapshot_states()
     test_build_cell_records_cache()
     test_guards()
+    test_reports_endpoints_and_worker()
     print()
     if _fail:
         print(f"FAILED: {len(_fail)} check(s): {_fail}")

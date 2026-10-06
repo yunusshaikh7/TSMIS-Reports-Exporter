@@ -67,10 +67,10 @@ _DYNAMIC_REPORT_MODULES = ("matrix", "day_matrix", "pdf_excel_matrix",
                            "evidence_ramp_detail",
                            "consolidate_tsmis_ramp_detail_pdf",
                            "compare_ramp_detail_pdf",
-                           # The ArcGIS "Reports vs layers" lane: every module
-                           # here is imported INSIDE a GUI endpoint, so nothing
-                           # else in the frozen bundle proves it resolves. The
-                           # registry pulls each report's build + comparator
+                           # The ArcGIS reports + "Reports vs ArcGIS" lane: every
+                           # module here is imported INSIDE a GUI endpoint, so
+                           # nothing else in the frozen bundle proves it resolves.
+                           # The registry pulls each report's build + comparator
                            # behind it, and those pull the clean-road substrate.
                            "arcgis_reports",
                            "arcgis_matrix",
@@ -204,6 +204,20 @@ def _exercise(tmp, emit):
     assert ui_index.exists(), f"UI assets missing: {ui_index}"
     emit(f"gui: bridge api ok ({len(state['reports'])} reports, "
          f"{len(state['routes'])} routes, ui={ui_index})")
+
+    # 6b. The ArcGIS reports tab + the Reports-vs-ArcGIS rows (v0.47.0): every
+    #     report and every export edition resolve through the frozen registry
+    #     (the editions come from the catalog), and the tab's payload reads.
+    import arcgis_reports
+    info = api.arcgis_reports_info()
+    assert not info.get("error"), f"arcgis_reports_info: {info.get('error')}"
+    assert [r["key"] for r in info["reports"]] == list(arcgis_reports.KEYS), \
+        "the ArcGIS reports tab lost a report"
+    editions = arcgis_reports.editions()
+    comparable = [e.key for e in editions if e.comparable]
+    assert comparable, "no export edition can be compared against an ArcGIS build"
+    emit(f"arcgis reports: {len(info['reports'])} reports, {len(editions)} export "
+         f"editions ({len(comparable)} comparable)")
 
     # 7. Hidden WebView window cycle -- the ONLY skippable sub-check. The
     #    import/asset/registry checks above already passed and never skip; an

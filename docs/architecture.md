@@ -279,12 +279,14 @@ table from the layers (county+PM overlay, as-of the TSN extract's date) into
 `output/arcgis_cleanroad/`, and `compare_clean_highway_tsn.py` diffs it against
 the TSN extract — see [comparison-engine.md](comparison-engine.md) §9j and
 [planning/cleanroad-highways.md](planning/cleanroad-highways.md). Since
-2026-09-02 the tab's MAIN view is the **Reports vs layers matrix**
-(`arcgis_matrix.py`, §12d): every report in the `arcgis_reports` registry rendered
-from the layers — ONE build per report under `output/arcgis_reports/`, stamped
-with the drop it came from (`arcgis_layers.drop_info`: the oldest layer's export
-time + a content fingerprint over the `.xlsx` files) — and compared against each
-exported day. App-private data (`_PRIVATE` = `DATA_ROOT/data` when frozen, else `DATA_ROOT`):
+2026-09-02 the tab renders every report in the `arcgis_reports` registry from
+the layers — ONE build per report under `output/arcgis_reports/`, stamped with the
+drop it came from (`arcgis_layers.drop_info`: the oldest layer's export time + a
+content fingerprint over the `.xlsx` files), held and refreshed on the **ArcGIS
+reports** sub-tab since v0.47.0 — and the **Reports vs ArcGIS matrix**
+(`arcgis_matrix.py`, §12d; *Reports vs layers* until v0.47.0) compares every export
+edition of each report, Excel and PDF alike, against its build for each exported
+day. App-private data (`_PRIVATE` = `DATA_ROOT/data` when frozen, else `DATA_ROOT`):
 `AUTH`, `LOG_DIR`, `FAILURES_DIR`, `CONFIG_FILE`, `UPDATE_DIR`,
 `EDGE_LOGIN_PROFILE_DIR`, `WEBVIEW_PROFILE_DIR`, `DOWNLOADED_BROWSERS_DIR`. The
 frozen auth file is `data/tsmis_auth.json`; the dev auth file is
@@ -487,7 +489,7 @@ where it lives" map — each item owned by the doc named:
 | **Transactional artifacts** | Workbooks use exclusively reserved identity-bound temps, source/output-alias rejection, target-aware guards, validation, then `os.replace`; last-good survives failures. `consolidation_meta.py` records completion, `cache_envelope.py` versions Matrix caches, and `artifact_store.py` owns staged store promotion/recovery. | [engine-and-reliability.md](engine-and-reliability.md) |
 | **Engine leaf split** | `common.py` became a re-export **shim** over an acyclic set of engine leaves (`auth_nav`, `report_nav`, `session`, `site_target`, `routes`, `errors`, `timeouts`, `browser_channels`, `edge_device`); `from common import X` is unchanged. Import direction is guarded (`build/check_import_direction.py`). | [engine-and-reliability.md](engine-and-reliability.md) |
 | **GUI restructuring** | `task_coordinator.py` is the single owner of task/gate state (exactly-once terminal delivery); `contract.py` + `ui/contract.js` are the Python⇄JS bridge enum SSOT; endpoint groups split into `gui_endpoint` / `gui_matrix` / `gui_win32`. | [gui.md](gui.md) |
-| **Front-end split** | `scripts/ui/` is now `index.html` + `app.css` + `app.js` + `mock.js` (the `#mock` fixtures, a separate file) + `ui-dom.js` / `ui-matrix.js` / `ui-settings.js` + `contract.js`. | [gui.md](gui.md) |
+| **Front-end split** | `scripts/ui/` is now `index.html` + `app.css` + `app.js` + `mock.js` (the `#mock` fixtures, a separate file) + `ui-dom.js` and the per-tab renderer modules (`ui-export.js` / `ui-batch.js` / `ui-compare.js` / `ui-matrix.js` / `ui-arcgis.js` / `ui-arcgis-reports.js` / `ui-settings.js`) + `contract.js`. | [gui.md](gui.md) |
 | **Comparator substrate** | At the v0.18.0 overhaul the five non-HL vs-TSN file comparators shared `compare_tsn_common` while semantic `compare_core` output stayed byte-identical. Current Phase-1 changes add only shared literal-cell and target-aware write-safety seams; semantic equality remediation remains separately regression-gated. | [comparison-engine.md](comparison-engine.md) |
 | **New report (CR-002)** | Intersection Detail (PDF) forward-ported as an exact parallel of Highway Log (PDF) — see the registry tables above. | [reports.md](reports.md) |
 | **Packaging / updater** | Updater hardened (fail-closed checksum, staged re-hash before swap, zip-slip guard, bounded retry, revert pagination, log rotation, frozen-only cache clear); a hash-pinned reproducible build; `release.yml` per-variant `.sha256` enforcement; the exact **windowed** exe runs the self-test gate; a credential-safe work-PC **evidence kit** (`evidence.py`, `--collect-evidence`). | [build-and-release.md](build-and-release.md), [work-pc-validation.md](work-pc-validation.md) |
@@ -540,7 +542,7 @@ record of how the structure was built; this is what the structure now holds.
 | **Consolidate** | Turns a run folder's per-route exports into one workbook, per report; also the entry point for the PDF-sourced consolidations. | [reports.md](reports.md) |
 | **Compare** | Every file/folder comparison, in generated sub-tabs: cross-environment, vs TSN, the **vs TSN Matrix** (by day), the **vs Baseline Matrix** (a day against an earlier pull of the same report), and the **PDF vs Excel Matrix** (each dual-edition family self-checked inside one run folder). | [comparison-engine.md](comparison-engine.md) §9, §12b–§12c |
 | **Everything** | Two sub-tabs — the always-current batch store (report types × environments into one undated destination, stage-and-swap) and the **Everything comparison matrix** over it. | [comparison-engine.md](comparison-engine.md) §12 |
-| **ArcGIS** | Three sub-tabs, none touching the site: **Layers** (v0.46.0 — the `arcgis_layers/` library and its in-app refresh through ArcGIS Pro's own Python, replacing the manual export), **Reports vs layers** (the main view since 2026-09-02 — a by-day MATRIX of every TSMIS report *rendered* from the layers and diffed against our own export of it; ONE build per report, each stamped with the layer drop it came from) and **Clean Road vs TSN** (our own CA HIGHWAYS table, compared vs the TSN extract). | [comparison-engine.md](comparison-engine.md) §9j–§9l + §12d, [planning/cleanroad-highways.md](planning/cleanroad-highways.md) |
+| **ArcGIS** | Four sub-tabs, none touching the site: **Layers** (v0.46.0 — the `arcgis_layers/` library and its in-app refresh through ArcGIS Pro's own Python, replacing the manual export), **ArcGIS reports** (v0.47.0 — every TSMIS report *rendered* from the layers, ONE build per report, refreshed in place and stamped with the layer drop it came from), **Reports vs ArcGIS** (*Reports vs layers* until v0.47.0 — a by-day MATRIX of every export edition, Excel and PDF, diffed against its report's ArcGIS build) and **Clean Road vs TSN** (our own CA HIGHWAYS table, compared vs the TSN extract). | [comparison-engine.md](comparison-engine.md) §9j–§9l + §12d, [planning/cleanroad-highways.md](planning/cleanroad-highways.md) |
 | **Settings** | Site/browser targets, timeouts, TSN datasets, comparison output options (including **Counts only**), the support bundle, updates. | [gui.md](gui.md), [build-and-release.md](build-and-release.md) |
 
 ### Three source lanes, deliberately separate

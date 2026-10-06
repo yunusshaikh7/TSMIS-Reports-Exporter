@@ -690,9 +690,9 @@ class PdfExcelMatrixCompareWorker(threading.Thread):
 
 
 class ArcgisMatrixCompareWorker(threading.Thread):
-    """(Re)build ArcGIS-tab "Reports vs layers" cells — each a (day, report)
-    comparison of the report's SINGLE layer build vs that day's consolidated
-    export.
+    """(Re)build ArcGIS-tab "Reports vs ArcGIS" cells — each a (day, edition)
+    comparison of that day's consolidated export vs the report's SINGLE ArcGIS
+    build.
 
     `cells` is a list of (date, row_key). No browser, no TSN dataset — pure
     orchestration via arcgis_matrix.build_cell over the shared consolidate /
@@ -718,7 +718,7 @@ class ArcgisMatrixCompareWorker(threading.Thread):
                         on_log=lambda m: self.q.put(("log", m)))
         tally = _AttemptTally(len(self.cells))
         total = tally.total
-        clock = _RunClock([f"{row}|vs_layers" for _date, row in self.cells])
+        clock = _RunClock([f"{row}|vs_arcgis" for _date, row in self.cells])
         attempts_root = arcgis_matrix.ag_root()
         try:
             for date, row_key in self.cells:
@@ -728,7 +728,7 @@ class ArcgisMatrixCompareWorker(threading.Thread):
                                             "status": "running",
                                             "done": tally.done, "total": total,
                                             **clock.progress_extra()}))
-                self.q.put(("log", f"  ▸ comparing {row_key} · {date} vs the layer build…"))
+                self.q.put(("log", f"  ▸ comparing {row_key} · {date} vs the ArcGIS report…"))
                 error_type = None
                 started = clock.start()
                 try:
@@ -750,8 +750,8 @@ class ArcgisMatrixCompareWorker(threading.Thread):
                     if not cancelled_cell:
                         why = f"{type(e).__name__}: {e}"
                         error_type = type(e).__name__
-                dur = clock.finish(f"{row_key}|vs_layers", started)
-                self.q.put(("log", _cell_done_line(row_key, date, "vs_layers",
+                dur = clock.finish(f"{row_key}|vs_arcgis", started)
+                self.q.put(("log", _cell_done_line(row_key, date, "vs_arcgis",
                                                    attempt, why, dur)))
                 tally.count(attempt)
                 _record_attempt(attempts_root, f"{row_key}|{self.source}", date,
@@ -764,54 +764,6 @@ class ArcgisMatrixCompareWorker(threading.Thread):
         finally:
             self.q.put(("matrix_done", {**tally.payload(self.cancel.is_set()),
                                         "elapsed_s": round(clock.elapsed, 1)}))
-
-
-class ArcgisReportBuildWorker(threading.Thread):
-    """Build one report's SINGLE layer build inside the matrix queue, so it lines
-    up with the comparisons that read it and is cancellable the same way. Offline
-    (openpyxl over the layer library; a statewide Highway Detail build runs 25-30
-    minutes); posts ('matrix_done', …) so the bridge clears the task and
-    refreshes the grid. A build that did not finish `ok` (failed, cancelled,
-    or the layers refused) is reported as such — never as a success."""
-
-    def __init__(self, row_key, asof, queue, cancel_event):
-        super().__init__(daemon=True, name="arcgis-report-build")
-        self.row_key = row_key
-        self.asof = asof
-        self.q = queue
-        self.cancel = cancel_event
-
-    def run(self):
-        import arcgis_matrix                          # lazy: pulls the layer builds
-
-        events = Events(is_cancelled=self.cancel.is_set,
-                        on_log=lambda m: self.q.put(("log", m)))
-        errors = 0
-        partial = 0
-        try:
-            res = arcgis_matrix.build_report(self.row_key, events, asof=self.asof)
-            if getattr(res, "status", None) != "ok":
-                raise ValueError(getattr(res, "message", None)
-                                 or f"the {self.row_key} layer build did not finish")
-            if outcome.consolidate_completion_of(res) != outcome.COMPLETE:
-                partial = 1
-            self.q.put(("log", f"Layer build ready: {res.output_path}"))
-        except Exception as e:                       # noqa: BLE001
-            errors = 1
-            if self.cancel.is_set():
-                self.q.put(("log", f"Layer build stopped: {self.row_key}."))
-            else:
-                log.exception("arcgis report build (%s) crashed", self.row_key)
-                self.q.put(("log", f"Layer build failed ({type(e).__name__}): {e}"))
-        finally:
-            cancelled = self.cancel.is_set()
-            self.q.put(("matrix_done", {
-                "done": 1 - errors, "total": 1, "errors": errors,
-                "cancelled": cancelled, "attempted": 1,
-                "succeeded": 0 if errors else 1,
-                "failed": errors if not cancelled else 0,
-                "cancelled_cells": errors if cancelled else 0,
-                "partial_cells": partial}))
 
 
 class MatrixEvidenceWorker(threading.Thread):

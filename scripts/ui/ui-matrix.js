@@ -388,14 +388,14 @@ function mxCellContent(cmp, tsnMeta) {
              // so a failed/incomplete refresh says WHY on hover, not just "failed".
              title: attempt.why || undefined };
   }
-  // `why` (the Reports-vs-layers matrix): the one-line reason a row cannot be
+  // `why` (the Reports-vs-ArcGIS matrix): the one-line reason a row cannot be
   // compared yet, carried to the tooltip; the cell itself stays short.
   if (cmp.supported === false) return { cls: "mx-na", main: "—", sub: "not available yet",
                                         title: cmp.why || undefined };
   if (cmp.missing_side) {
-    // The Reports-vs-layers matrix: the report's single layer build is absent.
+    // The Reports-vs-ArcGIS matrix: the report's ArcGIS build is absent.
     if (cmp.missing_side === "layers")
-      return { cls: "mx-missing", main: "needs build", sub: "build from the layers" };
+      return { cls: "mx-missing", main: "needs ArcGIS", sub: "build it on ArcGIS reports" };
     if (cmp.missing_side === "tsn") {
       if (tsnMeta && tsnMeta.source_kind === "pdfs")
         return { cls: "mx-missing", main: "consolidate", sub: `${tsnMeta.pdf_count} TSN PDFs` };

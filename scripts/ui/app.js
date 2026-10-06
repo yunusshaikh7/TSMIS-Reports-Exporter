@@ -1132,6 +1132,7 @@ function dispatch(events) {
           if (S.tab === "compare" && S.compareGroup === PVE_MATRIX_GROUP) renderPveMatrix();
           if (typeof arcgisMatrixActive === "function" && arcgisMatrixActive()) renderArcgisMatrix();
           if (S.tab === "arcgis" && typeof agSub !== "undefined" && agSub === "layers") renderArcgisLayers();
+          if (S.tab === "arcgis" && typeof agSub !== "undefined" && agSub === "builds") renderArcgisBuilds();
           break;
         case "modal": showMessage(ev.kind, ev.title, ev.message); break;
         default:
@@ -1171,7 +1172,7 @@ function bindEvents() {
     everything: { btn: "tabEverything", pane: "paneEverything", title: "Export everything",
                   sub: "Export selected report types across selected environments." },
     arcgis: { btn: "tabArcgis", pane: "paneArcgis", title: "ArcGIS layers",
-              sub: "Refresh the TSMIS layers with ArcGIS Pro, render reports from them, and compare those against the app's own exports, by day." },
+              sub: "Refresh the TSMIS layers with ArcGIS Pro, build the ArcGIS reports from them, and compare every export against those reports, by day." },
     settings: { btn: "tabSettings", pane: "paneSettings", title: "Settings",
                 sub: "Reliability, debugging and storage options." },
   };

@@ -68,9 +68,15 @@ def _src(mod):
 #     for the in-app layer refresh that replaced the manual export: the tab's
 #     payload, the refresh and ArcGIS Pro check jobs, and choosing / clearing
 #     ArcGIS Pro's python.exe. No existing endpoint answers any of them.
+#   * the ArcGIS ▸ ArcGIS reports tab (v0.47.0) — two endpoints: the tab's
+#     payload (every report's ArcGIS build, which the matrix snapshot only
+#     carries buried in its library and only while that sub-tab renders) and the
+#     ONE-job refresh of several reports (build_arcgis_report queues one; it now
+#     delegates here).
 FROZEN_API = {
     "arcgis_layers_info", "refresh_arcgis_layers", "check_arcgis_pro",
     "choose_arcgis_python", "clear_arcgis_python",
+    "arcgis_reports_info", "refresh_arcgis_reports",
     "open_arcgis_reports_folder",
     "arcgis_matrix_info", "set_arcgis_matrix_source", "add_arcgis_matrix_day",
     "remove_arcgis_matrix_day", "set_arcgis_matrix_report",
