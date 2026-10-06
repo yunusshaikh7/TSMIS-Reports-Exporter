@@ -236,7 +236,8 @@ plus the label-only-header + real-data-refresh proof, is the current binding not
 Harness: session scratchpad `id_new_vs_old_canary.py` / `id_whatchanged.py`.
 
 **2026-09 SITE EDITION — first on the 2026-09-25 ssor-prod pull (the owner's
-`_inbox/2026-09-25 ssor-prod.zip`: 217 routes in both editions + the work-PC
+`2026-09-25 ssor-prod.zip`, filed as `ground-truth/Intersection Detail 2026-09-25/`
+with the zip inside: 217 routes in both editions + the work-PC
 consolidated workbook).** Every header relabelled AND one real move: the intersecting
 route number and its suffix swapped (532/532 route numbers moved from consolidated
 position 31 to 30, the 2 suffixes 30 → 31, nothing else moved — censused cell-for-cell
@@ -1687,12 +1688,12 @@ ACCESS_EFF 7,934 · LT_TRAV_WAY 6,810 · END_PM 6,797 · LENGTH 6,797 (the
 |---|---|---:|---|
 | ArcGIS (built) | `output\arcgis_cleanroad\clean_highway_built.xlsx` (repo-relative; rebuilt from the library) | 10,672,050 | `0013F7DBF25C88160C1E97F2ED629B2C75A5E75D97398E32F6B78DA1EE56BB3F` |
 | TSN (normalized) | `tsn_library\clean_highway\consolidated\tsn_clean_highway_normalized.xlsx` | 14,864,389 | `664D31D1D7C2B1438FFAF3ACA68617D9C98637948E0A02B6521BCB5CF0AAB525` |
-| TSN (raw source) | `C:\Users\Yunus\Downloads\TSMIS\_inbox\Cleanroad\TSN_Cleanroad_files\CA HIGHWAYS 09.08.2025.xlsx` | 21,290,781 | `BBD1ACF9D4A8FEF86F96A0A2CF54BE1105E8C919600DBCD05A325B194F5C86E5` |
-| ArcGIS layer library (the whole 41-file drop, as delivered) | `C:\Users\Yunus\Downloads\TSMIS\_inbox\AllLayers7.22_ExcelFiles.zip` | 329,208,782 | `2F59FEA4224F8F232F3FA823B03A321D57B0ACBD4A2E03C9BE2B3A0E7EC9889A` |
+| TSN (raw source) | `C:\Users\Yunus\Downloads\TSMIS\ground-truth\Clean Road and ArcGIS layers\TSN_Cleanroad_files\CA HIGHWAYS 09.08.2025.xlsx` (in `_inbox\Cleanroad\` until 2026-10-05) | 21,290,781 | `BBD1ACF9D4A8FEF86F96A0A2CF54BE1105E8C919600DBCD05A325B194F5C86E5` |
+| ArcGIS layer library (the whole 41-file drop, as delivered) | `C:\Users\Yunus\Downloads\TSMIS\ground-truth\Clean Road and ArcGIS layers\All Layers 7.22\AllLayers7.22_ExcelFiles.zip` (delivered to `_inbox\`) | 329,208,782 | `2F59FEA4224F8F232F3FA823B03A321D57B0ACBD4A2E03C9BE2B3A0E7EC9889A` |
 
 Acceptance evidence (all three legs PASSED 2026-07-22): the shipped-path E2E
 (`run_e2e.py`, ConsolidateWorker → tsn_library.build_consolidated → compare
-mode="both"), then `_inbox\Cleanroad\_analysis\audit_v0290.py` —
+mode="both"), then `ground-truth\Clean Road and ArcGIS layers\_analysis\audit_v0290.py` —
 (A) an INDEPENDENT recomputation from the two committed inputs (no scripts/
 arithmetic) reproduced the pairing and EVERY per-column differing-cell count
 exactly (223,473 / 42,129 / 52,647·5,081·7,436; 1 duplicate-key group,

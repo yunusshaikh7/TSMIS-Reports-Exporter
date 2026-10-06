@@ -27,11 +27,12 @@ builds):
 
 Everything below is **measured** — no column mapping is assumed. The original
 census ran against the 2026-07-20 layer export and the 2025-09-08 TSN extract;
-the library was refreshed on 2026-08-19 (40 layers, `_inbox/Cleanroad/All Layers
-8.19/`) and the rules re-measured against the real 2026-08-17 export. Census
-scripts and exact numbers live locally beside the data in
-`Downloads\TSMIS\_inbox\Cleanroad\_analysis\` (see its README; local-only, like
-all real data).
+the library was refreshed on 2026-08-19 (40 layers, `ground-truth/Clean Road and
+ArcGIS layers/All Layers 8.19/`) and the rules re-measured against the real
+2026-08-17 export. Census scripts and exact numbers live locally beside the data in
+`Downloads\TSMIS\ground-truth\Clean Road and ArcGIS layers\_analysis\` (see its
+README; local-only, like all real data; filed there from `_inbox\Cleanroad\` on
+2026-10-05).
 
 > **The as-of does NOT follow the layer library.** `resolve_default_asof()` takes
 > it from the staged TSN extract, so a default build off fresh layers still
@@ -302,7 +303,8 @@ empty-in-export SHS layers.
 
 **Re-target (2026-09-02).** The site now exports all three Clean Road files
 (v0.44.0), so the CA INTERSECTIONS and CA RAMPS builds above land as ROWS of the
-ArcGIS tab's **Reports vs layers matrix** (`arcgis_reports.py` already lists
+ArcGIS tab's **Reports vs ArcGIS matrix** (*Reports vs layers* until v0.47.0; their
+builds go on the **ArcGIS reports** tab; `arcgis_reports.py` already lists
 `clean_highway` / `clean_intersection` / `clean_ramp`, greyed until their builds and
 the site-export consolidators exist): our build vs the site's export, TSMIS vs
 TSMIS, one build per file stamped with the layer drop it came from. The vs-TSN

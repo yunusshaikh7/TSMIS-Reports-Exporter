@@ -145,7 +145,11 @@ management = SimpleNamespace(MakeTableView=_make_table_view, GetCount=_get_count
 conversion = SimpleNamespace(TableToExcel=_table_to_excel)
 '''
 
-# The real SHS Tolls header (the 2026-08-19 export): 33 columns.
+# The real SHS Tolls header as the in-app export writes it (the first work-PC
+# refresh, 2026-10-05): 33 columns. The manual exports read the layer through a
+# map and named the last column `Shape.STLength()`; read straight from the
+# service it is `Shape__Length` (same values), so the first in-app refresh of a
+# manual library reports exactly that one change on every line layer.
 TOLLS_HEADER = [
     "OBJECTID", "District", "RouteNum", "RouteSuffix", "Alignment", "BeginCounty",
     "BeginPMPrefix", "BeginPMMeasure", "BeginPMSuffix", "EndCounty", "EndPMPrefix",
@@ -153,7 +157,9 @@ TOLLS_HEADER = [
     "InventoryItemStartDate", "InventoryItemEndDate", "RouteID", "FromARMeasure",
     "ToARMeasure", "LRSFromDate", "LRSToDate", "EventID", "CreatedUser",
     "LastEditedUser", "CreatedDate", "LastEditedDate", "ARSStatus", "LocError",
-    "GlobalID", "Toll_Type", "Shape.STLength()"]
+    "GlobalID", "Toll_Type", "Shape__Length"]
+MANUAL_TOLLS_HEADER = TOLLS_HEADER[:-1] + ["Shape.STLength()"]   # the 2026-08-19 drop
+TRANSITION_NOTE = "columns changed (+Shape__Length) (−Shape.STLength())"
 CITY_HEADER = ["OBJECTID", "District", "RouteNum", "BeginCounty", "City_Code",
                "RouteID", "LRSFromDate", "LRSToDate"]
 
@@ -244,7 +250,7 @@ def inprocess_launcher(fake):
 
 def seed_manual_library(lib):
     """A manual drop in `lib`: a six-column manifest (stamped 2026-08-19) and an
-    older three-row SHS Tolls file."""
+    older three-row SHS Tolls file with the manual export's column names."""
     from openpyxl import Workbook
 
     import clean_road_layers as crl
@@ -253,14 +259,14 @@ def seed_manual_library(lib):
     lib.mkdir(parents=True, exist_ok=True)
     wb = Workbook(write_only=True)
     ws = wb.create_sheet("SHS Tolls")
-    ws.append(TOLLS_HEADER)
+    ws.append(MANUAL_TOLLS_HEADER)
     for row in _tolls_rows(3):
         ws.append(row)
     wb.save(lib / "11_SHS Tolls.xlsx")
     idx = Workbook(write_only=True)
     sheet = idx.create_sheet("INDEX")
     sheet.append(crl.INDEX_HEADER)
-    sheet.append(["11_SHS Tolls.xlsx", "SHS Tolls", 3, len(TOLLS_HEADER), "SHS Tolls",
+    sheet.append(["11_SHS Tolls.xlsx", "SHS Tolls", 3, len(MANUAL_TOLLS_HEADER), "SHS Tolls",
                   "https://example.invalid/FeatureServer;VERSION=sde.DEFAULT/138"])
     idx.properties.created = datetime(2026, 8, 19, 19, 14, 14)
     idx.save(lib / crl.INDEX_NAME)
@@ -293,6 +299,8 @@ def run(tmp, emit=print):
         _check(res.status == "partial", f"status {res.status!r}: {res.message}")
         _check(by["SHS Tolls"]["status"] == "exported" and by["SHS Tolls"]["rows"] == 27,
                f"SHS Tolls {by['SHS Tolls']}")
+        _check(by["SHS Tolls"].get("message") == TRANSITION_NOTE,
+               f"the manual-to-in-app column note {by['SHS Tolls'].get('message')!r}")
         _check(by["City"]["status"] == "exported" and by["City"]["rows"] == 40,
                f"City {by['City']}")
         _check(by["Route Direction"]["status"] == "failed"

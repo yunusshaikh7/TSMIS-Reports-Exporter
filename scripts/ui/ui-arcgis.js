@@ -1,20 +1,21 @@
 // ArcGIS tab module (v0.29.0, split like the other ui-*.js — same global scope).
-// Three sub-tabs:
+// Four sub-tabs, in the order the work flows:
 //   LAYERS (v0.46.0, first) — the app's own copy of the 40 TSMIS layers and the
 //                       in-app refresh that replaced the manual export: ArcGIS
 //                       Pro's status + a quick check, every layer with its rows /
 //                       export time / the builds that read it, and Refresh all /
 //                       Refresh selected (a matrix-queue job; each finished layer
 //                       is swapped in while the next one exports).
-//   REPORTS VS LAYERS — every TSMIS report rendered from the layer library and
-//                       diffed against our own export of it, as a by-day MATRIX
-//                       (rows = the registry's reports, columns = exported days).
-//                       ONE layer build per report, like the TSN library: the
-//                       library card names the staged drop (export date +
-//                       content fingerprint) and each row header says whether
-//                       its build is from that drop, with Build / Open buttons.
-//                       Both sides are TSMIS, so they should agree; the build's
-//                       as-of date sits beside the export day in the Notes.
+//   ARCGIS REPORTS (v0.47.0) — every report rendered from those layers, one
+//                       ArcGIS build per report, refreshed in place. Lives in
+//                       ui-arcgis-reports.js.
+//   REPORTS VS ARCGIS — every export EDITION (Excel and PDF rows) diffed against
+//                       its report's ArcGIS build, as a by-day MATRIX (columns =
+//                       exported days). The row picks the build up by itself; its
+//                       header says what that build is as of and whether it came
+//                       from the layers in the library now. Both sides are TSMIS,
+//                       so they should agree; the build's as-of date sits beside
+//                       the export day in the Notes.
 //   CLEAN ROAD VS TSN — the CA HIGHWAYS build (as-of date + Build button) and
 //                       the ArcGIS-vs-TSN comparison launcher (formulas/values
 //                       checkboxes ride the same start flow as the classic
@@ -100,6 +101,7 @@ function syncArcgisLock() {
   }
   if (agSub === "reports") updateArcgisMatrixProgress();
   if (agSub === "layers") updateArcgisLayersProgress();
+  if (agSub === "builds") updateArcgisBuildsProgress();
 }
 
 // The tab's one entry point: render whichever sub-tab is showing (and apply
@@ -107,26 +109,23 @@ function syncArcgisLock() {
 function renderArcgisTab() {
   if (typeof applyMatrixWide === "function") applyMatrixWide();
   if (agSub === "layers") renderArcgisLayers();
+  else if (agSub === "builds") renderArcgisBuilds();
   else if (agSub === "reports") renderArcgisMatrix();
   else renderArcgis();
 }
 
 // ---- sub-tabs ------------------------------------------------------------ //
+const AG_SUBS = { layers: ["subAgLayers", "agLayers"], builds: ["subAgBuilds", "agBuilds"],
+                  reports: ["subAgReports", "agReports"], cleanroad: ["subAgCleanRoad", "agCleanRoad"] };
+
 function setArcgisSub(which) {
-  agSub = which;
-  const on = (id, is) => {
-    const el = $(id);
-    if (!el) return;
-    el.classList.toggle("active", is);
-    el.setAttribute("aria-selected", String(is));
-  };
-  on("subAgLayers", which === "layers");
-  on("subAgCleanRoad", which === "cleanroad");
-  on("subAgReports", which === "reports");
-  const ly = $("agLayers"), cr = $("agCleanRoad"), rp = $("agReports");
-  if (ly) ly.classList.toggle("hidden", which !== "layers");
-  if (cr) cr.classList.toggle("hidden", which !== "cleanroad");
-  if (rp) rp.classList.toggle("hidden", which !== "reports");
+  agSub = AG_SUBS[which] ? which : "layers";
+  Object.entries(AG_SUBS).forEach(([key, [btn, pane]]) => {
+    const is = key === agSub;
+    const b = $(btn), p = $(pane);
+    if (b) { b.classList.toggle("active", is); b.setAttribute("aria-selected", String(is)); }
+    if (p) p.classList.toggle("hidden", !is);
+  });
   renderArcgisTab();
 }
 
@@ -224,7 +223,8 @@ function renderArcgisLayerLibrary(info) {
         : `Layers exported between ${oldest} and ${newest} — a build reads as of its oldest layer.`);
   }
   hint += ` Refresh exports from ${info.service} with ArcGIS Pro and swaps each layer in as it `
-    + "finishes; builds made from the old layers then read stale on Reports vs layers.";
+    + "finishes; the ArcGIS reports built from the old layers then read out of date — "
+    + "refresh them on ArcGIS reports.";
   $("agLayersHint").textContent = hint;
   const foot = [];
   const run = info.last_run;
@@ -359,70 +359,73 @@ async function aglRefresh(names) {
   return true;
 }
 
-// ---- "Reports vs layers": the library card ------------------------------- //
+// ---- "Reports vs ArcGIS": the ArcGIS-side card -------------------------- //
+// Which ArcGIS build each report's rows are compared with right now — a chip
+// per report that has a build, warning-coloured when it is missing or from
+// older layers. Clicking one opens the ArcGIS reports sub-tab.
 function renderArcgisLibrary(lib) {
   const drop = lib.drop || {};
-  const staged = lib.staged || 0, expected = lib.expected || 0;
-  $("agLibMeta").textContent = drop.exported
-    ? `drop exported ${drop.exported} · ${staged}/${expected} layers`
-    : `${staged}/${expected} layers staged`;
-  const bits = [];
-  if (staged && !lib.index_present) bits.push("00_INDEX.xlsx is missing — copy the export's manifest in with the layers.");
-  if ((lib.missing || []).length) bits.push(`Missing: ${lib.missing.join(", ")}`);
-  if ((lib.unknown || []).length) bits.push(`Not in the manifest (ignored): ${lib.unknown.join(", ")}`);
-  const fp = drop.fingerprint ? String(drop.fingerprint) : "";
-  let hint;
-  if (!staged) {
-    hint = "No layers yet — refresh them on the Layers tab.";
-  } else {
-    hint = drop.exported
-      ? `Layers exported ${aglWhen(drop.exported_at) || drop.exported}`
-        + (drop.mixed && drop.newest_at ? ` to ${aglWhen(drop.newest_at)} (a build reads as of its oldest layer)` : "")
-        + (drop.exported_source === "files" ? " (from the file dates — the manifest carries no timestamp)" : "")
-      : "The layers' export date is unknown";
-    hint += (fp ? ` · fingerprint …${fp.slice(-10)}` : "")
-      + ". Every build records the drop it came from; a row built from another drop reads stale.";
-  }
-  $("agLibHint").textContent = hint;
-  const issues = $("agLibIssues");
-  issues.innerHTML = "";
-  bits.forEach((t) => {
-    const p = document.createElement("p");
-    p.className = "hint";
-    p.textContent = t;
-    issues.appendChild(p);
+  const builds = Object.values(lib.builds || {}).filter((b) => b.available);
+  const built = builds.filter((b) => b.built);
+  $("agLibMeta").textContent = `${built.length} of ${builds.length} ArcGIS report${builds.length === 1 ? "" : "s"} built`
+    + (drop.exported ? ` · layers exported ${drop.exported}` : "");
+  const stale = built.filter((b) => b.stale).length;
+  $("agLibHint").textContent = !lib.staged
+    ? "No layers yet — refresh them on the Layers tab, then build the ArcGIS reports."
+    : stale
+      ? `${stale} ArcGIS report${stale > 1 ? "s were" : " was"} built from older layers — refresh `
+        + `${stale > 1 ? "them" : "it"} on ArcGIS reports, then rebuild the stale comparisons.`
+      : "Every row — Excel and PDF alike — is compared with the newest ArcGIS build of its "
+        + "report, picked up automatically.";
+  const chips = $("agLibIssues");
+  chips.textContent = "";
+  builds.forEach((b) => {
+    const line = agBuildLine(b);
+    const chip = document.createElement("button");
+    chip.className = "agb-chip" + (line.cls ? " " + line.cls : "");
+    chip.textContent = `${b.label} — ${line.text}`;
+    chip.title = line.text + (b.path ? `\n${b.path}` : "") + "\nOpen ArcGIS reports";
+    chip.onclick = () => setArcgisSub("builds");
+    chips.appendChild(chip);
   });
-  const asof = $("agMxAsof");
-  if (asof && !asof.value) asof.placeholder = drop.exported ? `${drop.exported} (the drop's export date)` : "YYYY-MM-DD";
 }
 
-// One row's build state as a short line: {text, cls}. Warning colour when the
-// build is from another drop or its outcome is unknown, success when current.
+// A report's ArcGIS build as a short line: {text, cls}. Warning colour when it
+// is missing, from older layers or its outcome is unknown; success when current.
 function agBuildLine(b) {
-  if (!b || !b.available) return { text: (b && b.why) || "no build yet", cls: "" };
+  if (!b || !b.available) return { text: "no ArcGIS build yet", cls: "" };
   if (!b.built) {
     const missing = (b.missing_layers || []).length;
-    return { text: missing ? `not built · ${missing} layer${missing > 1 ? "s" : ""} missing` : "not built yet", cls: "" };
+    return { text: missing ? `not built · ${missing} layer${missing > 1 ? "s" : ""} missing` : "not built yet",
+             cls: "warn" };
   }
   const asof = b.asof ? `as of ${b.asof}` : "as-of unknown";
-  const rows = Number.isFinite(Number(b.rows)) && Number(b.rows) > 0
-    ? ` · ${Number(b.rows).toLocaleString()} rows` : "";
-  if (b.stale_reason === "outcome_untrusted")
-    return { text: `built ${asof}${rows} · outcome unknown — rebuild`, cls: "warn" };
-  if (b.stale_reason === "drop_changed")
-    return { text: `built ${asof}${rows} · from ${b.drop_exported ? "the " + b.drop_exported + " drop" : "an older drop"} — rebuild`,
-             cls: "warn" };
-  const partial = b.completion === "partial" ? " · partial" : "";
-  return { text: `built ${asof}${rows}${partial} · current drop`, cls: "ok" };
+  if (b.stale_reason === "outcome_untrusted") return { text: `${asof} · outcome unknown — refresh it`, cls: "warn" };
+  if (b.stale_reason === "drop_changed") return { text: `${asof} · from older layers — refresh it`, cls: "warn" };
+  return { text: `${asof} · current layers`, cls: "ok" };
+}
+
+// A matrix row header's second line: what the row is compared with.
+function agRowSideLine(rk, b, supported) {
+  if (!supported) {
+    if (!b || !b.available) return { text: "no ArcGIS build yet", cls: "" };
+    const ed = (b.editions || []).find((e) => e.key === rk);
+    return { text: b.comparable && ed && !ed.comparable ? "edition not consolidated yet"
+                                                        : "comparison not wired yet", cls: "" };
+  }
+  if (!b || !b.built) return { text: "no ArcGIS build yet — build it", cls: "warn" };
+  const asof = b.asof ? `vs ArcGIS as of ${b.asof}` : "vs ArcGIS (as-of unknown)";
+  if (b.stale_reason === "outcome_untrusted") return { text: "ArcGIS build outcome unknown", cls: "warn" };
+  if (b.stale_reason === "drop_changed") return { text: `${asof} · older layers`, cls: "warn" };
+  return { text: asof, cls: "ok" };
 }
 
 async function agBuildReport(rk) {
-  const box = $("agMxAsof");
-  const r = await api.build_arcgis_report(rk, box ? box.value.trim() : "");
+  const r = await api.build_arcgis_report(rk, "");
   if (r && r.error) showMessage("error", "Can't build", r.error);
 }
 
-// ---- "Reports vs layers": the matrix -------------------------------------- //
+// ---- "Reports vs ArcGIS": the matrix -------------------------------------- //
 function syncArcgisMatrixFormulas() {
   syncFormulasToggle("agMatrixFormulas", "arcgis_matrix_formulas");
 }
@@ -496,7 +499,7 @@ async function renderArcgisMatrix() {
     (snap.all_rows || []).forEach((r) => {
       const isOn = !hidden.has(r.key);
       rtog.appendChild(mxToggleChip(r.label, isOn,
-        (isOn ? "Hide " : "Show ") + r.label + (r.supported ? "" : " (no build yet)"), locked,
+        (isOn ? "Hide " : "Show ") + r.label + (r.supported ? "" : " (not available yet)"), locked,
         (next) => api.set_arcgis_matrix_report(r.key, next), renderArcgisMatrix));
     });
   }
@@ -506,16 +509,19 @@ async function renderArcgisMatrix() {
     grid.style.gridTemplateColumns = ""; grid.style.gridTemplateRows = "";
     const empty = document.createElement("div");
     empty.className = "dm-empty";
-    empty.textContent = "Add an export day from Matrix options to compare each report's "
-      + "layer build against that day's export. Build a report from the layers with "
-      + "the ▤ button on its row.";
+    empty.textContent = "Add an export day from Matrix options to compare each export — "
+      + "Excel and PDF — against its report's ArcGIS build. The builds live on ArcGIS reports.";
     grid.appendChild(empty);
     wireArcgisMatrixFooter();
     updateArcgisMatrixProgress();
     return;
   }
   grid.style.gridTemplateColumns = `minmax(230px,1.3fr) repeat(${days.length}, minmax(120px,1fr))`;
-  grid.style.gridTemplateRows = `auto repeat(${snap.rows.length}, minmax(50px,1fr))`;
+  // Rows that cannot compare yet stay listed (the whole report set is visible)
+  // but compact, so the live rows keep the room.
+  const rowSupported = snap.row_supported || {};
+  grid.style.gridTemplateRows = ["auto"].concat(snap.rows.map((rk) =>
+    rowSupported[rk] ? "minmax(50px,1fr)" : "minmax(34px,auto)")).join(" ");
 
   const corner = document.createElement("div");
   corner.className = "mx-cell mx-corner mx-colhead";
@@ -532,7 +538,7 @@ async function renderArcgisMatrix() {
       mxHeadBtn("i-compare", `Rebuild every report for ${d} (vs the layer builds)`, "mxch-rebuild",
         async () => {
           const r = await api.rebuild_arcgis_matrix("all", null, d);
-          if (r && r.nothing) showMessage("info", "Nothing to rebuild", "No comparable cells in this day — build the reports from the layers first.");
+          if (r && r.nothing) showMessage("info", "Nothing to rebuild", "No comparable cells in this day — build the ArcGIS reports first (ArcGIS reports).");
           else if (r && r.error) showMessage("error", "Can't rebuild", r.error);
         }),
       mxHeadBtn("i-trash", `Remove the ${d} column`, "mxch-rm", async () => {
@@ -547,40 +553,39 @@ async function renderArcgisMatrix() {
     grid.appendChild(h);
   });
 
+  const families = snap.row_family || {};
   snap.rows.forEach((rk) => {
     const rlabel = snap.row_labels[rk] || rk;
-    const b = builds[rk] || {};
-    const supported = !!(snap.row_supported || {})[rk];
-    const rh = document.createElement("div"); rh.className = "mx-cell mx-rowhead";
+    const b = builds[families[rk] || rk] || {};      // the report's ArcGIS build
+    const supported = !!rowSupported[rk];
+    const rh = document.createElement("div");
+    rh.className = "mx-cell mx-rowhead" + (supported ? "" : " agm-off");
     rh.dataset.rk = rk; rh.dataset.label = rlabel;
     const top = document.createElement("div"); top.className = "mxrh-top";
     const lbl = document.createElement("span"); lbl.className = "mxrh-label";
     lbl.textContent = rlabel;
     top.appendChild(lbl);
     if (supported) {
-      top.appendChild(mxHeadBtn("i-compare", `Rebuild ${rlabel} for every day (vs the layer build)`,
+      top.appendChild(mxHeadBtn("i-compare", `Rebuild ${rlabel} for every day (vs its ArcGIS build)`,
         "mxch-rebuild", async () => {
           const r = await api.rebuild_arcgis_matrix("all", rk, null);
-          if (r && r.nothing) showMessage("info", "Nothing to rebuild", "No comparable cells in this row — build the report from the layers and add an exported day.");
+          if (r && r.nothing) showMessage("info", "Nothing to rebuild", "No comparable cells in this row — build the report on ArcGIS reports and add an exported day.");
           else if (r && r.error) showMessage("error", "Can't rebuild", r.error);
         }));
     }
     rh.appendChild(top);
-    // The row's ONE layer build: state line + build / open buttons.
-    const line = agBuildLine(b);
+    // What the row is compared with: its report's ONE ArcGIS build, picked up
+    // by itself (built and refreshed on ArcGIS reports) — or why it can't be yet.
+    const line = agRowSideLine(rk, b, supported);
     const bl = document.createElement("div");
     bl.className = "mxrh-build" + (line.cls ? " " + line.cls : "");
     const bt = document.createElement("span"); bt.className = "mxrh-buildtext";
-    bt.textContent = line.text; bt.title = line.text + (b.path ? `\n${b.path}` : "");
+    const meta = (snap.all_rows || []).find((r) => r.key === rk);
+    bt.textContent = line.text;
+    bt.title = line.text + (b.path ? `\n${b.path}` : "") + (meta && meta.why ? `\n${meta.why}` : "");
     bl.appendChild(bt);
-    if (b.available) {
-      const bb = mxHeadBtn("i-layers", b.built ? `Rebuild ${rlabel} from the layers` : `Build ${rlabel} from the layers`,
-        "mxch-rebuild", () => agBuildReport(rk));
-      bb.disabled = locked;
-      bl.appendChild(bb);
-    }
     if (b.built) {
-      bl.appendChild(mxHeadBtn("i-external", `Open the ${rlabel} layer build`, "mxch-open", async () => {
+      bl.appendChild(mxHeadBtn("i-external", `Open the ${b.label || rlabel} ArcGIS build`, "mxch-open", async () => {
         const r = await api.open_arcgis_report(rk);
         if (r && r.error) showMessage("error", "Can't open", r.error);
       }));
@@ -600,20 +605,20 @@ async function renderArcgisMatrix() {
       let v = mxCellContent(cmp);
       // Neither the build nor the export is there: say both, in this matrix's words.
       if (cmp.missing_side === "both" && !cmp.last_attempt)
-        v = { cls: "mx-missing", main: "needs build", sub: "not built · not exported" };
+        v = { cls: "mx-missing", main: "needs ArcGIS", sub: "no ArcGIS build · not exported" };
       cell.classList.add(v.cls); main.textContent = v.main; sub.textContent = v.sub;
       if (v.warn) cell.classList.add(v.warn);
       const ed = c.export || {};
       const edWhen = ed.present
         ? `${fmtAge(ed.age_seconds)}${ed.subdir ? " (" + ed.subdir + ")" : ""}`
         : "not exported";
-      cell.title = `${rlabel} — ${d} vs the layer build\nExport: ${edWhen}`
-        + (b.built ? `\nLayer build: ${agBuildLine(b).text}` : "")
+      cell.title = `${rlabel} — ${d} vs its ArcGIS build\nExport: ${edWhen}`
+        + (b.built ? `\nArcGIS build: ${agBuildLine(b).text}` : "")
         + (v.title ? `\n⚠ ${v.title}` : "");
       cell.append(main, sub);
       const acts = document.createElement("div"); acts.className = "mx-actions";
       if (supported && b.available && !b.built) {
-        acts.appendChild(mxActBtn("i-layers", `Build ${rlabel} from the layers`,
+        acts.appendChild(mxActBtn("i-layers", `Build the ${b.label || rlabel} ArcGIS report`,
           locked, () => agBuildReport(rk)));
       }
       if (cmp.supported && !cmp.missing_side) {
@@ -644,13 +649,13 @@ function wireArcgisMatrixFooter() {
   const ba = $("btnAgMxBuildAll");
   if (ba) ba.onclick = async () => {
     const r = await api.rebuild_arcgis_matrix("all");
-    if (r && r.nothing) showMessage("info", "Nothing to compare", "Build a report from the layers and add an exported day first.");
+    if (r && r.nothing) showMessage("info", "Nothing to compare", "Build the ArcGIS reports (ArcGIS reports) and add an exported day first.");
     else if (r && r.error) showMessage("error", "Can't compare", r.error);
   };
   const rb = $("btnAgMxRebuildAll");
   if (rb) rb.onclick = async () => {
     const r = await api.rebuild_arcgis_matrix("stale");
-    if (r && r.nothing) showMessage("info", "Up to date", "Every Reports-vs-layers comparison is current.");
+    if (r && r.nothing) showMessage("info", "Up to date", "Every Reports-vs-ArcGIS comparison is current.");
     else if (r && r.error) showMessage("error", "Can't rebuild", r.error);
   };
   const of = $("btnAgMxOpenComparisons");
@@ -668,15 +673,14 @@ function updateArcgisMatrixProgress() {
     const m = S.st && S.st.matrix;
     if (m && m.total) {
       el.hidden = false;
-      el.textContent = m.phase === "building"
-        ? `Building from the layers${m.row ? " — " + m.row : ""}…`
+      el.textContent = m.phase === "building" ? agbProgressText(m)
         : (m.phase === "layers" || m.phase === "probe") ? aglProgressText(m)
         : mxProgressText(m);
     } else el.hidden = true;
   }
   const locked = !!(S.st && S.st.task);
   document.querySelectorAll(
-    "#agMatrixSource, #agMatrixReportToggles .mx-toggle, #agMatrixGrid .mxrh-build .mxch-rebuild")
+    "#agMatrixSource, #agMatrixReportToggles .mx-toggle, #agMatrixGrid .mxrh-top .mxch-rebuild")
     .forEach((c) => { c.disabled = locked; });
   const addSel = $("agMatrixAddDay"), addBtn = $("btnAgAddDay");
   const noAvail = !addSel || !addSel.querySelector('option[value]:not([value=""])');
@@ -696,13 +700,16 @@ function bindArcgis() {
   $("subAgLayers").onclick = () => setArcgisSub("layers");
   $("subAgCleanRoad").onclick = () => setArcgisSub("cleanroad");
   $("subAgReports").onclick = () => setArcgisSub("reports");
+  bindArcgisBuilds();
+  $("btnAgGoBuilds").onclick = () => setArcgisSub("builds");
   $("btnAgRefreshAll").onclick = async () => {
     const n = (AGL && AGL.expected) || 40;
     const ok = await showConfirm({
       title: `Refresh all ${n} layers?`,
       message: "ArcGIS Pro exports every TSMIS layer from the service and the app swaps each one "
-        + "in as it finishes — the largest layers take several minutes each. Builds made from "
-        + "the current layers read stale afterwards; rebuild them on Reports vs layers.",
+        + "in as it finishes. The whole library takes about an hour and a half — County Code "
+        + "and City alone take over an hour of it. The ArcGIS reports built from the current "
+        + "layers read out of date afterwards; refresh them on ArcGIS reports.",
       confirmLabel: "Refresh",
     });
     if (ok) await aglRefresh([]);
@@ -726,8 +733,6 @@ function bindArcgis() {
   };
   $("btnAgLayersOpen").onclick = () => api.open_arcgis_layers_folder();
   $("btnAgLayersCancel").onclick = () => api.cancel_run();
-  $("btnAgRepOpenOut").onclick = () => api.open_arcgis_reports_folder();
-  $("btnAgOpenLayers").onclick = () => api.open_arcgis_layers_folder();
   $("btnAgOpenOut").onclick = () => api.open_arcgis_output_folder();
   $("btnAgCancel").onclick = () => api.cancel_run();
   $("btnAgBuild").onclick = async () => {

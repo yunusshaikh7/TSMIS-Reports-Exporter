@@ -718,22 +718,27 @@
         </div><!-- /pveMatrixSection -->
       </div>
 
-      <!-- ArcGIS pane: the layer library and everything built FROM it, in three
-           sub-tabs. LAYERS (v0.46.0, first) manages the app's own copy of the
-           TSMIS layers and refreshes it with ArcGIS Pro — no manual export.
-           REPORTS VS LAYERS renders every TSMIS report from the layers and diffs
-           it against our own export of it as a by-day MATRIX — TSMIS vs TSMIS,
-           so the two sides should agree; one build per report, like the TSN
-           library, each stamped with the layer drop it came from. CLEAN ROAD VS
-           TSN is the CA HIGHWAYS overlay build + the ArcGIS-vs-TSN comparison
-           (kept for when the TSN extract needs re-checking). -->
+      <!-- ArcGIS pane: the layer library and everything built FROM it, in four
+           sub-tabs, in the order the work flows. LAYERS (v0.46.0, first) manages
+           the app's own copy of the TSMIS layers and refreshes it with ArcGIS
+           Pro — no manual export. ARCGIS REPORTS (v0.47.0) holds every TSMIS
+           report rendered from those layers — one ArcGIS build per report,
+           refreshed in place, each stamped with the layers it came from; the
+           reports with no build yet are listed greyed. REPORTS VS ARCGIS diffs
+           every export edition (Excel and PDF) against its report's ArcGIS build
+           as a by-day MATRIX — TSMIS vs TSMIS, so the two sides should agree.
+           CLEAN ROAD VS TSN is the CA HIGHWAYS overlay build + the ArcGIS-vs-TSN
+           comparison (kept for when the TSN extract needs re-checking). -->
       <div class="card pane hidden mx-host" id="paneArcgis">
         <div class="subtabs" role="tablist">
           <button class="subtab active" id="subAgLayers" role="tab" aria-selected="true">
             <svg class="ic"><use href="#i-layers"/></svg>Layers
           </button>
+          <button class="subtab" id="subAgBuilds" role="tab" aria-selected="false">
+            <svg class="ic"><use href="#i-file-text"/></svg>ArcGIS reports
+          </button>
           <button class="subtab" id="subAgReports" role="tab" aria-selected="false">
-            <svg class="ic"><use href="#i-compare"/></svg>Reports vs layers
+            <svg class="ic"><use href="#i-compare"/></svg>Reports vs ArcGIS
           </button>
           <button class="subtab" id="subAgCleanRoad" role="tab" aria-selected="false">
             <svg class="ic"><use href="#i-grid"/></svg>Clean Road vs TSN
@@ -789,33 +794,58 @@
         </div>
         </div><!-- /agLayers -->
 
-        <!-- Sub-tab 2: the layer builds + the by-day matrix -->
+        <!-- Sub-tab 2 (v0.47.0): every report rendered from the layers — one
+             ArcGIS build per report, refreshed in place -->
+        <div id="agBuilds" class="hidden">
+        <div class="card-section">
+          <div class="section-head">
+            <span class="section-label">ArcGIS reports</span>
+            <span class="section-meta" id="agBuildsMeta">—</span>
+          </div>
+          <p class="hint" id="agBuildsHint">Reading the ArcGIS reports…</p>
+          <div class="actions-row agl-actions">
+            <button class="btn btn-accent" id="btnAgBuildsAll">
+              <svg class="ic"><use href="#i-refresh"/></svg>Refresh all reports
+            </button>
+            <label class="agb-asof" title="Rebuild as of a past date (YYYY-MM-DD). Blank builds the layers as they were exported.">
+              <span class="muted">As of</span>
+              <span class="set-input"><input type="text" class="input" id="agBuildsAsof" data-lock-when-busy
+                     autocomplete="off" spellcheck="false" placeholder="the layers' export date" style="width:160px"></span>
+            </label>
+            <span class="hint agl-progress" id="agBuildsProgress" hidden></span>
+            <span class="spacer"></span>
+            <button class="btn btn-subtle btn-small hidden" id="btnAgBuildsCancel">
+              <svg class="ic"><use href="#i-x"/></svg>Cancel
+            </button>
+            <button class="btn btn-subtle btn-small" id="btnAgBuildsOpen">
+              <svg class="ic"><use href="#i-folder-open"/></svg>Open reports folder
+            </button>
+          </div>
+          <div class="agl-table agb-table" id="agBuildsTable" role="table" aria-label="ArcGIS reports"></div>
+          <p class="hint" id="agBuildsFoot"></p>
+        </div>
+        </div><!-- /agBuilds -->
+
+        <!-- Sub-tab 3: every export edition vs its report's ArcGIS build, by day -->
         <div id="agReports" class="mx-pane hidden">
         <div class="card-section" id="agLibSection">
           <div class="section-head">
-            <span class="section-label">ArcGIS layer library</span>
+            <span class="section-label">ArcGIS side</span>
             <span class="section-meta" id="agLibMeta">—</span>
           </div>
-          <p class="hint" id="agLibHint">Checking the layer library…</p>
-          <div id="agLibIssues"></div>
-          <div class="dm-toolbar" style="margin-top:6px">
-            <span class="muted">Build as of</span>
-            <span class="set-input"><input type="text" class="input" id="agMxAsof" data-lock-when-busy
-                   autocomplete="off" spellcheck="false" placeholder="the drop's export date" style="width:170px"></span>
-            <span class="hint">Blank builds the layers as exported. Each row header says what its build is as of.</span>
+          <p class="hint" id="agLibHint">Checking the ArcGIS reports…</p>
+          <div class="agb-chiprow">
+            <div class="agb-chips" id="agLibIssues"></div>
             <span class="spacer"></span>
-            <button class="btn btn-subtle btn-small" id="btnAgOpenLayers">
-              <svg class="ic"><use href="#i-folder-open"/></svg>Open layers folder
-            </button>
-            <button class="btn btn-subtle btn-small" id="btnAgRepOpenOut">
-              <svg class="ic"><use href="#i-folder-open"/></svg>Open builds folder
+            <button class="btn btn-subtle btn-small" id="btnAgGoBuilds">
+              <svg class="ic"><use href="#i-file-text"/></svg>ArcGIS reports
             </button>
           </div>
         </div>
 
         <div class="card-section mx-gridsection">
           <div class="section-head">
-            <span class="section-label">Reports vs layers — by export day</span>
+            <span class="section-label">Reports vs ArcGIS — by export day</span>
             <span class="section-meta">
               Source
               <span class="tb-select select-light"><select id="agMatrixSource"></select><svg class="ic"><use href="#i-chevron-down"/></svg></span>
@@ -828,8 +858,8 @@
             <span class="mx-key mx-diff-hi">many diffs</span>
             <span class="mx-key mx-partial">partial inputs</span>
             <span class="mx-key mx-stale">stale</span>
-            <span class="mx-key mx-missing">needs build / export</span>
-            <span class="mx-key mx-na">no build yet</span>
+            <span class="mx-key mx-missing">needs ArcGIS build / export</span>
+            <span class="mx-key mx-na">not available yet</span>
           </div>
           <div class="matrix-wrap"><div class="matrix-grid" id="agMatrixGrid"></div></div>
         </div>
@@ -851,7 +881,7 @@
         </div>
         </div><!-- /agReports -->
 
-        <!-- Sub-tab 3: the clean-road files vs the TSN extract -->
+        <!-- Sub-tab 4: the clean-road files vs the TSN extract -->
         <div id="agCleanRoad" class="hidden">
         <div class="card-section">
           <div class="section-head">
@@ -1472,9 +1502,9 @@
         </div>
       </div>
 
-      <!-- Reports-vs-layers matrix config zone: same corner pattern, shown on the
-           ArcGIS tab's "Reports vs layers" sub-tab (body.matrix-wide.mw-ag). The
-           shared job queue, day columns, the live-formulas option, and the report
+      <!-- Reports-vs-ArcGIS matrix config zone: same corner pattern, shown on the
+           ArcGIS tab's "Reports vs ArcGIS" sub-tab (body.matrix-wide.mw-ag). The
+           shared job queue, day columns, the live-formulas option, and the row
            show/hide toggles. -->
       <div class="card matrix-config" id="arcgisMatrixConfig">
         <div class="mc-head"><svg class="ic"><use href="#i-grid"/></svg>Matrix options</div>
@@ -1501,9 +1531,9 @@
             </button>
           </div>
           <p class="hint" style="margin:6px 0 0">Add exported days as columns. Each cell
-            compares the report's <b>one</b> layer build against that day's export
-            (either edition, consolidated from its run folder). A cell needs the
-            report built from the layers and exported that day.</p>
+            compares that day's export of the row's edition (consolidated from its
+            run folder) against the report's <b>one</b> ArcGIS build. A cell needs
+            the ArcGIS build (ArcGIS reports) and that edition exported that day.</p>
         </div>
 
         <div class="mc-group">
@@ -1559,6 +1589,7 @@
 <script src="ui-compare.js"></script>
 <script src="ui-matrix.js"></script>
 <script src="ui-arcgis.js"></script>
+<script src="ui-arcgis-reports.js"></script>
 <script src="ui-settings.js"></script>
 <script src="app.js"></script>
 <script>

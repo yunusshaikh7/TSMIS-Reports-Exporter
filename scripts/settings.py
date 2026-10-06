@@ -922,10 +922,12 @@ def set_pve_matrix_formulas(on):
     return _set_flag("pve_matrix_formulas", on)
 
 
-# ---- ArcGIS-tab "Reports vs layers" matrix ---------------------------------
+# ---- ArcGIS-tab "Reports vs ArcGIS" matrix ---------------------------------
 # Same shape as the PDF-vs-Excel matrix (a source, ordered day-columns, hidden
-# report rows, a drag row order, a formulas toggle): the other side of every
-# cell is the report's single layer build, which has no per-matrix setting.
+# rows, a drag row order, a formulas toggle): the other side of every cell is
+# the report's single ArcGIS build, which has no per-matrix setting. Rows are
+# export editions since v0.47.0; a report's own key is still the key of its
+# established row, so hidden/order lists saved before then keep applying.
 
 _DEFAULT_ARCGIS_MATRIX_SOURCE = "ssor-prod"
 
@@ -938,7 +940,7 @@ def get_arcgis_matrix_source():
 
 
 def set_arcgis_matrix_source(key):
-    """Save (or, empty, reset) the Reports-vs-layers matrix source."""
+    """Save (or, empty, reset) the Reports-vs-ArcGIS matrix source."""
     data = dict(_read_file())
     key = (key or "").strip()
     if key:
@@ -959,7 +961,7 @@ def get_arcgis_matrix_days():
 
 
 def set_arcgis_matrix_days(days):
-    """Persist the ordered Reports-vs-layers day-column list. Empty -> cleared."""
+    """Persist the ordered Reports-vs-ArcGIS day-column list. Empty -> cleared."""
     data = dict(_read_file())
     days = [d for d in (days or []) if isinstance(d, str) and d]
     if days:
@@ -972,7 +974,7 @@ def set_arcgis_matrix_days(days):
 
 
 def get_arcgis_matrix_hidden():
-    """Hidden report-row keys on the Reports-vs-layers matrix (default: none)."""
+    """Hidden report-row keys on the Reports-vs-ArcGIS matrix (default: none)."""
     return _get_str_list("arcgis_matrix_hidden")
 
 
@@ -990,7 +992,7 @@ def set_arcgis_matrix_row_order(keys):
 
 
 def get_arcgis_matrix_formulas():
-    """Whether the Reports-vs-layers matrix ALSO writes a live-formulas workbook
+    """Whether the Reports-vs-ArcGIS matrix ALSO writes a live-formulas workbook
     (its own toggle; default off)."""
     return _get_flag("arcgis_matrix_formulas")
 

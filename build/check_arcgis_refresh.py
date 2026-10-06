@@ -283,6 +283,37 @@ def test_real_subprocess():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_layer_limit_scales():
+    print("the per-layer time limit grows with the layer's own row count:")
+    flat = arcgis_pro.LAYER_LIMIT_S
+    check("a small layer keeps the flat limit", arcgis_pro.layer_limit_for(27) == flat)
+    check("an unknown or unreadable count keeps the flat limit",
+          arcgis_pro.layer_limit_for(None) == flat and arcgis_pro.layer_limit_for("x") == flat
+          and arcgis_pro.layer_limit_for(0) == flat)
+    big = arcgis_pro.layer_limit_for(824914)
+    check("County Code (824,914 rows, 54 min on 2026-10-05) gets 3x its measured time",
+          big >= 3 * 3234 and big > flat, str(big))
+    with _library() as lib:
+        spec = ast_.sample_spec()
+        spec["layers"]["74"]["delay"] = 2.5                  # City: 40 rows, 2.5 s
+        request = {"protocol": 1, "mode": "export",
+                   "service": "https://example.invalid/FeatureServer",
+                   "layers": [{"name": "City", "id": 74, "out": str(lib / "City.xlsx")}]}
+
+        def _run(per_row):
+            return arcgis_pro.run_worker(
+                ar.session_dir(), request, lambda _ev: None, None, "fake-python.exe",
+                launcher=ast_.inprocess_launcher(ast_.make_fake_arcpy(spec)),
+                layer_limit=1, layer_seconds_per_row=per_row)
+
+        roomy = _run(0.1)                                    # 40 rows -> a 4 s limit
+        check("once counted, a layer gets its row-scaled limit over the floor",
+              not roomy.timed_out, roomy.timed_out)
+        tight = _run(0)                                      # no allowance -> the 1 s floor
+        check("with no per-row allowance the floor still stops a stuck layer",
+              "took longer than" in tight.timed_out, tight.timed_out)
+
+
 def test_drop_dates():
     print("the drop's dates — every layer's own export time, the oldest wins:")
     from openpyxl import Workbook
@@ -455,6 +486,7 @@ def main():
     test_index_write_failure_rolls_back()
     test_not_signed_in_hint()
     test_real_subprocess()
+    test_layer_limit_scales()
     test_drop_dates()
     test_row_count()
     test_gui_wiring()

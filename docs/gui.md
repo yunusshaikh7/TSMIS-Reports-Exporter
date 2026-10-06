@@ -8,7 +8,7 @@ For the engine the GUI drives, see [engine-and-reliability.md](engine-and-reliab
 
 ## UI stack
 
-The packaged product is a **pywebview window using the Edge WebView2 backend**, rendering `scripts/ui/` — **plain HTML/CSS/JS, no framework and no build step**. As of v0.18.0 the front-end is split into `index.html` + `app.css` + `app.js` (orchestration) + `mock.js` (the `#mock` fixtures, a SEPARATE file — never edit fixtures in `app.js`) + `ui-dom.js` / `ui-matrix.js` / `ui-settings.js` (renderer modules) + `contract.js` (the bridge enum mirror of `scripts/contract.py`). Static files ship in the bundle; end-user setup stays global-pip. This replaced the original Tkinter window (v0.8.0): Tk could neither match the approved design (Windows-11 look, dark titlebar, two-column layout) nor stop cutting off on small screens. A web layout is responsive (stacks + scrolls below ~980px wide; theme = System/Light/Dark header toggle persisted in `localStorage`, resolved to an effective `html[data-theme]` before first paint).
+The packaged product is a **pywebview window using the Edge WebView2 backend**, rendering `scripts/ui/` — **plain HTML/CSS/JS, no framework and no build step**. As of v0.18.0 the front-end is split into `index.html` + `app.css` + `app.js` (orchestration) + `mock.js` (the `#mock` fixtures, a SEPARATE file — never edit fixtures in `app.js`) + `ui-dom.js` and the per-tab renderer modules (`ui-export.js` / `ui-batch.js` / `ui-compare.js` / `ui-matrix.js` / `ui-arcgis.js` / `ui-arcgis-reports.js` / `ui-settings.js`) + `contract.js` (the bridge enum mirror of `scripts/contract.py`). Static files ship in the bundle; end-user setup stays global-pip. This replaced the original Tkinter window (v0.8.0): Tk could neither match the approved design (Windows-11 look, dark titlebar, two-column layout) nor stop cutting off on small screens. A web layout is responsive (stacks + scrolls below ~980px wide; theme = System/Light/Dark header toggle persisted in `localStorage`, resolved to an effective `html[data-theme]` before first paint).
 
 WebView2 is a safe dependency here: it ships with Windows 10/11 and evergreen Edge — the same Edge this tool already requires. `tkinter`/`_tkinter` are **excluded** from the bundle.
 
@@ -409,12 +409,14 @@ proved the wiring — a new matrix cost a table row per report instead of a fift
 if-chain. Lives in `pdf_excel_matrix.py`; the sub-tab renders through the same
 `ui-matrix.js` as the other three.
 
-### The ArcGIS tab (v0.29.0; the Layers sub-tab and the in-app refresh since v0.46.0)
+### The ArcGIS tab (v0.29.0; Layers since v0.46.0; ArcGIS reports + Reports vs ArcGIS since v0.47.0)
 
 The one tab that never touches the TSMIS site. Everything builds from the
-`arcgis_layers/` library, which the app now refreshes itself; `gui_arcgis_api.py`
-(the matrix + Clean Road) and `gui_arcgis_layers_api.py` (Layers) own the endpoints
-and `ui-arcgis.js` renders them. Three sub-tabs, Layers first (and the default):
+`arcgis_layers/` library, which the app refreshes itself; `gui_arcgis_api.py`
+(ArcGIS reports, the matrix, Clean Road) and `gui_arcgis_layers_api.py` (Layers) own
+the endpoints, and `ui-arcgis.js` + `ui-arcgis-reports.js` render them. Four
+sub-tabs in the order the work flows — layers → the reports built from them → every
+export compared against those reports — with Layers first (and the default):
 
 - **Layers** (v0.46.0) — replaces the owner's manual per-layer export.
   - **ArcGIS Pro card** — where ArcGIS Pro's `arcgispro-py3` python.exe was found
@@ -447,60 +449,87 @@ and `ui-arcgis.js` renders them. Three sub-tabs, Layers first (and the default):
     its existing library name (the replaced file goes to `_previous/`), and
     rewrites `00_INDEX.xlsx` with two new columns — *Exported At* (that layer's
     export start) and *Exported By*. If the manifest can't be written (open in
-    Excel) the swap is undone. Limits: 10 min for ArcPy to start, 90 min per layer.
+    Excel) the swap is undone. Limits: 10 min for ArcPy to start; 90 min per
+    layer, or — once the worker has counted a big layer — 12 ms a row
+    (`arcgis_pro.layer_limit_for`, v0.47.0: County Code's 824,914 rows took 54 min
+    on the first real refresh, so it gets about 2 h 45 min).
     `arcgis_layers/_refresh/last_run.json` / `last_probe.json` feed the card.
-- **Reports vs layers** — a by-day **matrix**: rows = every
-  TSMIS report the `arcgis_reports` registry lists (the two rendered so far plus the
-  rows still waiting on a build, greyed *no build yet* with the reason on hover),
-  columns = exported days you add, each cell = the report's ONE layer build compared
-  against that day's consolidated export (either edition — Excel preferred). Both
-  sides are TSMIS, so they should agree. The engine is `arcgis_matrix.py`
+- **ArcGIS reports** (v0.47.0) — every TSMIS report rendered from the layers, as a
+  table in the Layers look (`ui-arcgis-reports.js`, payload `arcgis_reports_info` →
+  `arcgis_matrix.reports_snapshot`). One row per `arcgis_reports` registry report:
+  its name with what Reports vs ArcGIS compares against it (*compared with
+  Highway Detail · Highway Detail (PDF)*), the build's as-of date and when it was
+  built, its rows, and a status — *current* (green) / *built from older layers —
+  refresh it* / *outcome unknown* (warning colour) / *not built yet* / *N layers
+  missing* / *last refresh failed …* (the failed or cancelled attempt is kept, in the
+  shared attempts overlay under `output/arcgis_reports/_state/`, until a refresh
+  lands) / *building…* / *waiting…*. A report whose build hasn't been written is
+  listed too, greyed *build coming later*, so the whole set is visible.
+  - **Refresh all reports** (confirms first, naming the reports) or a row's
+    **Refresh** / **Build** queues ONE `kind:"arcgis_build"` job whose `rows` are the
+    reports, built one after another (`ArcgisReportBuildWorker`, in
+    `gui_worker_arcgis.py`); progress names the report being built, Cancel stops
+    between reports and inside one. The **As of** box rebuilds as of a past date;
+    blank is the layers' own date.
+  - **One build per report, refreshed in place** (owner decisions 2026-09-02 /
+    2026-10-05). Every build stamps the layer drop it came from — the drop's export
+    date (the OLDEST layer's *Exported At*, or a manual manifest's own timestamp)
+    and a content fingerprint over the `.xlsx` files — into its marker sheet and
+    outcome sidecar (`layer_drop` under the module's `SIDECAR_KEY`), so refreshing
+    the layers makes the row read *built from older layers* without anyone
+    re-checking by hand. The as-of defaults to the OLDEST export date among the
+    layers that report reads (`arcgis_layers.consistent_asof`), never the TSN
+    extract's — that default belongs to the Clean Road sub-tab only. A build gates
+    on the report's OWN required layers (`REQUIRED_LAYERS`), not the whole manifest.
+- **Reports vs ArcGIS** (renamed from *Reports vs layers* in v0.47.0) — a by-day
+  **matrix**: rows = every EXPORT EDITION of every registry report — the Excel export
+  and the print (PDF) edition are separate rows (`arcgis_reports.editions()`,
+  derived from the catalog) — columns = exported days you add, each cell = that
+  day's consolidated export of the row's edition compared against the report's ONE
+  ArcGIS build. The row picks the build up by itself (`arcgis_matrix.arcgis_side`,
+  the newest — and only — build of that report), so both editions of a report
+  compare against the same workbook; nothing on the matrix picks or builds it. Both
+  sides are TSMIS, so they should agree. Rows that can't compare yet stay listed,
+  compact and greyed, with the reason on hover. The engine is `arcgis_matrix.py`
   ([comparison-engine.md](comparison-engine.md) §12d); it renders through the same
   `ui-matrix.js` primitives as the other four matrices, goes full-width via
   `body.matrix-wide.mw-ag` with its own corner `#arcgisMatrixConfig` (queue,
-  add-day, live-formulas, report toggles), and rides the shared job queue
-  (`which:"arcgis"` compares → `ArcgisMatrixCompareWorker`; `kind:"arcgis_build"`
-  builds → `ArcgisReportBuildWorker`).
-  - **One build per report, like the TSN library** (owner decision 2026-09-02). The
-    **library card** above the grid names the staged drop — its export date (the
-    OLDEST layer's *Exported At*, or a manual manifest's own timestamp), a content
-    fingerprint over the `.xlsx` files (v0.46.0: the README and the app's working
-    folders don't count), the layer count vs the manifest — and each **row header** carries
-    its build's state on a second line: *not built* / *built as of D · N rows ·
-    current drop* (green) / *built … from the 2026-07-22 drop — rebuild* (warning
-    colour) / *outcome unknown — rebuild*, with a ▤ build button and an open
-    button. A cell whose report is not built reads **needs build** and offers the
-    same ▤. Every build stamps the drop it came from into its marker sheet and
-    outcome sidecar (`layer_drop` under the module's `SIDECAR_KEY`), so a fresher
-    drop makes the row read stale without anyone re-checking by hand.
-  - **The as-of date** defaults to the OLDEST export date among the layers that
-    report reads (`arcgis_layers.consistent_asof`; for a fully refreshed library
-    that is simply the refresh date), never the TSN extract's — that default
-    belongs to the Clean Road sub-tab only. The "Build as of" box on the library
-    card overrides it for one build; the comparison's Notes state the build's
-    as-of beside the export day.
-  - A build gates on the report's OWN required layers (`REQUIRED_LAYERS`), not
-    the whole 40-layer manifest.
+  add-day, live-formulas, row toggles), and rides the shared job queue
+  (`which:"arcgis"` → `ArcgisMatrixCompareWorker`).
+  - The **ArcGIS side** card above the grid shows each built report as a chip —
+    *as of D · current layers* (green) or *from older layers — refresh it* /
+    *not built yet* (warning) — and links to ArcGIS reports. Each row header's
+    second line says what it is compared with (*vs ArcGIS as of D*, *· older
+    layers*, *no ArcGIS build yet — build it*). A cell whose report has no build
+    reads **needs ArcGIS** and offers a build button, which queues that report's
+    refresh — after it lands, the row compares with no other step.
+  - Rows are the Excel/PDF export keys, and a report's own key is still its
+    established row, so the saved hidden rows / row order and the comparisons made
+    before v0.47.0 keep applying; the comparison files keep their `_vs_layers`
+    names.
 - **Clean Road vs TSN** — builds our own CA HIGHWAYS table from the layers as-of a
   chosen date and compares it against the TSN extract, both flavors. The as-of box
   matters: `resolve_default_asof()` takes its default from the *staged TSN
   extract*, not from the layer library, so a build off fresh layers still
   reconstructs the extract's date unless you set it. Kept for when the TSN extract
-  needs re-checking; the same CA HIGHWAYS build is the Clean Road: Highway row's
-  build on the matrix.
+  needs re-checking; the same CA HIGHWAYS build is the Clean Road: Highway report
+  on ArcGIS reports.
 
-Statewide builds are long (~25–30 min for Highway Detail), so every flow is
-cancellable and reports progress through the same `Events` sink as an export.
+Statewide builds are long (~25–30 min for Highway Detail, ~7 min for CA HIGHWAYS),
+so every flow is cancellable and reports progress through the same `Events` sink as
+an export.
 
 **Extending it** — a new report is a registry row plus its build and comparator
-modules (`arcgis_reports.py`); the matrix, the endpoints, the `#mock` preview and
-`check_arcgis_matrix` derive from the registry. Read
+modules (`arcgis_reports.py`); ArcGIS reports, the matrix rows (both editions), the
+endpoints, the `#mock` preview and `check_arcgis_matrix` derive from the registry,
+and an edition becomes comparable on its own once the app consolidates it. Read
 [planning/cleanroad-highways.md](planning/cleanroad-highways.md) first for the
 measured build rules, and don't re-derive them. Mock + bridge exercised at
-`/index.html#mock` (ArcGIS ▸ Layers / Reports vs layers). The refresh is proven
-offline by `check_arcgis_refresh` and the frozen `--self-test`, both of which run
-the SHIPPED worker against the stand-in ArcPy in `arcgis_selftest.py`; real ArcPy
-only exists on the work PC.
+`/index.html#mock` (ArcGIS ▸ Layers / ArcGIS reports / Reports vs ArcGIS). The
+refresh is proven offline by `check_arcgis_refresh` and the frozen `--self-test`,
+both of which run the SHIPPED worker against the stand-in ArcPy in
+`arcgis_selftest.py`; real ArcPy only exists on the work PC — its first real run
+(2026-10-05, v0.46.0) exported all 40 layers cleanly.
 
 ### Matrix cell states, and the one that is deliberately not green
 
