@@ -3,6 +3,40 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.49.0 — 2026-10-06
+
+Every export now records which TSMIS site it came from. Reports wait on the dev
+site until they are approved and then move to the main site, so the same source
+and environment can be exported from either, and the two are different evidence.
+
+- **Run folders name the site**: `2026-10-07 ssor-prod dev-site` or
+  `2026-10-07 ssor-prod main-site` (`other-site` for a custom address on any other
+  host). A dev-site export and a main-site export of the same day no longer share a
+  folder, and a main-site run never resumes over dev-site files. The name carries
+  through to every file inside — the per-route exports
+  (`2026-10-07 ssor-prod dev-site highway_log_route_3.xlsx`), the consolidated
+  workbooks and the comparison workbooks. Folders exported before this release keep
+  their names and read as *site not recorded*.
+- **The matrices follow the site the app points at** (Settings ▸ "Use development
+  site"). The vs TSN, vs Baseline, PDF vs Excel and Reports vs ArcGIS matrices read
+  that site's exports plus the ones from before the site was recorded, never another
+  site's. The source picker names the site (`SSOR / Prod · dev site`), and every day
+  column and add-day option says which site its export came from, or *site not
+  recorded*. Switch the site in Settings to see the other site's days.
+- **Dev site vs main site.** In the Compare tab's folders mode, two exports of the
+  same source and environment from different sites are labelled `SSOR-PROD DEV` and
+  `SSOR-PROD MAIN` — the check to run once a report moves to the main site.
+- **Run reports** (`output/run_reports`) carry the site in their name and a Site
+  column with the exact address the export opened. Website source captures are
+  named the same way.
+- The temporary folder evidence images are drawn into now has a short fixed name:
+  it was the deepest path the app writes, and the longer folder names would have
+  taken it past the work PC's 260-character limit (now 247 at worst).
+
+Verified offline through the app's own export and matrix paths (a new check exports
+from the dev address and then the main address); the work-PC run is next (roadmap
+B1).
+
 ## v0.48.0 — 2026-10-06
 
 Every edition of every report now consolidates and compares. The nine that were

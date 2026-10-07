@@ -75,7 +75,7 @@ partial run never leaves one route with two files, and the end-anchored
 
 **Current export state.** Reports wait on the **dev site** (`tsmis-dev.dot.ca.gov`,
 Settings ▸ "Use development site") until they are approved, then move to the **main
-site** (`tsmis.dot.ca.gov`) — owner, 2026-10-07. Many reports exist only on the dev
+site** (`tsmis.dot.ca.gov`) — owner, 2026-10-06. Many reports exist only on the dev
 site, most current exports (the 2026-10-02 statewide delivery included) come from it,
 and the comparisons are the approval evidence; since v0.49.0 every run folder says
 which site it came from. Every enabled on-site report exports in
