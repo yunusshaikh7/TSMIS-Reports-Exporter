@@ -34,12 +34,10 @@ plus four extra layer lookups per route), so expect Highway-Log-class times.
 Print editions (v0.45.2): `*_printAll` (cover page + landscape scale-to-fit)
 saved as PDF -- the `*_PDF_SPEC`s below share their Excel sibling's dropdown
 option (`data_value`), so selecting both editions coalesces into one render.
-EXPORT-ONLY like the Excel editions: there is no real print to census a parser
-against yet (the HSL / RD-PDF sequence -- ship the export, census real work-PC
-output, then integrate). Consolidating / comparing these SITE exports is the
-same later tier. The TSN side is already staged: `report_catalog.TSN` carries
-the three library slots (`tsn_load_clean_road`; Highway normalizes verbatim,
-Intersection / Ramp stay refusing skeletons).
+Since v0.48.0 both editions consolidate and compare (the HSL / RD-PDF sequence:
+the export shipped first, the owner's 2026-10-02 statewide run was censused,
+then `clean_road_print` + `compare_clean_road_tsn` integrated them); the three
+TSN library slots (`tsn_load_clean_road`) normalize their extracts verbatim.
 
 Where the live site still greys a report (prod lags dev), select_report fails
 fast with ReportUnavailableError -- no per-route stall.

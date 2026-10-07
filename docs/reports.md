@@ -95,7 +95,7 @@ retired the separate `input/` folder).
    across every file, and the owner supplied the statewide TSN print the same day
    (`ground-truth/Highway Summary TSN print 9.15/`, event 4843734, reference
    09/15/2025). v0.37.0 ships the consolidator, the cross-environment comparator AND the vs-TSN leg (see
-   [Highway Summary](#highway-summary--the-miles-measured-aggregate-v0360) below).
+   [Highway Summary](#highway-summary--the-miles-measured-aggregate-v0370) below).
    It is the THIRD aggregate summary comparison and the first that measures MILES.
 4. **Where each report lives (site-side, as of 2026-07-10):** EVERY enabled report
    now exports from the **production** site — the late-2026-07-09 prod rollout
@@ -137,12 +137,11 @@ retired the separate `input/` folder).
    `tsn_load_clean_road.build_into_highway` (marker v1), and
    `compare_clean_highway_tsn` diffs the two in both flavors with every column
    indexed back to its source layer (the built workbook's `Provenance` sheet +
-   the comparison Notes). Intersection/Ramp stay refusing skeletons — their
-   builds follow the same pattern (design + censused mappings in
-   [planning/cleanroad-highways.md](planning/cleanroad-highways.md)).
-   That is exactly what happened 2026-09-02: the real saves were written off the
-   9.1 capture and the trio left the gate; the Intersection/Ramp SITE exports now
-   exist to census those builds against once real files arrive.
+   the comparison Notes). The Intersection/Ramp ArcGIS builds are not written
+   yet (roadmap G1) — they follow the same pattern (design + censused mappings in
+   [planning/cleanroad-highways.md](planning/cleanroad-highways.md)), and the
+   site's own Intersection/Ramp exports, real since the 2026-10-02 delivery, are
+   what those builds will be compared against.
 
 **Cross-cutting engine capabilities** (all reports, unless noted): resume + retry +
 skip/cancel + fast-fail per route; **fast mode** (N parallel browsers);
