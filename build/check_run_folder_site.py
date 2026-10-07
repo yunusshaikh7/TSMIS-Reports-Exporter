@@ -178,8 +178,12 @@ def test_matrices():
         _export(tmp / "2026-09-25 ssor-prod main-site")
         with pinned_site("dev"):
             days = day_matrix.available_days("ssor-prod")
+            # Today always leads and is listed once — on the day the check runs on
+            # DAY itself (as CI did, 2026-10-07 UTC) DAY IS today.
+            today = paths.today_str()
             c.check("vs TSN picker (dev site): today + its own day + the unrecorded one",
-                    days == [paths.today_str(), DAY, "2026-10-02"], str(days))
+                    days == [today] + [d for d in (DAY, "2026-10-02") if d != today],
+                    str(days))
             c.check("vs Baseline picker (dev site): never the main-only day",
                     baseline_matrix.available_days("ssor-prod") == [DAY, "2026-10-02"])
             c.check("the per-day report tags read the same folders",
