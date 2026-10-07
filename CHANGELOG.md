@@ -3,6 +3,46 @@
 All notable changes to TSMIS Reports Exporter, newest first. Each GitHub
 release shows only its own section (see `build/gen_release_notes.py`).
 
+## v0.48.0 — 2026-10-06
+
+Every edition of every report now consolidates and compares. The nine that were
+export-only — Ramp Summary (Excel), Intersection Summary (PDF), Highway Summary
+(PDF) and all six Clean Road files — joined off the 2026-10-02 statewide export of
+every report.
+
+- **Clean Road: Highway, Intersection and Ramp, both editions.** Each one
+  consolidates (on the Consolidate tab, and automatically after an Excel export)
+  and compares vs TSN against TSN's `CA HIGHWAYS`, `CA INTERSECTIONS` and
+  `CA RAMPS` extracts, between environments, and PDF vs Excel. Rows pair on the
+  physical location (route, county, postmile prefix, postmile, roadbed). The
+  columns the site has no source for are shown as context and never counted, and
+  the Notes sheet lists every place the two systems write the same fact
+  differently and how it is matched. The PDF editions are read straight off the
+  site's print table, whose type comes out as small as 1.4 pt; a print whose
+  layout has changed is refused rather than read into the wrong columns.
+- **The summaries' second editions.** Ramp Summary (Excel), Intersection Summary
+  (PDF) and Highway Summary (PDF) consolidate to the same workbook as their
+  sibling edition — on the 10.2 export every count and every mile agrees on every
+  route — so each compares vs the same TSN print with the same result, between
+  environments, and against its sibling in a new PDF vs Excel check.
+- **Every matrix gains the new rows**: 22 report rows on the Everything, by-day
+  and vs Baseline matrices, and 11 reports on the PDF vs Excel matrix (5 before).
+- **First results** (the 10.2 export vs TSN's September-2025 extracts, so the
+  differences include a year of change since TSMIS replaced TSN): Clean Road Ramp
+  pairs 15,204 ramps, with 10 only in TSMIS and 206 only in TSN. Most of its
+  differing cells are one column, `RAM_BEGIN_DATE`: the site fills it from the
+  ramp layer's inventory start date, which TSN keeps in `RAM_CHANGE_DATE` (the
+  Notes say so). Intersection pairs 16,201 (260 / 425 one-sided) and Highway
+  47,746 (3,989 / 12,337 — the two systems cut the road into segments
+  differently). Every PDF vs Excel check matches.
+- After updating, import `CA INTERSECTIONS` and `CA RAMPS` into their TSN slots
+  (Settings ▸ TSN reports) and build them once; Clean Road: Highway uses the
+  `CA HIGHWAYS` extract the ArcGIS comparison already reads (import it the same
+  way if that slot is empty).
+
+Verified offline against the full 10.2 export through the app's own matrix path;
+the work-PC run is next (roadmap B1).
+
 ## v0.47.0 — 2026-10-05
 
 The ArcGIS tab is now laid out end to end: the layers, the reports built from
