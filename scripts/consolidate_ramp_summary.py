@@ -950,7 +950,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     through the confirm_overwrite(path)->bool callback, and returns a
     ConsolidateResult. Honors events.is_cancelled() between files.
 
-    `day` picks which export run folder ("<YYYY-MM-DD> <src>-<env>") to read; None means
+    `day` picks which export run folder ("<YYYY-MM-DD> <src>-<env> <host>-site") to read; None means
     the newest run folder, falling back to the legacy flat layout when no run
     folders exist yet.
     """

@@ -5,7 +5,9 @@ environment vocabulary, the process-global + per-thread site selection
 (`set_site` / `set_thread_site` / `get_site`), and the URL builders (`get_url`,
 `default_site_url`, `dev_site_url`, `expected_host`). One TSMIS page serves every
 (data source × environment) combination via query parameters; this module owns
-"which combination the next navigation targets" and the URL that encodes it.
+"which combination the next navigation targets" and the URL that encodes it —
+and (v0.49.0, `host_kind` / `host_kind_for`) which TSMIS HOST that URL is on,
+the main site or the dev site, which every export run folder now records.
 
 `settings` is imported lazily inside `get_url` (the custom-URL override), so this
 stays an import-time leaf. The module logger keeps the `"tsmis.auth"` name
@@ -105,9 +107,18 @@ def get_url():
     shipped" stopgap) wins over the built-in pattern and applies to the very
     next navigation."""
     src, env = get_site()
+    override = _override_url(src, env)
+    if override:
+        log.info("site: using custom URL for %s-%s: %s", src, env, override)
+        return override
+    return default_site_url(src, env)
+
+
+def _override_url(src, env):
+    """The Settings custom address for (src, env), or None."""
     try:
         import settings
-        override = settings.get_site_url(src, env)
+        return settings.get_site_url(src, env)
     except Exception as e:               # settings must never stop a run
         reason = str(e).splitlines()[0] if str(e) else type(e).__name__
         log.warning(
@@ -115,11 +126,45 @@ def get_url():
             "using built-in URL",
             type(e).__name__, reason,
         )
-        override = None
-    if override:
-        log.info("site: using custom URL for %s-%s: %s", src, env, override)
-        return override
-    return default_site_url(src, env)
+        return None
+
+
+def combo_url(src, env):
+    """The report-page URL one explicit (data source, environment) pair opens —
+    `get_url` for a pair that need not be the active one, and without its
+    per-navigation log line (the matrices ask this on every render)."""
+    return _override_url(src, env) or default_site_url(src, env)
+
+
+# WHICH TSMIS host an export came from. Reports wait on the dev host until they
+# are approved, then move to the main host, so the same (data source,
+# environment) pair can be exported from either — and the two are different
+# evidence. Every export run folder records it ("2026-10-07 ssor-prod dev-site",
+# see paths.run_folder_name). A Settings custom address on any other host reads
+# as "other" (its exact address is in the run report and the log).
+HOST_MAIN = "main"
+HOST_DEV = "dev"
+HOST_OTHER = "other"
+HOST_KINDS = (HOST_MAIN, HOST_DEV, HOST_OTHER)
+HOST_LABELS = {HOST_MAIN: "main site", HOST_DEV: "dev site", HOST_OTHER: "other site"}
+
+
+def host_kind(url):
+    """'main' / 'dev' / 'other' for a report-page URL, by its host."""
+    try:
+        host = (urlsplit(url).hostname or "").lower()
+    except (ValueError, TypeError):
+        return HOST_OTHER
+    if host == TSMIS_HOST:
+        return HOST_MAIN
+    if host == TSMIS_DEV_HOST:
+        return HOST_DEV
+    return HOST_OTHER
+
+
+def host_kind_for(src, env):
+    """Which host an export of (src, env) would come from right now."""
+    return host_kind(combo_url(src, env))
 
 
 def expected_host():

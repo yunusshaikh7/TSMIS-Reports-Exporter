@@ -33,8 +33,8 @@ import consolidation_meta
 import matrix
 import report_catalog
 import output_state
-from paths import (comparisons_root, day_source_dir, list_output_days,
-                   parse_run_folder, today_str)
+from paths import (comparisons_root, day_run_label, day_source_dir,
+                   parse_run_folder, run_days_for, today_str)
 
 log = logging.getLogger("tsmis.pve_matrix")
 
@@ -93,16 +93,19 @@ def pve_root():
 
 
 def day_folder_name(date, source):
-    return f"{date} {source}"
+    """The run-folder name the (date, source) column reads, TSMIS site tag
+    included when the export recorded one (paths.day_run_label)."""
+    return day_run_label(date, source)
 
 
 def day_out_path(date, source, row_key):
     """The self-check VALUES workbook for one (day, family). The basename embeds the
     family + day + source (M1-C) so two days' self-checks of one family can be open
-    in Excel at once and a lifted file still says what it is."""
+    in Excel at once and a lifted file still says what it is — the day part is the
+    run folder's own name, TSMIS site tag included (v0.49.0)."""
     fam = row_key[:-4] if row_key.endswith("_pdf") else row_key
-    return (pve_root() / day_folder_name(date, source)
-            / f"{fam}_pdf_vs_excel {date} {source}.xlsx")
+    name = day_folder_name(date, source)
+    return pve_root() / name / f"{fam}_pdf_vs_excel {name}.xlsx"
 
 
 def _results_path():
@@ -189,7 +192,9 @@ _folder_newest_mtime = artifact_store.newest_report_file_mtime
 
 def tsmis_dir(date, source, subdir):
     """The per-route export folder (one edition) the cell reads, resolved to the REAL
-    run folder (CMP-AUD-092: a pre-v0.10 bare-date folder is found, not reconstructed)."""
+    run folder: the TSMIS site `source` points at now, else one from before the site
+    was recorded (CMP-AUD-092: a pre-v0.10 bare-date folder is found, not
+    reconstructed)."""
     return day_source_dir(date, source) / subdir
 
 
@@ -205,18 +210,14 @@ def _edition_subdirs():
 
 def available_days(source):
     """Dates (newest first) with an export for ANY edition of ANY family for
-    `source` — the add-day picker's options. TODAY is always offered (the export-
+    `source` from the TSMIS site it points at now (or from before the site was
+    recorded) — the add-day picker's options. TODAY is always offered (the export-
     less today renders every cell as needs-export)."""
     edition_subs = _edition_subdirs()
     out, seen = [today_str()], {today_str()}
-    for name in list_output_days():
-        parsed = parse_run_folder(name)
-        if not parsed:
+    for date, base in run_days_for(source):
+        if date in seen:
             continue
-        date, src, env = parsed
-        if f"{src}-{env}" != source or date in seen:
-            continue
-        base = day_source_dir(date, source)
         if any(_folder_newest_mtime(base / sub) is not None for sub in edition_subs):
             seen.add(date)
             out.append(date)
@@ -306,7 +307,8 @@ def pve_matrix_snapshot(source, days, hidden=None, dest=None, now=None,
 
     return {
         "source": source,
-        "sources": [{"key": k, "label": matrix.default_env_label(k)} for k in sources()],
+        "sources": matrix.day_source_options(sources()),
+        "day_hosts": matrix.day_hosts(source, days),
         "days": days,
         "today": today,
         "rows": [r[0] for r in rows],

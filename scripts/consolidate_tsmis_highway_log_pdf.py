@@ -446,7 +446,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     """Convert every TSMIS Highway Log PDF to a TSMIS-format per-route workbook,
     then combine them into one workbook (Route column added).
 
-    `day` picks which export run folder ("<YYYY-MM-DD> <src>-<env>") of
+    `day` picks which export run folder ("<YYYY-MM-DD> <src>-<env> <host>-site") of
     "Highway Log (PDF)" exports to read; None means the newest run folder, falling
     back to the legacy flat layout when no run folders exist yet — exactly like the
     Excel Highway Log consolidator.

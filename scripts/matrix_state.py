@@ -21,6 +21,8 @@ import report_catalog
 import report_library
 import reports
 from common import DATA_SOURCES, ENVIRONMENTS
+from paths import day_source_dir, run_folder_host
+from site_target import HOST_LABELS, host_kind_for
 
 log = logging.getLogger("tsmis.matrix")
 
@@ -64,6 +66,27 @@ def default_env_label(key):
     registry: 'ssor-prod' -> 'SSOR / Prod'."""
     src, _, env = str(key).partition("-")
     return f"{src.upper()} / {env.title()}" if env else str(key).upper()
+
+
+def day_source_options(keys):
+    """The by-day matrices' source picker: each env key labelled with the TSMIS
+    site it points at right now — the site whose exports the matrix reads
+    ('SSOR / Prod · dev site'). `host` rides along for the UI."""
+    out = []
+    for k in keys:
+        src, _, env = str(k).partition("-")
+        host = host_kind_for(src, env)
+        out.append({"key": k, "label": f"{default_env_label(k)} · {HOST_LABELS[host]}",
+                    "host": host})
+    return out
+
+
+def day_hosts(source, days):
+    """{date: host} for a by-day matrix's columns — the TSMIS site each day's run
+    folder records ('main' / 'dev' / 'other'), or None for an export from before
+    the site was recorded. A day with no export yet reads as the site its export
+    would come from."""
+    return {d: run_folder_host(day_source_dir(d, source).name) for d in days}
 
 
 def _row_defs():

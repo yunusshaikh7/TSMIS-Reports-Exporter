@@ -391,6 +391,7 @@ re-bless every deliberate fix) is owned by [comparison-engine.md](comparison-eng
 | Check | Locks |
 |---|---|
 | `check_a1_filenames.py` | A1 self-describing output filenames (`<date> <src>-<env>` stamping; env-tagged batch filenames) |
+| `check_run_folder_site.py` | v0.49.0 — run folders record the TSMIS site (`… dev-site` / `… main-site`): host classification, the name/parse round trip, the readers' precedence (own site > not recorded > bare date, never the other site), the matrices' pickers/labels/comparison names, a REAL `run_export` from the dev and then the main address (two folders, no cross-site resume, the run report's Site column), the compare side labels, and the evidence-path budget at the work-PC depth |
 | `check_a2_compare_filter.py` | A2 — the cross-env compare dropdowns only offer run folders that contain the chosen report |
 | `check_b1_pause.py` | B1 Pause/Resume (between-routes hold, works in fast mode) |
 | `check_b2_autoconsolidate.py` | B2 auto-consolidate on export finish |

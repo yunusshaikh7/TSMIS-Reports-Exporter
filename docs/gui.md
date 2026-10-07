@@ -379,6 +379,17 @@ the PDF-vs-Excel picker tags a family with both editions `HL` and a one-edition 
 `HL:xlsx` / `HL:pdf` (a cell it cannot build). One renderer, `mxDayOptionText`, serves the
 three pickers; an older bridge without the map falls back to the bare date.
 
+**Every day says which TSMIS site it came from** (v0.49.0, all four day matrices). Run
+folders record the site (`2026-10-07 ssor-prod dev-site`), and a day matrix reads the
+site its source points at now plus the days from before the site was recorded (see
+[architecture.md](architecture.md#run-folders-v0100-replaces-bare-dated-outputs-site-tag-v0490)).
+So the source picker labels each source with that site (`SSOR / Prod · dev site`,
+`matrix.day_source_options`), and the snapshot's `day_hosts` (date → `main` / `dev` /
+`other`, or null) puts the site under every day column header (`mxDaySiteTag`) and into
+every add-day option — `2026-10-07  ·  dev site  ·  HL HSL RD`, or
+`2026-10-02  ·  site not recorded  ·  RS` for a day exported before v0.49.0, which could
+be from either site. An older bridge without `day_hosts` shows neither.
+
 ### The Compare-tab "vs Baseline Matrix" (v0.26.0)
 
 A **third** matrix sub-tab under Compare (group id `baseline_by_day`, appended beside

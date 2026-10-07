@@ -60,9 +60,11 @@ The parallel engine substitutes its own `worker(idx)` for the `for route` loop b
 4. `src, env = get_site()` (`exporter.py:536`) snapshots the active data-source/environment **once, at run start**.
 5. Output directory (`exporter.py:539`):
    ```python
-   out_dir = Path(out_dir) if out_dir else output_run_dir(src, env) / spec.subdir
+   site_url = get_url()
+   out_dir = (Path(out_dir) if out_dir
+              else output_run_dir(src, env, host=host_kind(site_url)) / spec.subdir)
    ```
-   The default is the dated run folder `output/<YYYY-MM-DD src-env>/<spec.subdir>/`. The `out_dir` override is the B3 "always-current" batch destination — it writes straight into the caller's folder instead of a dated one (see [../architecture.md](../architecture.md) for the run-folder model).
+   The default is the dated run folder `output/<YYYY-MM-DD src-env host-site>/<spec.subdir>/` — the site tag (v0.49.0) read from the address captured once at run start, which also fills the run report's Site column. The `out_dir` override is the B3 "always-current" batch destination — it writes straight into the caller's folder instead of a dated one (see [../architecture.md](../architecture.md) for the run-folder model).
 6. `RunResult(output_dir=str(out_dir))` is created (`exporter.py:541`). Note this carries `output_dir` as a **string**, while `out_dir` stays a `Path` for filesystem ops.
 7. Two `log.info` blocks (`exporter.py:546-548`) pin the full run context (label, route count, dest, resolved URL, auth state, both ceilings) so one uploaded log answers "what ran against what with which settings" — the heavy-logging contract.
 

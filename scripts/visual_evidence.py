@@ -299,6 +299,16 @@ def availability():
             "env_rows": env_rows(), "deps_ok": _DEPS_OK}
 
 
+# The temporary folder images render into before the swap. It sits beside the
+# final image folder and holds every image while it renders, so it is the DEEPEST
+# path an evidence run writes. Named after the image folder, it put the
+# comparison's whole name in the path twice; a short fixed prefix (mkdtemp adds
+# the uniqueness; '.tmp-' keeps it an in-flight temp to artifact_store) keeps it
+# inside the work PC's 260-character limit now that run-folder names carry the
+# TSMIS site (v0.49.0). build/check_run_folder_site pins the budget.
+IMAGE_TMP_PREFIX = ".evidence.tmp-"
+
+
 def sibling_paths(comparison_path):
     """(workbook, image folder) next to a comparison workbook — the same
     naming family as its '(formulas).xlsx' sibling."""
@@ -1399,8 +1409,7 @@ def generate(row_key, consolidated, tsn_path, comparison_path, tsmis_pdf_dir,
         img_dir.parent.mkdir(parents=True, exist_ok=True)
         _require_output_guard(commit_guard, img_dir.parent,
                               "evidence output-folder creation")
-        tmp_dir = Path(tempfile.mkdtemp(
-            prefix=f".{img_dir.name}.tmp-", dir=img_dir.parent))
+        tmp_dir = Path(tempfile.mkdtemp(prefix=IMAGE_TMP_PREFIX, dir=img_dir.parent))
         tmp_dir_fs_identity = owned_dir.directory_identity(tmp_dir)
         if tmp_dir_fs_identity is None:
             raise owned_dir.OwnershipError(

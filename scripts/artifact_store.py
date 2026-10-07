@@ -1826,19 +1826,13 @@ def exported_subdirs_by_day(source, subdirs):
     same `newest_report_file_mtime` test the matrices' `available_days` use, so a
     day is offered exactly when it carries at least one tag.
 
-    Where one date has both a suffixed run folder and a pre-v0.10 bare-date
-    folder, the first folder (newest-first order) that holds an export answers
-    for the date, mirroring `available_days`."""
-    from paths import OUTPUT_ROOT, list_output_days, parse_run_folder  # leaf module
+    Each date answers from the ONE folder the matrix cells read for it
+    (paths.run_days_for / day_source_dir): the export from the TSMIS site
+    `source` points at now, else one from before the site was recorded (a
+    pre-v0.10 bare-date folder included) — never another site's export."""
+    from paths import run_days_for  # leaf module
     out = {}
-    for name in list_output_days():
-        parsed = parse_run_folder(name)
-        if not parsed:
-            continue
-        date, src, env = parsed
-        if f"{src}-{env}" != source or date in out:
-            continue
-        base = OUTPUT_ROOT / name
+    for date, base in run_days_for(source):
         present = [s for s in subdirs
                    if newest_report_file_mtime(base / s) is not None]
         if present:

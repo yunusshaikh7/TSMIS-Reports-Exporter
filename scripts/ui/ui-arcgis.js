@@ -533,6 +533,8 @@ async function renderArcgisMatrix() {
     const lab = document.createElement("div"); lab.className = "dnd-handle";
     lab.textContent = d;
     h.appendChild(lab);
+    const siteTag = mxDaySiteTag(d, snap);
+    if (siteTag) h.appendChild(siteTag);
     const btns = document.createElement("span"); btns.className = "mxch-btns";
     btns.append(
       mxHeadBtn("i-compare", `Rebuild every report for ${d} (vs the layer builds)`, "mxch-rebuild",

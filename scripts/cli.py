@@ -319,8 +319,9 @@ def _confirm_overwrite_console(path):
 def _resolve_day_console():
     """Pick which export run folder to consolidate.
 
-    Run folders are named "<YYYY-MM-DD> <src>-<env>" (legacy bare-date folders
-    read as ssor-prod). Honors TSMIS_DAY (a folder name, or a bare date — the
+    Run folders are named "<YYYY-MM-DD> <src>-<env> <host>-site" (v0.49.0; older
+    ones lack the site tag, and legacy bare-date folders read as ssor-prod).
+    Honors TSMIS_DAY (a folder name, or a bare date — the
     newest run folder of that date wins); otherwise prompts only when several
     run folders exist (Enter / EOF = newest). Returns the chosen folder name,
     or None when none exist yet (the consolidators then fall back to the

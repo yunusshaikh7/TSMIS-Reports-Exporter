@@ -242,7 +242,9 @@ def test_metadata_and_payload_boundaries() -> None:
 # `...\output\comparisons\tsn-by-day\<day>\` on the managed work PC install is 97
 # characters, and that machine has LongPathsEnabled=0 and cannot change it. Only
 # the LENGTH matters here; the two gates below must hold at exactly this depth.
-_FIELD_PARENT_LEN = 97
+# v0.49.0: the <day> folder name now ends with the TSMIS site the export came
+# from (' other-site' is the longest tag), so the parent is that much deeper.
+_FIELD_PARENT_LEN = 97 + len(" other-site")
 
 
 def test_field_depth_budget() -> None:

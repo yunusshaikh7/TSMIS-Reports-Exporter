@@ -18,12 +18,33 @@ const MX_HI = 50;   // >= this many discrepancies reads as "many" (red); tunable
 // export. An empty list says so in words; `today` (the vs-TSN / PDF-vs-Excel
 // matrices' always-offered exportable column) says "today" too.
 function mxDayOptionText(d, snap) {
+  const site = mxDaySite(d, snap);
+  const day = site ? `${d}  ·  ${site}` : d;
   const codes = ((snap && snap.available_day_reports) || {})[d];
-  if (!Array.isArray(codes)) return d;                 // an older bridge: date only
+  if (!Array.isArray(codes)) return day;               // an older bridge: no codes
   if (!codes.length) {
-    return `${d}  ·  ${snap && snap.today === d ? "today — nothing exported yet" : "nothing exported"}`;
+    return `${day}  ·  ${snap && snap.today === d ? "today — nothing exported yet" : "nothing exported"}`;
   }
-  return `${d}  ·  ${codes.join(" ")}`;
+  return `${day}  ·  ${codes.join(" ")}`;
+}
+
+// The TSMIS site each day's run folder records (`snap.day_hosts`: date -> "main" /
+// "dev" / "other", or null for an export from before the app recorded it — such a
+// day could be from either site, so it says so). Shown under every day column and
+// in the add-day pickers, so a dev-site day never passes for a main-site one.
+const MX_SITE_LABELS = { main: "main site", dev: "dev site", other: "other site" };
+function mxDaySite(d, snap) {
+  const hosts = snap && snap.day_hosts;
+  if (!hosts || !Object.prototype.hasOwnProperty.call(hosts, d)) return "";   // an older bridge
+  return MX_SITE_LABELS[hosts[d]] || "site not recorded";
+}
+function mxDaySiteTag(d, snap) {
+  const text = mxDaySite(d, snap);
+  if (!text) return null;
+  const tag = document.createElement("div");
+  tag.className = "mx-sub mx-daysite";
+  tag.textContent = text;
+  return tag;
 }
 
 function fmtDur(sec) {
@@ -1175,6 +1196,8 @@ async function renderDayMatrix() {
     const lab = document.createElement("div"); lab.className = "dnd-handle";
     lab.textContent = d;
     h.appendChild(lab);
+    const siteTag = mxDaySiteTag(d, snap);
+    if (siteTag) h.appendChild(siteTag);
     h.appendChild(dmConsolidatedBadge(d, dayCons[d] || { exists: false, fresh: false, actionable: false }));
     const btns = document.createElement("span"); btns.className = "mxch-btns";
     // Export is offered ONLY for today's column — past days are the immutable
@@ -1566,6 +1589,8 @@ async function renderBaselineMatrix() {
     const lab = document.createElement("div"); lab.className = "dnd-handle";
     lab.textContent = d + (d === bl.date ? " (baseline)" : "");
     h.appendChild(lab);
+    const siteTag = mxDaySiteTag(d, snap);
+    if (siteTag) h.appendChild(siteTag);
     const btns = document.createElement("span"); btns.className = "mxch-btns";
     if (d !== bl.date) {
       btns.appendChild(
@@ -1836,6 +1861,8 @@ async function renderPveMatrix() {
     const lab = document.createElement("div"); lab.className = "dnd-handle";
     lab.textContent = d;
     h.appendChild(lab);
+    const siteTag = mxDaySiteTag(d, snap);
+    if (siteTag) h.appendChild(siteTag);
     const btns = document.createElement("span"); btns.className = "mxch-btns";
     btns.append(
       mxHeadBtn("i-compare", `Rebuild every report for ${d} (PDF vs Excel)`, "mxch-rebuild",

@@ -32,7 +32,8 @@ from pathlib import Path
 from urllib.parse import urljoin, urlsplit
 
 from events import ConsolidateResult, Events
-from paths import OUTPUT_ROOT, today_str
+from paths import OUTPUT_ROOT, run_folder_name, today_str
+from site_target import HOST_LABELS, host_kind
 
 log = logging.getLogger("tsmis.site_capture")
 
@@ -319,8 +320,11 @@ def capture(events=None, confirm_overwrite=None, day=None):
 
     src, env = get_site()
     stamp = time.strftime("%H%M%S")
-    out_dir = capture_root() / f"{today_str()} {src}-{env} {stamp}"
     url = get_url()
+    # Named like an export run folder (site tag included, v0.49.0) so a dev-site
+    # capture and a main-site capture are told apart at a glance.
+    out_dir = capture_root() / (
+        f"{run_folder_name(src, env, today_str(), host_kind(url))} {stamp}")
 
     events.on_log("=" * 60)
     events.on_log(f"Website source capture — {src.upper()}-{env.upper()}")
@@ -390,7 +394,7 @@ def _write_manifest(out_dir, url, src, env, saved, failed, note=None,
     lines = [
         "TSMIS website source capture",
         f"Captured: {time.strftime('%Y-%m-%d %H:%M:%S')}",
-        f"Site: {src}-{env}",
+        f"Site: {src}-{env} on the {HOST_LABELS[host_kind(url)]}",
         f"Page: {url}",
         f"Site build (BUILD_DATE): {build_date or 'not found'}",
     ]

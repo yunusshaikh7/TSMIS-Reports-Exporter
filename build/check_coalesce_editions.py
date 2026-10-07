@@ -226,7 +226,16 @@ def test_combined_output_dirs():
     pdf = _spec("highway_log_pdf", save_highway_log_pdf)
     with temp_dir("tsmis_coal3_") as tmp:
         run_root = Path(tmp) / "2026-07-09 ssor-prod"
-        with patch(exporter, "output_run_dir", lambda s, e: run_root):
+        hosts = []
+
+        def fake_run_dir(_s, _e, host=None):
+            hosts.append(host)
+            return run_root
+
+        with patch(exporter, "output_run_dir", fake_run_dir):
+            c.check("the run's site reaches the dated folder (v0.49.0 site tag)",
+                    exporter._combined_output_dirs([excel], None, "ssor", "prod", "dev")
+                    == [run_root / "highway_log"] and hosts == ["dev"], f"hosts={hosts}")
             # THE crash: every normal (non-store) coalesced export passes
             # out_dirs=[None, None] (run_dirs from _prep_edition with no store
             # base). Each None must resolve to that spec's dated run folder —

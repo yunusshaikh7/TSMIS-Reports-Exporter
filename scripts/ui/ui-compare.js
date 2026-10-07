@@ -260,9 +260,9 @@ async function renderCompareDirs() {
   }
   if (key !== compareChoice()) return;          // recipe changed under us (belt + suspenders)
   compareDirsLoading = false;
-  // sensible defaults: baseline = newest ssor-prod run, other side = the
-  // newest folder that differs from the baseline
-  const baseline = days.find((d) => /ssor-prod$/.test(d)) || days[0] || "";
+  // sensible defaults: baseline = newest ssor-prod run (any TSMIS site tag),
+  // other side = the newest folder that differs from the baseline
+  const baseline = days.find((d) => / ssor-prod(?: [a-z]+-site)?$/.test(d)) || days[0] || "";
   fillCompareDirSelect($("cmpDirA"), CMP_DIRS.a, baseline, days);
   const other = days.find((d) => d !== $("cmpDirA").value) || days[0] || "";
   fillCompareDirSelect($("cmpDirB"), CMP_DIRS.b, other, days);

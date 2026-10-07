@@ -206,19 +206,31 @@ A multi-report run runs each selected `ReportSpec` in turn through the same engi
 (so at most `workers` browsers are ever open at once), each spec with its own
 browser, preflight, and run-report CSV.
 
-## Run folders (v0.10.0; replaces bare dated outputs)
+## Run folders (v0.10.0; replaces bare dated outputs; site tag v0.49.0)
 
-Every run writes into `output/<YYYY-MM-DD src-env>/<report>/`
-(`paths.output_run_dir`; src/env from `common.get_site()` at run start). Each day's
-exports live in their own folder AND different source/environment combinations never
-mix — the folder name says exactly what's inside, which the cross-environment
-comparison keys on (e.g. `2026-06-11 ssor-prod`).
+Every run writes into `output/<YYYY-MM-DD src-env host-site>/<report>/`
+(`paths.output_run_dir`; src/env from `common.get_site()` at run start, the host
+from the address the run opens). Each day's exports live in their own folder,
+different source/environment combinations never mix, AND an export from the **dev
+site** never lands in the same folder as one from the **main site** — the folder
+name says exactly what's inside, which every comparison keys on (e.g.
+`2026-10-07 ssor-prod dev-site`). Reports wait on the dev site
+(`tsmis-dev.dot.ca.gov`) until they are approved and move to the main site
+(`tsmis.dot.ca.gov`), so the same source and environment can be exported from
+either, and the two are different evidence. The tag is `main-site` / `dev-site` /
+`other-site` (`site_target.host_kind`: a Settings custom address on any other host
+reads as `other`; its exact address is in the run report's Site column and the
+log). A `<date> <src>-<env>` folder from v0.10–v0.48 never recorded its site and
+reads as **site not recorded**.
 
 | Helper (`scripts/paths.py`) | Purpose |
 |---|---|
-| `run_folder_name(src, env, day=None)` | The run-folder name; `day=None` = today. |
-| `output_run_dir(src, env, day=None)` | `output/<day src-env>/`. |
-| `parse_run_folder(name)` | `(date, src, env)` or None. Legacy bare-date folders (pre-v0.10) read as the old defaults **ssor-prod** (regex `_RUN_RE` makes the ` <src>-<env>` suffix optional). |
+| `run_folder_name(src, env, day=None, host=None)` | The run-folder name; `day=None` = today; `host` adds the site tag (None = the untagged pre-v0.49 spelling readers still look for). |
+| `output_run_dir(src, env, day=None, host=None)` | `output/<day src-env host-site>/` — where an export writes; `host=None` = the host (src, env) points at right now (`site_target.host_kind_for`). |
+| `parse_run_folder(name)` | `(date, src, env)` or None. Legacy bare-date folders (pre-v0.10) read as the old defaults **ssor-prod** (regex `_RUN_RE` makes the ` <src>-<env>` suffix, and the ` <host>-site` tag after it, optional). |
+| `run_folder_host(name)` | `'main'` / `'dev'` / `'other'` from the tag, or None (site not recorded / not a run folder). |
+| `day_source_dir(date, source, host=None)` | The folder a matrix column reads: that host's own folder, else the unrecorded `<date> <source>` one, else the pre-v0.10 bare date — **never another site's**. |
+| `day_run_label(date, source, host=None)` / `run_days_for(source, host=None)` | The name that folder carries (what the matrices' comparison files and cache records are named after) / every day a source has such a folder, newest first (the matrices' day pickers). |
 | `list_output_days()` | Existing run/legacy folders, newest first. |
 | `latest_output_day()` | Newest run-folder name, or None. |
 | `list_output_days_for_report(subdir)` | Run folders that actually contain non-empty `<subdir>/` files — the A2 cross-env compare-folder filter. |
@@ -232,6 +244,19 @@ exist, consolidators fall back to the legacy flat `output/<report>/` layout, so
 pre-0.7 exports stay consolidatable. Resume/idempotency, the integrity gate, and
 live browser status are runtime behavior — see
 [engine-and-reliability.md](engine-and-reliability.md).
+
+**Which site the matrices read (v0.49.0).** The by-day matrices (vs TSN, vs
+Baseline, PDF vs Excel, Reports vs ArcGIS) keep their `(source, date)` columns and
+read, for each, the folder `day_source_dir` picks for the site the source points at
+**now** — the same site the matrix's own today-column export writes to — plus the
+folders from before the site was recorded, which could be from either site. A
+dev-site day and a main-site day therefore never share a comparison file or a cache
+record (their names follow the folder: `ramp_detail_vs_tsn 2026-10-07 ssor-prod
+dev-site.xlsx`), each source in the pickers is labelled with its site
+(`SSOR / Prod · dev site`), and every day column says which site its export
+records (or "site not recorded"). Another site's days appear after switching the
+site in Settings; a dev-vs-main comparison of one report is the Compare tab's
+folders mode, whose side labels then read `SSOR-PROD DEV` / `SSOR-PROD MAIN`.
 
 Artifact directories expose deliverables at their top level and group durable
 machine state under one `_state/` child. Outcome/provenance sidecars, compressed
@@ -297,7 +322,7 @@ set — browser-channel detail is owned by
 [build-and-release.md](build-and-release.md).
 
 Two output-filename helpers: `stamped_consolidated_filename(filename, day)` (A1 —
-stamps `<date> <src>-<env>` provenance into a consolidated workbook's name; returns
+stamps the run folder's `<date> <src>-<env> <host>-site` provenance into a consolidated workbook's name; returns
 unchanged for None / legacy-flat `day`) and `env_tagged_filename(filename, tag)`
 (Export-Everything — FRONT-stamps the `<src-env>` subfolder name; FRONT on purpose
 so the consolidators' `*.xlsx`/`*.pdf` glob + end-anchored `_route_(\w+)\.xlsx$`
@@ -346,7 +371,7 @@ the "what is it and where does it plug in" map.
 
 | Feature | What it is | Where it plugs in |
 |---|---|---|
-| **A1 self-describing filenames** | Consolidated workbooks stamp the run's `<date> <src>-<env>` into the filename; both comparison families append a generated-on date in `suggest_name`. TSN Highway Log exempt (no src/env, undated input); legacy flat layout keeps its fixed name. `compare_core/_SCHEMA` text untouched (regression-locked). | `paths.stamped_consolidated_filename` via every `consolidate_*.out_path_for`. Lock: `build/check_a1_filenames.py`. |
+| **A1 self-describing filenames** | Consolidated workbooks stamp the run folder's name (`<date> <src>-<env> <host>-site` since v0.49.0) into the filename; both comparison families append a generated-on date in `suggest_name`. TSN Highway Log exempt (no src/env, undated input); legacy flat layout keeps its fixed name. `compare_core/_SCHEMA` text untouched (regression-locked). | `paths.stamped_consolidated_filename` via every `consolidate_*.out_path_for`. Lock: `build/check_a1_filenames.py`. |
 | **A2 compare-folder filter** | Cross-env compare folder dropdowns list only runs that actually contain the chosen report (server-side; Browse paths skip the filter). | `paths.list_output_days_for_report` + `GuiApi.get_compare_folders`; `start_compare_env` preflights it. Lock: `build/check_a2_compare_filter.py`. |
 | **B1 Pause/Resume** | Holds BETWEEN routes (never inside a thread-affine Playwright wait), in both sequential and parallel engines — so it WORKS in fast mode (all workers park), unlike Skip. | `Events.is_paused` (8th callback) + shared `exporter._wait_while_paused`; `GuiApi.pause_or_resume` toggles `pause_event`, cleared on cancel and at end-of-task. Lock: `build/check_b1_pause.py`. |
 | **B2 auto-consolidate** | One Export-tab toggle; `ExportWorker` runs the matching consolidator INLINE after each spec's export (reuses the held task slot + same Events sink). The two PDF editions (Highway Log (PDF) + Intersection Detail (PDF)) have no inline auto-consolidator → skipped (they need a scratch convert dir, so the matrix / auto-consolidate handles them specially; every other report, incl. both Intersection **Excel** reports, consolidates inline as of v0.17.0); failures logged, never fatal. | `reports.consolidator_for_spec` maps export→consolidate by subdir. Lock: `build/check_b2_autoconsolidate.py`. |

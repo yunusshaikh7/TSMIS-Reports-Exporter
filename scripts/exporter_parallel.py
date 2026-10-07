@@ -75,7 +75,8 @@ from exporter import (
 )
 from pathlib import Path
 from paths import output_run_dir, resolve_route_file
-from run_report import auto_report_path, write_run_report
+from run_report import auto_report_path, report_site_tag, write_run_report
+from site_target import host_kind
 
 log = logging.getLogger("tsmis.export.parallel")
 
@@ -260,7 +261,9 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
     retry_timeout_ms = retry_timeout_ms or retry_report_timeout_ms()
 
     src, env = get_site()
-    out_dir = Path(out_dir) if out_dir else output_run_dir(src, env) / spec.subdir   # default: env-labeled run folder
+    site_url = get_url()         # captured once: folder host tag + run report agree
+    out_dir = (Path(out_dir) if out_dir      # default: the env- and site-labeled run folder
+               else output_run_dir(src, env, host=host_kind(site_url)) / spec.subdir)
     _require_safe_destination(events, out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     _require_safe_destination(events, out_dir)
@@ -270,7 +273,7 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
     log.info("parallel export start: %s (%d routes, %d workers) -> %s",
              spec.label, total, n, out_dir)
     log.info("parallel export config: site=%s auth_file=%s timeout=%ds retry_timeout=%ds",
-             get_url(), has_valid_auth(), timeout_ms // 1000, retry_timeout_ms // 1000)
+             site_url, has_valid_auth(), timeout_ms // 1000, retry_timeout_ms // 1000)
     events.on_log(f"Fast mode (experimental): {n} browsers in parallel, {total} routes.")
     if has_valid_auth():
         # Field failure: managed Edge timed out N concurrent saved-session
@@ -410,7 +413,9 @@ def run_export_parallel(spec, events=None, *, workers=None, routes=ROUTES,
     if result.per_route:
         try:
             report_path = write_run_report(
-                result, spec.label, auto_report_path(spec.subdir, f"{src}-{env}"))
+                result, spec.label,
+                auto_report_path(spec.subdir, report_site_tag(src, env, site_url)),
+                site_url=site_url)
             result.report_path = str(report_path)
             events.on_log(f"Run report saved: {report_path}")
             log.info("run report saved: %s", report_path)
@@ -511,9 +516,10 @@ def run_export_parallel_combined(specs, events=None, *, workers=None, routes=ROU
     timeout_ms = timeout_ms or fast_report_timeout_ms()
     retry_timeout_ms = retry_timeout_ms or retry_report_timeout_ms()
     src, env = get_site()
+    site_url = get_url()         # captured once: folder host tag + run reports agree
     save_order = sorted(range(len(specs)), key=lambda i: _save_rebuilds_page(specs[i]))
     dirs, results = [], []
-    for d in _combined_output_dirs(specs, out_dirs, src, env):
+    for d in _combined_output_dirs(specs, out_dirs, src, env, host_kind(site_url)):
         _require_safe_destination(events, d)
         d.mkdir(parents=True, exist_ok=True)
         _require_safe_destination(events, d)
@@ -526,7 +532,7 @@ def run_export_parallel_combined(specs, events=None, *, workers=None, routes=ROU
     log.info("parallel combined export start: %s [%s] (%d routes, %d workers)",
              base.label, subdirs, total, n)
     log.info("parallel combined export config: site=%s auth_file=%s timeout=%ds "
-             "retry_timeout=%ds", get_url(), has_valid_auth(),
+             "retry_timeout=%ds", site_url, has_valid_auth(),
              timeout_ms // 1000, retry_timeout_ms // 1000)
     events.on_log(f"Fast mode (experimental): {n} browsers in parallel, "
                   f"{total} routes — {len(specs)} editions saved per route.")
@@ -672,7 +678,9 @@ def run_export_parallel_combined(specs, events=None, *, workers=None, routes=ROU
         if result.per_route:
             try:
                 report_path = write_run_report(
-                    result, spec.label, auto_report_path(spec.subdir, f"{src}-{env}"))
+                    result, spec.label,
+                    auto_report_path(spec.subdir, report_site_tag(src, env, site_url)),
+                    site_url=site_url)
                 result.report_path = str(report_path)
             except Exception as e:
                 log.warning("could not write run report for %s: %s", spec.subdir, e)

@@ -1385,6 +1385,7 @@ class GuiMatrixMixin:
         snap = self._day_matrix_snapshot()
         snap["available_days"] = day_matrix.available_days(snap["source"])
         snap["available_day_reports"] = day_matrix.available_day_reports(snap["source"])
+        snap["day_hosts"].update(matrix.day_hosts(snap["source"], snap["available_days"]))
         self._push_state()
         return snap
 
@@ -1690,6 +1691,7 @@ class GuiMatrixMixin:
         snap["available_days"] = pdf_excel_matrix.available_days(snap["source"])
         snap["available_day_reports"] = pdf_excel_matrix.available_day_reports(
             snap["source"])
+        snap["day_hosts"].update(matrix.day_hosts(snap["source"], snap["available_days"]))
         self._push_state()
         return snap
 
@@ -1880,6 +1882,7 @@ class GuiMatrixMixin:
         snap["available_days"] = baseline_matrix.available_days(snap["source"])
         snap["available_day_reports"] = baseline_matrix.available_day_reports(
             snap["source"])
+        snap["day_hosts"].update(matrix.day_hosts(snap["source"], snap["available_days"]))
         snap["baseline_options"] = baseline_matrix.baseline_options(
             snap["source"], settings.get_batch_dest())
         self._push_state()
