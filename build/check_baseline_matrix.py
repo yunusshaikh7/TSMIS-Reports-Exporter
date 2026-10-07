@@ -103,9 +103,12 @@ def main():
         check("tokens are filename-safe",
               baseline_matrix.baseline_token("store") == "store"
               and baseline_matrix.baseline_token("day:2026-06-11") == "2026-06-11")
+        # No export planted yet: a day resolves to the canonical target its next
+        # export would create — the main site's tagged folder, since the sandboxed
+        # config carries no custom (dev-site) addresses (v0.49.0).
         check("baseline dirs resolve (day -> run folder, store -> dest/<source>)",
               baseline_matrix.baseline_dir("ssor-prod", "day:2026-06-11", str(dest))
-              == out / "2026-06-11 ssor-prod"
+              == out / "2026-06-11 ssor-prod main-site"
               and baseline_matrix.baseline_dir("ssor-prod", "store", str(dest))
               == dest / "ssor-prod")
         check("labels distinct per kind",
@@ -122,6 +125,9 @@ def main():
         _rd_route_file(dest / "ssor-prod" / "ramp_detail"
                        / "tsar_ramp_detail_route_101.xlsx", "RAMP A NEW")
         _touch(out / "2026-06-18 ssor-prod" / "highway_log" / "r1.xlsx")
+        check("a planted pre-v0.49 day (site not recorded) is the folder the day reads",
+              baseline_matrix.baseline_dir("ssor-prod", "day:2026-06-11", str(dest))
+              == out / "2026-06-11 ssor-prod")
 
         print("available days + baseline options:")
         check("days scoped to the source, newest first",

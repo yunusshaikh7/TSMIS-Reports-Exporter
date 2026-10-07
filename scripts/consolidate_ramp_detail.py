@@ -108,7 +108,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
                 input_dir=None, out_path=None, commit_guard=None):
     """Combine every per-route Ramp Detail XLSX into one workbook.
 
-    `day` picks which export run folder ("<YYYY-MM-DD> <src>-<env>") to read; None means
+    `day` picks which export run folder ("<YYYY-MM-DD> <src>-<env> <host>-site") to read; None means
     the newest run folder, falling back to the legacy flat layout when no run
     folders exist yet."""
     day = day or latest_output_day()

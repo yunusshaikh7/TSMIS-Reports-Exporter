@@ -79,7 +79,7 @@ def _member_census(files):
 from comparison_contract import (ComparisonCounts, ComparisonOutcome, LoadedSide,
                                  comparison_result_boundary)
 from events import ConsolidateResult, Events
-from paths import OUTPUT_ROOT, parse_run_folder, today_str
+from paths import OUTPUT_ROOT, parse_run_folder, run_folder_host, today_str
 
 log = logging.getLogger("tsmis.compare")
 
@@ -116,13 +116,14 @@ _SIDE_LABEL_CAP = 31 - len("Only in ")          # = 23
 def _cap_label(s, limit=_SIDE_LABEL_CAP):
     """Cap a derived side label to `limit` chars WITHOUT dropping its trailing
     distinguisher. The labels built below end in the part that keeps two
-    same-source sides apart -- a run date (" 2026-06-11") or an " (A)"/" (B)"
-    suffix. A plain end-truncation (s[:limit]) would cut exactly that, collapsing
-    two distinct sides into the same prefix (then the A/B fallback fires and the
-    real provenance is lost). Trim the BASE and keep the suffix instead."""
+    same-source sides apart -- a run date (" 2026-06-11"), the TSMIS site
+    (" DEV" / " MAIN" / " OTHER") or an " (A)"/" (B)" suffix. A plain
+    end-truncation (s[:limit]) would cut exactly that, collapsing two distinct
+    sides into the same prefix (then the A/B fallback fires and the real
+    provenance is lost). Trim the BASE and keep the suffix instead."""
     if len(s) <= limit:
         return s
-    m = re.search(r"(?: \d{4}-\d{2}-\d{2}| \([AB]\))$", s)
+    m = re.search(r"(?: \d{4}-\d{2}-\d{2}| \([AB]\)| (?:DEV|MAIN|OTHER))$", s)
     if not m:
         return s[:limit]
     suffix = m.group(0)
@@ -130,11 +131,27 @@ def _cap_label(s, limit=_SIDE_LABEL_CAP):
     return (s[:m.start()][:keep] + suffix)[:limit]
 
 
+def _run_folder_of(folder):
+    """The run-folder NAME a picked folder belongs to (the folder itself, or its
+    parent when a report subdir was picked), or None."""
+    folder = Path(folder)
+    for name in (folder.name, folder.parent.name):
+        if parse_run_folder(name):
+            return name
+    return None
+
+
 def _side_labels(dir_a, dir_b):
-    """Distinct side names for the two folders. Same src-env on both sides
-    (e.g. prod today vs prod last month) gets the run date appended; still
-    identical falls back to A/B suffixes (sheet names must differ)."""
+    """Distinct side names for the two folders. Same src-env on both sides gets
+    what tells them apart appended: the TSMIS site when both run folders record
+    a DIFFERENT one (a dev-site export vs the main site's — the approval check),
+    else the run date (prod today vs prod last month); still identical falls
+    back to A/B suffixes (sheet names must differ)."""
     la, lb = side_label(dir_a), side_label(dir_b)
+    if la == lb:
+        hosts = [run_folder_host(_run_folder_of(d) or "") for d in (dir_a, dir_b)]
+        if None not in hosts and hosts[0] != hosts[1]:
+            la, lb = (f"{la} {hosts[0].upper()}", f"{lb} {hosts[1].upper()}")
     if la == lb:
         for folder, label in ((dir_a, la), (dir_b, lb)):
             parsed = parse_run_folder(Path(folder).name) \

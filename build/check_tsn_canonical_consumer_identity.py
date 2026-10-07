@@ -513,7 +513,9 @@ def test_both_evidence_entry_points():
               and everything_calls[0].get("expected_generation_id") == "g1"
               and callable(everything_calls[0].get("source_identity_check")))
 
-        day_key = "2026-07-12 ssor-prod|highway_log_pdf"
+        # The cache key is the day's run-folder NAME, which carries the TSMIS site
+        # since v0.49.0 — derive it the way the matrix does, never spell it.
+        day_key = f"{day_matrix.day_folder_name('2026-07-12', 'ssor-prod')}|highway_log_pdf"
         with patch(matrix, "tsn_source", lambda *_a, **_k: source), \
                 patch(day_matrix, "load_results", lambda: {day_key: wrong}), \
                 patch(matrix, "run_evidence_only", day_run):

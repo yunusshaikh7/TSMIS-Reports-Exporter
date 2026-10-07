@@ -478,6 +478,23 @@ function makeMockApi() {
     "ars-prod": ["2026-06-17", "2026-06-11"],
     "ssor-test": ["2026-06-16"], "ssor-dev": [], "ars-test": [], "ars-dev": [],
   };
+  // v0.49.0: which TSMIS site each day's run folder records. The preview is
+  // pointed at the dev site, so today and the newest pulls are dev-site exports;
+  // the older days predate the app recording the site (null = "site not
+  // recorded"), exactly what a real upgrade looks like.
+  const MOCK_SITE = "dev";
+  function mockDayHosts(...dayLists) {
+    const out = {};
+    [MOCK_TODAY, ...dayLists.flat()].forEach((d) => { out[d] = d >= "2026-06-17" ? MOCK_SITE : null; });
+    return out;
+  }
+  function mockSourceOptions() {
+    return ["ssor-prod", "ssor-test", "ssor-dev", "ars-prod", "ars-test", "ars-dev"].map((k) => {
+      const [s, v] = k.split("-");
+      return { key: k, host: MOCK_SITE,
+               label: `${s.toUpperCase()} / ${v[0].toUpperCase()}${v.slice(1)} · dev site` };
+    });
+  }
   // Per day, WHICH reports are actually exported (the catalog's short codes, in
   // row order) — the add-day pickers' per-option tags. A partial day is the
   // realistic case (one report pulled that day), which is why the tags exist.
@@ -584,9 +601,8 @@ function makeMockApi() {
           age_seconds: present ? (i + 1) * 86400 : null }, cmp };
       });
     });
-    return { source, sources: ["ssor-prod", "ssor-test", "ssor-dev", "ars-prod", "ars-test", "ars-dev"]
-               .map((k) => { const [s, v] = k.split("-");
-                 return { key: k, label: `${s.toUpperCase()} / ${v[0].toUpperCase()}${v.slice(1)}` }; }),
+    return { source, sources: mockSourceOptions(),
+             day_hosts: mockDayHosts(days, MOCK_DAY_AVAIL[source] || []),
              days, today: MOCK_TODAY, rows: shown.map((r) => r.key), row_labels: rowLabels,
              row_supported: rowSupported, all_rows: allRows, hidden,
              tsn_meta: tsnMeta, cells,
@@ -644,9 +660,8 @@ function makeMockApi() {
       });
     });
     return { source,
-             sources: ["ssor-prod", "ssor-test", "ssor-dev", "ars-prod", "ars-test", "ars-dev"]
-               .map((k) => { const [s, v] = k.split("-");
-                 return { key: k, label: `${s.toUpperCase()} / ${v[0].toUpperCase()}${v.slice(1)}` }; }),
+             sources: mockSourceOptions(),
+             day_hosts: mockDayHosts(days, MOCK_DAY_AVAIL[source] || []),
              days,
              baseline: { id: blId || null, kind: blId === "store" ? "store" : blDate ? "day" : null,
                          date: blDate,
@@ -703,9 +718,8 @@ function makeMockApi() {
       });
     });
     return { source,
-             sources: ["ssor-prod", "ssor-test", "ssor-dev", "ars-prod", "ars-test", "ars-dev"]
-               .map((k) => { const [s, v] = k.split("-");
-                 return { key: k, label: `${s.toUpperCase()} / ${v[0].toUpperCase()}${v.slice(1)}` }; }),
+             sources: mockSourceOptions(),
+             day_hosts: mockDayHosts(days, MOCK_DAY_AVAIL[source] || []),
              days, today: MOCK_TODAY,
              rows: shown.map((r) => r.key), row_labels: rowLabels,
              row_supported: rowSupported, all_rows: MOCK_PVE_ROWS, hidden, cells,
@@ -998,9 +1012,8 @@ function makeMockApi() {
       });
     });
     return { source,
-             sources: ["ssor-prod", "ssor-test", "ssor-dev", "ars-prod", "ars-test", "ars-dev"]
-               .map((k) => { const [s, v] = k.split("-");
-                 return { key: k, label: `${s.toUpperCase()} / ${v[0].toUpperCase()}${v.slice(1)}` }; }),
+             sources: mockSourceOptions(),
+             day_hosts: mockDayHosts(days, MOCK_DAY_AVAIL[source] || []),
              days, today: MOCK_TODAY,
              rows: shown.map((r) => r.key), row_labels: rowLabels,
              row_supported: rowSupported, row_family: rowFamily, all_rows: MOCK_AG_ROWS, hidden, cells,

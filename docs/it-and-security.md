@@ -333,7 +333,8 @@ These controls have current executable checks; re-audit them when their boundari
   plus every relative file name found in the page and inside each fetched file,
   followed to a fixpoint (the `document.write`'d report modules, `config.js`,
   `debug.js`, images, referenced notes) — into `output/site-capture/<date src-env
-  HHMMSS>/` under the files' own site names, with a manifest (BUILD_DATE, CONFIG
+  host-site HHMMSS>/` (the dev or main site, v0.49.0) under the files' own site names,
+  with a manifest (BUILD_DATE, CONFIG
   env/src, a SHA-256 per file, the third-party URLs it saw), so the folder is
   handed over as-is. It deliberately writes NO archive: `evidence.py` is the one
   module in the app that builds a zip (`check_evidence_bundle` pins that), and an

@@ -21,6 +21,8 @@ import sys
 from datetime import date
 from pathlib import Path
 
+from site_target import HOST_KINDS, host_kind_for
+
 APP_NAME = "TSMIS Exporter"
 
 
@@ -115,15 +117,21 @@ TSN_LIBRARY_ROOT = DATA_ROOT / "tsn_library"
 # See scripts/arcgis_layers.py.
 ARCGIS_LAYERS_ROOT = DATA_ROOT / "arcgis_layers"
 
-# Exports are grouped into RUN FOLDERS: output/<YYYY-MM-DD src-env>/<report>/
-# (e.g. "2026-06-11 ssor-prod"), so a new day's run never resumes over (or
-# mixes with) yesterday's files AND different data source / environment
-# combinations never overwrite each other — the folder name says exactly what
-# is inside, which the cross-environment comparison relies on. Folders from
-# before v0.10 are bare dates ("2026-06-11"); those always meant the defaults,
-# so they read as ssor-prod. The consolidators take the run-folder NAME as
-# their `day` argument (an opaque string to them; newest by default).
-_RUN_RE = re.compile(r"(\d{4}-\d{2}-\d{2})(?: (\w+)-(\w+))?$")
+# Exports are grouped into RUN FOLDERS: output/<YYYY-MM-DD src-env host-site>/
+# <report>/ (e.g. "2026-10-07 ssor-prod dev-site"), so a new day's run never
+# resumes over (or mixes with) yesterday's files, different data source /
+# environment combinations never overwrite each other, AND an export from the
+# dev site never lands in the same folder as one from the main site — the folder
+# name says exactly what is inside, which every comparison relies on. The host
+# tag ("main-site" / "dev-site" / "other-site", site_target.host_kind) arrived
+# in v0.49.0: a "<date> <src>-<env>" folder from v0.10–v0.48 never said which
+# site it came from (it reads as "site not recorded"), and folders from before
+# v0.10 are bare dates ("2026-06-11") that always meant the defaults, so they
+# read as ssor-prod. The consolidators take the run-folder NAME as their `day`
+# argument (an opaque string to them; newest by default).
+_HOST_SUFFIX = "-site"
+_RUN_RE = re.compile(r"(\d{4}-\d{2}-\d{2})(?: (\w+)-(\w+)(?: ("
+                     + "|".join(HOST_KINDS) + r")" + _HOST_SUFFIX + r")?)?$")
 
 
 def today_str():
@@ -148,47 +156,120 @@ def valid_calendar_date(s):
 _LEGACY_DEFAULT_SOURCE = "ssor-prod"
 
 
-def run_folder_name(src, env, day=None):
-    """The run-folder name for one (data source, environment) on one day."""
-    return f"{day or today_str()} {src}-{env}"
+def run_folder_name(src, env, day=None, host=None):
+    """The run-folder name for one (data source, environment) on one day, tagged
+    with the TSMIS host the export came from: '2026-10-07 ssor-prod dev-site'.
+    `host` is a site_target host kind ('main' / 'dev' / 'other'); None spells the
+    untagged v0.10–v0.48 name, which only readers still look for."""
+    name = f"{day or today_str()} {src}-{env}"
+    return f"{name} {host}{_HOST_SUFFIX}" if host else name
 
 
-def day_source_dir(date_token, source):
-    """The ACTUAL on-disk export run folder for (date, source), resolving the
-    pre-v0.10 LEGACY bare-date layout instead of blindly reconstructing a label.
-    CMP-AUD-092: current exports are '<date> <src>-<env>'; a pre-v0.10 export is a
-    bare '<date>' that meant the ssor-prod defaults, so reconstructing
-    '<date> ssor-prod' pointed at a folder that never existed (the day read 0/N
-    present). Prefer the suffixed folder; fall back to the bare-date folder only
-    when it exists AND `source` is that legacy default. Deterministic when both
-    exist (suffixed wins), so a real — always suffixed — export is never
-    mis-resolved."""
-    suffixed = OUTPUT_ROOT / f"{date_token} {source}"
-    if suffixed.is_dir():
-        return suffixed
+def _source_host(source):
+    """The host a 'src-env' source key points at right now."""
+    src, _, env = str(source).partition("-")
+    return host_kind_for(src, env)
+
+
+def day_source_dir(date_token, source, host=None):
+    """The ACTUAL on-disk export run folder for (date, source) as seen from `host`
+    (None = the host `source` points at right now — the one its next export
+    writes into), resolving the older layouts instead of blindly reconstructing a
+    name. Precedence, deterministic when several exist:
+
+      1. '<date> <source> <host>-site' — that host's own export (v0.49.0+);
+      2. '<date> <source>' — a v0.10–v0.48 export, whose host was never recorded;
+      3. '<date>' — a pre-v0.10 bare-date export, which meant the ssor-prod
+         defaults (CMP-AUD-092: reconstructing '<date> ssor-prod' pointed at a
+         folder that never existed, so the day read 0/N present).
+
+    A folder tagged with ANOTHER host is never returned: a dev-site export is not
+    the main site's and must never be read as it. Absent everywhere -> (1), the
+    canonical target (reads as missing until an export creates it)."""
+    host = host or _source_host(source)
+    tagged = OUTPUT_ROOT / f"{date_token} {source} {host}{_HOST_SUFFIX}"
+    if tagged.is_dir():
+        return tagged
+    untagged = OUTPUT_ROOT / f"{date_token} {source}"
+    if untagged.is_dir():
+        return untagged
     if source == _LEGACY_DEFAULT_SOURCE and valid_calendar_date(date_token):
         bare = OUTPUT_ROOT / date_token
         if bare.is_dir():
             return bare
-    return suffixed          # canonical target (may be absent -> reads as missing)
+    return tagged
 
 
-def output_run_dir(src, env, day=None):
-    """output/<day src-env>/ — where an export run writes. `day` is a
-    YYYY-MM-DD string; None means today."""
-    return OUTPUT_ROOT / run_folder_name(src, env, day)
+_SOURCE_RE = re.compile(r"\w+-\w+")
+
+
+def day_run_label(date_token, source, host=None):
+    """The run-folder NAME a (date, source) matrix column stands for — what its
+    comparison folder, workbook names and cache records carry: the name of the
+    folder `day_source_dir` resolves, so a dev-site day and a main-site day never
+    share a comparison file. A pre-v0.10 bare-date folder keeps the
+    '<date> <source>' label it always had. A token that is not a real date or
+    source is returned as '<date> <source>' WITHOUT touching the disk, so the
+    callers' parse_run_folder boundary check still refuses it."""
+    label = f"{date_token} {source}"
+    if (not valid_calendar_date(date_token)
+            or not _SOURCE_RE.fullmatch(str(source))):
+        return label
+    name = day_source_dir(date_token, source, host).name
+    return label if name == date_token else name
+
+
+def run_days_for(source, host=None):
+    """[(date, folder)] newest first: every day `source` has an export run folder
+    that `day_source_dir` would read as seen from `host` (None = the host `source`
+    points at now) — that host's own folders plus the ones from before the host
+    was recorded; another host's folders are left out. Each folder is exactly the
+    one `day_source_dir` picks for its date, so a day picker offers what the
+    matrix cells will read."""
+    host = host or _source_host(source)
+    out, seen = [], set()
+    for name in list_output_days():
+        m = _RUN_RE.fullmatch(name)
+        day, src, env, tag = m.groups()
+        if f"{src or 'ssor'}-{env or 'prod'}" != source or day in seen:
+            continue
+        if tag is not None and tag != host:
+            continue
+        seen.add(day)
+        out.append((day, day_source_dir(day, source, host)))
+    return out
+
+
+def output_run_dir(src, env, day=None, host=None):
+    """output/<day src-env host-site>/ — where an export run writes. `day` is a
+    YYYY-MM-DD string (None = today); `host` is the TSMIS host the export comes
+    from (None = the one (src, env) points at right now, which is the address
+    the export opens — so the folder always says where its files came from)."""
+    return OUTPUT_ROOT / run_folder_name(src, env, day,
+                                         host or host_kind_for(src, env))
 
 
 def parse_run_folder(name):
     """(date, src, env) for a run-folder name, or None if `name` isn't one.
-    Legacy bare-date folders (pre-v0.10) read as the old defaults, ssor-prod."""
+    Legacy bare-date folders (pre-v0.10) read as the old defaults, ssor-prod.
+    The host tag (v0.49.0+) is read separately by `run_folder_host`."""
     m = _RUN_RE.fullmatch(name)
     if not m:
         return None
-    day, src, env = m.groups()
+    day, src, env, _host = m.groups()
     if not valid_calendar_date(day):     # CMP-AUD-092: reject impossible-date tokens
         return None
     return (day, src or "ssor", env or "prod")
+
+
+def run_folder_host(name):
+    """The TSMIS host a run folder's name records ('main' / 'dev' / 'other'), or
+    None when it records none — a folder from before v0.49.0 (site not recorded)
+    or a name that isn't a run folder."""
+    m = _RUN_RE.fullmatch(name or "")
+    if not m or not valid_calendar_date(m.group(1)):
+        return None
+    return m.group(4)
 
 
 def stamped_consolidated_filename(filename, day):

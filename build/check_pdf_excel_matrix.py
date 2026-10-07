@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT / "scripts"), str(ROOT)]
 
-from _checklib import write_comparison_stub  # noqa: E402
+from _checklib import pinned_site, write_comparison_stub  # noqa: E402
 
 import artifact_store  # noqa: E402
 import matrix  # noqa: E402
@@ -75,12 +75,29 @@ def test_rows_from_catalog():
 
 def test_snapshot_and_naming():
     print("snapshot shape + M1-C self-identifying names + the needs-both-editions gate:")
-    out = pve.day_out_path("2026-07-22", "ssor-prod", "highway_log_pdf")
-    check("workbook name embeds family + day + source (M1-C.7)",
-          out.name == "highway_log_pdf_vs_excel 2026-07-22 ssor-prod.xlsx")
-    check("store lives under comparisons/pdf-vs-excel-by-day/<day source>/",
-          out.parent.name == "2026-07-22 ssor-prod"
-          and out.parent.parent.name == "pdf-vs-excel-by-day")
+    tmp = Path(tempfile.mkdtemp(prefix="pve_names_"))
+    saved = paths.OUTPUT_ROOT
+    try:
+        paths.OUTPUT_ROOT = tmp
+        with pinned_site("main"):
+            out = pve.day_out_path("2026-07-22", "ssor-prod", "highway_log_pdf")
+            check("workbook name embeds family + day + source + site (M1-C.7; v0.49.0)",
+                  out.name == "highway_log_pdf_vs_excel 2026-07-22 ssor-prod main-site.xlsx")
+            check("store lives under comparisons/pdf-vs-excel-by-day/<run folder>/",
+                  out.parent.name == "2026-07-22 ssor-prod main-site"
+                  and out.parent.parent.name == "pdf-vs-excel-by-day")
+            (tmp / "2026-07-22 ssor-prod").mkdir()          # a pre-v0.49 export
+            legacy = pve.day_out_path("2026-07-22", "ssor-prod", "highway_log_pdf")
+            check("a folder from before the site was recorded keeps its own name",
+                  legacy.name == "highway_log_pdf_vs_excel 2026-07-22 ssor-prod.xlsx")
+        with pinned_site("dev"):
+            (tmp / "2026-07-22 ssor-prod dev-site").mkdir()
+            dev = pve.day_out_path("2026-07-22", "ssor-prod", "highway_log_pdf")
+            check("on the dev site the dev-site export wins over the unrecorded one",
+                  dev.name == "highway_log_pdf_vs_excel 2026-07-22 ssor-prod dev-site.xlsx")
+    finally:
+        paths.OUTPUT_ROOT = saved
+        shutil.rmtree(tmp, ignore_errors=True)
     snap = pve.pve_matrix_snapshot("ssor-prod", ["2026-07-22"], today="2026-07-22")
     check("snapshot is shape-compatible with the by-day matrix (rows/days/cells, no tsn_meta)",
           set(snap) >= {"source", "days", "rows", "row_labels", "cells", "all_rows"}

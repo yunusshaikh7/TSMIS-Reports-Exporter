@@ -213,7 +213,8 @@ _NEW_PAYLOAD_PRIMARY_MAX_NAME = _payload_primary_basename(
     "0" * 64, 999999, "0" * 64)
 _NEW_PAYLOAD_SLOT_MAX_NAME = _payload_slot_basename(
     "0" * 64, 999999, "0" * 64, _PAYLOAD_FALLBACK_SLOT_COUNT - 1)
-_FIELD_COMPARISON_PARENT_LEN = 97
+# (+ the longest TSMIS-site tag a run-folder name has carried since v0.49.0)
+_FIELD_COMPARISON_PARENT_LEN = 97 + len(" other-site")
 _FIELD_COMPARISON_STATE_PARENT_LEN = (
     _FIELD_COMPARISON_PARENT_LEN + 1
     + _windows_utf16_units(output_state.STATE_DIRNAME)

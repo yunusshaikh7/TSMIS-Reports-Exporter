@@ -64,6 +64,26 @@ def patch(obj, name, value):
 
 
 @contextlib.contextmanager
+def pinned_site(kind):
+    """Point every (src, env) at ONE TSMIS host for the block — 'main' (the
+    built-in addresses), 'dev' (the Settings dev-site preset) or 'other' (a custom
+    address on another host) — so a check's run-folder names (v0.49.0: tagged
+    with the site) never depend on this PC's config.json. Patches the one lookup
+    get_url / combo_url / host_kind_for all read, so the export side and the
+    matrix side agree exactly as they do in the app."""
+    scripts_path()
+    import site_target
+    urls = {
+        "main": lambda src, env: None,
+        "dev": site_target.dev_site_url,
+        "other": lambda src, env: (
+            f"https://tsmis-uat.dot.ca.gov/index.html?env={env}&src={src}"),
+    }
+    with patch(site_target, "_override_url", urls[kind]):
+        yield
+
+
+@contextlib.contextmanager
 def temp_dir(prefix="tsmis_check_"):
     """A temp directory removed (best-effort) when the block exits."""
     d = Path(tempfile.mkdtemp(prefix=prefix))

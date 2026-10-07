@@ -48,8 +48,8 @@ import matrix
 import outcome
 import output_state
 import paths
-from paths import (comparisons_root, day_source_dir, list_output_days,
-                   parse_run_folder, today_str)
+from paths import (comparisons_root, day_run_label, day_source_dir,
+                   parse_run_folder, run_days_for, today_str)
 
 log = logging.getLogger("tsmis.arcgis_matrix")
 
@@ -103,15 +103,18 @@ def ag_root():
 
 
 def day_folder_name(date, source):
-    return f"{date} {source}"
+    """The run-folder name the (date, source) column reads, TSMIS site tag
+    included when the export recorded one (paths.day_run_label)."""
+    return day_run_label(date, source)
 
 
 def day_out_path(date, source, row_key):
     """The VALUES workbook for one (day, report). The basename embeds the report,
     the day and the source (M1-C) so two days' comparisons of one report can be
-    open in Excel at once and a lifted file still says what it is."""
-    return (ag_root() / day_folder_name(date, source)
-            / f"{row_key}_vs_layers {date} {source}.xlsx")
+    open in Excel at once and a lifted file still says what it is — the day part
+    is the run folder's own name, TSMIS site tag included (v0.49.0)."""
+    name = day_folder_name(date, source)
+    return ag_root() / name / f"{row_key}_vs_layers {name}.xlsx"
 
 
 def _results_path():
@@ -193,7 +196,8 @@ _folder_newest_mtime = artifact_store.newest_report_file_mtime
 
 def tsmis_dir(date, source, subdir):
     """The per-route export folder (one edition) the cell reads, resolved to the
-    REAL run folder (CMP-AUD-092: a pre-v0.10 bare-date folder is found)."""
+    REAL run folder: the TSMIS site `source` points at now, else one from before
+    the site was recorded (CMP-AUD-092: a pre-v0.10 bare-date folder is found)."""
     return day_source_dir(date, source) / subdir
 
 
@@ -220,20 +224,13 @@ def _all_subdirs():
 
 def available_days(source):
     """Dates (newest first) with an export of ANY comparable row's edition for
-    `source` — the add-day picker's options. There is no export action on this
+    `source` from the TSMIS site it points at now (or from before the site was
+    recorded) — the add-day picker's options. There is no export action on this
     matrix, so a day is offered only when something is on disk for it."""
     subs = _all_subdirs()
-    out, seen = [], set()
-    for name in list_output_days():
-        parsed = parse_run_folder(name)
-        if not parsed:
-            continue
-        date, src, env = parsed
-        if f"{src}-{env}" != source or date in seen:
-            continue
-        base = day_source_dir(date, source)
+    out = []
+    for date, base in run_days_for(source):
         if any(_folder_newest_mtime(base / sub) is not None for sub in subs):
-            seen.add(date)
             out.append(date)
     return out
 
@@ -439,7 +436,8 @@ def ag_matrix_snapshot(source, days, hidden=None, now=None, row_order=None,
 
     return {
         "source": source,
-        "sources": [{"key": k, "label": matrix.default_env_label(k)} for k in sources()],
+        "sources": matrix.day_source_options(sources()),
+        "day_hosts": matrix.day_hosts(source, days),
         "days": days,
         "today": today,
         "rows": [r.key for r in rows],

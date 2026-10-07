@@ -28,7 +28,7 @@ Deep Highway Log internals live under [highway_log/](highway_log/columns.md) -- 
 | 9–11 | Clean Road: Highway / Intersection / Ramp | XLSX | `output/<run>/clean_<kind>/` |
 | 9b–11b | Clean Road: … (PDF) | PDF (Letter, landscape; v0.45.2) | `output/<run>/clean_<kind>_pdf/` |
 
-`<run>` is a run folder, `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`) -- see [engine-and-reliability.md](engine-and-reliability.md) for run-folder mechanics.
+`<run>` is a run folder, `"<YYYY-MM-DD> <src>-<env> <host>-site"` (e.g. `2026-10-07 ssor-prod dev-site`; the site tag arrived in v0.49.0, so an older `2026-06-11 ssor-prod` folder reads as *site not recorded*) -- see [engine-and-reliability.md](engine-and-reliability.md) for run-folder mechanics and [architecture.md](architecture.md#run-folders-v0100-replaces-bare-dated-outputs-site-tag-v0490) for the site tag.
 
 The catalog (`scripts/report_catalog.py`) is the single source of truth for report metadata (P4); `reports.py` derives `EXPORT_REPORTS` from it, feeding the GUI checkboxes and `export_multi.py`, so the list can't drift. The `.bat` menus keep their own text, with a registry-parity check for the consolidate menu (`build/check_report_catalog.py`). Each row is `(menu label, format hint, ReportSpec)`. **Console** numbering follows `EXPORT_REPORTS` order; the **GUI picker** is grouped to mirror the website — its order comes from the catalog's `_PICKER_ORDER` / `picker_order()` and each entry's optional `group` + `short_label` (v0.18.1; see [Report grouping & site-menu-safe selection](#report-grouping--site-menu-safe-selection-v0181) below).
 

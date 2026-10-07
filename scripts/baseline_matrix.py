@@ -35,8 +35,8 @@ import outcome
 import reports
 import output_state
 from events import ConsolidateResult
-from paths import (OUTPUT_ROOT, day_source_dir, list_output_days,
-                   parse_run_folder)
+from paths import (OUTPUT_ROOT, day_run_label, day_source_dir,
+                   parse_run_folder, run_days_for)
 
 log = logging.getLogger("tsmis.baseline_matrix")
 
@@ -136,7 +136,9 @@ def byday_root():
 
 
 def day_folder_name(date, source):
-    return f"{date} {source}"
+    """The run-folder name the (date, source) column reads, TSMIS site tag
+    included when the export recorded one (paths.day_run_label)."""
+    return day_run_label(date, source)
 
 
 def out_path(date, source, row_key, baseline_id):
@@ -147,10 +149,11 @@ def out_path(date, source, row_key, baseline_id):
     day columns — two days' comparisons of the same report open in Excel together
     (which refuses duplicate basenames; M1-B/c12). Still stable per cell (`date`
     is the cell's column, not today), so mtime freshness is unchanged. (Pre-v0.30
-    cells used `<row>_vs_<token>.xlsx`; they rebuild once under the new name.)"""
+    cells used `<row>_vs_<token>.xlsx`; they rebuild once under the new name.)
+    The day part is the run folder's own name, TSMIS site tag included (v0.49.0)."""
     token = baseline_token(baseline_id)
-    return (byday_root() / day_folder_name(date, source)
-            / f"{row_key}_vs_{token} {date} {source}.xlsx")
+    name = day_folder_name(date, source)
+    return byday_root() / name / f"{row_key}_vs_{token} {name}.xlsx"
 
 
 def _results_path():
@@ -228,28 +231,22 @@ _folder_newest_mtime = artifact_store.newest_report_file_mtime
 
 
 def tsmis_dir(date, source, subdir):
-    """The per-route export the cell compares, resolved to the REAL run folder
-    (CMP-AUD-092: a pre-v0.10 legacy bare-date folder included)."""
+    """The per-route export the cell compares, resolved to the REAL run folder:
+    the TSMIS site `source` points at now, else one from before the site was
+    recorded (CMP-AUD-092: a pre-v0.10 legacy bare-date folder included)."""
     return day_source_dir(date, source) / subdir
 
 
 def available_days(source):
     """Dates (newest first) under output/ that have an export for ANY matrix
-    report for `source` — the add-day AND baseline pickers' day options. No
+    report for `source` from the TSMIS site it points at now (or from before the
+    site was recorded) — the add-day AND baseline pickers' day options. No
     "today" special: this matrix compares historical exports only (the vs TSN
     matrix owns exporting today's column)."""
     subs = [r[2] for r in _rows() if r[3]]
-    out, seen = [], set()
-    for name in list_output_days():
-        parsed = parse_run_folder(name)
-        if not parsed:
-            continue
-        date, src, env = parsed
-        if f"{src}-{env}" != source or date in seen:
-            continue
-        base = OUTPUT_ROOT / name
+    out = []
+    for date, base in run_days_for(source):
         if any(_folder_newest_mtime(base / sub) is not None for sub in subs):
-            seen.add(date)
             out.append(date)
     return out
 
@@ -368,7 +365,8 @@ def baseline_matrix_snapshot(source, days, baseline_id, hidden=None, dest=None,
 
     return {
         "source": source,
-        "sources": [{"key": k, "label": matrix.default_env_label(k)} for k in sources()],
+        "sources": matrix.day_source_options(sources()),
+        "day_hosts": matrix.day_hosts(source, days),
         "days": days,
         "baseline": {
             "id": baseline_id if parsed else None,

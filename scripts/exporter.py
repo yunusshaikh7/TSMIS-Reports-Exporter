@@ -48,7 +48,8 @@ from common import (
 )
 from events import Events, RunResult
 from paths import FAILURES_DIR, output_run_dir, resolve_route_file
-from run_report import auto_report_path, write_run_report
+from run_report import auto_report_path, report_site_tag, write_run_report
+from site_target import host_kind
 
 log = logging.getLogger("tsmis.export")
 
@@ -1135,14 +1136,18 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
     timeout_ms = timeout_ms or report_timeout_ms()
     retry_timeout_ms = retry_timeout_ms or retry_report_timeout_ms()
 
-    # Exports are grouped into run folders (output/<YYYY-MM-DD src-env>/
+    # Exports are grouped into run folders (output/<YYYY-MM-DD src-env host-site>/
     # <report>/), so a new day starts fresh instead of resuming over
-    # yesterday's files AND different source/environment runs never mix —
-    # the folder name says exactly which site the files came from.
+    # yesterday's files AND different source/environment runs — or a dev-site
+    # and a main-site run — never mix: the folder name says exactly which site
+    # the files came from. The address is captured ONCE so the folder's host tag,
+    # the logged site and the run report's Site column always agree.
     src, env = get_site()
+    site_url = get_url()
     # out_dir override (B3 "always-current" destination): write straight into the
     # caller's folder instead of the dated run folder. Default = the dated layout.
-    out_dir = Path(out_dir) if out_dir else output_run_dir(src, env) / spec.subdir
+    out_dir = (Path(out_dir) if out_dir
+               else output_run_dir(src, env, host=host_kind(site_url)) / spec.subdir)
     _require_safe_destination(events, out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     _require_safe_destination(events, out_dir)
@@ -1153,7 +1158,7 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
     # against what, with which settings" without asking.
     log.info("export start: %s (%d routes) -> %s", spec.label, total, out_dir)
     log.info("export config: site=%s auth_file=%s timeout=%ds retry_timeout=%ds",
-             get_url(), has_valid_auth(), timeout_ms // 1000, retry_timeout_ms // 1000)
+             site_url, has_valid_auth(), timeout_ms // 1000, retry_timeout_ms // 1000)
     if total != len(ROUTES):
         log.info("export routes (subset): %s", ", ".join(routes))
 
@@ -1241,7 +1246,9 @@ def run_export(spec, events=None, *, routes=ROUTES, timeout_ms=None, retry_timeo
     if result.per_route:
         try:
             report_path = write_run_report(
-                result, spec.label, auto_report_path(spec.subdir, f"{src}-{env}"))
+                result, spec.label,
+                auto_report_path(spec.subdir, report_site_tag(src, env, site_url)),
+                site_url=site_url)
             result.report_path = str(report_path)
             events.on_log(f"Run report saved: {report_path}")
             log.info("run report saved: %s", report_path)
@@ -1384,10 +1391,11 @@ def _retry_failed_combined(page, base_spec, targets_for, results, events, timeou
              results[0].failed or "none")
 
 
-def _combined_output_dirs(specs, out_dirs, src, env):
+def _combined_output_dirs(specs, out_dirs, src, env, host=None):
     """One output dir per edition of a combined run: the caller's PER-ENTRY
-    override when given, else that spec's dated run folder — exactly
-    run_export's `out_dir=None` fallback, applied per edition.
+    override when given, else that spec's dated run folder (tagged with `host`,
+    the site the run opens) — exactly run_export's `out_dir=None` fallback,
+    applied per edition.
 
     A None ENTRY means "no override for this edition": every normal
     (non-store) coalesced export passes run_dirs of None from
@@ -1400,7 +1408,7 @@ def _combined_output_dirs(specs, out_dirs, src, env):
     for i, spec in enumerate(specs):
         override = out_dirs[i] if out_dirs else None
         resolved.append(Path(override) if override is not None
-                        else output_run_dir(src, env) / spec.subdir)
+                        else output_run_dir(src, env, host=host) / spec.subdir)
     return resolved
 
 
@@ -1433,10 +1441,11 @@ def run_export_combined(specs, events=None, *, routes=ROUTES, timeout_ms=None,
     timeout_ms = timeout_ms or report_timeout_ms()
     retry_timeout_ms = retry_timeout_ms or retry_report_timeout_ms()
     src, env = get_site()
+    site_url = get_url()         # captured once: folder host tag + run reports agree
     # Save order puts page-rebuilding (PDF) saves last; results stay in `specs` order.
     save_order = sorted(range(len(specs)), key=lambda i: _save_rebuilds_page(specs[i]))
     dirs, results = [], []
-    for d in _combined_output_dirs(specs, out_dirs, src, env):
+    for d in _combined_output_dirs(specs, out_dirs, src, env, host_kind(site_url)):
         _require_safe_destination(events, d)
         d.mkdir(parents=True, exist_ok=True)
         _require_safe_destination(events, d)
@@ -1447,7 +1456,7 @@ def run_export_combined(specs, events=None, *, routes=ROUTES, timeout_ms=None,
     subdirs = ", ".join(specs[i].subdir for i in save_order)
     log.info("combined export start: %s [%s] (%d routes)", base.label, subdirs, total)
     log.info("combined export config: site=%s auth_file=%s timeout=%ds retry_timeout=%ds",
-             get_url(), has_valid_auth(), timeout_ms // 1000, retry_timeout_ms // 1000)
+             site_url, has_valid_auth(), timeout_ms // 1000, retry_timeout_ms // 1000)
 
     def targets_for(route):
         return [(specs[i], resolve_route_file(dirs[i], specs[i].filename(route)))
@@ -1523,7 +1532,9 @@ def run_export_combined(specs, events=None, *, routes=ROUTES, timeout_ms=None,
         if result.per_route:
             try:
                 report_path = write_run_report(
-                    result, spec.label, auto_report_path(spec.subdir, f"{src}-{env}"))
+                    result, spec.label,
+                    auto_report_path(spec.subdir, report_site_tag(src, env, site_url)),
+                    site_url=site_url)
                 result.report_path = str(report_path)
             except Exception as e:
                 log.warning("could not write run report for %s: %s", spec.subdir, e)

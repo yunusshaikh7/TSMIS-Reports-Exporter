@@ -1509,7 +1509,9 @@ row.) Like `matrix.py`, it NEVER edits the manual compare code — it only orche
 
 - **Shared engine:** `day_matrix.build_day_cell` delegates to `matrix.consolidate_and_compare_tsn`
   (the same path `build_comparison`'s tsn branch uses, now keyed on `(row_key, subdir)`) over the
-  day's run folder `output/<date src-env>/<subdir>/`. The TSN dataset resolves per row's `tsn_subdir`
+  day's run folder `output/<run>/<subdir>/` — the folder `paths.day_source_dir` picks for the TSMIS site the
+  source points at now (v0.49.0: that site's own `<date> <src-env> <host>-site` folder, else one from before
+  the site was recorded; never another site's). The TSN dataset resolves per row's `tsn_subdir`
   via `matrix.tsn_source` → `tsn_library.resolve`. Automatic mode uses the canonical library and
   legacy `<batch_dest>/_tsn_input/<subdir>/` fallbacks. A `settings.matrix_tsn_files` pick is a
   versioned explicit selection: a missing, replaced, or legacy path-only pick blocks the cell until
@@ -1524,8 +1526,8 @@ row.) Like `matrix.py`, it NEVER edits the manual compare code — it only orche
   (`check_matrix_tsn.test_stale_app_owned_selection_heals`). The
   by-day matrix shows a PER-ROW TSN picker (named by its report, like the Everything matrix);
   each cell resolves its own report's TSN.
-- **Store:** `output/comparisons/tsn-by-day/<date src-env>/<row>_vs_tsn.xlsx` (stable, dateless per
-  cell); typed truth is read from the strict generation and cached in that tree's `_state/_results.json`
+- **Store:** `output/comparisons/tsn-by-day/<run>/<row>_vs_tsn <run>.xlsx`, `<run>` the column's run-folder
+  name (`paths.day_run_label`, site tag included since v0.49.0; stable per cell); typed truth is read from the strict generation and cached in that tree's `_state/_results.json`
   under output identity `tsn-by-day`, generation ID, mtime, and input fingerprint. Snapshot
   (`day_matrix_snapshot`) is offline/read-only rather than pure-stat; missing or mismatched trust
   data is stale. `cells_to_rebuild(scope, row=, date=)` skips greyed rows + missing sides.
@@ -1586,10 +1588,11 @@ PDF baseline.
   holds** — the "which days have an old copy" answer per option; the grid's per-cell
   `missing_side: "baseline"` state answers it per report. The baseline's own day column renders
   `is_baseline` (skipped by `cells_to_rebuild`; building it is rejected).
-- **Store:** `output/comparisons/baseline-by-day/<date src-env>/<row>_vs_<token>.xlsx` — the
+- **Store:** `output/comparisons/baseline-by-day/<run>/<row>_vs_<token> <run>.xlsx` (`<run>` the day
+  column's run-folder name, TSMIS site tag included since v0.49.0) — the
   baseline token (`store` / the baseline date) is PART of the name, so each baseline's comparisons
   are distinct artifacts and switching baselines never clobbers the other's. Strict typed truth is
-  cached in that tree's `_state/_results.json` under `"<date src-env>|<row>|<baseline-id>"`, with output
+  cached in that tree's `_state/_results.json` under `"<run>|<row>|<baseline-id>"`, with output
   identity `baseline-by-day`, generation ID, mtime, and the **two-folder input fingerprint**
   (`fp_folders=(day, baseline)`). BOTH sides are multi-file folders, so a route deleted on either
   one reads the cell stale; missing or untrusted generation/cache data is stale too.
@@ -1686,9 +1689,9 @@ report's PDF-vs-Excel self-check proves it — so one comparator per report serv
   ArcGIS"), and a row the lane cannot compare yet renders `supported: False` with its
   `why`. (The source keeps its pre-rename name so the caches recorded before v0.47.0
   still match.)
-- **Store:** `output/comparisons/arcgis-by-day/<date src-env>/<row>_vs_layers <date>
-  <source>.xlsx` (the row is the edition key; the file name kept its pre-rename form so
-  earlier comparisons stay valid), counts cached in that tree's `_state/_results.json`
+- **Store:** `output/comparisons/arcgis-by-day/<run>/<row>_vs_layers <run>.xlsx` (`<run>` the
+  day column's run-folder name, TSMIS site tag included since v0.49.0; the row is the edition
+  key; the file name kept its pre-rename form so earlier comparisons stay valid), counts cached in that tree's `_state/_results.json`
   (identity `arcgis-by-day`, per-cell input fingerprint, generation id, producer
   versions, and `source_identities.layers`), the attempts overlay beside it.
 - **One queue, five matrices:** compare Jobs carry `which:"arcgis"` →

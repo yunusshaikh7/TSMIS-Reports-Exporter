@@ -62,16 +62,23 @@ One TSMIS page serves every combination of **data source** (SSOR / ARS) and
 | 11 | Clean Road File: Ramp | XLSX | `output/<run>/clean_ramp/` |
 | 9b–11b | Clean Road File: Highway / Intersection / Ramp (PDF) | PDF (Letter, landscape) | `output/<run>/clean_<kind>_pdf/` |
 
-`<run>` is a run folder `"<YYYY-MM-DD> <src>-<env>"` (e.g. `2026-06-11 ssor-prod`);
+`<run>` is a run folder `"<YYYY-MM-DD> <src>-<env> <host>-site"` (e.g.
+`2026-10-07 ssor-prod dev-site`) — **since v0.49.0 the name records which TSMIS site
+the export came from** (`dev-site` / `main-site`; `other-site` for a custom address on
+another host), so a dev-site and a main-site export never share a folder; an older
+`2026-06-11 ssor-prod` folder reads as *site not recorded*;
 **since v0.32.0 each per-route file inside it carries that run identity
-front-anchored in its NAME** (`2026-07-23 ssor-prod highway_log_route_3.xlsx` —
+front-anchored in its NAME** (`2026-10-07 ssor-prod dev-site highway_log_route_3.xlsx` —
 `paths.resolve_route_file`; legacy dateless names are honored on resume so an old
 partial run never leaves one route with two files, and the end-anchored
 `_route_<token>.<ext>` contract is untouched).
 
-**Current export state.** Every enabled report exports from the **production** site
-(the 2026-07-09 prod rollout; the dev site — Settings ▸ "Use development site" — is
-only needed for Route History testing), and every enabled on-site report exports in
+**Current export state.** Reports wait on the **dev site** (`tsmis-dev.dot.ca.gov`,
+Settings ▸ "Use development site") until they are approved, then move to the **main
+site** (`tsmis.dot.ca.gov`) — owner, 2026-10-07. Many reports exist only on the dev
+site, most current exports (the 2026-10-02 statewide delivery included) come from it,
+and the comparisons are the approval evidence; since v0.49.0 every run folder says
+which site it came from. Every enabled on-site report exports in
 **BOTH formats** the site offers. **8 (Highway Summary) is FULLY INTEGRATED as of
 v0.37.0** — consolidate + cross-environment + **vs TSN** (off the owner's statewide
 print); the vendor un-greyed the report 2026-08-17 and both its schema and the print

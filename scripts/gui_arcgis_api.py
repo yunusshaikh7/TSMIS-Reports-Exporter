@@ -148,11 +148,13 @@ class GuiArcgisMixin:
         """The Reports-vs-ArcGIS snapshot (incl. the library) + the add-day
         picker's available days."""
         import arcgis_matrix
+        import matrix
 
         snap = self._arcgis_matrix_snapshot()
         snap["available_days"] = arcgis_matrix.available_days(snap["source"])
         snap["available_day_reports"] = arcgis_matrix.available_day_reports(
             snap["source"])
+        snap["day_hosts"].update(matrix.day_hosts(snap["source"], snap["available_days"]))
         self._push_state()
         return snap
 

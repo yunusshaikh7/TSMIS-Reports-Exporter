@@ -34,8 +34,8 @@ import consolidation_meta
 import matrix
 import reports
 import output_state
-from paths import (OUTPUT_ROOT, day_source_dir, list_output_days,
-                   parse_run_folder, today_str)
+from paths import (OUTPUT_ROOT, day_run_label, day_source_dir,
+                   parse_run_folder, run_days_for, today_str)
 
 log = logging.getLogger("tsmis.day_matrix")
 
@@ -109,7 +109,11 @@ def byday_root():
 
 
 def day_folder_name(date, source):
-    return f"{date} {source}"
+    """The run-folder name the (date, source) column reads — '<date> <source>
+    <host>-site' for an export that recorded its TSMIS site, '<date> <source>' for
+    an older one (paths.day_run_label) — so a dev-site day's comparison never
+    shares a file or a cache record with a main-site day's."""
+    return day_run_label(date, source)
 
 
 def day_out_path(date, source, row_key):
@@ -121,9 +125,11 @@ def day_out_path(date, source, row_key):
     M1-B/c12). The name is still STABLE per cell: `date` is the cell's own column,
     never today, so the overwrite-in-place + mtime-freshness model is unchanged.
     (Pre-v0.30 cells used the dateless `<row>_vs_tsn.xlsx`; they read as
-    not-built once and rebuild under the new name.)"""
-    return (byday_root() / day_folder_name(date, source)
-            / f"{row_key}_vs_tsn {date} {source}.xlsx")
+    not-built once and rebuild under the new name.) Since v0.49.0 the day part is
+    the run folder's own name, so it carries the TSMIS site too:
+    'highway_log_vs_tsn 2026-10-07 ssor-prod dev-site.xlsx'."""
+    name = day_folder_name(date, source)
+    return byday_root() / name / f"{row_key}_vs_tsn {name}.xlsx"
 
 
 def _results_path():
@@ -212,17 +218,19 @@ _folder_newest_mtime = artifact_store.newest_report_file_mtime
 
 
 def tsmis_dir(date, source, subdir):
-    """The per-route export the cell compares, resolved to the REAL run folder
-    (CMP-AUD-092: a pre-v0.10 legacy bare-date folder is found instead of a
-    reconstructed '<date> <source>' that never existed)."""
+    """The per-route export the cell compares, resolved to the REAL run folder:
+    the export from the TSMIS site `source` points at now, else one from before
+    the site was recorded (paths.day_source_dir — CMP-AUD-092's pre-v0.10
+    bare-date folder included); never another site's export."""
     return day_source_dir(date, source) / subdir
 
 
 def available_days(source):
     """Dates (newest first) under output/ that have an export for ANY supported
-    vs-TSN report for `source` — the add-day picker's options. Supported subdirs
-    come from _day_rows (every report with a coded comparator — all of them as of
-    v0.17.0).
+    vs-TSN report for `source` — the add-day picker's options — from the TSMIS
+    site `source` points at now (or from before the site was recorded). Supported
+    subdirs come from _day_rows (every report with a coded comparator — all of
+    them as of v0.17.0).
 
     TODAY is always offered, exports or not (W3): today's column is the one the
     matrix itself can export INTO, so requiring an export first was circular —
@@ -231,14 +239,9 @@ def available_days(source):
     Export action live."""
     supported_subs = [r[2] for r in _day_rows() if r[4]]
     out, seen = [today_str()], {today_str()}
-    for name in list_output_days():
-        parsed = parse_run_folder(name)
-        if not parsed:
+    for date, base in run_days_for(source):
+        if date in seen:
             continue
-        date, src, env = parsed
-        if f"{src}-{env}" != source or date in seen:
-            continue
-        base = OUTPUT_ROOT / name
         if any(_folder_newest_mtime(base / sub) is not None for sub in supported_subs):
             seen.add(date)
             out.append(date)
@@ -411,7 +414,8 @@ def day_matrix_snapshot(source, days, hidden=None, tsn_files=None, dest=None,
 
     return {
         "source": source,
-        "sources": [{"key": k, "label": matrix.default_env_label(k)} for k in sources()],
+        "sources": matrix.day_source_options(sources()),
+        "day_hosts": matrix.day_hosts(source, days),
         "days": days,
         "today": today,                  # the only EXPORTABLE column (past = locked)
         "rows": [r[0] for r in rows],
