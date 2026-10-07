@@ -926,6 +926,13 @@ _SOURCE_FILE_SPEC = {
     "highway_detail_pdf": ("highway_detail", "pdf"),
     "intersection_detail_pdf": ("intersection_detail", "pdf"),
     "highway_log_pdf": ("highway_log", "pdf"),
+    # v0.48.0: the site's Clean Road files (both editions share the export prefix).
+    "clean_highway": ("clean_highway", "xlsx"),
+    "clean_intersection": ("clean_intersection", "xlsx"),
+    "clean_ramp": ("clean_ramp", "xlsx"),
+    "clean_highway_pdf": ("clean_highway", "pdf"),
+    "clean_intersection_pdf": ("clean_intersection", "pdf"),
+    "clean_ramp_pdf": ("clean_ramp", "pdf"),
 }
 
 
@@ -964,7 +971,7 @@ class EnvCompare:
                  force_header=None, side_loader=None, agg_header=None,
                  flat_pdf_loader=None, physical_key_builder=None,
                  value_normalizer=None, header_canonicalizer=None,
-                 layout_merger=None):
+                 layout_merger=None, discovery_glob=None):
         self.key = key                        # "ramp_summary" | "ramp_detail" | …
         self.REPORT_NAME = report_name
         self.subdir = subdir
@@ -1019,6 +1026,11 @@ class EnvCompare:
         # every other family (and an unrecognized pairing) keeps the
         # different-column-layouts refusal.
         self.layout_merger = layout_merger
+        # v0.48.0 (opt-in): the file pattern an aggregate `side_loader` reads when
+        # its per-route files are PRINTS (Intersection / Highway Summary (PDF)) —
+        # the alias guard + provenance census must discover the same members the
+        # loader parses. None keeps the derived default.
+        self.discovery_glob = discovery_glob
 
     def suggest_name(self, dir_a, dir_b):
         la, lb = _side_labels(Path(dir_a), Path(dir_b))
@@ -1086,6 +1098,8 @@ class EnvCompare:
         return tuple(files)
 
     def _discovery_pattern(self):
+        if self.discovery_glob:
+            return self.discovery_glob
         use_pdf = (self.flat_pdf_loader is not None
                    or (self.sheet_name is None and self.side_loader is None))
         return "*.pdf" if use_pdf else "*.xlsx"

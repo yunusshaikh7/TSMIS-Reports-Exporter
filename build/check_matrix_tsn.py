@@ -67,15 +67,14 @@ def test_paths_and_modes():
           matrix.tsn_capable("highway_sequence"))
 
     defs = matrix._row_defs()
-    check("thirteen matrix rows — every report (both HL + both Intersection + both "
-          "Highway Detail + both Highway Sequence + both Ramp Detail formats, "
-          "v0.26.0; Highway Summary v0.37.0)",
+    check("twenty-two matrix rows — every export edition (both formats of every "
+          "report; Highway Summary v0.37.0, the nine second editions v0.48.0)",
           set(defs) == {"ramp_summary", "ramp_detail", "highway_sequence",
                         "highway_log", "highway_log_pdf", "intersection_summary",
                         "intersection_detail", "intersection_detail_pdf",
                         "highway_detail", "highway_detail_pdf",
                         "highway_sequence_pdf", "ramp_detail_pdf",
-                        "highway_summary"})
+                        "highway_summary", "ramp_summary_excel", "intersection_summary_pdf", "highway_summary_pdf", "clean_highway", "clean_highway_pdf", "clean_intersection", "clean_intersection_pdf", "clean_ramp", "clean_ramp_pdf"})
 
     def modes(rk):
         _l, sub, _i, adapter, _hr = defs[rk]

@@ -30,6 +30,10 @@ import consolidate_intersection_detail
 import consolidate_intersection_summary
 import consolidate_highway_detail
 import consolidate_highway_summary
+import consolidate_ramp_summary_excel
+import consolidate_clean_road_highway
+import consolidate_clean_road_intersection
+import consolidate_clean_road_ramp
 from events import Events, RunResult, ConsolidateResult
 
 _fail = []
@@ -66,6 +70,11 @@ def test_mapping():
         "intersection_summary": consolidate_intersection_summary,  # v0.17.0
         "highway_detail": consolidate_highway_detail,             # v0.20.0
         "highway_summary": consolidate_highway_summary,           # v0.37.0
+        # v0.48.0: the Excel second editions auto-consolidate too.
+        "ramp_summary_excel": consolidate_ramp_summary_excel,
+        "clean_highway": consolidate_clean_road_highway,
+        "clean_intersection": consolidate_clean_road_intersection,
+        "clean_ramp": consolidate_clean_road_ramp,
     }
     for _label, _fmt, spec in reports.EXPORT_REPORTS:
         got = reports.consolidator_for_spec(spec)

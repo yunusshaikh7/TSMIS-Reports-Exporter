@@ -38,6 +38,7 @@ import artifact_store
 import consolidation_meta
 from events import Events, ConsolidateResult
 from compare_core import is_formula_injection   # shared formula-injection guard
+from pdf_table_lib import write_pdf_source_marker
 
 SUBDIR = "ramp_summary"
 FILENAME = "tsar_ramp_summary_consolidated.xlsx"
@@ -766,7 +767,8 @@ def build_combined_sheet(wb, records, col_letters):
     wb.active = wb.index(ws)
 
 
-def build_workbook(records, out_path, proceed=None, commit_guard=None):
+def build_workbook(records, out_path, proceed=None, commit_guard=None,
+                   pdf_marker=False):
     """Write a styled, audited workbook with one row per record. `proceed` (P12) is
     the pre-replace overwrite gate — atomic_save_if evaluates it AFTER serializing the
     workbook to the temp and JUST BEFORE the os.replace; returns True iff committed (a
@@ -900,6 +902,10 @@ def build_workbook(records, out_path, proceed=None, commit_guard=None):
     # Combined summary sheet on top, with live formulas referencing
     # the per-route rows on this sheet.
     build_combined_sheet(wb, records, col_letters)
+    if pdf_marker:
+        # CMP-AUD-066: the print's workbook proves it came from the PDFs, so
+        # the PDF-vs-Excel self-check can tell its two sides apart.
+        write_pdf_source_marker(wb)
 
     if not consolidation_meta.guard_allows(commit_guard, out_path):
         return False
@@ -915,6 +921,27 @@ def build_workbook(records, out_path, proceed=None, commit_guard=None):
 # Entry point
 # =============================================================================
 
+class Edition:
+    """One Ramp Summary export edition this pipeline consolidates: where its
+    per-route files live, how one is parsed into a record, and how the user is
+    told about it. The PDF print is the original edition; the Excel export
+    (v0.48.0, `consolidate_ramp_summary_excel`) parses into the SAME record, so
+    both write the identical audited workbook and every comparison reads either.
+    `pdf_marker` stamps the CMP-AUD-066 PDF-conversion marker (the print only)."""
+
+    def __init__(self, *, glob, parse, noun, report_name, title, input_dir_for,
+                 out_path_for, pdf_marker, missing_deps):
+        self.glob = glob
+        self.parse = parse
+        self.noun = noun
+        self.report_name = report_name
+        self.title = title
+        self.input_dir_for = input_dir_for
+        self.out_path_for = out_path_for
+        self.pdf_marker = pdf_marker
+        self.missing_deps = missing_deps
+
+
 def consolidate(events=None, confirm_overwrite=None, day=None,
                 input_dir=None, out_path=None, commit_guard=None):
     """Parse every per-route Ramp Summary PDF into one audited workbook.
@@ -927,30 +954,41 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     the newest run folder, falling back to the legacy flat layout when no run
     folders exist yet.
     """
+    return consolidate_edition(PDF_EDITION, events=events,
+                               confirm_overwrite=confirm_overwrite, day=day,
+                               input_dir=input_dir, out_path=out_path,
+                               commit_guard=commit_guard)
+
+
+def consolidate_edition(edition, events=None, confirm_overwrite=None, day=None,
+                        input_dir=None, out_path=None, commit_guard=None):
+    """The shared consolidation pipeline for one Ramp Summary `edition`."""
     events = events or Events()
+    report_name = edition.report_name
     if not _DEPS_OK:
         return ConsolidateResult(
             status="error",
-            message="Required components are missing (pdfplumber, openpyxl).",
+            message=f"Required components are missing ({edition.missing_deps}).",
         )
     confirm = confirm_overwrite or (lambda _p: True)
     day = day or latest_output_day()
-    input_dir = input_dir or input_dir_for(day)
-    out_path = out_path or out_path_for(day)
+    input_dir = input_dir or edition.input_dir_for(day)
+    out_path = out_path or edition.out_path_for(day)
 
     if not input_dir.exists():
         return ConsolidateResult(
             status="error",
-            message=(f"The {REPORT_NAME} output folder doesn't exist yet:\n{input_dir}\n\n"
-                     f"Export the {REPORT_NAME} report first, then consolidate."),
+            message=(f"The {report_name} output folder doesn't exist yet:\n{input_dir}\n\n"
+                     f"Export the {report_name} report first, then consolidate."),
         )
 
-    pdfs = sorted(input_dir.glob("*.pdf"))
+    pdfs = sorted(p for p in input_dir.glob(edition.glob)
+                  if not p.name.startswith("~$"))
     if not pdfs:
         return ConsolidateResult(
             status="error",
-            message=(f"No {REPORT_NAME} files were found in:\n{input_dir}\n\n"
-                     f"Export the {REPORT_NAME} report first, then consolidate."),
+            message=(f"No {report_name} files were found in:\n{input_dir}\n\n"
+                     f"Export the {report_name} report first, then consolidate."),
         )
 
     # Confirm overwrite *before* spending time parsing PDFs. Record existence for
@@ -962,7 +1000,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
                                  message="Cancelled. Existing file kept.")
 
     events.on_log("=" * 60)
-    events.on_log(f"TSAR Ramp Summary Consolidation - {len(pdfs)} file(s)")
+    events.on_log(f"{edition.title} - {len(pdfs)} file(s)")
     events.on_log("=" * 60)
     events.on_log("")
 
@@ -975,7 +1013,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             return ConsolidateResult(status="cancelled", message="Cancelled by user.")
         prefix = f"[{i:>3}/{len(pdfs)}] {p.name}"
         try:
-            rec = parse_pdf(str(p))
+            rec = edition.parse(str(p))
         except Exception as e:
             events.on_log(f"{prefix} FAILED ({type(e).__name__}): {e}")
             failed.append(p.name)
@@ -985,7 +1023,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         # and don't let a folder full of them overwrite a good workbook.
         if not record_has_data(rec):
             events.on_log(f"{prefix} skipped: no ramp data "
-                          "(one-page / truncated PDF?)")
+                          f"(one-page / truncated {edition.noun}?)")
             blank.append(p.name)
             continue
         # CMP-AUD-050: a populated record must own exactly one nonblank
@@ -995,13 +1033,13 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         route = "" if rec.get("route") is None else str(rec["route"]).strip()
         if not route:
             events.on_log(f"{prefix} FAILED: no route identity parsed from "
-                          "the PDF")
+                          f"the {edition.noun}")
             failed.append(p.name)
             continue
         if route in route_sources:
             return ConsolidateResult(
                 status="error",
-                message=(f"Two PDFs both claim route {route}: "
+                message=(f"Two {edition.noun}s both claim route {route}: "
                          f"{route_sources[route]} and {p.name} (is the same "
                          "route in the folder twice?). Nothing was written; "
                          "remove the duplicate and run again."),
@@ -1015,11 +1053,11 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     if not records:
         return ConsolidateResult(
             status="error",
-            message=(f"None of the {len(pdfs)} {REPORT_NAME} PDF(s) yielded ramp "
+            message=(f"None of the {len(pdfs)} {report_name} {edition.noun}(s) yielded ramp "
                      f"data ({len(failed)} failed to parse, {len(blank)} had no "
                      f"data — truncated/one-page?). Nothing was written and the "
                      f"existing file (if any) was left unchanged.\nRe-export the "
-                     f"{REPORT_NAME} report and try again."))
+                     f"{report_name} report and try again."))
 
     events.on_log("")
     events.on_log("Writing consolidated workbook...")
@@ -1028,7 +1066,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         # (atomic_save_if) — so a destination that appears during the BUILD, not just
         # during parsing, is caught before the final write.
         committed = build_workbook(
-            records, out_path,
+            records, out_path, pdf_marker=edition.pdf_marker,
             proceed=lambda: (consolidation_meta.guard_allows(commit_guard, out_path)
                              and artifact_store.confirm_late_overwrite(
                                  out_path, existed_at_confirm, confirm)),
@@ -1068,7 +1106,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     summary_lines = []
     if failed or blank:
         summary_lines.append(
-            f"⚠ INCOMPLETE — {len(failed) + len(blank)} PDF(s) left OUT "
+            f"⚠ INCOMPLETE — {len(failed) + len(blank)} {edition.noun}(s) left OUT "
             f"({len(failed)} failed, {len(blank)} had no data); the workbook "
             f"does NOT contain their routes. Re-export them before relying on it.")
     if unexplained:
@@ -1103,6 +1141,20 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
                              producer_extra={
                                  "route_census": [str(rec["route"]).strip()
                                                   for rec in records]})
+
+
+# The lambdas bind late on purpose: a check that monkeypatches the module's
+# parse / path helpers must still reach this edition.
+PDF_EDITION = Edition(
+    glob="*.pdf",
+    parse=lambda path: parse_pdf(path),
+    noun="PDF",
+    report_name=REPORT_NAME,
+    title="TSAR Ramp Summary Consolidation",
+    input_dir_for=lambda day: input_dir_for(day),
+    out_path_for=lambda day: out_path_for(day),
+    pdf_marker=True,
+    missing_deps="pdfplumber, openpyxl")
 
 
 if __name__ == "__main__":

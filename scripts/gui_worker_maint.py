@@ -43,6 +43,9 @@ _LEGACY_OUTPUT_DIRS = ("ramp_summary", "ramp_summary_excel",
                        "consolidated", "tsn_highway_log", "tsmis_highway_log_pdf",
                        "tsmis_intersection_detail_pdf", "tsmis_highway_detail_pdf",
                        "tsmis_highway_sequence_pdf", "tsmis_ramp_detail_pdf",
+                       # v0.48.0: the Clean Road prints' scratch conversions.
+                       "tsmis_clean_highway_pdf", "tsmis_clean_intersection_pdf",
+                       "tsmis_clean_ramp_pdf",
                        "run_reports", "comparisons")
 
 # The consolidated-workbook files (name, human label) the Reset cleanup removes from
@@ -62,6 +65,17 @@ _LEGACY_CONSOLIDATED_FILES = (
      "TSMIS Highway Sequence (PDF) consolidated workbook"),
     ("tsmis_ramp_detail_pdf_consolidated.xlsx",
      "TSMIS Ramp Detail (PDF) consolidated workbook"),
+    # v0.48.0: the second editions' PDF-sourced workbooks.
+    ("tsmis_intersection_summary_pdf_consolidated.xlsx",
+     "TSMIS Intersection Summary (PDF) consolidated workbook"),
+    ("tsmis_highway_summary_pdf_consolidated.xlsx",
+     "TSMIS Highway Summary (PDF) consolidated workbook"),
+    ("tsmis_clean_highway_pdf_consolidated.xlsx",
+     "TSMIS Clean Road: Highway (PDF) consolidated workbook"),
+    ("tsmis_clean_intersection_pdf_consolidated.xlsx",
+     "TSMIS Clean Road: Intersection (PDF) consolidated workbook"),
+    ("tsmis_clean_ramp_pdf_consolidated.xlsx",
+     "TSMIS Clean Road: Ramp (PDF) consolidated workbook"),
 )
 
 

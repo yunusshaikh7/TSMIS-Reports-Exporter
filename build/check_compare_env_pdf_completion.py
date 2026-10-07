@@ -1,7 +1,8 @@
 """Focused Phase-2 check for PDF cross-environment coverage propagation.
 
-Locks all five convert-then-compare families:
-  Highway Log, Highway Sequence, Highway Detail, Intersection Detail, Ramp Detail.
+Locks all eight convert-then-compare families:
+  Highway Log, Highway Sequence, Highway Detail, Intersection Detail, Ramp Detail,
+  and the three Clean Road prints (v0.48.0).
 
 The consolidator's structured completion/skipped/failed fields must survive the
 converted-XLSX loader and the atomic comparison commit without parsing summary text.
@@ -15,7 +16,12 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
+import clean_road_columns as crc
 import compare_env
+import compare_env_editions as cee
+import consolidate_tsmis_clean_highway_pdf as crhpdf
+import consolidate_tsmis_clean_intersection_pdf as cripdf
+import consolidate_tsmis_clean_ramp_pdf as crrpdf
 import consolidate_tsmis_highway_detail_pdf as hdpdf
 import consolidate_tsmis_highway_log_pdf as hlpdf
 import consolidate_tsmis_highway_sequence_pdf as hspdf
@@ -36,6 +42,12 @@ CASES = (
      compare_env._load_intersection_detail_pdf_side),
     ("ramp_detail_pdf", "Ramp Detail (PDF)", rdpdf,
      compare_env._load_ramp_detail_pdf_side),
+    ("clean_highway_pdf", "Clean Road: Highway (PDF)", crhpdf,
+     cee._clean_road_pdf_side(crc.HIGHWAY, crhpdf)),
+    ("clean_intersection_pdf", "Clean Road: Intersection (PDF)", cripdf,
+     cee._clean_road_pdf_side(crc.INTERSECTION, cripdf)),
+    ("clean_ramp_pdf", "Clean Road: Ramp (PDF)", crrpdf,
+     cee._clean_road_pdf_side(crc.RAMP, crrpdf)),
 )
 
 _fail = []
@@ -54,7 +66,7 @@ def _converted_rows(expected_header=None):
 
 
 def test_each_converter_result_becomes_a_loaded_side():
-    print("five PDF converters -> LoadedSide (no summary-text state parsing):")
+    print("eight PDF converters -> LoadedSide (no summary-text state parsing):")
     original_xlsx_loader = compare_env._load_xlsx_side
     poison = "POISON SUMMARY: skipped_inputs=999 failed_inputs=888 complete"
     state = {"partial": True}
@@ -207,7 +219,7 @@ def _side(label, partial):
 
 
 def test_returned_comparison_truth_for_every_family():
-    print("returned comparison coverage across formulas/values/both, all five families:")
+    print("returned comparison coverage across formulas/values/both, all eight families:")
     scenarios = (
         # name, side A partial, side B partial, skipped total, failed total
         ("symmetric_partial", True, True, 6, 6),

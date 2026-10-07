@@ -53,18 +53,24 @@ def _touch_export(base, subdir, name="r001.xlsx"):
 
 
 def test_rows_from_catalog():
-    print("family rows derive from report_catalog.MATRIX (the 5 dual-edition families):")
+    print("family rows derive from report_catalog.MATRIX (the 11 dual-edition families):")
     rows = pve._pve_rows()
-    check("exactly five dual-edition families",
+    check("exactly eleven dual-edition families (v0.48.0: every report)",
           {r[0] for r in rows} == {"highway_log_pdf", "intersection_detail_pdf",
                                    "highway_detail_pdf", "highway_sequence_pdf",
-                                   "ramp_detail_pdf"})
+                                   "ramp_detail_pdf", "ramp_summary",
+                                   "intersection_summary_pdf", "highway_summary_pdf",
+                                   "clean_highway_pdf", "clean_intersection_pdf",
+                                   "clean_ramp_pdf"})
     lut = pve._row_lookup()
     check("each row names its PDF + Excel edition subdirs",
           lut["highway_log_pdf"][2] == "highway_log_pdf"
           and lut["highway_log_pdf"][3] == "highway_log")
     check("labels are the family report labels",
-          lut["intersection_detail_pdf"][1] == "Intersection Detail")
+          lut["intersection_detail_pdf"][1] == "Intersection Detail"
+          # Ramp Summary's print holds the BASE key; its sibling is the Excel one.
+          and lut["ramp_summary"][1] == "TSAR: Ramp Summary"
+          and lut["ramp_summary"][3] == "ramp_summary_excel")
 
 
 def test_snapshot_and_naming():

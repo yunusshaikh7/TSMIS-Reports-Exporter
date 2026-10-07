@@ -68,6 +68,16 @@ import consolidate_intersection_summary as _c_int_summary
 import consolidate_highway_detail as _c_highway_detail
 import consolidate_tsmis_highway_detail_pdf as _c_tsmis_highway_detail_pdf
 import consolidate_highway_summary as _c_highway_summary
+# v0.48.0: the nine second editions graduate from export-only.
+import consolidate_ramp_summary_excel as _c_ramp_summary_excel
+import consolidate_tsmis_intersection_summary_pdf as _c_tsmis_int_summary_pdf
+import consolidate_tsmis_highway_summary_pdf as _c_tsmis_highway_summary_pdf
+import consolidate_clean_road_highway as _c_clean_highway
+import consolidate_clean_road_intersection as _c_clean_intersection
+import consolidate_clean_road_ramp as _c_clean_ramp
+import consolidate_tsmis_clean_highway_pdf as _c_tsmis_clean_highway_pdf
+import consolidate_tsmis_clean_intersection_pdf as _c_tsmis_clean_intersection_pdf
+import consolidate_tsmis_clean_ramp_pdf as _c_tsmis_clean_ramp_pdf
 
 import compare_env as _cmp_env
 import compare_highway_log as _cmp_highway_log
@@ -83,6 +93,9 @@ import compare_highway_sequence_pdf as _cmp_highway_seq_pdf
 import compare_highway_detail_tsn as _cmp_highway_detail_tsn
 import compare_highway_summary_tsn as _cmp_highway_summary_tsn
 import compare_highway_detail_pdf as _cmp_highway_detail_pdf
+import compare_env_editions as _cmp_env2
+import compare_summary_editions as _cmp_summary2
+import compare_clean_road_tsn as _cmp_clean_road
 
 # Per-tier descriptors. `key` is the stable export/consolidation/comparison-op key
 # (P3 / §C.5); the rest is display + the module/adapter the op runs.
@@ -182,17 +195,13 @@ EXPORT = (
     # Summary gains its print edition (`ints_printAll`). Appended LAST (stable
     # ids 13/14, batch order frozen). Both coalesce with their siblings
     # automatically (shared data_value).
-    # EXPORT-ONLY (PCOA-FINAL-018): each is the edition its family verifies
-    # through the OTHER one — Ramp Summary is checked via its PDF, Intersection
-    # Summary via its Excel — so neither of these two has a consolidator or a
-    # comparison. Closing the gap is a separate feature; the marker makes it
-    # visible instead of silent.
+    # Export-only until v0.48.0 (PCOA-FINAL-018); since then each consolidates
+    # into its sibling's exact workbook and compares like it (vs TSN, between
+    # environments, PDF vs Excel).
     ExportEntry("ramp_summary_excel", "TSAR: Ramp Summary (Excel)", "Excel",
-                _RAMP_SUMMARY_EXCEL_SPEC, group="Ramp", short_label="Summary (Excel)",
-                export_only=True),
+                _RAMP_SUMMARY_EXCEL_SPEC, group="Ramp", short_label="Summary (Excel)"),
     ExportEntry("intersection_summary_pdf", "Intersection Summary (PDF)", "PDF",
-                _INT_SUMMARY_PDF_SPEC, group="Intersection", short_label="Summary (PDF)",
-                export_only=True),
+                _INT_SUMMARY_PDF_SPEC, group="Intersection", short_label="Summary (PDF)"),
     # Route History Table (dev site, 2026-07-09) — RESERVED groundwork at stable
     # id 15, app-wide DISABLED (`reports.DISABLED_EXPORT_SUBDIRS`): the site's
     # report is an embedded SSRS page with no export flow, so the picker shows
@@ -203,41 +212,40 @@ EXPORT = (
     # module behind them; EXPORT ENABLED 2026-09-02 off the dev site 9.1 capture
     # (BUILD_DATE 2026-08-19), which un-greyed them and ships `clean_*.js` — real
     # Excel-sibling specs in export_clean_road. Appended LAST (stable-id
-    # append-only; batch positions 0–15 frozen). EXPORT-ONLY (PCOA-FINAL-018):
-    # no consolidator, MATRIX row or comparison recipe until real per-route files
-    # are censused — the TSN sources ARE staged (the TSN block below), so the
-    # picker says "export only" rather than the app pretending to check them.
+    # append-only; batch positions 0–15 frozen). Export-only until v0.48.0,
+    # when the owner's statewide 2026-10-02 pull was censused: since then each
+    # consolidates (`consolidate_clean_road_*`) and compares vs the TSN
+    # clean-road extracts, between environments and against its print.
     ExportEntry("clean_highway", "Clean Road: Highway", "Excel", _CLEAN_HIGHWAY_SPEC,
-                group="Clean Road", short_label="Highway", export_only=True),
+                group="Clean Road", short_label="Highway"),
     ExportEntry("clean_intersection", "Clean Road: Intersection", "Excel",
-                _CLEAN_INTERSECTION_SPEC, group="Clean Road", short_label="Intersection",
-                export_only=True),
+                _CLEAN_INTERSECTION_SPEC, group="Clean Road", short_label="Intersection"),
     ExportEntry("clean_ramp", "Clean Road: Ramp", "Excel", _CLEAN_RAMP_SPEC,
-                group="Clean Road", short_label="Ramp", export_only=True),
+                group="Clean Road", short_label="Ramp"),
     # Highway Summary (PDF), v0.38.0 — the same "Highway Summary" dropdown option
     # saved via the site's Print layout (hs_printAll), the exact parallel of
     # Intersection Summary (PDF). Confirmed on the 2026-08-10 site capture.
-    # Appended LAST (stable id 19; batch positions 0–18 frozen). EXPORT-ONLY: the
-    # vendor's 2026-08-17 release delivered the Excel edition only, so there is no
-    # real print to verify a parser against — its consolidator / comparisons land
-    # once statewide PDFs exist (the Highway Detail v0.19.2 -> v0.20.0 sequence).
+    # Appended LAST (stable id 19; batch positions 0–18 frozen). Export-only
+    # until v0.48.0: the first real statewide prints (2026-10-02) verified its
+    # parser, which reads every route equal to the Excel edition.
     # Coalesces with the Excel edition automatically (shared data_value).
     ExportEntry("highway_summary_pdf", "Highway Summary (PDF)", "PDF",
                 _HIGHWAY_SUMMARY_PDF_SPEC, group="Highway",
-                short_label="Summary (PDF)", export_only=True),
+                short_label="Summary (PDF)"),
     # The Clean Road print editions, v0.45.2 — the same three dropdown options
     # saved via the site's Print layout (clh_/cli_/clr_printAll). Appended LAST
-    # (stable ids 20/21/22; batch positions 0–19 frozen). EXPORT-ONLY like their
-    # Excel siblings; each coalesces with its sibling (shared data_value).
+    # (stable ids 20/21/22; batch positions 0–19 frozen). Integrated in v0.48.0
+    # with their Excel siblings (`clean_road_print` reads them back); each
+    # coalesces with its sibling (shared data_value).
     ExportEntry("clean_highway_pdf", "Clean Road: Highway (PDF)", "PDF",
                 _CLEAN_HIGHWAY_PDF_SPEC, group="Clean Road",
-                short_label="Highway (PDF)", export_only=True),
+                short_label="Highway (PDF)"),
     ExportEntry("clean_intersection_pdf", "Clean Road: Intersection (PDF)", "PDF",
                 _CLEAN_INTERSECTION_PDF_SPEC, group="Clean Road",
-                short_label="Intersection (PDF)", export_only=True),
+                short_label="Intersection (PDF)"),
     ExportEntry("clean_ramp_pdf", "Clean Road: Ramp (PDF)", "PDF",
                 _CLEAN_RAMP_PDF_SPEC, group="Clean Road",
-                short_label="Ramp (PDF)", export_only=True),
+                short_label="Ramp (PDF)"),
 )
 
 # Consolidate tab. The three Highway Log consolidators split by source/format
@@ -284,6 +292,24 @@ CONSOLIDATE = (
     # Highway Summary (v0.37.0) — the aggregate-per-route summary the vendor
     # un-greyed on 2026-08-17, completing the Highway group. Appended LAST.
     ConsolidateEntry("cons:highway_summary", "Highway Summary", _c_highway_summary),
+    # v0.48.0 — the nine second editions, appended. Each writes its sibling's
+    # exact workbook (the Summary pair) or the shared Clean Road layout.
+    ConsolidateEntry("cons:ramp_summary_excel", "TSAR: Ramp Summary (Excel)",
+                     _c_ramp_summary_excel),
+    ConsolidateEntry("cons:intersection_summary_pdf", "TSMIS Intersection Summary (PDF)",
+                     _c_tsmis_int_summary_pdf),
+    ConsolidateEntry("cons:highway_summary_pdf", "TSMIS Highway Summary (PDF)",
+                     _c_tsmis_highway_summary_pdf),
+    ConsolidateEntry("cons:clean_highway", "Clean Road: Highway", _c_clean_highway),
+    ConsolidateEntry("cons:clean_highway_pdf", "TSMIS Clean Road: Highway (PDF)",
+                     _c_tsmis_clean_highway_pdf),
+    ConsolidateEntry("cons:clean_intersection", "Clean Road: Intersection",
+                     _c_clean_intersection),
+    ConsolidateEntry("cons:clean_intersection_pdf", "TSMIS Clean Road: Intersection (PDF)",
+                     _c_tsmis_clean_intersection_pdf),
+    ConsolidateEntry("cons:clean_ramp", "Clean Road: Ramp", _c_clean_ramp),
+    ConsolidateEntry("cons:clean_ramp_pdf", "TSMIS Clean Road: Ramp (PDF)",
+                     _c_tsmis_clean_ramp_pdf),
 )
 
 # Compare tab SUB-TABS (the FIRST is the default). "env" = cross-environment
@@ -353,6 +379,32 @@ COMPARE = (
     # matrix cell derives as unsupported (matrix.tsn_supported) until one arrives.
     CompareEntry("cmp:highway_summary:env", "Highway Summary — between environments",
                  _cmp_env.HIGHWAY_SUMMARY, "folders", "env"),
+    # v0.48.0 — the nine second editions' env rows, appended after the existing
+    # env rows so the matrix row order is unchanged; each keeps its own family.
+    CompareEntry("cmp:ramp_summary_excel:env",
+                 "TSAR: Ramp Summary (Excel) — between environments",
+                 _cmp_env2.RAMP_SUMMARY_EXCEL, "folders", "env"),
+    CompareEntry("cmp:intersection_summary_pdf:env",
+                 "Intersection Summary (PDF) — between environments",
+                 _cmp_env2.INTERSECTION_SUMMARY_PDF, "folders", "env"),
+    CompareEntry("cmp:highway_summary_pdf:env",
+                 "Highway Summary (PDF) — between environments",
+                 _cmp_env2.HIGHWAY_SUMMARY_PDF, "folders", "env"),
+    CompareEntry("cmp:clean_highway:env", "Clean Road: Highway — between environments",
+                 _cmp_env2.CLEAN_HIGHWAY, "folders", "env"),
+    CompareEntry("cmp:clean_highway_pdf:env",
+                 "Clean Road: Highway (PDF) — between environments",
+                 _cmp_env2.CLEAN_HIGHWAY_PDF, "folders", "env"),
+    CompareEntry("cmp:clean_intersection:env",
+                 "Clean Road: Intersection — between environments",
+                 _cmp_env2.CLEAN_INTERSECTION, "folders", "env"),
+    CompareEntry("cmp:clean_intersection_pdf:env",
+                 "Clean Road: Intersection (PDF) — between environments",
+                 _cmp_env2.CLEAN_INTERSECTION_PDF, "folders", "env"),
+    CompareEntry("cmp:clean_ramp:env", "Clean Road: Ramp — between environments",
+                 _cmp_env2.CLEAN_RAMP, "folders", "env"),
+    CompareEntry("cmp:clean_ramp_pdf:env", "Clean Road: Ramp (PDF) — between environments",
+                 _cmp_env2.CLEAN_RAMP_PDF, "folders", "env"),
     # vs TSN (file-based).
     CompareEntry("cmp:highway_log:tsn", "Highway Log — TSMIS vs TSN",
                  _cmp_highway_log, "files", "tsn"),
@@ -409,6 +461,47 @@ COMPARE = (
     # miles), the Ramp/Intersection Summary parallel. Appended LAST.
     CompareEntry("cmp:highway_summary:tsn", "Highway Summary — TSMIS vs TSN",
                  _cmp_highway_summary_tsn, "files", "tsn"),
+    # v0.48.0 — the second editions' vs-TSN + PDF-vs-Excel file rows, appended.
+    # The three Summary flavors ride their family's own aggregate comparison.
+    CompareEntry("cmp:ramp_summary:excel_vs_tsn", "TSAR: Ramp Summary — TSMIS (Excel) vs TSN",
+                 _cmp_summary2.RAMP_SUMMARY_EXCEL_VS_TSN, "files", "tsn"),
+    CompareEntry("cmp:ramp_summary:pdf_vs_excel",
+                 "TSAR: Ramp Summary — TSMIS (PDF) vs TSMIS (Excel)",
+                 _cmp_summary2.RAMP_SUMMARY_PDF_VS_EXCEL, "files", "self"),
+    CompareEntry("cmp:intersection_summary:pdf_vs_tsn",
+                 "Intersection Summary — TSMIS (PDF) vs TSN",
+                 _cmp_summary2.INTERSECTION_SUMMARY_PDF_VS_TSN, "files", "tsn"),
+    CompareEntry("cmp:intersection_summary:pdf_vs_excel",
+                 "Intersection Summary — TSMIS (PDF) vs TSMIS (Excel)",
+                 _cmp_summary2.INTERSECTION_SUMMARY_PDF_VS_EXCEL, "files", "self"),
+    CompareEntry("cmp:highway_summary:pdf_vs_tsn", "Highway Summary — TSMIS (PDF) vs TSN",
+                 _cmp_summary2.HIGHWAY_SUMMARY_PDF_VS_TSN, "files", "tsn"),
+    CompareEntry("cmp:highway_summary:pdf_vs_excel",
+                 "Highway Summary — TSMIS (PDF) vs TSMIS (Excel)",
+                 _cmp_summary2.HIGHWAY_SUMMARY_PDF_VS_EXCEL, "files", "self"),
+    # The site's Clean Road files vs the TSN clean-road extracts (compare_clean_road_tsn).
+    CompareEntry("cmp:clean_highway:tsn", "Clean Road: Highway — TSMIS vs TSN",
+                 _cmp_clean_road.HIGHWAY_VS_TSN, "files", "tsn"),
+    CompareEntry("cmp:clean_highway:pdf_vs_tsn", "Clean Road: Highway — TSMIS (PDF) vs TSN",
+                 _cmp_clean_road.HIGHWAY_PDF_VS_TSN, "files", "tsn"),
+    CompareEntry("cmp:clean_highway:pdf_vs_excel",
+                 "Clean Road: Highway — TSMIS (PDF) vs TSMIS (Excel)",
+                 _cmp_clean_road.HIGHWAY_PDF_VS_EXCEL, "files", "self"),
+    CompareEntry("cmp:clean_intersection:tsn", "Clean Road: Intersection — TSMIS vs TSN",
+                 _cmp_clean_road.INTERSECTION_VS_TSN, "files", "tsn"),
+    CompareEntry("cmp:clean_intersection:pdf_vs_tsn",
+                 "Clean Road: Intersection — TSMIS (PDF) vs TSN",
+                 _cmp_clean_road.INTERSECTION_PDF_VS_TSN, "files", "tsn"),
+    CompareEntry("cmp:clean_intersection:pdf_vs_excel",
+                 "Clean Road: Intersection — TSMIS (PDF) vs TSMIS (Excel)",
+                 _cmp_clean_road.INTERSECTION_PDF_VS_EXCEL, "files", "self"),
+    CompareEntry("cmp:clean_ramp:tsn", "Clean Road: Ramp — TSMIS vs TSN",
+                 _cmp_clean_road.RAMP_VS_TSN, "files", "tsn"),
+    CompareEntry("cmp:clean_ramp:pdf_vs_tsn", "Clean Road: Ramp — TSMIS (PDF) vs TSN",
+                 _cmp_clean_road.RAMP_PDF_VS_TSN, "files", "tsn"),
+    CompareEntry("cmp:clean_ramp:pdf_vs_excel",
+                 "Clean Road: Ramp — TSMIS (PDF) vs TSMIS (Excel)",
+                 _cmp_clean_road.RAMP_PDF_VS_EXCEL, "files", "self"),
 )
 
 # ----------------------------------------------------------------------------- #
@@ -440,7 +533,12 @@ MatrixEntry = namedtuple(
     "row_key fmt tsn_key tsn_subdir self_id self_key self_other self_pdf",
     defaults=(None, None, None, None, None, None, None))
 MATRIX = (
-    MatrixEntry("ramp_summary", tsn_key="cmp:ramp_summary:tsn"),
+    # Ramp Summary is the one family whose PDF edition holds the BASE key (the
+    # print came first); since v0.48.0 it is a dual-edition family like the
+    # others, with its Excel sibling `ramp_summary_excel` below.
+    MatrixEntry("ramp_summary", fmt="pdf", tsn_key="cmp:ramp_summary:tsn",
+                self_id="vs_excel", self_key="cmp:ramp_summary:pdf_vs_excel",
+                self_other="ramp_summary_excel", self_pdf="ramp_summary"),
     MatrixEntry("ramp_detail", tsn_key="cmp:ramp_detail:tsn"),
     MatrixEntry("highway_sequence", tsn_key="cmp:highway_sequence:tsn"),
     # Highway Log is the one Excel row that ALSO surfaces the self-check (its
@@ -480,6 +578,36 @@ MATRIX = (
     # exactly the way `day_matrix._day_rows` documents — a `cmp:*:tsn` recipe plus
     # a per-report TSN dataset, no other change.
     MatrixEntry("highway_summary", tsn_key="cmp:highway_summary:tsn"),
+    # v0.48.0 — the nine second editions. Each Summary edition shares its
+    # family's TSN dataset; the Clean Road rows read the TSN clean-road extracts.
+    MatrixEntry("ramp_summary_excel", fmt="excel",
+                tsn_key="cmp:ramp_summary:excel_vs_tsn", tsn_subdir="ramp_summary"),
+    MatrixEntry("intersection_summary_pdf", fmt="pdf",
+                tsn_key="cmp:intersection_summary:pdf_vs_tsn",
+                tsn_subdir="intersection_summary", self_id="vs_excel",
+                self_key="cmp:intersection_summary:pdf_vs_excel",
+                self_other="intersection_summary", self_pdf="intersection_summary_pdf"),
+    MatrixEntry("highway_summary_pdf", fmt="pdf",
+                tsn_key="cmp:highway_summary:pdf_vs_tsn",
+                tsn_subdir="highway_summary", self_id="vs_excel",
+                self_key="cmp:highway_summary:pdf_vs_excel",
+                self_other="highway_summary", self_pdf="highway_summary_pdf"),
+    MatrixEntry("clean_highway", tsn_key="cmp:clean_highway:tsn"),
+    MatrixEntry("clean_highway_pdf", fmt="pdf", tsn_key="cmp:clean_highway:pdf_vs_tsn",
+                tsn_subdir="clean_highway", self_id="vs_excel",
+                self_key="cmp:clean_highway:pdf_vs_excel", self_other="clean_highway",
+                self_pdf="clean_highway_pdf"),
+    MatrixEntry("clean_intersection", tsn_key="cmp:clean_intersection:tsn"),
+    MatrixEntry("clean_intersection_pdf", fmt="pdf",
+                tsn_key="cmp:clean_intersection:pdf_vs_tsn",
+                tsn_subdir="clean_intersection", self_id="vs_excel",
+                self_key="cmp:clean_intersection:pdf_vs_excel",
+                self_other="clean_intersection", self_pdf="clean_intersection_pdf"),
+    MatrixEntry("clean_ramp", tsn_key="cmp:clean_ramp:tsn"),
+    MatrixEntry("clean_ramp_pdf", fmt="pdf", tsn_key="cmp:clean_ramp:pdf_vs_tsn",
+                tsn_subdir="clean_ramp", self_id="vs_excel",
+                self_key="cmp:clean_ramp:pdf_vs_excel", self_other="clean_ramp",
+                self_pdf="clean_ramp_pdf"),
 )
 
 # B2 auto-consolidate: which consolidate module handles each EXPORTABLE report,
@@ -495,6 +623,12 @@ _AUTO_CONSOLIDATOR = (
     ("intersection_detail", _c_int_detail),
     ("highway_detail", _c_highway_detail),
     ("highway_summary", _c_highway_summary),
+    # v0.48.0: the Excel second editions (the PDF ones run through the matrix's
+    # PDF store consolidator instead).
+    ("ramp_summary_excel", _c_ramp_summary_excel),
+    ("clean_highway", _c_clean_highway),
+    ("clean_intersection", _c_clean_intersection),
+    ("clean_ramp", _c_clean_ramp),
 )
 
 # Canonical TSN library descriptors — each report's TSN source format + the lazy
@@ -616,15 +750,14 @@ TSN = (
              # reads that outcome from the stored sidecar, so an existing library
              # has to rebuild once to stop reporting incomplete coverage.
              normalization_version=2),
-    # Clean Road (2026-07-22) — STAGED library slots for the three TSN clean-road
-    # extracts (CA HIGHWAYS / CA INTERSECTIONS / CA RAMPS, the underlying tables
-    # rather than the TSAR projections; CA HIGHWAYS carries the SAME 60,083
-    # records as the Highway Detail extract but 74 columns instead of 56). These
-    # exist so the raw/ folders are created + hinted and the owner's drops are
-    # counted; `tsn_load_clean_road` deliberately has NO normalizer — the target
-    # shape is decided by the comparison these will feed, and the matching site
-    # reports are still greyed (see export_clean_road.py). No comparator, no
-    # matrix row. Version stays 1 until a real projection lands.
+    # Clean Road — the library slots for the three TSN clean-road extracts
+    # (CA HIGHWAYS / CA INTERSECTIONS / CA RAMPS, the underlying tables rather
+    # than the TSAR projections; CA HIGHWAYS carries the SAME 60,083 records as
+    # the Highway Detail extract but 74 columns instead of 56). Staged 2026-07-22;
+    # Highway's verbatim normalizer landed with the ArcGIS build (v0.29.0) and
+    # Intersection / Ramp's with the site-export comparisons (v0.48.0,
+    # `compare_clean_road_tsn`). Each normalized copy is the verbatim extract +
+    # the CMP-AUD-037 marker; v1 is the first projection each slot has had.
     TsnEntry("clean_highway", "TSN Clean Road Highway", "*.xlsx", "statewide_xlsx",
              "tsn_clean_highway_normalized.xlsx", "tsn_load_clean_road:build_into_highway"),
     TsnEntry("clean_intersection", "TSN Clean Road Intersection", "*.xlsx", "statewide_xlsx",
@@ -870,6 +1003,10 @@ _INPUT_PROFILE_BY_KEY = {
     # must accept .pdf as well as .xlsx (the default "std" profile is
     # consolidated-workbook-only and would refuse the print).
     "cmp:highway_summary:tsn": "summary_tsn",
+    # v0.48.0: the second editions' Summary vs-TSN flavors read the same TSN side.
+    "cmp:ramp_summary:excel_vs_tsn": "summary_tsn",
+    "cmp:intersection_summary:pdf_vs_tsn": "summary_tsn",
+    "cmp:highway_summary:pdf_vs_tsn": "summary_tsn",
 }
 
 _COMPARE_BY_KEY = {c.key: c for c in COMPARE}

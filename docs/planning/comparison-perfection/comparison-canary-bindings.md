@@ -1935,3 +1935,44 @@ the CMP-AUD-066 PDF-conversion marker and is refused by both the pre- and post-f
 alike (the same refusal), so its "untouched" claim rests on the 8.31 identity above and on
 the code path (`TSMIS_PDF_VS_TSN` loads through `_load_tsmis`, which still reads the
 export's own seat).
+
+## 2026-10-06 — v0.48.0: the last nine editions (first binding)
+
+Inputs, all local, through the SHIPPED by-day matrix path (`day_matrix.build_day_cell`
+for vs TSN, `pdf_excel_matrix.build_pve_cell` for PDF vs Excel — store consolidation,
+TSN library certification and the catalog's comparator, exactly as the app runs them),
+the TSN datasets built by the app's own Rebuild (`tsn_library.build_consolidated(...,
+force=True)`):
+
+| Role | File | Bytes | SHA-256 |
+|---|---|---:|---|
+| TSMIS export, every edition | `ground-truth\All Reports 10.2\2026-10-02 ssor-prod.zip` (4,578 files; 252 highway / 217 intersection / 126 ramp routes) | 310,317,874 | `43f227bdc54465d1727fb5a203565cd69bd7d75fd076136459a22a9d22be9144` |
+| TSN Ramp Summary print | `Ramp Summary Statewide_TSN.pdf` (09/15/2025) | 11,758 | `e09842e939af4bc0da82014cfd0de1f6670e7fed5e4c5f6441628bda818a118b` |
+| TSN Intersection Summary print | `Intersection Summary Statewide_TSN.pdf` (09/15/2025) | 12,326 | `c3ad85848764df1b6da53c0bba0f785b3c045e83675f5983555ef514688a7d46` |
+| TSN Highway Summary print | `Highway Summary Statewide_TSN.pdf` (09/15/2025) | 19,429 | `d1676b1b2af88b04ccbf8ecc6d5c0faf851840a1ce12b9e1fb8191620e35e3d8` |
+| TSN `CA HIGHWAYS` | `CA HIGHWAYS 09.08.2025.xlsx` (60,083 rows, 273 routes) | 21,290,781 | `bbd1acf9d4a8fef86f96a0a2cf54be1105e8c919600dbcd05a325b194f5c86e5` |
+| TSN `CA INTERSECTIONS` | `CA INTERSECTIONS 09.03.2025.xlsx` (16,626 rows, 216 routes) | 4,347,043 | `7afe4d1f4ca19242c6ff6b387274bb0f01f8aa86303a08f6a79d485767162e02` |
+| TSN `CA RAMPS` | `CA RAMPS 09.08.2025.xlsx` (15,410 rows, 126 routes) | 2,681,455 | `624b8e14cbe207be006ec24db158863b0519bb2d522cc575315207a7086f7077` |
+
+vs TSN (paired / only-TSMIS / only-TSN; differing rows / cells). The TSN side is the
+September-2025 snapshot, so these are migration drift (D5), never defect counts:
+
+| Row | Result |
+|---|---|
+| Ramp Summary (Excel) | 29 / 0 / 2; 23 / 23 — the Ramp Summary (PDF) row's exact verdict |
+| Intersection Summary (PDF) | 58 / 8 / 0; 53 / 53 — the Intersection Summary (Excel) row's exact verdict |
+| Highway Summary (PDF) | 92 / 4 / 0; 89 / 89 — the Highway Summary (Excel) row's exact verdict |
+| Clean Road: Ramp | 15,204 / 10 / 206; 14,992 / 15,993 (`RAM_BEGIN_DATE` 14,954, `RAM_SEG_ORDER_ID` 523, `RAM_CITY_CODE` 207) |
+| Clean Road: Ramp (PDF) | 15,204 / 10 / 206; 14,992 / 15,989 (the four `_x000d_` descriptions the print cannot carry) |
+| Clean Road: Intersection | 16,201 / 260 / 425; 3,165 / 5,599 (`INX_MAIN_BEGIN_DATE` 1,969, `INX_CROSS_BEGIN_DATE` 509, `INX_SEG_ORDER_ID` 503) |
+| Clean Road: Intersection (PDF) | 16,201 / 260 / 425; 3,165 / 5,599 — identical to the Excel edition |
+| Clean Road: Highway | 47,746 / 3,989 / 12,337; 34,874 / 141,593 (`THY_RIGHT_ROAD_EFF_DATE` 14,076, `THY_MEDIAN_EFF_DATE` 13,691, `THY_LEFT_ROAD_EFF_DATE` 13,557, `THY_LENGTH_MILES_AMT` 9,904, `THY_END_PM_AMT` 9,065) |
+| Clean Road: Highway (PDF) | 47,746 / 3,989 / 12,337; 34,874 / 141,593 — identical to the Excel edition |
+
+PDF vs Excel (paired; differing cells): Ramp Summary 126 routes, 0 · Intersection Summary
+217, 0 · Highway Summary 252, 0 · Clean Road Intersection 16,461, 0 · Clean Road Highway
+51,735, 0 · Clean Road Ramp 15,214, 0 (it was 4 before the CMP-AUD-197 decode — the
+four route-010 `_x000d_` descriptions).
+
+Re-run this exact pair (the zip + the six TSN sources) to catch a TSMIS-side parser,
+consolidator or comparator regression; the TSN half can no longer move.

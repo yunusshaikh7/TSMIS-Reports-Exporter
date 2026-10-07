@@ -28,6 +28,7 @@ except ImportError:
 
 import summary_layout
 from compare_core import is_formula_injection
+from pdf_table_lib import write_pdf_source_marker
 import outcome
 import artifact_store
 import consolidation_meta
@@ -198,7 +199,8 @@ def _build_combined(wb, statewide, total):
     wb.active = wb.index(ws)
 
 
-def build_workbook(records, out_path, proceed=None, commit_guard=None):
+def build_workbook(records, out_path, proceed=None, commit_guard=None,
+                   pdf_marker=False):
     """Per-route sheet (Route, Total, one column per category key) + Combined.
     `proceed` (P12) is the pre-replace overwrite gate atomic_save_if evaluates JUST
     BEFORE the os.replace; returns True iff committed (a declined `proceed` keeps the
@@ -232,6 +234,10 @@ def build_workbook(records, out_path, proceed=None, commit_guard=None):
 
     total_all = sum(r.get("total") or 0 for r in records)
     _build_combined(wb, statewide, total_all)
+    if pdf_marker:
+        # CMP-AUD-066: the print's workbook proves it came from the PDFs, so
+        # the PDF-vs-Excel self-check can tell its two sides apart.
+        write_pdf_source_marker(wb)
     if not consolidation_meta.guard_allows(commit_guard, out_path):
         return False
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -244,37 +250,68 @@ def build_workbook(records, out_path, proceed=None, commit_guard=None):
 # --------------------------------------------------------------------------- #
 # entry point
 # --------------------------------------------------------------------------- #
+class Edition:
+    """One Intersection Summary export edition this pipeline consolidates: where its
+    per-route files live and how one is parsed into (route, values, total).
+    The Excel export is the original edition; the print (v0.48.0) parses into
+    the SAME record, so both write the identical workbook and every comparison
+    reads either. `pdf_marker` stamps the CMP-AUD-066 PDF-conversion marker."""
+
+    def __init__(self, *, glob, parse, noun, report_name, title, input_dir_for,
+                 out_path_for, pdf_marker, missing_deps):
+        self.glob = glob
+        self.parse = parse
+        self.noun = noun
+        self.report_name = report_name
+        self.title = title
+        self.input_dir_for = input_dir_for
+        self.out_path_for = out_path_for
+        self.pdf_marker = pdf_marker
+        self.missing_deps = missing_deps
+
+
 def consolidate(events=None, confirm_overwrite=None, day=None,
                 input_dir=None, out_path=None, commit_guard=None):
     """Parse every per-route Intersection Summary XLSX into one workbook.
     Console-free; honors cancel; returns a ConsolidateResult."""
+    return consolidate_edition(EXCEL_EDITION, events=events,
+                               confirm_overwrite=confirm_overwrite, day=day,
+                               input_dir=input_dir, out_path=out_path,
+                               commit_guard=commit_guard)
+
+
+def consolidate_edition(edition, events=None, confirm_overwrite=None, day=None,
+                        input_dir=None, out_path=None, commit_guard=None):
+    """The shared consolidation pipeline for one Intersection Summary `edition`."""
+    report_name = edition.report_name
     events = events or Events()
     if not _DEPS_OK:
-        return ConsolidateResult(status="error",
-                                 message="Required components are missing (openpyxl).")
+        return ConsolidateResult(
+            status="error",
+            message=f"Required components are missing ({edition.missing_deps}).")
     confirm = confirm_overwrite or (lambda _p: True)
     day = day or latest_output_day()
-    input_dir = input_dir or input_dir_for(day)
-    out_path = out_path or out_path_for(day)
+    input_dir = input_dir or edition.input_dir_for(day)
+    out_path = out_path or edition.out_path_for(day)
 
     if not input_dir.exists():
         return ConsolidateResult(
             status="error",
-            message=(f"The {REPORT_NAME} output folder doesn't exist yet:\n{input_dir}\n\n"
-                     f"Export the {REPORT_NAME} report first, then consolidate."))
-    files = sorted(input_dir.glob("*.xlsx"))
+            message=(f"The {report_name} output folder doesn't exist yet:\n{input_dir}\n\n"
+                     f"Export the {report_name} report first, then consolidate."))
+    files = sorted(input_dir.glob(edition.glob))
     files = [f for f in files if not f.name.startswith("~$")]
     if not files:
         return ConsolidateResult(
             status="error",
-            message=(f"No {REPORT_NAME} files were found in:\n{input_dir}\n\n"
-                     f"Export the {REPORT_NAME} report first, then consolidate."))
+            message=(f"No {report_name} files were found in:\n{input_dir}\n\n"
+                     f"Export the {report_name} report first, then consolidate."))
     existed_at_confirm = out_path.exists()
     if existed_at_confirm and not confirm(out_path):
         return ConsolidateResult(status="cancelled", message="Cancelled. Existing file kept.")
 
     events.on_log("=" * 60)
-    events.on_log(f"TSAR Intersection Summary Consolidation - {len(files)} file(s)")
+    events.on_log(f"{edition.title} - {len(files)} file(s)")
     events.on_log("=" * 60)
 
     records, failed, blank = [], [], []
@@ -283,7 +320,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
             return ConsolidateResult(status="cancelled", message="Cancelled by user.")
         prefix = f"[{i:>3}/{len(files)}] {p.name}"
         try:
-            route, counts, total = parse_route(str(p))
+            route, counts, total = edition.parse(str(p))
         except Exception as e:
             events.on_log(f"{prefix} FAILED ({type(e).__name__}): {e}")
             failed.append(p.name)
@@ -326,7 +363,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
     if not records:
         return ConsolidateResult(
             status="error",
-            message=(f"None of the {len(files)} {REPORT_NAME} file(s) yielded data "
+            message=(f"None of the {len(files)} {report_name} file(s) yielded data "
                      f"({len(failed)} failed, {len(blank)} empty). Nothing was written."))
 
     events.on_log("")
@@ -335,7 +372,7 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
         # P12 TOCTOU: the overwrite gate is INSIDE build_workbook, at the os.replace
         # (atomic_save_if) — a destination that appears during the BUILD is caught.
         committed = build_workbook(
-            records, out_path,
+            records, out_path, pdf_marker=edition.pdf_marker,
             proceed=lambda: (consolidation_meta.guard_allows(commit_guard, out_path)
                              and artifact_store.confirm_late_overwrite(
                                  out_path, existed_at_confirm, confirm)),
@@ -371,6 +408,20 @@ def consolidate(events=None, confirm_overwrite=None, day=None,
                              skipped_inputs=len(blank), failed_inputs=len(failed),
                              producer_extra={
                                  "route_census": [rec["route"] for rec in records]})
+
+
+# The lambdas bind late on purpose: a check that monkeypatches the module's
+# parse / path helpers must still reach this edition.
+EXCEL_EDITION = Edition(
+    glob="*.xlsx",
+    parse=lambda path: parse_route(path),
+    noun="file",
+    report_name=REPORT_NAME,
+    title="TSAR Intersection Summary Consolidation",
+    input_dir_for=lambda day: input_dir_for(day),
+    out_path_for=lambda day: out_path_for(day),
+    pdf_marker=False,
+    missing_deps="openpyxl")
 
 
 if __name__ == "__main__":

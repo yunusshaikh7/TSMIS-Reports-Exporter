@@ -1284,6 +1284,36 @@ Pinned by `build/check_arcgis_report_intersection.py` (synthetic library end-to-
 universe, both leg rules, the per-column carry rule, the position contract, the role gates, and
 the registry's required surface for every registered report).
 
+### 9m. The last nine editions (v0.48.0) — summary second editions + Clean Road site exports
+
+`compare_core` is untouched; every new comparison is a schema + loaders over the engine, and
+`compare_env` gained only an opt-in `discovery_glob` (an aggregate side that reads prints).
+
+- **Summary second editions** (`compare_summary_editions`). Ramp Summary (Excel), Intersection
+  Summary (PDF) and Highway Summary (PDF) consolidate to their sibling edition's exact workbook,
+  so their vs-TSN flavors REUSE the family comparator's own loaders and `_SCHEMA` — only the side
+  label and the role gate change (the Excel flavor refuses a PDF conversion; a print flavor
+  requires one). On the 2026-10-02 delivery each flavor's verdict equals its sibling's exactly
+  (Ramp 29 paired / 2 TSN-only / 23 differing; Intersection 58 / 8 TSMIS-only / 53; Highway
+  92 / 4 TSMIS-only / 89 — the same numbers, because the counts are the same). The PDF-vs-Excel
+  self-checks compare the two consolidations route by route, every count column a field.
+- **Clean Road site exports** (`compare_clean_road_tsn`): three flavors per report — Excel vs TSN,
+  PDF vs TSN, PDF vs Excel — over one profile per report (its context columns, dates, amounts,
+  free text, and the TSN domain prefix on the design code). The key is the D4 physical identity
+  shared with `compare_clean_highway_tsn` (route · county · PM prefix · begin PM · roadbed), the
+  postmile cell carrying it. The site's unsourced columns are context. The CMP-AUD-197 rule holds
+  as in Ramp Detail: the self-check decodes the Excel export's OOXML escapes and edge tabs away;
+  the vs-TSN flavors read the escapes decoded and keep the character as content.
+- **Cross-environment** (`compare_env_editions`): the summaries ride the aggregate `side_loader`
+  path through their consolidators' own readers; the Clean Road reports key every row on the file's
+  route token (the engine's identity contract), and their prints convert through the PDF
+  consolidator in a scratch folder like the other print editions, with the producer's completion
+  carried through (`check_compare_env_pdf_completion` covers all three).
+
+Pinned by `build/check_summary_editions.py`, `build/check_clean_road_print.py` and
+`build/check_clean_road_compare.py`; the real-data numbers are in
+[reports.md](reports.md#clean-road-site-exports--consolidate-and-compare-v0480).
+
 ---
 
 ## 10. Internal mechanics (quick reference)
@@ -1399,13 +1429,15 @@ foundation it sits on was audited cell-accurate over the full 6-env batch (2026-
   PDF export). `reports.tsn_matrix_extra_rows()` is empty (every report is a full row).
 - **Per-row comparison MODE** (`matrix._row_modes`, picked via a dropdown under each row's name,
   persisted in `settings.matrix_row_modes`):
-  - `env` — cross-environment (env vs baseline; `compare_env.<adapter>.compare_folders`). **All 13 rows** (Highway Summary joined in v0.37.0).
+  - `env` — cross-environment (env vs baseline; `compare_env.<adapter>.compare_folders`). **All 22 rows** (Highway Summary joined in v0.37.0; the last nine editions in v0.48.0).
   - `tsn` — vs TSN, for **every** report (`matrix.tsn_comparator_for(row_key)`): the FLAT/AGGREGATE
-    family-specific comparators for all seven TSN datasets and their PDF siblings. Each PDF row
-    **shares its Excel sibling's TSN subdir**, so one TSN dataset serves both editions.
-  - `vs_excel` — five PDF-to-Excel self-comparators (Highway Log, Intersection Detail, Highway
-    Detail, Highway Sequence, Ramp Detail), one on every PDF row. Highway Log Excel also exposes
-    the inverse `vs_pdf` placement. These six placements bring the Matrix total to 30.
+    family-specific comparators for all eleven TSN datasets and their second editions. Each
+    second edition **shares its sibling's TSN subdir**, so one TSN dataset serves both editions.
+  - `vs_excel` — eleven PDF-to-Excel self-comparators (Highway Log, Intersection Detail, Highway
+    Detail, Highway Sequence, Ramp Detail, and since v0.48.0 Ramp Summary, Intersection Summary,
+    Highway Summary and the three Clean Road reports), one on every PDF row — Ramp Summary's sits
+    on its native-PDF base row. Highway Log Excel also exposes the inverse `vs_pdf` placement.
+    That brings the Matrix total to 56 (22 env + 22 vs TSN + 11 vs Excel + 1 vs PDF).
   A global "set all comparisons to…" (env|tsn) lives in the config zone.
 - **build_comparison** dispatches by mode: env → `build_cell_comparison`; tsn/self → consolidate the env's
   store folder(s) on the fly (`consolidate_highway_log` / `consolidate_tsmis_highway_log_pdf` — the PDF
@@ -1550,7 +1582,7 @@ PDF baseline.
   regression-locked by `check_compare_env_sidelabel`) exists because the store's folder shape
   derives a side label confusingly close to the run-folder one.
 - **Baseline identity:** `"day:<date>"` or `"store"` (`parse_baseline`); the picker
-  (`baseline_options`) lists the store + every exported day **with how many of the 13 reports each
+  (`baseline_options`) lists the store + every exported day **with how many of the 22 reports each
   holds** — the "which days have an old copy" answer per option; the grid's per-cell
   `missing_side: "baseline"` state answers it per report. The baseline's own day column renders
   `is_baseline` (skipped by `cells_to_rebuild`; building it is rejected).

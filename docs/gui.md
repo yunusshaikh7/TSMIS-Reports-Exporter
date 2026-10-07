@@ -390,7 +390,7 @@ cameras — `compare_folders` reads the per-route files straight from both folde
 `selectCompareGroup("baseline_by_day")` swaps in `#baselineMatrixSection`, full-width via
 `body.matrix-wide.mw-bl`; `renderBaselineMatrix` is fed by `gui_api.baseline_matrix_info`.
 The **Source + Baseline selects** live in the section head — the baseline picker lists the
-store + every exported day with its report coverage ("2026-06-11 (9/13 reports)"), the
+store + every exported day with its report coverage ("2026-06-11 (9/22 reports)"), the
 per-report half renders as the cells' "baseline not exported" state, and the baseline's own
 day column renders "baseline" cells (highlighted `.mx-baseline-col`, not rebuildable). Its
 config corner (`#baselineMatrixConfig`) holds the shared queue panel, the add-day toolbar,
@@ -402,7 +402,7 @@ Mock + bridge exercised at `/index.html#mock` (Compare ▸ vs Baseline Matrix).
 ### The Compare-tab "PDF vs Excel Matrix" (v0.31.0)
 
 The **fourth** matrix, and the only one whose two sides come from the *same* run
-folder: the 5 dual-edition families × exported days, each cell self-checking that
+folder: the 11 dual-edition families (5 until v0.48.0) × exported days, each cell self-checking that
 day's PDF export against its Excel export. It was built ON the
 `report_catalog.MATRIX` wiring the same day that wiring landed, which is what
 proved the wiring — a new matrix cost a table row per report instead of a fifth

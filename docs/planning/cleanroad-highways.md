@@ -306,10 +306,18 @@ empty-in-export SHS layers.
 ArcGIS tab's **Reports vs ArcGIS matrix** (*Reports vs layers* until v0.47.0; their
 builds go on the **ArcGIS reports** tab; `arcgis_reports.py` already lists
 `clean_highway` / `clean_intersection` / `clean_ramp`, greyed until their builds and
-the site-export consolidators exist): our build vs the site's export, TSMIS vs
-TSMIS, one build per file stamped with the layer drop it came from. The vs-TSN
-comparison of the same builds stays on the Clean Road sub-tab pattern. The
-measured rules above are unchanged by this — only where the comparison lives.
+a build-vs-export comparator exist — the site-export consolidators shipped in
+v0.48.0): our build vs the site's export, TSMIS vs TSMIS, one build per file
+stamped with the layer drop it came from. The vs-TSN comparison of the same builds
+stays on the Clean Road sub-tab pattern. The measured rules above are unchanged by
+this — only where the comparison lives.
+
+**The site exports themselves (v0.48.0).** Both editions of all three files now
+consolidate and compare vs the TSN extracts (`compare_clean_road_tsn`; the
+`clean_intersection` / `clean_ramp` TSN slots normalize verbatim) — see
+[reports.md](../reports.md#clean-road-site-exports--consolidate-and-compare-v0480).
+That is the SITE's file vs TSN, separate from this doc's builds; a build's
+comparison against the site's export is what the greyed rows above still wait on.
 
 ## App integration — SHIPPED v0.29.0 (the ArcGIS tab)
 
